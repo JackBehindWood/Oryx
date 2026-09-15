@@ -21,6 +21,10 @@ cmake_install.cmake
 # Premake5 build files
 .premake/
 
+# Makefiles
+*.make
+Makefile
+
 # IDE and editor files
 .vscode/
 .idea/

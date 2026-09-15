@@ -18,14 +18,16 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-dependencies = []
+dependencies = [
+    "requests>=2.28.0",
+]
 
 [project.scripts]
-build = "build:main"
+build = "build_system.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["build.py"]
+packages = ["build_system"]

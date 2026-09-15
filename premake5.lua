@@ -2,6 +2,7 @@
 
 workspace "oryx"
     configurations { "Debug", "Release", "Dist" }
+    location "."
 
     if os.host() == "macosx" then
         platforms { "ARM64", "x64" }  -- ARM64 first (preferred on Apple Silicon)

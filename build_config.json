@@ -1,0 +1,5 @@
+{
+    "project_name": "oryx",
+    "build_generator": "gmake2",
+    "test_executable": "oryx_tests"
+}
