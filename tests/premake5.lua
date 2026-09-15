@@ -1,18 +1,22 @@
-project "ORYX"
-    kind "StaticLib"
+-- Test executable
+project "TESTS"
+    kind "ConsoleApp"
     language "C++"
     cppdialect "C++20"
-    staticruntime "off"
-
+    
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
 
     files {
-        "src/**.h",
-        "src/**.hpp",
-        "src/**.cpp"
+        "**.h",
+        "**.hpp",
+        "**.cpp",
     }
 
     includedirs {
-        "src"
+        ".",
+    }
+
+    links {
+        "ORYX"
     }
