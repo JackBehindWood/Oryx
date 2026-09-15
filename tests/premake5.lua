@@ -1,5 +1,5 @@
 -- Test executable
-project "TESTS"
+project "Tests"
     kind "ConsoleApp"
     language "C++"
     cppdialect "C++20"
@@ -15,8 +15,9 @@ project "TESTS"
 
     includedirs {
         ".",
+        "%{wks.location}/Oryx/src",
     }
 
     links {
-        "ORYX"
+        "Oryx"
     }

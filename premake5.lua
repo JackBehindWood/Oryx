@@ -1,6 +1,8 @@
 -- Oryx: An open-source engine for games, strategies, simulation, and decision-making
 
 workspace "oryx"
+	startproject "Oryx"
+
     configurations { "Debug", "Release", "Dist" }
     location "."
 

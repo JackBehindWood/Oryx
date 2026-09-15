@@ -56,7 +56,6 @@ def make_executable(path):
     current_mode = path.stat().st_mode
     path.chmod(current_mode | 0o111)
 
-
 def remove_file(path):
     """Remove a file if it exists."""
     path = Path(path)

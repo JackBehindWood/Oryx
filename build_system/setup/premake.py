@@ -1,7 +1,7 @@
 import platform
 import subprocess
 
-from ..config import PREMAKE_DIR
+from ..config import PROJECT_ROOT
 from .utils import (
     download_file,
     extract_archive,
@@ -12,6 +12,9 @@ from .utils import (
 # ---------------------------------------------------------------------------
 # Premake configuration
 # ---------------------------------------------------------------------------
+
+PREMAKE_DIR = PROJECT_ROOT / "premake"
+
 
 PREMAKE_VERSION = "5.0.0-beta2"
 
@@ -97,34 +100,40 @@ def install_premake():
         # Remove downloaded archive
         remove_file(archive_path)
 
-        # Make executable on Unix-like systems
-        if system in {"Linux", "Darwin"}:
-            executable = get_premake_executable()
-
-            if executable.exists():
-                make_executable(executable)
-                print(f"✓ Made executable: {executable}\n")
-
         # Download Premake licence
         print("📄 Downloading Premake5 licence...")
-
         license_path = PREMAKE_DIR / "LICENSE.txt"
 
         try:
             download_file(PREMAKE_LICENSE_URL, license_path)
             print(f"✓ Saved licence to {license_path}\n")
-
         except Exception as error:
             print(f"⚠️ Could not download licence: {error}\n")
+
+        # Make executable on Unix-like systems
+        executable = get_premake_executable()
+        if system in {"Linux", "Darwin"} and executable.exists():
+            make_executable(executable)
+            print(f"✓ Made executable: {executable}\n")
+
+        # -------------------------------------------------------------------
+        # Clean up extraneous files (keep ONLY the executable & LICENSE.txt)
+        # -------------------------------------------------------------------
+        allowed_files = {executable.name.lower(), "license.txt"}
+
+        for item in PREMAKE_DIR.iterdir():
+            if item.is_file() and item.name.lower() not in allowed_files:
+                remove_file(item)
+            elif item.is_dir():
+                # Remove extra directories if any were unpacked
+                from .utils import remove_directory
+                remove_directory(item)
 
         return True
 
     except Exception as error:
         print(f"✗ Failed to download/extract Premake5: {error}")
-
-        # Clean up incomplete archive if necessary
         remove_file(archive_path)
-
         return False
 
 

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "oryx/version.h"
+#include "Oryx/version.h"
 
 int main() {
     std::cout << "Oryx v" 
