@@ -96,3 +96,4 @@ oryx.local.toml
 Thumbs.db
 .DS_Store
 *.log
+/graphify-out

@@ -54,7 +54,7 @@ Each stage should provide a useful, testable foundation for the next.
 
 # 2. Phase 0 — Architecture & Design
 
-**Current phase**
+**Status: Complete**
 
 Before implementing the substantial engine, conduct a dedicated architecture and design brainstorm.
 
@@ -84,6 +84,12 @@ Define the smallest useful conceptual core.
 ### Deliverable
 
 A reviewed architecture and initial API design.
+
+**Delivered:** see `ARCHITECTURE.md` and `DESIGN.md`, which capture the
+resolved core model (`IGame`/`IState`/`IStrategy`, `ActionId`,
+`Outcome`/`Rewards<T>`, naming conventions, extension/registration approach)
+and the decision log (`DESIGN.md` §19) recording what's settled versus still
+open for later phases.
 
 ---
 

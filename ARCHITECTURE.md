@@ -179,19 +179,41 @@ The architecture should avoid making assumptions that all strategies share the s
 
 ## 3.4 Math
 
-`Math` is a small, header-only module (`Oryx/src/Oryx/Math/`) providing
-templated vector types for grid/board coordinates, e.g.
-`template<typename T> struct Vec2 { T x, y; };` with numeric aliases
-(`Vec2f`, `Vec2d`, `Vec2i`). Being header-only, it is included directly from
-the precompiled header (`oxpch.h`).
+`Math` is a header-only module (`Oryx/src/Oryx/Math/`), widened during
+Phase 2 planning beyond the narrower "`Vec2` struct" scoping this section
+originally described. It now provides:
 
-Per the struct-is-data-only convention (`DESIGN.md` §5), `Vec2<T>` holds
-only its fields — arithmetic and other operations are free functions, not
-members.
+* `oryx::math` (`Functions.h`) — generic templated wrappers around
+  `<cmath>` (`sqrt`, `abs`, `sin`, `cos`, `pow`, `tan`, `atan2`, `floor`,
+  `ceil`, `round`, `exp`, `log`, `log2`, `min`, `max`, `clamp`, `lerp`), so
+  templated math code has one uniform call surface instead of relying on
+  ADL over the raw `std::` overloads.
+* `Vector<N, T>` (`Vector.h`) — a generic vector with the dimension `N` as
+  a non-type template parameter, backed by a plain C array (not
+  `std::array`). Provides `operator[]`, conditional `x()`/`y()`/`z()`
+  accessors (via C++20 `requires` clauses, only available when `N` is
+  large enough), and both member (`length()`, `normalized()`, `sum()`,
+  `mean()`) and free-function (`dot`, `length`, `normalize`, `sum`, `mean`)
+  forms of the same operations — a deliberate numpy/GLM-style dual API,
+  see the naming-convention exception in `DESIGN.md` §5.
+* `Vector2.h` / `Vector3.h` — dedicated headers for the `Vector2f`/`Vector2d`/
+  `Vector2i` and `Vector3f`/`Vector3d`/`Vector3i` aliases, plus their
+  respective `cross()` free functions: 2D cross is a scalar
+  (perp-dot-product, useful for orientation/turn-direction tests on a
+  grid/board), 3D cross returns a `Vector<3, T>`. These are genuinely
+  dimension-specific and are not defined in the generic `Vector.h`.
+* `Matrix<R, C, T>` (`Matrix.h`) — construction, element access
+  (`at(row, col)`), `operator*` (matrix multiply), `transpose()`, and a
+  square-only `identity()`. No determinant/inverse/decompositions yet.
+* `Math.h` — an umbrella header aggregating the above, included directly
+  from the precompiled header (`oxpch.h`), and `Math.cpp` — explicit
+  template instantiation of the common `Vector<2|3, float|double|int>`
+  aliases, so they're compiled once into the `Oryx` static lib rather than
+  re-instantiated per translation unit.
 
-`Math` is scoped to what board/grid games and, later, graphics actually
-need. It is explicitly not a general-purpose maths library and should grow
-only from demonstrated requirements (`DESIGN.md` §20).
+`Math` remains scoped to what board/grid games, and later graphics, need —
+no determinant/inverse, quaternions, or higher-dimensional types until a
+real use case demonstrates the requirement (`DESIGN.md` §20).
 
 ---
 

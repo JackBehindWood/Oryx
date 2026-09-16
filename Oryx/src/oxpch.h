@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 
+#include <cstdint>
 #include <string>
 #include <sstream>
 #include <array>
@@ -18,3 +19,5 @@
 #include "Oryx/Core/Base.h"
 
 #include "Oryx/Core/Log.h"
+
+#include "Oryx/Math/Math.h"

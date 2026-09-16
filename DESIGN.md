@@ -145,8 +145,16 @@ Likewise, advanced metaprogramming should not become a prerequisite for understa
   methods do not — e.g. `Application` keeps its name (it has real state and
   concrete methods alongside one pure virtual `update()`).
 * Structs are data-only: plain fields, no member functions. Any behaviour
-  needed on struct-held data is a free function instead (e.g. `Vec2<T>`
-  below has `x`/`y` fields only; `dot`, `length`, etc. are free functions).
+  needed on struct-held data is a free function instead (e.g. `Outcome`
+  has `is_terminal`/`rewards` fields only).
+* Exception — math types (`Vector<N, T>`, `Matrix<R, C, T>`): these are
+  `class`, not data-only structs, and deliberately expose *both* member
+  functions (`length()`, `normalized()`, `sum()`, `mean()`) and equivalent
+  free functions (`dot`, `length`, `normalize`, `sum`, `mean`, `cross`).
+  This mirrors the dual method/module-function API convention used by
+  numpy and similar math libraries (GLM, Eigen), and is a documented,
+  intentional carve-out scoped to the math module — it does not loosen the
+  data-only-struct rule elsewhere.
 
 This was not written down before the Phase 2 brainstorm; existing code
 predates it and is not being retrofitted (e.g. `Application::Get()` is a
@@ -155,23 +163,37 @@ historical exceptions, not examples to copy for new pure interfaces).
 
 ### Math Module
 
-A small, header-only `oryx::Math` module (`Oryx/src/Oryx/Math/`) provides
-templated coordinate/vector types, included directly from `oxpch.h`:
+A header-only `oryx::Math` module (`Oryx/src/Oryx/Math/`), widened during
+Phase 2 planning from the originally-scoped "`Vec2` struct" (see
+`ARCHITECTURE.md` §3.4 for the full breakdown). It now provides `oryx::math`
+(templated `<cmath>` wrappers), a generic `Vector<N, T>` with dimension `N`
+as a non-type template parameter (backed by a plain C array, not
+`std::array`), dedicated `Vector2.h`/`Vector3.h` headers for the 2D/3D
+aliases and their respective `cross()` overloads, and a small
+`Matrix<R, C, T>`:
 
 ```cpp
-template<typename T>
-struct Vec2 { T x, y; };
+template<size_t N, typename T>
+class Vector
+{
+public:
+    T& operator[](size_t i);
+    T length() const;
+    Vector<N, T> normalized() const;
+    // ...
+private:
+    T m_data[N]{};
+};
 
-using Vec2f = Vec2<float>;
-using Vec2d = Vec2<double>;
-using Vec2i = Vec2<int>;
+using Vector2f = Vector<2, float>;
+using Vector3f = Vector<3, float>;
 ```
 
-Per the struct-is-data-only convention above, `Vec2<T>` holds only its
-fields; arithmetic and other operations (`operator+`, `dot`, `length`, ...)
-are free functions. The module is scoped to what board/grid games and,
-later, graphics actually need — not a general-purpose maths library — and
-should grow only from demonstrated requirements (§20).
+`Vector<N,T>`/`Matrix<R,C,T>` are the documented exception to the
+struct-is-data-only rule above. The module is still scoped to what
+board/grid games and, later, graphics actually need — not a
+general-purpose maths library — and should grow only from demonstrated
+requirements (§20).
 
 ---
 
@@ -532,7 +554,7 @@ rather than silently choosing an architecture in code.
 | Player/turn model (Phase 2/3)   | Strict alternating turns only | Working decision (scoped) |
 | Randomness utility              | `oryx::Random` (Core, seedable); not wired into chance nodes | Working decision |
 | Phase 2 execution loop          | No `Simulation`/`Match`/`Runner` class; proven via test/demo loop | Working decision |
-| Math module                     | Header-only `oryx::Math`, templated `Vec2<T>` | Working decision |
+| Math module                     | Header-only `oryx::Math`: `oryx::math` `<cmath>` wrappers, generic `Vector<N,T>` (+ `Vector2`/`Vector3` headers), `Matrix<R,C,T>` — widened during Phase 2 planning from the original `Vec2`-only scope | Working decision |
 | Extension registration          | Self-registering factories, no central list | Working decision (principle; `Registry<T>` implementation timing open) |
 | Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
 | Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
