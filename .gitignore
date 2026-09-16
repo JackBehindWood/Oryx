@@ -10,6 +10,7 @@
 *.out
 build/
 bin/
+bin-int/
 dist/
 *.dSYM/
 
@@ -19,11 +20,12 @@ CMakeCache.txt
 cmake_install.cmake
 
 # Premake5 build files
-.premake/
+premake/
 
 # Makefiles
 *.make
 Makefile
+compile_commands.json
 
 # IDE and editor files
 .vscode/
