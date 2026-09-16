@@ -3,8 +3,7 @@
 
 namespace oryx {
 
-Application::Application(ApplicationCommandLineArgs args)
-    : m_command_line_args(args)
+Application::Application(ApplicationCommandLineArgs)
 {
 }
 
@@ -14,6 +13,10 @@ Application::~Application()
 
 void Application::run()
 {
+    while (m_running)
+    {
+        update();
+    }
 }
 
 } // namespace oryx

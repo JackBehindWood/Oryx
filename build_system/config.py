@@ -113,12 +113,14 @@ class BuildConfig:
         return BIN_DIR / self.outputdir
 
     def _resolve_target_path(self, target: str) -> Path:
-        # Premake nests the binary under a project-named subdirectory for most
-        # generators, but not all — fall back to the flat layout if needed.
-        nested = self.binary_path / target / target
-        if nested.exists():
-            return nested
-        return self.binary_path / target
+        # useOryxProjectDefaults() (premake/common.lua) always sets targetdir
+        # to end in "/%{prj.name}", so the binary always lands nested as
+        # <target>/<target> — regardless of generator, profile, or whether it
+        # has been built yet. (Do not resolve this by checking nested.exists():
+        # that made the path depend on build state, silently falling back to a
+        # wrong flat path — e.g. in generated launch.json — for any profile
+        # that hadn't been compiled yet.)
+        return self.binary_path / target / target
 
     def executable_path(self, name: str) -> Path:
         """Full path to a named target's compiled binary (see [executables.<name>] in oryx.toml)."""

@@ -3,3 +3,4 @@
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Log.h"
 #include "Oryx/Core/Assert.h"
+#include "Oryx/Core/Application.h"

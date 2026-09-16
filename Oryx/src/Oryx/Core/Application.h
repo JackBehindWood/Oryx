@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string_view>
+#include <vector>
+
 namespace oryx {
 
 struct ApplicationCommandLineArgs
@@ -11,6 +14,15 @@ struct ApplicationCommandLineArgs
     {
         return args[index];
     }
+
+    std::vector<std::string_view> unpack() const
+    {
+        std::vector<std::string_view> result;
+        result.reserve(count);
+        for (int i = 0; i < count; ++i)
+            result.emplace_back(args[i]);
+        return result;
+    }
 };
 
 class Application
@@ -20,11 +32,13 @@ public:
     virtual ~Application();
 
     void run();
+    void close() { m_running = false; }
 
-    const ApplicationCommandLineArgs& get_command_line_args() const { return m_command_line_args; }
+protected:
+    virtual void update() = 0;
 
 private:
-    ApplicationCommandLineArgs m_command_line_args;
+    bool m_running = true;
 };
 
 // Implemented by the client application (e.g. Oasis).

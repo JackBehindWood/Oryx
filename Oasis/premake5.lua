@@ -3,6 +3,10 @@ project "Oasis"
     kind "ConsoleApp"
     useOryxProjectDefaults()
 
+    -- Run with the repo root as cwd (matches .vscode/launch.json and the
+    -- `uv run build` CLI) so relative paths behave the same everywhere.
+    debugdir "%{wks.location}/.."
+
     files {
         "src/**.h",
         "src/**.hpp",
