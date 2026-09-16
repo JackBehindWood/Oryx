@@ -6,6 +6,18 @@ namespace oryx::math
 {
 
 template<typename T>
+inline constexpr T PI = static_cast<T>(3.14159265358979323846);
+
+template<typename T>
+inline constexpr T TWO_PI = PI<T> * static_cast<T>(2);
+
+template<typename T>
+inline constexpr T HALF_PI = PI<T> / static_cast<T>(2);
+
+template<typename T>
+inline constexpr T EPSILON = static_cast<T>(1e-5);
+
+template<typename T>
 T sqrt(T value) { return static_cast<T>(std::sqrt(value)); }
 
 template<typename T>
@@ -54,15 +66,37 @@ template<typename T>
 T log2(T value) { return static_cast<T>(std::log2(value)); }
 
 template<typename T>
-T min(T a, T b) { return a < b ? a : b; }
+constexpr T min(T a, T b) { return a < b ? a : b; }
 
 template<typename T>
-T max(T a, T b) { return a > b ? a : b; }
+constexpr T max(T a, T b) { return a > b ? a : b; }
 
 template<typename T>
-T clamp(T value, T low, T high) { return min(max(value, low), high); }
+constexpr T clamp(T value, T low, T high) { return min(max(value, low), high); }
 
 template<typename T>
-T lerp(T a, T b, T t) { return a + (b - a) * t; }
+constexpr T lerp(T a, T b, T t) { return a + (b - a) * t; }
+
+template<typename T>
+constexpr T sign(T value) { return value > T{ 0 } ? T{ 1 } : (value < T{ 0 } ? T{ -1 } : T{ 0 }); }
+
+template<typename T>
+constexpr T saturate(T value) { return clamp(value, T{ 0 }, T{ 1 }); }
+
+template<typename T>
+constexpr T smoothstep(T edge0, T edge1, T x)
+{
+    T t = saturate((x - edge0) / (edge1 - edge0));
+    return t * t * (T{ 3 } - T{ 2 } * t);
+}
+
+template<typename T>
+constexpr T radians(T degrees_value) { return degrees_value * PI<T> / T{ 180 }; }
+
+template<typename T>
+constexpr T degrees(T radians_value) { return radians_value * T{ 180 } / PI<T>; }
+
+template<typename T>
+bool approx_equal(T a, T b, T epsilon = EPSILON<T>) { return abs(a - b) <= epsilon; }
 
 } // namespace oryx::math

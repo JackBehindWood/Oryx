@@ -9,17 +9,17 @@ TEST_CASE("oryx::Random with the same seed produces the same sequence")
 
     for (int i = 0; i < 10; ++i)
     {
-        CHECK(a.next_int(0, 1000000) == b.next_int(0, 1000000));
+        CHECK(a.get_int(0, 1000000) == b.get_int(0, 1000000));
     }
 }
 
-TEST_CASE("oryx::Random next_int respects inclusive [min, max] bounds")
+TEST_CASE("oryx::Random get_int respects inclusive [min, max] bounds")
 {
     oryx::Random random(1);
 
     for (int i = 0; i < 1000; ++i)
     {
-        int64_t value = random.next_int(5, 7);
+        int64_t value = random.get_int(5, 7);
         CHECK(value >= 5);
         CHECK(value <= 7);
     }
@@ -33,7 +33,7 @@ TEST_CASE("oryx::Random with different seeds produces different sequences")
     bool any_different = false;
     for (int i = 0; i < 20; ++i)
     {
-        if (a.next_int(0, 1000000000) != b.next_int(0, 1000000000))
+        if (a.get_int(0, 1000000000) != b.get_int(0, 1000000000))
         {
             any_different = true;
             break;

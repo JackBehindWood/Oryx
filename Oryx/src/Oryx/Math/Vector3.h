@@ -5,9 +5,9 @@
 namespace oryx
 {
 
-using Vector3f = Vector<3, float>;
-using Vector3d = Vector<3, double>;
-using Vector3i = Vector<3, int>;
+using Vec3f = Vector<3, float>;
+using Vec3d = Vector<3, double>;
+using Vec3i = Vector<3, int>;
 
 template<typename T>
 constexpr Vector<3, T> cross(const Vector<3, T>& a, const Vector<3, T>& b)
