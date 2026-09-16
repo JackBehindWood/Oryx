@@ -1,5 +1,6 @@
 #include "doctest.h"
-#include "Oryx/version.h"
+
+#include "Oryx.h"
 
 TEST_CASE("Oryx version constants are non-negative") 
 {

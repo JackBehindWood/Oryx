@@ -2,6 +2,9 @@ project "Oryx"
     kind "StaticLib"
     useOryxProjectDefaults()
 
+    pchheader "oxpch.h"
+	pchsource "src/oxpch.cpp"
+
     files {
         "src/**.h",
         "src/**.hpp",

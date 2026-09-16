@@ -1,24 +1,25 @@
-#include "log.h"
+#include "Log.h"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace oryx {
 
-std::shared_ptr<spdlog::logger> Log::s_CoreLogger;
-std::shared_ptr<spdlog::logger> Log::s_ClientLogger;
+std::shared_ptr<spdlog::logger> Log::s_core_logger;
+std::shared_ptr<spdlog::logger> Log::s_client_logger;
 
-void Log::Init() {
+void Log::init() 
+{
     spdlog::set_pattern("%^[%T] %n: %v%$");
 
-    s_CoreLogger = spdlog::stdout_color_mt("ORYX");
-    s_ClientLogger = spdlog::stdout_color_mt("APP");
+    s_core_logger = spdlog::stdout_color_mt("ORYX");
+    s_client_logger = spdlog::stdout_color_mt("APP");
 
 #ifdef ORYX_DEBUG
-    s_CoreLogger->set_level(spdlog::level::trace);
-    s_ClientLogger->set_level(spdlog::level::trace);
+    s_core_logger->set_level(spdlog::level::trace);
+    s_client_logger->set_level(spdlog::level::trace);
 #else
-    s_CoreLogger->set_level(spdlog::level::info);
-    s_ClientLogger->set_level(spdlog::level::info);
+    s_core_logger->set_level(spdlog::level::info);
+    s_client_logger->set_level(spdlog::level::info);
 #endif
 }
 
