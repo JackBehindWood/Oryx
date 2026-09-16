@@ -181,39 +181,83 @@ The architecture should avoid making assumptions that all strategies share the s
 
 `Math` is a header-only module (`Oryx/src/Oryx/Math/`), widened during
 Phase 2 planning beyond the narrower "`Vec2` struct" scoping this section
-originally described. It now provides:
+originally described, and widened again for a general vector/matrix pass.
+It now provides:
 
 * `oryx::math` (`Functions.h`) — generic templated wrappers around
   `<cmath>` (`sqrt`, `abs`, `sin`, `cos`, `pow`, `tan`, `atan2`, `floor`,
-  `ceil`, `round`, `exp`, `log`, `log2`, `min`, `max`, `clamp`, `lerp`), so
-  templated math code has one uniform call surface instead of relying on
-  ADL over the raw `std::` overloads.
+  `ceil`, `round`, `exp`, `log`, `log2`, `min`, `max`, `clamp`, `lerp`),
+  named constants (`PI<T>`, `TWO_PI<T>`, `HALF_PI<T>`, `EPSILON<T>`), and
+  `sign`, `saturate`, `smoothstep`, `radians`/`degrees`, `approx_equal` —
+  so templated math code has one uniform call surface instead of relying
+  on ADL over the raw `std::` overloads. Everything that's pure arithmetic
+  (`min`/`max`/`clamp`/`lerp`/`sign`/`saturate`/`smoothstep`/`radians`/
+  `degrees`) is `constexpr`; anything that calls into `<cmath>` isn't.
 * `Vector<N, T>` (`Vector.h`) — a generic vector with the dimension `N` as
   a non-type template parameter, backed by a plain C array (not
-  `std::array`). Provides `operator[]`, conditional `x()`/`y()`/`z()`
+  `std::array`). Provides `operator[]`, conditional `x()`/`y()`/`z()`/`w()`
   accessors (via C++20 `requires` clauses, only available when `N` is
-  large enough), and both member (`length()`, `normalized()`, `sum()`,
-  `mean()`) and free-function (`dot`, `length`, `normalize`, `sum`, `mean`)
-  forms of the same operations — a deliberate numpy/GLM-style dual API,
-  see the naming-convention exception in `DESIGN.md` §5.
-* `Vector2.h` / `Vector3.h` — dedicated headers for the `Vector2f`/`Vector2d`/
-  `Vector2i` and `Vector3f`/`Vector3d`/`Vector3i` aliases, plus their
-  respective `cross()` free functions: 2D cross is a scalar
-  (perp-dot-product, useful for orientation/turn-direction tests on a
-  grid/board), 3D cross returns a `Vector<3, T>`. These are genuinely
-  dimension-specific and are not defined in the generic `Vector.h`.
+  large enough), compound-assignment operators, unary negation, `!=`, and
+  componentwise `*`/`/` against another `Vector`. Both member (`length()`,
+  `normalized()`, `sum()`, `mean()`, `distance()`, `distance_squared()`)
+  and free-function (`dot`, `length`, `normalize`, `sum`, `mean`,
+  `distance`, `distance_squared`, `lerp`, `clamp`, `min`, `max`, `abs`,
+  `approx_equal`, `to_string`) forms exist for the operations above where
+  a primary receiver makes sense — a deliberate numpy/GLM-style dual API,
+  see the naming-convention exception in `DESIGN.md` §5. `dot`/`cross` and
+  the operators stay free-function-only, matching the original design;
+  `distance`/`distance_squared` are a deliberate exception (see the
+  comment in `Vector.h`).
+* `Vector2.h` / `Vector3.h` / `Vector4.h` — dedicated headers for the
+  `Vec2f`/`Vec2d`/`Vec2i`, `Vec3f`/`Vec3d`/`Vec3i`, and `Vec4f`/`Vec4d`/
+  `Vec4i` aliases. `Vector2.h`/`Vector3.h` also carry their respective
+  `cross()` free functions (2D cross is a scalar perp-dot-product, 3D
+  cross returns a `Vector<3, T>`) and, on `Vector2.h`, `manhattan_distance`/
+  `chebyshev_distance` for grid/board distance queries. `Vector4.h` has no
+  `cross()` — there's no natural 4D analog in scope.
 * `Matrix<R, C, T>` (`Matrix.h`) — construction, element access
-  (`at(row, col)`), `operator*` (matrix multiply), `transpose()`, and a
-  square-only `identity()`. No determinant/inverse/decompositions yet.
+  (`at(row, col)`), `operator*` (matrix×matrix and matrix×vector),
+  `operator+`/`operator-`/scalar `operator*`/`operator==`, `transpose()`,
+  and a square-only `identity()`. `determinant()`/`inverse()` are
+  supported only as a bounded 2×2/3×3 special case, exposed as fully
+  specialized free-function overloads (and mirrored as members via a
+  `requires` constraint on the class's own `R`/`C`) so calling them on any
+  other size is a compile error — not a general N×N algorithm. A singular
+  matrix passed to `inverse()` trips an `OX_CORE_ASSERT` in Debug builds
+  and falls through to IEEE `Inf`/`NaN` in Release, where the assert
+  compiles out. `Matrix2f`/`Matrix2d`/`Matrix4f`/`Matrix4d` aliases
+  (`Mat2f`/`Mat2d`/`Mat4f`/`Mat4d`) live directly in `Matrix.h`; `Matrix3.h`
+  adds `Mat3f`/`Mat3d` plus 2D affine transform helpers —
+  `translation`/`rotation`/`scale` (each returning a `Mat3`) and
+  `transform_point` (affine-only, via homogeneous coordinates, no
+  perspective divide, no separate `Transform` class). `Matrix.h` depends
+  on `Vector.h` (for matrix×vector multiply) and `Core/Assert.h` (for the
+  `inverse()` guard) — the first edges from `Math` to another module, both
+  harmless since `Core` is the foundational layer already pulled in first
+  everywhere.
+* `Colour.h` — a minimal, plain data-only `struct Colour { float r, g, b,
+  a }` (opaque black by default) with free `operator==`/`operator!=`/
+  `approx_equal`/`lerp`. Deliberately **not** given the Vector/Matrix dual
+  member+free-function API — that documented exception (`DESIGN.md` §5)
+  is scoped to exactly those two types. No byte-based variant and no
+  named-colour palette (`White`/`Black`/...) — deferred until a real
+  renderer/texture-format consumer exists (`DESIGN.md` §20).
 * `Math.h` — an umbrella header aggregating the above, included directly
   from the precompiled header (`oxpch.h`), and `Math.cpp` — explicit
-  template instantiation of the common `Vector<2|3, float|double|int>`
-  aliases, so they're compiled once into the `Oryx` static lib rather than
-  re-instantiated per translation unit.
+  template instantiation of the common `Vector<2|3|4, float|double|int>`
+  aliases and the named square `Matrix<2|2|3|3|4|4, float|double>` shapes
+  (no `int` matrices — no grid-data use case, only transform use cases),
+  so they're compiled once into the `Oryx` static lib rather than
+  re-instantiated per translation unit. Explicit instantiation only
+  covers these named/aliased shapes — arbitrary `R×C` matrix usage still
+  instantiates per-TU as before.
 
-`Math` remains scoped to what board/grid games, and later graphics, need —
-no determinant/inverse, quaternions, or higher-dimensional types until a
-real use case demonstrates the requirement (`DESIGN.md` §20).
+`Math` remains scoped to what board/grid games, and later graphics, need.
+Determinant/inverse are supported only as the bounded 2×2/3×3 special case
+described above — general N×N determinant/inverse, 4×4 inverse,
+quaternions, a `Matrix4`-based 3D transform pipeline, and other
+higher-dimensional types remain out of scope until a real use case
+demonstrates the requirement (`DESIGN.md` §20).
 
 ---
 

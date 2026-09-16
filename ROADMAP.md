@@ -177,8 +177,12 @@ full detail).
   implementations may hold internal state across calls
 * `oryx::Random` — standalone, seedable utility in `Oryx/Core`; not yet
   wired into `IGame`/`IState` (no chance nodes in Phase 2/3)
-* `oryx::Math` — small header-only module (`Vec2<T>` + aliases), included
-  via `oxpch.h`, scoped to grid/board coordinate needs
+* `oryx::Math` — header-only module (`oryx::math` `<cmath>` wrappers +
+  constants, generic `Vector<N,T>`/`Matrix<R,C,T>` with `Vec2/3/4` and
+  `Mat2/3/4` aliases, bounded 2x2/3x3 determinant/inverse, 2D affine
+  transform helpers, a minimal `Colour`), included via `oxpch.h`, scoped
+  to grid/board coordinate and 2D-transform needs (see `ARCHITECTURE.md`
+  §3.4)
 * Unit testing infrastructure (doctest), validating the above against a
   minimal/dummy game — not Tic-Tac-Toe itself, which is Phase 3's deliverable
 

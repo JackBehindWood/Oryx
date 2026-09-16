@@ -94,6 +94,7 @@ public:
     T sum() const;
     T mean() const;
     T length() const;
+    T length_squared() const;
     Vector<N, T> normalized() const;
 
     // distance()/distance_squared() get member forms (unlike dot()/cross(), which stay
@@ -251,6 +252,12 @@ T length(const Vector<N, T>& v)
 }
 
 template<size_t N, typename T>
+T length_squared(const Vector<N, T>& v)
+{
+    return dot(v, v);
+}
+
+template<size_t N, typename T>
 Vector<N, T> normalize(const Vector<N, T>& v)
 {
     return v / length(v);
@@ -355,6 +362,9 @@ T Vector<N, T>::mean() const { return oryx::mean(*this); }
 
 template<size_t N, typename T>
 T Vector<N, T>::length() const { return oryx::length(*this); }
+
+template<size_t N, typename T>
+T Vector<N, T>::length_squared() const { return oryx::length_squared(*this); }
 
 template<size_t N, typename T>
 Vector<N, T> Vector<N, T>::normalized() const { return oryx::normalize(*this); }

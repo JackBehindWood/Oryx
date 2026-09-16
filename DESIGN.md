@@ -146,15 +146,26 @@ Likewise, advanced metaprogramming should not become a prerequisite for understa
   concrete methods alongside one pure virtual `update()`).
 * Structs are data-only: plain fields, no member functions. Any behaviour
   needed on struct-held data is a free function instead (e.g. `Outcome`
-  has `is_terminal`/`rewards` fields only).
+  has `is_terminal`/`rewards` fields only; `Colour` has `r`/`g`/`b`/`a`
+  fields only, with `operator==`, `approx_equal` and `lerp` as free
+  functions).
 * Exception — math types (`Vector<N, T>`, `Matrix<R, C, T>`): these are
   `class`, not data-only structs, and deliberately expose *both* member
-  functions (`length()`, `normalized()`, `sum()`, `mean()`) and equivalent
-  free functions (`dot`, `length`, `normalize`, `sum`, `mean`, `cross`).
-  This mirrors the dual method/module-function API convention used by
-  numpy and similar math libraries (GLM, Eigen), and is a documented,
-  intentional carve-out scoped to the math module — it does not loosen the
-  data-only-struct rule elsewhere.
+  functions and equivalent free functions for the operations where a
+  primary receiver makes sense. For `Vector`: `length()`, `normalized()`,
+  `sum()`, `mean()`, `distance()`, `distance_squared()` as members, with
+  `dot`, `length`, `normalize`, `sum`, `mean`, `cross`, `distance`,
+  `distance_squared`, `lerp`, `clamp`, `min`, `max`, `abs`, `approx_equal`,
+  `to_string` as free functions (operators and `dot`/`cross` stay
+  free-function-only; `distance`/`distance_squared` are a deliberate
+  exception to that, noted inline in `Vector.h`). For `Matrix`:
+  `transpose()`, `determinant()`, `inverse()` (the latter two bounded to
+  2×2/3×3) as members, with the same plus the arithmetic operators as free
+  functions. This mirrors the dual method/module-function API convention
+  used by numpy and similar math libraries (GLM, Eigen), and is a
+  documented, intentional carve-out scoped to `Vector`/`Matrix` — it does
+  not loosen the data-only-struct rule elsewhere (`Colour` deliberately
+  stays a plain data-only struct, not part of this exception).
 
 This was not written down before the Phase 2 brainstorm; existing code
 predates it and is not being retrofitted (e.g. `Application::Get()` is a
@@ -164,13 +175,21 @@ historical exceptions, not examples to copy for new pure interfaces).
 ### Math Module
 
 A header-only `oryx::Math` module (`Oryx/src/Oryx/Math/`), widened during
-Phase 2 planning from the originally-scoped "`Vec2` struct" (see
-`ARCHITECTURE.md` §3.4 for the full breakdown). It now provides `oryx::math`
-(templated `<cmath>` wrappers), a generic `Vector<N, T>` with dimension `N`
-as a non-type template parameter (backed by a plain C array, not
-`std::array`), dedicated `Vector2.h`/`Vector3.h` headers for the 2D/3D
-aliases and their respective `cross()` overloads, and a small
-`Matrix<R, C, T>`:
+Phase 2 planning from the originally-scoped "`Vec2` struct", and widened
+again for a general vector/matrix/colour pass (see `ARCHITECTURE.md` §3.4
+for the full breakdown). It provides `oryx::math` (templated `<cmath>`
+wrappers, plus named constants `PI`/`TWO_PI`/`HALF_PI`/`EPSILON` and
+`sign`/`saturate`/`smoothstep`/`radians`/`degrees`/`approx_equal`), a
+generic `Vector<N, T>` with dimension `N` as a non-type template parameter
+(backed by a plain C array, not `std::array`), dedicated
+`Vector2.h`/`Vector3.h`/`Vector4.h` headers for the `Vec2`/`Vec3`/`Vec4`
+aliases (2D/3D also get `cross()`; 2D also gets `manhattan_distance`/
+`chebyshev_distance`), a `Matrix<R, C, T>` with matrix×matrix and
+matrix×vector multiply, `+`/`-`/scalar `*`/`==`, `transpose()`, and a
+bounded 2×2/3×3-only `determinant()`/`inverse()` (never a general N×N
+algorithm), `Matrix3.h`'s `translation`/`rotation`/`scale`/
+`transform_point` 2D affine-transform helpers (via homogeneous
+coordinates, no `Transform` class), and a minimal `Colour` struct:
 
 ```cpp
 template<size_t N, typename T>
@@ -185,15 +204,27 @@ private:
     T m_data[N]{};
 };
 
-using Vector2f = Vector<2, float>;
-using Vector3f = Vector<3, float>;
+using Vec2f = Vector<2, float>;
+using Vec3f = Vector<3, float>;
+
+struct Colour
+{
+    float r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f;
+};
 ```
 
 `Vector<N,T>`/`Matrix<R,C,T>` are the documented exception to the
-struct-is-data-only rule above. The module is still scoped to what
-board/grid games and, later, graphics actually need — not a
-general-purpose maths library — and should grow only from demonstrated
-requirements (§20).
+struct-is-data-only rule above; `Colour` deliberately is **not** — it stays
+a plain data-only struct, with `operator==`/`approx_equal`/`lerp` as free
+functions, since its behaviour is small enough that extending the
+Vector/Matrix exception to a third type isn't warranted. The module is
+still scoped to what board/grid games and, later, graphics actually need —
+not a general-purpose maths library. The 2×2/3×3 `determinant`/`inverse`
+are a deliberate, bounded addition (special-cased free-function overloads,
+not a general algorithm) to unblock real 2D transform math; general N×N
+determinant/inverse, 4×4 inverse, quaternions, a `Matrix4`-based 3D
+transform pipeline, and a byte-based/named-colour palette remain out of
+scope and should grow only from demonstrated requirements (§20).
 
 ---
 
@@ -554,7 +585,7 @@ rather than silently choosing an architecture in code.
 | Player/turn model (Phase 2/3)   | Strict alternating turns only | Working decision (scoped) |
 | Randomness utility              | `oryx::Random` (Core, seedable); not wired into chance nodes | Working decision |
 | Phase 2 execution loop          | No `Simulation`/`Match`/`Runner` class; proven via test/demo loop | Working decision |
-| Math module                     | Header-only `oryx::Math`: `oryx::math` `<cmath>` wrappers, generic `Vector<N,T>` (+ `Vector2`/`Vector3` headers), `Matrix<R,C,T>` — widened during Phase 2 planning from the original `Vec2`-only scope | Working decision |
+| Math module                     | Header-only `oryx::Math`: `oryx::math` `<cmath>` wrappers + constants, generic `Vector<N,T>` (+ `Vec2`/`Vec3`/`Vec4` headers), `Matrix<R,C,T>` (+ `Mat2`/`Mat3`/`Mat4`, bounded 2x2/3x3 determinant/inverse, 2D affine transform helpers), `Colour` — widened during Phase 2 planning from the original `Vec2`-only scope, then again for a general vector/matrix/colour pass | Working decision |
 | Extension registration          | Self-registering factories, no central list | Working decision (principle; `Registry<T>` implementation timing open) |
 | Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
 | Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
