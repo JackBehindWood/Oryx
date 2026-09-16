@@ -1,6 +1,0 @@
-{
-  "project_name": "Oryx",
-  "build_generator": "gmake2",
-  "test_executable": "Tests",
-  "config": "debug"
-}

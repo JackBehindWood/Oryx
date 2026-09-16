@@ -19,13 +19,9 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 
-# Premake5 build files
-premake/
-
-# Makefiles
-*.make
-Makefile
-compile_commands.json
+# Premake5 build files (premake/*.lua helper scripts are tracked; only the
+# downloaded binary + LICENSE.txt under premake/bin/ are ignored)
+premake/bin/
 
 # IDE and editor files
 .vscode/
@@ -36,6 +32,12 @@ compile_commands.json
 .DS_Store
 *.sublime-project
 *.sublime-workspace
+
+# Visual Studio project files
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
 
 # Python
 __pycache__/
@@ -85,6 +87,7 @@ docs/.doctrees/
 .env
 .env.local
 config.local.json
+oryx.local.toml
 
 # OS files
 Thumbs.db

@@ -1,0 +1,511 @@
+# Oryx Roadmap
+
+> **Status: Preliminary — direction rather than a fixed schedule**
+
+This roadmap describes the intended evolution of Oryx.
+
+The roadmap deliberately avoids assigning dates to features that depend on architectural decisions that have not yet been made.
+
+The immediate priority is to establish a small, coherent foundation before expanding into algorithms, games, visualisation, and research tooling.
+
+---
+
+# 1. Development Philosophy
+
+Oryx should evolve incrementally.
+
+The preferred progression is:
+
+```text
+Architecture & Design
+    ↓
+Minimal Build System
+    ↓
+Minimal C++ Core
+    ↓
+First Reference Game
+    ↓
+Baseline Strategies
+    ↓
+Simulation & Evaluation
+    ↓
+Benchmarking
+    ↓
+Python Research Layer
+    ↓
+Experiment Framework
+    ↓
+Strategy Observability
+    ↓
+Strategy Dashboard
+    ↓
+Graphics & Visualisation
+    ↓
+Larger Algorithm Ecosystem
+    ↓
+Larger Game Library
+    ↓
+Ecosystem & Extensions
+```
+
+Each stage should provide a useful, testable foundation for the next.
+
+---
+
+# 2. Phase 0 — Architecture & Design
+
+**Current phase**
+
+Before implementing the substantial engine, conduct a dedicated architecture and design brainstorm.
+
+### Goals
+
+Define the smallest useful conceptual core.
+
+### Questions
+
+* What exactly is a Game?
+* What exactly is a State?
+* What exactly is an Action?
+* What exactly is a Strategy?
+* How are players represented?
+* How are turns represented?
+* How is chance represented?
+* How are terminal outcomes represented?
+* How are games executed?
+* How are simulations represented?
+* How are results represented?
+* How should randomness work?
+* How should observability work?
+* What belongs in the engine?
+* What belongs outside it?
+* What should the Python API feel like?
+
+### Deliverable
+
+A reviewed architecture and initial API design.
+
+---
+
+# 3. Phase 1 — Minimal Build System
+
+Establish the project's foundational development and build workflow before implementing the C++ engine.
+
+The build system is implemented as the **`build_system` Python module**.
+
+It provides a Python-based developer CLI around Premake5 and the project's development workflows.
+
+### Initial Goals
+
+* Establish the Python package/module structure
+* Provide the `build` CLI
+* Integrate Premake5
+* Support local Premake5 dependency management
+* Support Debug, Release, and Distribution configurations
+* Configure C++ project generation
+* Compile the project
+* Run tests
+* Clean generated artifacts
+* Provide a complete configure → compile → test workflow
+* Establish a foundation for future development commands, via a decorator-based
+  command registry (`build_system/registry.py`) that auto-discovers new
+  `commands/<name>.py` modules and their interactive-menu entries
+* Scaffold `Oasis`, the companion executable that links `Oryx`, as the home for games/demos outside the engine core
+* Generate optional, per-developer IDE integration (`build config init --ide vscode|visual_studio`) —
+  VS Code tasks/launch configs with single-button build+debug per profile, or a generated Visual Studio solution
+* Provide a generic `vendor/<lib>` convention (Premake's `useVendorHeader()` + `build_system/vendor.py`)
+  for vendoring header-only third-party libraries as git submodules, under `Oryx/`, `Oasis/`, and `tests/`
+
+### Initial Commands
+
+The exact CLI may evolve, but the initial workflow should support concepts such as:
+
+```text
+build config init
+build build configure
+build build compile
+build build clean
+build build run
+build test run
+build build all
+```
+
+The build system should remain a **thin developer tooling layer** around Premake5 rather than becoming a second build system.
+
+### Future Extensions
+
+The module may eventually provide commands such as:
+
+```text
+build benchmark
+build experiment
+build docs
+build explain
+```
+
+These should be introduced when the corresponding project capabilities exist.
+
+### Deliverable
+
+A reproducible development workflow capable of configuring, building, testing, and cleaning the initial C++ project.
+
+---
+
+# 4. Phase 2 — Minimal C++ Core
+
+Build the smallest functional engine.
+
+Potential initial components:
+
+* Core game abstractions
+* Action representation
+* State representation
+* Player/agent concepts
+* Strategy interface
+* Basic execution loop
+* Result/outcome representation
+* Randomness abstraction
+* Unit testing infrastructure
+
+The exact interfaces should come from Phase 0 rather than being assumed beforehand.
+
+---
+
+# 5. Phase 3 — First Reference Game
+
+Implement a deliberately simple reference game.
+
+A game such as Tic-Tac-Toe is useful because it can exercise:
+
+* State representation
+* Action generation
+* Turn handling
+* Terminal states
+* Outcomes
+* Simple strategies
+* Deterministic testing
+
+The purpose is architectural validation, not creating a large game library immediately.
+
+`Oasis`, the companion executable that links against `Oryx`, is the intended
+host for this reference game and later games/demos — it already exists as a
+scaffold (Phase 1) ahead of this phase's actual content.
+
+---
+
+# 6. Phase 4 — Baseline Strategies
+
+Implement simple strategies to validate the Strategy abstraction.
+
+Potential initial strategies:
+
+* Random
+* First legal action
+* Simple heuristic
+* Minimax
+
+These should provide progressively stronger validation of the strategy interface.
+
+The goal is to test whether the architecture works across different decision-making styles.
+
+---
+
+# 7. Phase 5 — Simulation & Evaluation
+
+Introduce reusable simulation infrastructure.
+
+Potential capabilities:
+
+* Run individual games
+* Run batches of games
+* Compete strategies
+* Collect outcomes
+* Aggregate statistics
+* Configure seeds
+* Reproduce experiments
+
+The result should make it easy to answer questions such as:
+
+```text
+How does Strategy A perform against Strategy B
+over 100,000 games?
+```
+
+---
+
+# 8. Phase 6 — Benchmarking
+
+Introduce benchmark infrastructure for computational performance.
+
+Potential metrics:
+
+* Games per second
+* Decisions per second
+* Nodes explored
+* Memory usage
+* Search time
+* Rollout throughput
+
+Benchmarks should distinguish algorithmic performance from game outcome quality.
+
+---
+
+# 9. Phase 7 — Python Research Layer
+
+Introduce the first useful Python API through pybind11.
+
+Initial goals:
+
+* Create games
+* Create strategies
+* Run simulations
+* Collect results
+* Configure experiments
+* Access statistics
+
+Python should provide a natural interface for experimentation rather than expose the entire C++ implementation.
+
+---
+
+# 10. Phase 8 — Experiment Framework
+
+Build higher-level experimentation capabilities.
+
+Potential features:
+
+* Parameter sweeps
+* Repeated trials
+* Seed management
+* Experiment configuration
+* Result storage
+* Statistical summaries
+* Reproducibility metadata
+* Comparative analysis
+
+A central goal is making large experiments easy to describe and repeat.
+
+---
+
+# 11. Phase 9 — Strategy Observability
+
+Introduce optional strategy instrumentation.
+
+Potential capabilities:
+
+* Decision traces
+* Action probabilities
+* Values
+* Search statistics
+* Search trees
+* Simulation counts
+* Convergence information
+* Algorithm-specific metrics
+
+The observability model should be extensible rather than forcing all algorithms into the same schema.
+
+---
+
+# 12. Phase 10 — Strategy Dashboard
+
+Build a lightweight visual interface for inspecting algorithm behaviour.
+
+Potential visualisations include:
+
+* Current game state
+* Selected action
+* Action probabilities
+* Value estimates
+* Search trees
+* Simulation statistics
+* Decision traces
+* Algorithm-specific diagnostics
+
+The dashboard should consume observability data and remain separate from the strategy implementation.
+
+---
+
+# 13. Phase 11 — Graphics & Visualisation
+
+Introduce graphics capabilities where they provide clear value.
+
+Initial focus:
+
+* Board games
+* Grid games
+* Card games
+* Strategy games
+* Simulation visualisation
+* Algorithm visualisation
+
+The graphics system should remain lightweight and specialised to Oryx's use cases.
+
+---
+
+# 14. Phase 12 — Algorithm Ecosystem
+
+Expand the strategy and algorithm library.
+
+Potential areas include:
+
+### Search
+
+* Minimax
+* Alpha-Beta pruning
+* Monte Carlo Tree Search
+* Iterative deepening
+* Transposition tables
+
+### Optimisation
+
+* Dynamic programming
+* Local search
+* Genetic algorithms
+* Mathematical optimisation interfaces
+
+### Probability & Simulation
+
+* Monte Carlo methods
+* Markov processes
+* Stochastic decision models
+
+### Learning
+
+* Reinforcement learning
+* Policy methods
+* Value methods
+* Self-play
+
+### Game Theory
+
+* Best-response methods
+* Regret-based algorithms
+* Equilibrium-related algorithms
+
+Each addition should be justified by actual use cases and fit the core architecture.
+
+---
+
+# 15. Phase 13 — Larger Game Library
+
+Only after the core architecture has demonstrated itself should Oryx expand substantially into games.
+
+Potential categories:
+
+* Board games
+* Card games
+* Grid games
+* Abstract strategy games
+* Stochastic games
+* Imperfect-information games
+* Educational environments
+
+Games should ideally live outside the core engine where practical.
+
+---
+
+# 16. Phase 14 — Ecosystem & Extensions
+
+Longer-term possibilities include:
+
+* External game packages
+* External strategy packages
+* Plugin mechanisms
+* Experiment packages
+* Visualisation extensions
+* Educational modules
+* Community-contributed algorithms
+
+The extension model should remain simple enough that contributors can understand it without learning a large framework.
+
+---
+
+# 17. Build & Developer Tooling
+
+The **`build_system` Python module** should evolve alongside the project.
+
+The intended development workflow is exposed through the `build` CLI.
+
+For example:
+
+```text
+build config init
+build build configure
+build build compile
+build build clean
+build build run
+build test run
+build build all
+```
+
+As corresponding capabilities are implemented, the CLI may grow to support:
+
+```text
+build benchmark
+build experiment
+build docs
+build explain
+```
+
+The build system should remain a thin developer-experience layer around Premake5 and should not duplicate the responsibilities of the underlying C++ build system.
+
+New commands register via a small decorator (`build_system/registry.py`) rather
+than hand-wired lists, so extending the CLI is a matter of adding a
+`commands/<name>.py` module. Optional, per-developer IDE integration
+(`build config init --ide vscode|visual_studio`) and a generic `vendor/<lib>`
+convention for vendored header-only dependencies are part of this layer too —
+see [`build_system/README.md`](build_system/README.md) for details.
+
+---
+
+# 18. Documentation & Education
+
+Documentation should eventually cover:
+
+* Getting started
+* Architecture
+* Game implementation
+* Strategy implementation
+* Simulation
+* Experiments
+* Algorithms
+* Python API
+* Visualisation
+* Strategy observability
+
+The `explain` workflow is intended to make algorithms approachable for learners as well as useful to experienced developers.
+
+---
+
+# 19. What We Should Explicitly Avoid
+
+The roadmap does **not** currently prioritise:
+
+* Becoming a general-purpose game engine
+* Full 3D rendering
+* A massive built-in game library
+* A large framework of abstractions
+* Complex plugin infrastructure before it is needed
+* Premature distributed computing
+* Premature GPU infrastructure
+* Building every possible algorithm
+* Features without a demonstrated use case
+
+Oryx should remain a **Game Strategy Engine**, not gradually turn into an unrelated general-purpose engine.
+
+---
+
+# 20. Roadmap Principle
+
+The roadmap is intentionally flexible.
+
+A future feature should be evaluated against:
+
+```text
+Does it strengthen the Game Strategy Engine?
+        │
+        ├── Yes → investigate
+        │
+        └── No → probably keep it outside the core
+```
+
+The architecture should constrain the roadmap rather than the roadmap forcing complexity into the architecture.

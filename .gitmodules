@@ -1,0 +1,6 @@
+[submodule "tests/vendor/doctest"]
+	path = tests/vendor/doctest
+	url = https://github.com/doctest/doctest.git
+[submodule "Oryx/vendor/spdlog"]
+	path = Oryx/vendor/spdlog
+	url = https://github.com/gabime/spdlog.git

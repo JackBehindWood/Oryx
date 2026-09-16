@@ -1,105 +1,282 @@
-# Oryx
+# Oryx — Game Strategy Engine
 
-An open-source engine for games, strategies, simulation, and decision-making.
+Oryx is an open-source, extensible **Game Strategy Engine (GSE)** for implementing games, strategies, simulation, experimentation, optimisation, algorithm analysis, and visualisation.
 
-**Status:** Foundation phase — establishing core architecture and build infrastructure.
+The goal is to provide a small, powerful core that can support both serious engineering/research and learning.
 
-## What is Oryx?
+Oryx is not intended to become a general-purpose game engine. Its focus is on the intersection of:
 
-Oryx is a small, powerful, extensible platform for:
+* Games and game theory
+* Decision-making under uncertainty
+* Operations Research
+* Probability and stochastic processes
+* Search and optimisation
+* Monte Carlo methods
+* Reinforcement learning
+* Algorithm experimentation and analysis
+* Educational visualisation
 
-- **Games** — rule definitions, state, legal actions, outcomes
-- **Strategies** — decision-making algorithms, action selection, agent behavior
-- **Simulation** — executing strategies against games, analyzing outcomes
-- **Experimentation** — framework for research and algorithm exploration
-- **Optimization** — decision-making under uncertainty, uncertainty quantification
-- **Education** — learning game theory, algorithms, and strategy optimization
+The project is being developed incrementally. The architecture and API described in this document are intentionally subject to refinement as the project evolves.
 
-## Vision
+---
 
-A long-term vision is to build a small, powerful engine surrounded by an ecosystem of algorithms, simulations, visualizations, and educational tools—useful to software engineers, researchers, students, game developers, AI/ML practitioners, and educators.
+## Core Philosophy
 
-## Core Principle: Game ≠ Strategy ≠ Engine
+The fundamental architectural principle is:
 
-Oryx enforces clean separation:
+> **Game != Strategy != Engine**
 
-- **Game**: Defines rules, state, legal actions, transitions, outcomes
-- **Strategy**: Defines decision-making and action selection
-- **Engine**: Provides execution, simulation, evaluation, infrastructure
+These are separate responsibilities.
 
-These responsibilities must remain loosely coupled. New games or strategies should be addable without modifying the core engine.
+### Game
 
-## Current Status
+A **Game** defines the problem being played or simulated.
 
-Oryx is in its **foundation phase**:
+It owns concepts such as:
 
-- ✅ Project structure established
-- ✅ Build system (Premake5 + Python orchestrator) working
-- ✅ Minimal C++ scaffold to verify compilation
-- ⏳ Core abstractions (not yet implemented)
-- ⏳ First game implementation
-- ⏳ First strategy implementation
-- ⏳ Python bindings (pybind11)
+* Rules
+* State
+* Legal actions
+* State transitions
+* Terminal conditions
+* Outcomes
+* Game-specific information
 
-**Do not assume any engine features exist yet.** This is a clean foundation for deliberate, minimal development.
+A game should not know how an agent decides what to do.
 
-## Building Oryx
+### Strategy
 
-### Prerequisites
+A **Strategy** decides what action to take.
 
-- Python 3.9+
-- C++17 compiler (GCC, Clang, or MSVC)
-- `make` (Linux/macOS) or equivalent build tools
+Examples may include:
 
-### Build
+* Random strategies
+* Heuristics
+* Minimax
+* Monte Carlo Tree Search
+* Reinforcement-learning policies
+* Optimisation-based strategies
+* Game-theoretic strategies
 
-```bash
-# Configure and build
-python build.py build
+A strategy should operate through game abstractions rather than depending on a particular game implementation.
 
-# Run tests (if any exist)
-python build.py test
+### Engine
 
-# Clean build artifacts
-python build.py clean
+The **Engine** provides the infrastructure for executing and studying games and strategies.
 
-# All-in-one
-python build.py all
+Potential responsibilities include:
+
+* Simulation
+* Evaluation
+* Experiment execution
+* Randomness management
+* Statistics
+* Benchmarking
+* Search infrastructure
+* Strategy instrumentation
+* Reproducibility
+* Shared utilities
+
+The engine should not contain game-specific rules or strategy-specific decision logic.
+
+---
+
+## Project Vision
+
+Oryx should make it straightforward to move through the following workflow:
+
+```text
+Implement a Game
+      ↓
+Implement a Strategy
+      ↓
+Run Simulations
+      ↓
+Collect Results
+      ↓
+Compare Algorithms
+      ↓
+Inspect Decisions
+      ↓
+Visualise Behaviour
+      ↓
+Run Experiments
+      ↓
+Analyse Results
+      ↓
+Explain Algorithms
 ```
 
-The build system automatically downloads and manages Premake5 in the `premake/` directory on first run.
+A game or strategy should normally be addable without modifying the core engine.
 
-## Repository Structure
+---
 
+## Technology
+
+### C++
+
+C++ is the primary language for the engine.
+
+It is intended for:
+
+* Core abstractions
+* Game implementations where performance matters
+* Simulation
+* Search
+* Monte Carlo methods
+* Optimisation
+* High-performance algorithms
+* Shared engine infrastructure
+
+The project targets modern, readable C++ while avoiding complexity for its own sake.
+
+### Python
+
+Python is the experimentation, research, analysis, and tooling layer.
+
+It is intended for:
+
+* Experimentation
+* Notebooks
+* Statistics
+* Visualisation
+* Benchmarking
+* Configuration
+* Strategy prototyping
+* Reinforcement learning workflows
+* Research tooling
+* Development tooling
+
+The Python API should be idiomatic and high-level rather than simply exposing the C++ implementation directly.
+
+### Python Bindings
+
+[pybind11](https://github.com/pybind/pybind11) is the intended binding technology unless a strong technical reason emerges to use an alternative.
+
+### Build System
+
+Oryx uses **Premake5** for C++ project generation and build configuration.
+
+The project also includes a small Python development CLI.  See [`build_system`](build_system/README.md) for contribution guidelines.
+
+The CLI is intended to simplify common workflows without replacing Premake5.
+Run `uv run build` with no arguments for an interactive arrow-key menu, or use
+direct subcommands for scripts and CI:
+
+```text
+uv run build                          # interactive menu
+uv run build config init --ide vscode # oryx.toml + .vscode/{tasks,launch,...}.json
+uv run build build all                # configure, compile, test
+uv run build build run                # run the Oasis sandbox executable
+build benchmark
+build experiment
+build docs
+build explain
 ```
-oryx/
-├── include/           # C++ public headers
-│   └── oryx/
-├── src/               # C++ implementation (placeholder)
-├── tests/             # C++ tests
-├── research/          # Python research, analysis, tooling
-├── build.py           # Python build orchestrator
-├── premake5.lua       # Premake5 build configuration
-├── LICENSE            # Apache 2.0
-├── CONTRIBUTING.md    # Contribution guidelines
-└── README.md          # This file
-```
 
-## Development
+The exact command structure will evolve as the project develops.
 
-- **Build system**: Premake5 (via `build.py`)
-- **Primary language**: C++17
-- **Research/tooling**: Python
-- **Python bindings**: pybind11 (future)
+`Oasis` is the companion sandbox executable that links against `Oryx` — the
+home for games, demos, and experiments that consume the engine without being
+compiled into it. See [`ARCHITECTURE.md`](ARCHITECTURE.md#10-extension-model) for
+how it fits into the extension model.
 
-For contribution guidelines and architecture details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+---
+
+## Headless First
+
+The engine must support headless execution.
+
+Graphics are optional infrastructure rather than a requirement of the core engine.
+
+This allows Oryx to support:
+
+* Large-scale simulations
+* Server execution
+* Automated experiments
+* CI
+* Benchmarking
+* Research workflows
+* Reinforcement-learning environments
+
+without requiring a graphical environment.
+
+---
+
+## Strategy Observability
+
+One of Oryx's longer-term goals is to make strategy behaviour observable.
+
+Strategies may optionally expose information such as:
+
+* Selected actions
+* Action probabilities
+* Expected values
+* Value estimates
+* Search depth
+* Simulations performed
+* Nodes explored
+* Search trees
+* Probability distributions
+* Constraints
+* Optimisation variables
+* Regret
+* Convergence
+* Performance metrics
+* Decision traces
+* Algorithm-specific diagnostics
+
+Observability is intentionally optional.
+
+A strategy should remain usable without the Strategy Dashboard, and different strategies should be able to expose different information.
+
+---
+
+## Repository Status
+
+Oryx is currently in an early architectural and design phase.
+
+The current documentation establishes the project's direction and initial architectural boundaries, but the detailed architecture, APIs, and implementation strategy are expected to evolve following dedicated design and architecture sessions.
+
+In particular, the following are intentionally not considered final:
+
+* Core C++ interfaces
+* Game state representation
+* Action representation
+* Strategy interfaces
+* Simulation architecture
+* Experiment model
+* Observability API
+* Python API
+* Graphics architecture
+* Plugin/extension mechanisms
+
+The project favours **incremental design over speculative implementation**.
+
+---
+
+## Documentation
+
+| Document          | Purpose                                                    |
+| ----------------- | ---------------------------------------------------------- |
+| `README.md`       | Project overview and getting started                       |
+| `ARCHITECTURE.md` | Architectural structure and component boundaries           |
+| `DESIGN.md`       | Technical principles, decisions, and open design questions |
+| `ROADMAP.md`      | Development direction and planned milestones               |
+| `CONTRIBUTING.md` | Contribution guidelines                                    |
+
+---
+
+## Contributing
+
+Contributions are welcome.
+
+Before making substantial architectural changes, please review the architecture and design documentation and consider opening a discussion first.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for contribution guidelines.
+
+---
 
 ## License
 
-Oryx is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
-
-## Questions?
-
-- Open an issue for bugs or feature requests
-- Open a discussion for questions and ideas
-- See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+License information will be added as the project is formalised.

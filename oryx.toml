@@ -1,0 +1,12 @@
+[project]
+name = "Oryx"
+
+[build]
+generator = "gmake"
+profile = "debug"
+
+[test-suite]
+name = "Tests"
+
+[executables.oasis]
+name = "Oasis"

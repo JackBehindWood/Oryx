@@ -5,18 +5,20 @@ import zipfile
 from pathlib import Path
 
 
-def download_file(url, destination):
+def download_file(url, destination, reporthook=None):
     """
     Download a file from a URL.
 
     Args:
         url: URL to download.
         destination: Destination path.
+        reporthook: Optional urlretrieve-style progress callback
+            (block_num, block_size, total_size).
     """
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    urllib.request.urlretrieve(url, destination)
+    urllib.request.urlretrieve(url, destination, reporthook=reporthook)
 
 
 def extract_archive(archive, destination):

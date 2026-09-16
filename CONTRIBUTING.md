@@ -41,3 +41,8 @@ To suggest a feature or improvement:
    ```bash
    git clone https://github.com/your-username/oryx.git
    cd oryx
+   git submodule update --init --recursive
+   ```
+   (`tests/vendor/doctest`, the test framework, is a git submodule — without
+   this step `uv run build build compile` will fail with a clear message
+   telling you to run it.)

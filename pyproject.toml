@@ -19,11 +19,14 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
     "requests>=2.28.0",
+    "questionary>=2.0.0",
 ]
 
 [project.scripts]
-build = "build_system.main:main"
+build = "build_system.main:app"
 
 [build-system]
 requires = ["hatchling"]

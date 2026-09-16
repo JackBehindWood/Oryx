@@ -1,0 +1,86 @@
+import platform
+import shlex
+import shutil
+import subprocess
+from pathlib import Path
+
+from rich.console import Console
+
+from .config import BUILD_DIR, BuildConfig
+from .utils import get_macos_sdk_path, run_command, write_json
+
+console = Console()
+
+COMPILE_COMMANDS_FILE = BUILD_DIR / "compile_commands.json"
+
+
+def _arg_after(tokens: list[str], flag: str) -> str | None:
+    try:
+        return tokens[tokens.index(flag) + 1]
+    except (ValueError, IndexError):
+        return None
+
+
+def _compile_entries(make_file: Path, config_token: str) -> list[dict]:
+    """Dry-run a generated gmake project file and pull out one compile_commands.json
+    entry per translation unit from the fully-resolved compiler invocations `make`
+    prints — real ground truth, not a re-implementation of Premake's flag logic."""
+    try:
+        result = run_command(
+            ["make", "-n", "-B", "-f", make_file.name, f"config={config_token}"],
+            cwd=BUILD_DIR,
+        )
+    except subprocess.CalledProcessError as error:
+        console.print(f"[yellow]⚠️ Skipping {make_file.name}: {error.stderr or error}[/yellow]")
+        return []
+
+    sdk = get_macos_sdk_path() if platform.system() == "Darwin" else None
+
+    entries = []
+    for line in result.stdout.splitlines():
+        try:
+            tokens = shlex.split(line)
+        except ValueError:
+            continue
+
+        source = _arg_after(tokens, "-c")
+        if not source:
+            continue
+
+        if sdk:
+            # Real clang auto-detects the SDK for a bare `clang++` invocation
+            # (that's why the build itself works without this), but tools
+            # that just parse these arguments — VS Code's C/C++ extension,
+            # clangd — don't replicate that and need it explicit.
+            tokens = [tokens[0], "-isysroot", sdk] + tokens[1:]
+
+        entries.append({
+            "directory": str(BUILD_DIR),
+            "file": source,
+            "arguments": tokens,
+            "output": _arg_after(tokens, "-o"),
+        })
+
+    return entries
+
+
+def generate_compile_commands(cfg: BuildConfig) -> Path | None:
+    """Generate compile_commands.json from the .make files Premake already wrote,
+    covering every discovered project (Oryx.make, Oasis.make, Tests.make, and any
+    future project) with its own real per-file includes/defines. Returns None (and
+    prints a note) if `make` or the generated .make files aren't available yet —
+    the caller should treat that as non-fatal."""
+    if not shutil.which("make"):
+        console.print("[yellow]⚠️ 'make' not found; skipping compile_commands.json generation.[/yellow]")
+        return None
+
+    make_files = sorted(BUILD_DIR.glob("*.make"))
+    if not make_files:
+        console.print("[yellow]⚠️ No generated .make files found; run configure first for compile_commands.json.[/yellow]")
+        return None
+
+    entries = []
+    for make_file in make_files:
+        entries.extend(_compile_entries(make_file, cfg.make_config_token))
+
+    return write_json(COMPILE_COMMANDS_FILE, entries)

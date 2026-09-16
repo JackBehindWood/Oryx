@@ -1,11 +1,7 @@
 -- Test executable
 project "Tests"
     kind "ConsoleApp"
-    language "C++"
-    cppdialect "C++20"
-    
-    targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
-	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
+    useOryxProjectDefaults()
 
     files {
         "**.h",
@@ -13,11 +9,21 @@ project "Tests"
         "**.cpp",
     }
 
+    -- vendor/doctest is the upstream doctest submodule: exclude its own
+    -- tests/examples/scripts from our project, we only need its header.
+    useVendorHeader("doctest", "doctest")
+
     includedirs {
         ".",
-        "%{wks.location}/Oryx/src",
+        "%{_MAIN_SCRIPT_DIR}/Oryx/src",
+        "%{IncludeDir.spdlog}",
+    }
+
+    defines {
+        "SPDLOG_COMPILED_LIB"
     }
 
     links {
-        "Oryx"
+        "Oryx",
+        "spdlog",
     }

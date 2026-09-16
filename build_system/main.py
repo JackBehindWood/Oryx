@@ -1,215 +1,75 @@
-import sys
-import subprocess
+from pathlib import Path
 
-from .config import BIN_DIR, PROJECT_ROOT, BuildConfig
-from .setup.premake import ensure_premake
-from .utils import (
-    remove_directory,
-    run_command,
+import typer
+from rich.console import Console
+
+from build_system import interactive, registry
+from build_system.config import BuildConfig, DEFAULT_CONFIG_FILE, RunContext
+
+console = Console()
+
+app = typer.Typer(
+    name="oryx-build",
+    help="Oryx Engine Build & Tooling CLI",
+    invoke_without_command=True,
+    rich_markup_mode="markdown",
 )
 
+# Every build_system/commands/<name>.py module is auto-discovered and
+# attached here — dropping a new module in that directory (with its own
+# `app`, `GROUP_HELP`, and `@registry.command(...)`-decorated functions)
+# requires no edits to this file. See build_system/registry.py.
+for _module in registry.discover_command_modules():
+    _name = _module.__name__.rsplit(".", 1)[-1]
+    app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""))
 
-def configure(config: BuildConfig) -> bool:
-    """Generate build files with Premake5."""
-    print("⚙️ Configuring build...\n")
-
-    premake = ensure_premake()
-    if premake is None:
-        return False
-
-    command = [
-        str(premake),
-        config.build_generator,
-    ]
-
+@app.callback()
+def main(
+    ctx: typer.Context,
+    config_path: Path = typer.Option(
+        DEFAULT_CONFIG_FILE,
+        "--config",
+        "-c",
+        help="Path to the oryx.toml configuration file.",
+    ),
+    profile: str = typer.Option(
+        "debug",
+        "--profile",
+        "-p",
+        help="Build configuration profile: [debug | release | dist]",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show full command output and the underlying commands being run.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print the commands that would run without executing them.",
+    ),
+):
+    """Global context setup executed before running commands."""
     try:
-        run_command(command, cwd=PROJECT_ROOT)
-        print("✓ Build files generated successfully\n")
-        return True
+        cfg = BuildConfig.load(config_path)
+        cfg.profile = profile
+        cfg.__post_init__()
+        ctx.obj = RunContext(config=cfg, config_path=config_path, verbose=verbose, dry_run=dry_run)
+    except Exception as err:
+        console.print(f"[bold red]Configuration Error:[/bold red] {err}")
+        raise typer.Exit(code=1)
 
-    except subprocess.CalledProcessError as error:
-        print("✗ Failed to configure build:")
-        if error.stdout:
-            print(error.stdout)
-        if error.stderr:
-            print(error.stderr)
-        return False
-
-    except FileNotFoundError:
-        print("✗ Premake5 executable could not be run.")
-        return False
-
-def init_config() -> bool:
-    """Initialize default build configuration."""
-    print("⚙️ Initializing build configuration...\n")
-    try:
-        BuildConfig.init()
-        return True
-    except Exception as error:
-        print(f"✗ Failed to initialize configuration: {error}")
-        return False
-
-def build(config: BuildConfig) -> bool:
-    """Compile the project for the specified configuration."""
-    print(f"🔨 Building project ({config.config})...\n")
-
-    generator = config.build_generator
-
-    if generator == "gmake2":
-        # Extract the architecture part from outputdir (e.g. "Debug-macosx-ARM64" -> "arm64")
-        arch = config.outputdir.split("-")[-1].lower()
-        
-        # Target format expected by Premake's Makefile: debug_arm64, release_arm64, etc.
-        target_config = f"{config.config}_{arch}"
-
-        command = [
-            "make",
-            "-C",
-            str(PROJECT_ROOT),
-            f"config={target_config}",
-        ]
-    else:
-        print(f"✗ Unsupported generator: {generator}")
-        return False
-
-    try:
-        result = run_command(command)
-        if result.stdout:
-            print(result.stdout)
-        print(f"✓ Build successful ({config.config})\n")
-        return True
-
-    except subprocess.CalledProcessError as error:
-        print("✗ Build failed:")
-        if error.stdout:
-            print(error.stdout)
-        if error.stderr:
-            print(error.stderr)
-        return False
-
-    except FileNotFoundError:
-        print(f"✗ Build tool not found. Ensure {generator} is installed.")
-        return False
-
-def clean() -> None:
-    """Clean generated build artifacts."""
-    print("🧹 Cleaning build artifacts...\n")
-
-    if BIN_DIR.exists():
-        remove_directory(BIN_DIR)
-        print(f"✓ Removed {BIN_DIR}")
-
-    print()
-
-
-def test(config: BuildConfig) -> bool:
-    """Run the test executable."""
-    print(f"🧪 Running tests ({config.config})...\n")
-
-    # Reconstruct path using BuildConfig: bin/<outputdir>/<test_executable>/<test_executable>
-    test_path = config.binary_path / config.test_executable / config.test_executable
-
-    # Fallback check if executable sits directly under outputdir without a subfolder
-    if not test_path.exists():
-        test_path = config.binary_path / config.test_executable
-
-    if not test_path.exists():
-        print(f"✗ Test executable not found at expected path: {test_path}")
-        print("  Run 'build build' first.")
-        return False
-
-    try:
-        result = run_command([str(test_path)])
-        if result.stdout:
-            print(result.stdout)
-        print("✓ Tests passed\n")
-        return True
-
-    except subprocess.CalledProcessError as error:
-        print("✗ Tests failed:")
-        if error.stdout:
-            print(error.stdout)
-        if error.stderr:
-            print(error.stderr)
-        return False
-
-    except FileNotFoundError:
-        print(f"✗ Could not run {test_path}")
-        return False
-
-
-def all_tasks(config: BuildConfig) -> bool:
-    """Configure, build, and test the project."""
-    print(f"🚀 Running all build tasks ({config.config})...\n")
-
-    if not configure(config):
-        return False
-
-    if not build(config):
-        return False
-
-    if not test(config):
-        return False
-
-    print("✓ All tasks completed successfully!")
-    return True
-
-
-def print_help() -> None:
-    """Print build system usage information."""
-    print(
-        """
-Oryx Build System
-
-Usage:
-    build init        Initialize default build configuration file
-    build configure   Check dependencies and generate build files
-    build build       Generate build files and compile
-    build clean       Clean build artifacts
-    build test        Run tests
-    build all         Configure, build and test
-"""
-    )
-
-
-def main() -> int:
-    """Main build system entry point."""
-    if len(sys.argv) < 2:
-        print_help()
-        return 0
-
-    command = sys.argv[1].lower()
-
-    if command == "init":
-        return 0 if init_config() else 1
-
-    try:
-        config = BuildConfig.load()
-    except Exception as error:
-        print(f"✗ Failed to load build configuration: {error}")
-        return 1
-
-    if command == "configure":
-        return 0 if configure(config) else 1
-
-    if command == "build":
-        if not configure(config):
-            return 1
-        return 0 if build(config) else 1
-
-    if command == "clean":
-        clean()
-        return 0
-
-    if command == "test":
-        return 0 if test(config) else 1
-
-    if command == "all":
-        return 0 if all_tasks(config) else 1
-
-    print(f"Unknown command: {command}")
-    print_help()
-    return 1
+    if ctx.invoked_subcommand is None:
+        if interactive.is_interactive():
+            interactive.run_menu(ctx)
+        else:
+            # Plain print avoids Rich re-parsing Click's own markup-free help text.
+            print(ctx.get_help())
+        raise typer.Exit()
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        app()
+    finally:
+        registry.reset()
