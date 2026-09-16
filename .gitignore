@@ -14,6 +14,9 @@ bin-int/
 dist/
 *.dSYM/
 
+# Generated compile database
+compile_commands.json
+
 # CMake (not primary, but common)
 CMakeFiles/
 CMakeCache.txt
