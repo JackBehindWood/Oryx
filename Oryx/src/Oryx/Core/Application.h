@@ -3,14 +3,17 @@
 #include <string_view>
 #include <vector>
 
-namespace oryx {
+int main(int argc, char** argv);
+
+namespace oryx 
+{
 
 struct ApplicationCommandLineArgs
 {
-    int count = 0;
+    int32_t count = 0;
     char** args = nullptr;
 
-    const char* operator[](int index) const
+    const char* operator[](int32_t index) const
     {
         return args[index];
     }
@@ -19,8 +22,10 @@ struct ApplicationCommandLineArgs
     {
         std::vector<std::string_view> result;
         result.reserve(count);
-        for (int i = 0; i < count; ++i)
+        for (int32_t i = 0; i < count; ++i)
+        {
             result.emplace_back(args[i]);
+        }
         return result;
     }
 };
@@ -34,11 +39,16 @@ public:
     void run();
     void close() { m_running = false; }
 
+    static Application& Get() { return *s_instance; }
+
 protected:
     virtual void update() = 0;
 
 private:
     bool m_running = true;
+
+    static Application* s_instance;
+	friend int ::main(int argc, char** argv);
 };
 
 // Implemented by the client application (e.g. Oasis).

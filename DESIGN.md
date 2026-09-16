@@ -109,6 +109,11 @@ This is particularly important because Oryx may eventually support very differen
 
 The abstractions should grow from demonstrated requirements.
 
+`IGame`, `IState`, and `IStrategy` (see `ARCHITECTURE.md` §3) are examples
+of this: each pure-virtual interface exposes only what callers actually
+need, using an `I`-prefix reserved specifically for fully pure-virtual
+interfaces (see Naming Conventions in §5).
+
 ---
 
 # 5. C++ API Design
@@ -129,6 +134,44 @@ The C++ API should prioritise:
 Templates should be used where they provide meaningful benefits, not merely because they are available.
 
 Likewise, advanced metaprogramming should not become a prerequisite for understanding the engine.
+
+### Naming Conventions
+
+* Functions and methods: `snake_case` (e.g. `legal_actions()`)
+* Classes: `PascalCase` (e.g. `class Rewards`)
+* Pure-virtual interfaces (100% pure virtual, no data, no concrete methods)
+  additionally get an `I`-prefix (e.g. `IGame`, `IState`, `IStrategy`).
+  Abstract base classes that mix concrete behaviour with pure virtual
+  methods do not — e.g. `Application` keeps its name (it has real state and
+  concrete methods alongside one pure virtual `update()`).
+* Structs are data-only: plain fields, no member functions. Any behaviour
+  needed on struct-held data is a free function instead (e.g. `Vec2<T>`
+  below has `x`/`y` fields only; `dot`, `length`, etc. are free functions).
+
+This was not written down before the Phase 2 brainstorm; existing code
+predates it and is not being retrofitted (e.g. `Application::Get()` is a
+static accessor, `create_application()` a free function — both fine as
+historical exceptions, not examples to copy for new pure interfaces).
+
+### Math Module
+
+A small, header-only `oryx::Math` module (`Oryx/src/Oryx/Math/`) provides
+templated coordinate/vector types, included directly from `oxpch.h`:
+
+```cpp
+template<typename T>
+struct Vec2 { T x, y; };
+
+using Vec2f = Vec2<float>;
+using Vec2d = Vec2<double>;
+using Vec2i = Vec2<int>;
+```
+
+Per the struct-is-data-only convention above, `Vec2<T>` holds only its
+fields; arithmetic and other operations (`operator+`, `dot`, `length`, ...)
+are free functions. The module is scoped to what board/grid games and,
+later, graphics actually need — not a general-purpose maths library — and
+should grow only from demonstrated requirements (§20).
 
 ---
 
@@ -195,6 +238,12 @@ The final design should answer:
 * How are random states reproduced?
 
 These questions should be resolved before the simulation system becomes substantial.
+
+As of the Phase 2 brainstorm, a standalone, seedable `oryx::Random` utility
+(wrapping `std::mt19937_64`) has been added to `Oryx/Core`. It is not yet
+wired into `IGame`/`IState` — Phase 2/3 have no chance nodes — but exists so
+Phase 4's Random strategy, and later reproducibility work, have a single
+reproducible source rather than each reaching for `<random>` independently.
 
 ---
 
@@ -397,6 +446,13 @@ This allows the same game to run:
 * In automated tests
 * In a server environment
 
+Phase 3's `TicTacToeBoard` (in `Oasis`) is a concrete class, not yet behind
+a shared `IBoard` interface — with one game and one renderer, an interface
+has no second implementation to justify it. `IBoard` is extracted once
+Phase 11 Graphics needs to swap in a graphical renderer polymorphically
+(`ARCHITECTURE.md` §8), following the same don't-build-it-before-it's-needed
+reasoning as the `Registry<T>` timing decision (§19).
+
 ---
 
 # 17. Build System
@@ -469,10 +525,18 @@ rather than silently choosing an architecture in code.
 | Graphics                        | Separate from core    | Established direction |
 | Headless operation              | First-class           | Established direction |
 | Strategy observability          | Optional              | Established direction |
-| Plugin architecture             | Not decided           | Open                  |
-| State representation            | Not decided           | Open                  |
-| Action representation           | Not decided           | Open                  |
-| Simulation model                | Not decided           | Open                  |
+| Interface dispatch              | Virtual interfaces (`IGame`/`IState`/`IStrategy`, pure-virtual) | Working decision |
+| State representation            | Mutable, in-place `apply()`/`undo()` | Working decision |
+| Action representation           | Opaque `ActionId` (integer alias) | Working decision |
+| Outcome/result model            | `Outcome` with templated `Rewards<T>` (runtime-sized per player) | Working decision |
+| Player/turn model (Phase 2/3)   | Strict alternating turns only | Working decision (scoped) |
+| Randomness utility              | `oryx::Random` (Core, seedable); not wired into chance nodes | Working decision |
+| Phase 2 execution loop          | No `Simulation`/`Match`/`Runner` class; proven via test/demo loop | Working decision |
+| Math module                     | Header-only `oryx::Math`, templated `Vec2<T>` | Working decision |
+| Extension registration          | Self-registering factories, no central list | Working decision (principle; `Registry<T>` implementation timing open) |
+| Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
+| Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
+| Simulation model (batched/eval) | Not decided           | Open                  |
 | Parallelism model               | Not decided           | Open                  |
 | Serialization                   | Not decided           | Open                  |
 

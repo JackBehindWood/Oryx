@@ -153,21 +153,38 @@ A reproducible development workflow capable of configuring, building, testing, a
 
 # 4. Phase 2 — Minimal C++ Core
 
-Build the smallest functional engine.
+Build the smallest functional engine, using the interfaces decided during
+the Phase 0 brainstorm (see `ARCHITECTURE.md` §3 and `DESIGN.md` §19 for
+full detail).
 
-Potential initial components:
+### Components
 
-* Core game abstractions
-* Action representation
-* State representation
-* Player/agent concepts
-* Strategy interface
-* Basic execution loop
-* Result/outcome representation
-* Randomness abstraction
-* Unit testing infrastructure
+* `IGame` — pure-virtual, stateless factory (`new_initial_state()`, static
+  game info)
+* `IState` — pure-virtual; owns all rules and behaviour: `legal_actions()`,
+  `apply(ActionId)`/`undo(ActionId)` (mutated in place), `current_player()`,
+  `is_terminal()`, `outcome()`, `action_to_string(ActionId)`
+* `ActionId` — opaque integer alias, game-defined meaning
+* `Outcome` — `{ is_terminal, Rewards<double> }`; `Rewards<T>` is templated
+  on reward type, runtime-sized per the game's player count
+* `IStrategy` — pure-virtual, conceptually `ActionId decide(const IState&)`;
+  implementations may hold internal state across calls
+* `oryx::Random` — standalone, seedable utility in `Oryx/Core`; not yet
+  wired into `IGame`/`IState` (no chance nodes in Phase 2/3)
+* `oryx::Math` — small header-only module (`Vec2<T>` + aliases), included
+  via `oxpch.h`, scoped to grid/board coordinate needs
+* Unit testing infrastructure (doctest), validating the above against a
+  minimal/dummy game — not Tic-Tac-Toe itself, which is Phase 3's deliverable
 
-The exact interfaces should come from Phase 0 rather than being assumed beforehand.
+### Explicitly deferred
+
+* No `Simulation`/`Match`/`Runner` class yet — the execution loop (legal
+  actions → strategy decides → apply → check terminal → repeat) is proven
+  via tests/a demo loop, not a dedicated abstraction (`ARCHITECTURE.md` §5)
+* No `Registry<T>` — games/strategies will self-register (the principle is
+  decided, `ARCHITECTURE.md` §10), but the mechanism isn't built until a
+  second game/strategy makes manual construction inconvenient
+* No chance/simultaneous player support — strict alternating turns only
 
 ---
 
@@ -190,6 +207,20 @@ The purpose is architectural validation, not creating a large game library immed
 `Oasis`, the companion executable that links against `Oryx`, is the intended
 host for this reference game and later games/demos — it already exists as a
 scaffold (Phase 1) ahead of this phase's actual content.
+
+### Concrete near-term milestone
+
+A terminal-playable Tic-Tac-Toe: two players alternate entering moves via
+stdin, the board prints to stdout after each move, and the game reports the
+outcome once terminal — no `Graphics` system involved (that's Phase 11).
+
+This needs a `TicTacToeBoard` component (in `Oasis`) responsible for both
+rendering the board to stdout and reading a move from stdin. It is a
+**concrete class, not an interface** — with only one game and one renderer,
+a shared `IBoard` interface has no second implementation to justify it yet
+(same reasoning as the `Registry<T>` timing decision in Phase 2). `IBoard`
+gets extracted once Phase 11 Graphics actually needs to swap in a graphical
+renderer polymorphically, per `ARCHITECTURE.md` §8.
 
 ---
 

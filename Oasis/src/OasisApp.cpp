@@ -1,5 +1,4 @@
 #include <filesystem>
-#include <iostream>
 
 #include "OasisApp.h"
 
@@ -10,12 +9,7 @@ constexpr int kReferenceLoopTicks = 10;
 OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     : oryx::Application(args)
 {
-    std::cout << "Oasis — built on Oryx v"
-              << oryx::VERSION_MAJOR << "."
-              << oryx::VERSION_MINOR << "."
-              << oryx::VERSION_PATCH << std::endl;
-
-    ORYX_INFO("Oasis started");
+    ORYX_CORE_INFO("Oasis — built on Oryx v{}.{}.{}", oryx::VERSION_MAJOR, oryx::VERSION_MINOR, oryx::VERSION_PATCH);
     ORYX_INFO("Working directory: {}", std::filesystem::current_path().string());
 }
 

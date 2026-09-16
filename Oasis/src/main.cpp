@@ -1,4 +1,4 @@
-#include "Oryx/EntryPoint.h"
+#include "Oryx/Core/EntryPoint.h"
 
 #include "OasisApp.h"
 
