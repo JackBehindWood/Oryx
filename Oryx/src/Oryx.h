@@ -4,7 +4,12 @@
 #include "Oryx/Core/Log.h"
 #include "Oryx/Core/Assert.h"
 #include "Oryx/Core/Application.h"
+#include "Oryx/Core/Layer.h"
+#include "Oryx/Core/LayerStack.h"
 #include "Oryx/Core/Random.h"
+
+#include "Oryx/Events/Event.h"
+#include "Oryx/Events/ApplicationEvent.h"
 
 #include "Oryx/Math/Math.h"
 

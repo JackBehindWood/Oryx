@@ -96,4 +96,7 @@ oryx.local.toml
 Thumbs.db
 .DS_Store
 *.log
+
+# miscellaneous
 /graphify-out
+.claude/

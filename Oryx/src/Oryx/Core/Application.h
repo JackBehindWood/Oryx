@@ -3,9 +3,12 @@
 #include <string_view>
 #include <vector>
 
+#include "Oryx/Core/LayerStack.h"
+#include "Oryx/Events/Event.h"
+
 int main(int argc, char** argv);
 
-namespace oryx 
+namespace oryx
 {
 
 struct ApplicationCommandLineArgs
@@ -39,13 +42,19 @@ public:
     void run();
     void close() { m_running = false; }
 
-    static Application& Get() { return *s_instance; }
+    template<typename T, typename... Args>
+    T& push_layer(Args&&... args) { return m_layer_stack.push_layer<T>(std::forward<Args>(args)...); }
 
-protected:
-    virtual void update() = 0;
+    template<typename T, typename... Args>
+    T& push_overlay(Args&&... args) { return m_layer_stack.push_overlay<T>(std::forward<Args>(args)...); }
+
+    void post_event(Event& event);
+
+    static Application& Get() { return *s_instance; }
 
 private:
     bool m_running = true;
+    LayerStack m_layer_stack;
 
     static Application* s_instance;
 	friend int ::main(int argc, char** argv);

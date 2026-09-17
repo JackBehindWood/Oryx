@@ -141,9 +141,12 @@ Likewise, advanced metaprogramming should not become a prerequisite for understa
 * Classes: `PascalCase` (e.g. `class Rewards`)
 * Pure-virtual interfaces (100% pure virtual, no data, no concrete methods)
   additionally get an `I`-prefix (e.g. `IGame`, `IState`, `IStrategy`).
-  Abstract base classes that mix concrete behaviour with pure virtual
-  methods do not — e.g. `Application` keeps its name (it has real state and
-  concrete methods alongside one pure virtual `update()`).
+  Base classes that mix concrete behaviour with virtual methods do not —
+  e.g. `Application` keeps its name (it has real state — `m_running`, the
+  `LayerStack` — and concrete methods like `run()`/`close()`/`push_layer()`);
+  `Layer` (`Oryx/Core/Layer.h`) is the same case, with a concrete `name()`
+  alongside `attach()`/`detach()`/`update()`/`event()` virtuals that default
+  to no-ops rather than being pure.
 * Structs are data-only: plain fields, no member functions. Any behaviour
   needed on struct-held data is a free function instead (e.g. `Outcome`
   has `is_terminal`/`rewards` fields only; `Colour` has `r`/`g`/`b`/`a`
@@ -589,6 +592,7 @@ rather than silently choosing an architecture in code.
 | Extension registration          | Self-registering factories, no central list | Working decision (principle; `Registry<T>` implementation timing open) |
 | Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
 | Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
+| Application layering            | `Layer`/`LayerStack` owned by `Application` (`ARCHITECTURE.md` §3.6); `LayerStack` constructs layers via `push_layer<T>()`/`push_overlay<T>()`; `run()` drives `update()`, events propagate top-down via `Layer::event()` until handled | Working decision |
 | Simulation model (batched/eval) | Not decided           | Open                  |
 | Parallelism model               | Not decided           | Open                  |
 | Serialization                   | Not decided           | Open                  |

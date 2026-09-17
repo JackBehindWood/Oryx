@@ -271,6 +271,76 @@ are chosen at runtime through a virtual interface). This represents
 2-player zero-sum outcomes today (Tic-Tac-Toe: +1/-1/0) without requiring a
 breaking change when N-player or non-zero-sum games arrive later.
 
+## 3.6 Application & Layers
+
+`oryx::Application` (`Oryx/Core`) is the host/bootstrap layer — the
+Hazel-style `Application`/`EntryPoint.h`/`create_application()` factory
+pattern, unrelated to the Game/Strategy/Engine model above. `Application`
+owns a `LayerStack` and drives it from `run()`:
+
+```text
+Application::run()
+    │
+    ▼
+ while running:
+    for each Layer in the stack (insertion order):
+        Layer::update()
+```
+
+A `Layer` (`Oryx/Core/Layer.h`) is a base class, not a pure interface, so it
+does not take the `I`-prefix (same exception as `Application` — see
+`DESIGN.md` §5): it mixes concrete state (a `name()`) with virtuals that
+default to no-ops (`attach()`, `detach()`, `update()`, `event()`).
+`LayerStack` is responsible for constructing layers — `Application::push_layer<T>(args...)` /
+`push_overlay<T>(args...)` forward to `LayerStack`, which builds `T` via
+`create_unique<T>`, inserts it (layers before the overlay section, overlays
+always after), calls `attach()`, and returns `T&`. On destruction the stack
+calls `detach()` on every layer in reverse order.
+
+Layers communicate through `Event` (`Oryx/Events/Event.h`) — a Hazel-style
+base with a `handled` flag, an `EventType`/`EventCategory` pair for
+identifying and filtering events (`event_type()`, `category_flags()`,
+`is_in_category()`), and `EventDispatcher` for dispatching to a
+type-specific handler (`dispatcher.dispatch<T>(handler)`, matching on
+`T::static_type()`). The `OX_EVENT_CLASS_TYPE`/`OX_EVENT_CLASS_CATEGORY`
+macros wire a concrete `Event` subclass's `event_type()`/`name()`/
+`category_flags()` up to its `EventType`/`EventCategory` values. New
+`EventType`/`Event` pairs get added together, per event, once a real layer
+needs one — `AppTick`/`AppTickEvent` (`Oryx/Events/ApplicationEvent.h`) is
+the first, and still the only one (no windowing system exists to justify a
+`WindowResizeEvent` yet). `Application::post_event(Event&)` propagates an
+event top-down (most-recently-pushed layer first, via
+`LayerStack::rbegin()`), stopping as soon as a layer sets `handled = true`:
+
+```text
+Application::post_event(event)
+    │
+    ▼
+ for each Layer in the stack (reverse/top-down order):
+    Layer::event(event)
+    stop if event.handled
+```
+
+`OasisApp` currently pushes a single concrete layer, `OasisLayer`
+(`Oasis/src/OasisLayer.h`), which holds the tick-count demo loop previously
+inlined in `OasisApp::update()`. Each tick it posts an `AppTickEvent`
+through `Application::post_event()` rather than logging directly, and its
+own `event()` override picks that event back up via an `EventDispatcher`
+(`dispatcher.dispatch<AppTickEvent>(OX_BIND_EVENT_FN(OasisLayer::handle_app_tick))`)
+to do the actual logging. With only one layer in the stack today this is a
+round trip to itself, but it exercises the full `Layer`/`Event`/
+`EventDispatcher`/`Application::post_event` path end-to-end, not just the
+mechanism in isolation — the same path any future second layer would use
+to listen in on `OasisLayer`'s ticks.
+
+This is a container decision, not an orchestration-model one: it says
+nothing about how game simulation is driven (`# 5. Execution Model` below
+keeps that an explicit open question). Concrete future layers —
+`SimulationLayer`, a `PythonScriptingLayer`, a GUI/CLI front-end layer,
+profiling and benchmarking layers — are plausible consumers of this
+container (see `ROADMAP.md` Phases 6/7/9/11) but are not decided or built
+yet.
+
 ---
 
 # 4. Engine

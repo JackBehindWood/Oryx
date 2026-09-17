@@ -4,7 +4,7 @@
 	#ifdef _WIN64
 		/* Windows x64  */
 		#define OX_PLATFORM_WINDOWS
-        error "Windows is not supported!"
+		#error "Windows is not supported!"
 	#else
 		/* Windows x86 */
 		#error "x86 Builds are not supported!"

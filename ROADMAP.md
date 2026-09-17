@@ -195,6 +195,11 @@ full detail).
   decided, `ARCHITECTURE.md` §10), but the mechanism isn't built until a
   second game/strategy makes manual construction inconvenient
 * No chance/simultaneous player support — strict alternating turns only
+* No concrete `Layer` implementations beyond `Oasis`'s own — `Application`
+  gained a `LayerStack`/`Layer` extension point (`ARCHITECTURE.md` §3.6), but
+  `SimulationLayer`, a `PythonScriptingLayer`, a GUI/CLI layer, and
+  profiling/benchmarking layers are future direction only, tied to Phases
+  6/7/9/11 below
 
 ---
 

@@ -20,7 +20,22 @@ void Application::run()
 {
     while (m_running)
     {
-        update();
+        for (auto& layer : m_layer_stack)
+        {
+            layer->update();
+        }
+    }
+}
+
+void Application::post_event(Event& event)
+{
+    for (auto it = m_layer_stack.rbegin(); it != m_layer_stack.rend(); ++it)
+    {
+        if (event.handled)
+        {
+            break;
+        }
+        (*it)->event(event);
     }
 }
 
