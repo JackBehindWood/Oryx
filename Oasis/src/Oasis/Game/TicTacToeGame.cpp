@@ -100,3 +100,5 @@ std::string TicTacToeState::action_to_string(oryx::ActionId action) const
 }
 
 } // namespace oasis
+
+OX_REGISTER_GAME(oasis::TicTacToeGame, "tictactoe")

@@ -7,6 +7,7 @@
 #include "Oryx/Core/Layer.h"
 #include "Oryx/Core/LayerStack.h"
 #include "Oryx/Core/Random.h"
+#include "Oryx/Core/Registry.h"
 
 #include "Oryx/Events/Event.h"
 #include "Oryx/Events/ApplicationEvent.h"

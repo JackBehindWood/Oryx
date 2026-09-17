@@ -124,6 +124,11 @@ polymorphic type — its meaning is entirely defined by the game that produced
 it. This keeps the `IState` interface stable across every game and keeps
 action generation (a hot path in search) allocation-free.
 
+This was validated directly by Phase 4/5's `MinimaxStrategy`: full-tree
+lookahead recurses depth-first on the same `IState` object via `apply()`/
+`undo()`, exactly like every other consumer — no `clone()`/copy-construction
+contract was added to `IState` (`DESIGN.md` §19).
+
 `IState` should not:
 
 * Select actions on behalf of an agent
@@ -174,6 +179,13 @@ Potential strategies include:
 * Game-theoretic algorithms
 
 The architecture should avoid making assumptions that all strategies share the same internal algorithm.
+
+`RandomStrategy` (Phase 4) owns its own seedable `oryx::Random` member,
+seeded via its own constructor argument — `IStrategy` itself gained no
+seed/RNG parameter. Reproducibility/seed control for a batch is instead
+orchestrated at the `Match`/batch-runner level (`Oryx/Simulation`, §5),
+which decides how to construct and seed strategies for a run (`DESIGN.md`
+§8/§19).
 
 ---
 
@@ -334,12 +346,18 @@ mechanism in isolation — the same path any future second layer would use
 to listen in on `OasisLayer`'s ticks.
 
 This is a container decision, not an orchestration-model one: it says
-nothing about how game simulation is driven (`# 5. Execution Model` below
-keeps that an explicit open question). Concrete future layers —
-`SimulationLayer`, a `PythonScriptingLayer`, a GUI/CLI front-end layer,
-profiling and benchmarking layers — are plausible consumers of this
-container (see `ROADMAP.md` Phases 6/7/9/11) but are not decided or built
-yet.
+nothing about how game simulation is driven (see `# 5. Execution Model`
+below, resolved for Phase 5). `SimulationLayer` (Phase 5,
+`Oryx/src/Oryx/Simulation/`) is the first concrete `Layer` defined in Oryx
+core rather than in an app — a departure from `OasisLayer` being the only
+concrete `Layer` so far. This is justified because driving a batch of
+simulations is Engine responsibility, not specific to the `Oasis` demo app:
+any application linking `Oryx` can push `SimulationLayer` onto its own
+`LayerStack`. Other plausible future layers — a `PythonScriptingLayer`, a
+GUI/CLI front-end layer, profiling and benchmarking layers — remain
+undecided and unbuilt, and would need the same justification (a genuine
+cross-app need) before following `SimulationLayer`'s core-not-app placement
+(see `ROADMAP.md` Phases 6/7/9/11).
 
 ---
 
@@ -414,15 +432,19 @@ Outcome
 Evaluation / Statistics
 ```
 
-The exact orchestration model remains an open design question.
+For Phase 2/3, no dedicated abstraction was introduced — the loop above was
+validated directly via a doctest test exercising a minimal game and a small
+demonstration loop in `Oasis`.
 
-In particular, we should determine whether a dedicated `Simulation`, `Match`, `Runner`, or similar abstraction is actually necessary before introducing one.
-
-For Phase 2 specifically, no such abstraction is introduced yet. The loop
-above is validated directly — via a doctest test exercising a minimal game,
-and/or a small demonstration loop in `Oasis` — rather than through a
-dedicated class. Introducing `Simulation`/`Match`/`Runner` remains a Phase 5
-question once batched simulation and evaluation are actually needed.
+Phase 5 resolves this: a new `Oryx/src/Oryx/Simulation/` core module
+provides `Match` (one game + two strategies → `Outcome`, replacing the ad
+hoc loop above with a reusable class) and a batch runner (N repeated
+matches → aggregated win/loss/draw counts and aggregate `Rewards<T>`).
+`SimulationLayer` (§3.6), a concrete `Layer` defined in the same module,
+drives a batch through `Application`'s tick loop; `Oasis` pushes it onto
+its `LayerStack` like any other layer. This phase is explicitly
+single-threaded — see `DESIGN.md` §13/§19 — batching proves the `Match`/
+runner API shape, not throughput.
 
 ---
 
@@ -597,18 +619,35 @@ The exact extension mechanism—static registration, factories, modules, plugins
 
 Games and strategies register themselves — there is no central file listing
 every game or strategy (contrast with, e.g., Gymnasium's pattern of one
-`register()` call per environment in a shared `__init__.py`). The intended
-mechanism is a self-registering factory: a game or strategy registers a
-name and a factory function via a static object in its own `.cpp` file, so
-adding a new one never requires editing shared engine code.
+`register()` call per environment in a shared `__init__.py`). The mechanism
+is a self-registering factory: a game or strategy registers a name and a
+factory function via a static object in its own `.cpp` file, so adding a
+new one never requires editing shared engine code.
 
 This mirrors `build_system/registry.py`'s decorator-based command
-auto-discovery already used in this project's Python tooling.
+auto-discovery already used in this project's Python tooling — a single
+`Registry<T>::create("name")`-style lookup gives the same ergonomics as
+Gymnasium's `gym.make("name")`, without Gymnasium's `__init__.py`
+central-registration file.
 
-The actual `Registry<T>` utility is not built in Phase 2 — with only one
-game (Tic-Tac-Toe, Phase 3) there is nothing yet to register. It should be
-introduced whenever manual construction first becomes inconvenient, likely
-around Phase 4's baseline strategies or Phase 13's larger game library.
+`Registry<T>` is built in Phase 4, generic and used for both `IGame` and
+`IStrategy` immediately — not deferred until a second game exists.
+Registration is macro-based: `OX_REGISTER_GAME(TicTacToeGame, "tictactoe")`
+/ `OX_REGISTER_STRATEGY(RandomStrategy, "random")` expand to the static
+registrar boilerplate (a static object whose constructor calls
+`Registry<T>::register_factory(name, factory_fn)`), so an author writes one
+macro line per type instead of hand-writing a registrar struct. The macro
+expansion happens at that translation unit's compile time; the resulting
+static object runs the actual registration at static-initialization time,
+before `main()`.
+
+Strategies that are game-specific (e.g. Phase 4's TicTacToe heuristic, kept
+in `Oasis` — see `ROADMAP.md` Phase 4) register under a namespaced name
+(`"tictactoe/heuristic"`) rather than a global one (`"random"`).
+`Registry<T>` does not enforce game/strategy compatibility — misusing a
+game-specific strategy against the wrong game is the caller's
+responsibility, matching the same don't-build-enforcement-before-it's-needed
+reasoning as `IBoard` (§8).
 
 ### Oasis
 
@@ -706,9 +745,25 @@ following, at least for the minimal core:
 * Result model — resolved: `Outcome` with a templated `Rewards<T>` (§3.5)
 * Randomness abstraction — partially resolved: a standalone `oryx::Random`
   utility exists, but is not wired into `IGame`/`IState`
-* Plugin architecture — narrowed to **registry mechanism timing**: the
-  self-registering-factory principle is decided (§10); only the timing of
-  building the actual `Registry<T>` utility remains open
+* Plugin architecture — resolved: self-registering-factory principle (§10),
+  now built as a generic, macro-based `Registry<T>` (Phase 4), covering
+  both `IGame` and `IStrategy`
+
+The Phase 4/5 brainstorm (see `DESIGN.md` §19 decision log) resolved
+further, for this phase's scope:
+
+* `Registry<T>` implementation and timing — resolved: built in Phase 4,
+  generic, macro-based self-registration (`OX_REGISTER_GAME`/
+  `OX_REGISTER_STRATEGY`), covering both `IGame` and `IStrategy` (§10)
+* Simulation orchestration — resolved: `Match` + batch runner in
+  `Oryx/Simulation`, `SimulationLayer` drives batches via `Application`'s
+  tick loop (§5, §3.6)
+* Game-specific strategy registration — resolved: namespaced registry
+  names (e.g. `"tictactoe/heuristic"`); no compatibility enforcement (§10)
+* `IState` growth for search (clone/copy) — resolved: not needed;
+  `apply()`/`undo()` suffices for Minimax lookahead (§3.2)
+* Strategy randomness wiring — resolved: no `IStrategy` change;
+  `RandomStrategy` owns its own `oryx::Random` (§3.3)
 
 The following should **not** be considered settled yet:
 
@@ -718,16 +773,16 @@ The following should **not** be considered settled yet:
 * Chance/nature actions
 * Imperfect information
 * Game history
-* Simulation orchestration
 * Evaluation API
 * Experiment representation
 * Observability protocol
 * Dashboard transport
-* `Registry<T>` implementation and timing
 * Python ownership/lifetime semantics
 * Serialization
 * Graphics abstraction
-* Multi-threaded simulation model
+* Multi-threaded simulation model — explicitly deferred rather than merely
+  unaddressed: Phase 5's batch runner is single-threaded by design
+  (`DESIGN.md` §13/§19), not pending a decision
 
 These should be addressed systematically rather than solved piecemeal during implementation.
 

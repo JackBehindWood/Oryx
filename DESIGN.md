@@ -301,6 +301,13 @@ wired into `IGame`/`IState` — Phase 2/3 have no chance nodes — but exists so
 Phase 4's Random strategy, and later reproducibility work, have a single
 reproducible source rather than each reaching for `<random>` independently.
 
+Phase 4 resolves the strategy-level question: `RandomStrategy` owns its own
+`oryx::Random` member, seeded via its own constructor argument. `IStrategy`
+gained no seed/RNG parameter — seeding a batch's strategies is instead the
+responsibility of whatever constructs them, i.e. the `Match`/batch-runner
+level introduced in Phase 5 (`ARCHITECTURE.md` §5), not the strategy
+interface itself.
+
 ---
 
 # 9. Determinism and Reproducibility
@@ -428,7 +435,12 @@ Experiment
 
 This can provide a natural basis for parallel execution.
 
-The exact threading/executor model remains open.
+Phase 5's batch runner takes the first concrete step here — but stays
+single-threaded. Parallel execution is explicitly scoped out of Phase 5
+rather than left ambient: batching this phase exists to prove the `Match`/
+runner API shape (one game + two strategies → `Outcome`, aggregated over N
+runs), not to deliver throughput. The exact threading/executor model
+remains open for a later phase.
 
 ---
 
@@ -589,13 +601,18 @@ rather than silently choosing an architecture in code.
 | Randomness utility              | `oryx::Random` (Core, seedable); not wired into chance nodes | Working decision |
 | Phase 2 execution loop          | No `Simulation`/`Match`/`Runner` class; proven via test/demo loop | Working decision |
 | Math module                     | Header-only `oryx::Math`: `oryx::math` `<cmath>` wrappers + constants, generic `Vector<N,T>` (+ `Vec2`/`Vec3`/`Vec4` headers), `Matrix<R,C,T>` (+ `Mat2`/`Mat3`/`Mat4`, bounded 2x2/3x3 determinant/inverse, 2D affine transform helpers), `Colour` — widened during Phase 2 planning from the original `Vec2`-only scope, then again for a general vector/matrix/colour pass | Working decision |
-| Extension registration          | Self-registering factories, no central list | Working decision (principle; `Registry<T>` implementation timing open) |
+| Extension registration          | Self-registering factories, no central list; generic `Registry<T>` built in Phase 4, covering `IGame` and `IStrategy`, registered via `OX_REGISTER_GAME`/`OX_REGISTER_STRATEGY` macros expanding to a static self-registering object per type | Working decision |
 | Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
 | Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
 | Application layering            | `Layer`/`LayerStack` owned by `Application` (`ARCHITECTURE.md` §3.6); `LayerStack` constructs layers via `push_layer<T>()`/`push_overlay<T>()`; `run()` drives `update()`, events propagate top-down via `Layer::event()` until handled | Working decision |
 | Test tiers beyond Unit          | Integration tier established (`tests/integration/`, same `Tests` binary/doctest, no new premake project); per-game (e.g. Tic-Tac-Toe) unit tests still deferred — "play it" remains sufficient for now | Working decision (scoped) |
-| Simulation model (batched/eval) | Not decided           | Open                  |
-| Parallelism model               | Not decided           | Open                  |
+| Simulation model (batched/eval) | `Match` (game + 2 strategies → `Outcome`) and a batch runner (N matches → aggregated win/loss/draw + `Rewards<T>`) in new `Oryx/Simulation` module; `SimulationLayer` (Layer subclass, defined in Oryx core) drives batches via `Application`'s tick loop | Working decision |
+| Strategy location                | `RandomStrategy`/`FirstLegalStrategy`/`MinimaxStrategy` in `Oryx/Strategy` (game-agnostic); TicTacToe heuristic strategy in `Oasis` (game-specific), same reasoning as `TicTacToeBoard` | Working decision (scoped) |
+| Strategy registry scoping        | Flat `Registry<IStrategy>` with a namespaced-name convention for game-specific strategies (e.g. `"tictactoe/heuristic"` vs. `"random"`); no compatibility enforcement this phase | Working decision (scoped) |
+| `IState` clone/copy              | Not needed; `MinimaxStrategy` uses `apply()`/`undo()` depth-first on the same state object, no clone/copy-construction contract added | Working decision |
+| Strategy randomness wiring       | No `IStrategy` interface change; `RandomStrategy` owns its own `oryx::Random`, seeded via constructor; batch-level seeding is the `Match`/runner's responsibility | Working decision |
+| `SimulationLayer` location       | Defined in Oryx core (`Oryx/Simulation`) — first concrete `Layer` outside an app, since simulation-driving is Engine responsibility, not `Oasis`-specific | Working decision |
+| Parallelism model               | Explicitly deferred — Phase 5's batch runner is single-threaded by design; batching proves the API shape, not throughput | Deferred (explicit) |
 | Serialization                   | Not decided           | Open                  |
 
 ---

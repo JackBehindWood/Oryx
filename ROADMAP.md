@@ -254,6 +254,30 @@ These should provide progressively stronger validation of the strategy interface
 
 The goal is to test whether the architecture works across different decision-making styles.
 
+### Concrete near-term milestone
+
+Four strategies, confirmed rather than merely potential:
+
+* `RandomStrategy`, `FirstLegalStrategy`, `MinimaxStrategy` — game-agnostic,
+  depending only on `IState`, living in `Oryx/src/Oryx/Strategy/`
+* A TicTacToe-specific heuristic strategy — living in `Oasis`, for the same
+  reason `TicTacToeBoard` stayed concrete/local rather than becoming a core
+  abstraction (`ARCHITECTURE.md` §8)
+
+Minimax exercises lookahead using the existing `apply()`/`undo()` contract
+directly — depth-first search on the same state object, undoing after each
+branch. No `clone()`/copy-construction is added to `IState` for this.
+
+This phase also builds `Registry<T>`, generic and wired up for both `IGame`
+and `IStrategy` from the start (see `ARCHITECTURE.md` §10 and `DESIGN.md`
+§19). Games and strategies register via `OX_REGISTER_GAME`/
+`OX_REGISTER_STRATEGY` macros that expand to a self-registering static
+object per type — no central list, no `__init__.py`-style registration
+file to maintain. Game-specific strategies (like the heuristic above)
+register under a namespaced name (e.g. `"tictactoe/heuristic"`) rather than
+a global one (`"random"`); the registry itself doesn't enforce game/strategy
+compatibility yet.
+
 ---
 
 # 7. Phase 5 — Simulation & Evaluation
@@ -276,6 +300,23 @@ The result should make it easy to answer questions such as:
 How does Strategy A perform against Strategy B
 over 100,000 games?
 ```
+
+### Concrete near-term milestone
+
+A new `Oryx/src/Oryx/Simulation/` core module:
+
+* `Match` — one game + two strategies → `Outcome`
+* A batch runner — N repeated matches → aggregated win/loss/draw counts and
+  aggregate `Rewards<T>`
+* `SimulationLayer` — a concrete `Layer` subclass defined in Oryx core (not
+  Oasis) that drives a batch through `Application`'s tick loop; `Oasis`
+  pushes it onto its `LayerStack` the same way it pushes `OasisLayer` today
+  (`ARCHITECTURE.md` §3.6)
+
+This phase is explicitly single-threaded — batching proves the `Match`/
+runner API shape, not throughput. Parallel batch execution is deferred (see
+`DESIGN.md` §13/§19); the "100,000 games" example above is a target for the
+API to express cleanly, not a performance bar this phase needs to clear.
 
 ---
 

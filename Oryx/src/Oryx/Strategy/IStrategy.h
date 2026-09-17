@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Core/Registry.h"
 #include "Oryx/Game/ActionId.h"
 #include "Oryx/Game/IState.h"
 
@@ -13,5 +14,7 @@ public:
 
     virtual ActionId decide(const IState& state) = 0;
 };
+
+using StrategyRegistry = Registry<IStrategy>;
 
 } // namespace oryx

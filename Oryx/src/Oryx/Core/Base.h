@@ -21,6 +21,9 @@
 #define OX_EXPAND_MACRO(x) x
 #define OX_STRINGIFY_MACRO(x) #x
 
+#define OX_CONCAT_IMPL(a, b) a##b
+#define OX_CONCAT(a, b) OX_CONCAT_IMPL(a, b)
+
 #define BIT(x) (1 << x)
 
 #define OX_BIND_EVENT_FN(fn) [this](auto&&... args) -> decltype(auto) { return this->fn(std::forward<decltype(args)>(args)...); }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Base.h"
+#include "Oryx/Core/Registry.h"
 #include "Oryx/Game/IState.h"
 
 namespace oryx
@@ -16,5 +17,7 @@ public:
     virtual std::string name() const = 0;
     virtual int32_t num_players() const = 0;
 };
+
+using GameRegistry = Registry<IGame>;
 
 } // namespace oryx
