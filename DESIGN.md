@@ -593,6 +593,7 @@ rather than silently choosing an architecture in code.
 | Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
 | Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
 | Application layering            | `Layer`/`LayerStack` owned by `Application` (`ARCHITECTURE.md` §3.6); `LayerStack` constructs layers via `push_layer<T>()`/`push_overlay<T>()`; `run()` drives `update()`, events propagate top-down via `Layer::event()` until handled | Working decision |
+| Test tiers beyond Unit          | Integration tier established (`tests/integration/`, same `Tests` binary/doctest, no new premake project); per-game (e.g. Tic-Tac-Toe) unit tests still deferred — "play it" remains sufficient for now | Working decision (scoped) |
 | Simulation model (batched/eval) | Not decided           | Open                  |
 | Parallelism model               | Not decided           | Open                  |
 | Serialization                   | Not decided           | Open                  |

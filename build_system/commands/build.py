@@ -8,6 +8,7 @@ from build_system.compile_commands import generate_compile_commands
 from build_system.config import BUILD_DIR, PROJECT_ROOT, RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
+from build_system.setup.stale_objects import prune_stale_object_dirs
 from build_system.utils import remove_directory, run_command
 
 console = Console()
@@ -43,6 +44,12 @@ def configure(ctx: typer.Context):
     except subprocess.CalledProcessError as error:
         console.print(f"[bold red]✗ Failed to configure build:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
+
+    for project in prune_stale_object_dirs(cfg):
+        console.print(
+            f"[yellow]⚠️ Cleared stale object cache for {project} "
+            "(moved/renamed/deleted source detected).[/yellow]\n"
+        )
 
     try:
         if generate_compile_commands(cfg):

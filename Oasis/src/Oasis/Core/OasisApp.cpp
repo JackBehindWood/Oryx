@@ -3,6 +3,9 @@
 #include "OasisApp.h"
 #include "OasisLayer.h"
 
+namespace oasis
+{
+
 OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     : oryx::Application(args)
 {
@@ -11,3 +14,5 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
 
     push_layer<OasisLayer>();
 }
+
+} // namespace oasis

@@ -1,8 +1,8 @@
 #include "Oryx/Core/EntryPoint.h"
 
-#include "OasisApp.h"
+#include "Oasis/Core/OasisApp.h"
 
 oryx::Application* oryx::create_application(oryx::ApplicationCommandLineArgs args)
 {
-    return new OasisApp(args);
+    return new oasis::OasisApp(args);
 }

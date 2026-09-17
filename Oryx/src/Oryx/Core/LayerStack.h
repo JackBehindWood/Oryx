@@ -8,9 +8,6 @@
 namespace oryx
 {
 
-// Owns and orders a stack of Layers. Layers are inserted before the
-// overlay section, overlays are always appended after it, so overlays
-// always update after and receive events before ordinary layers.
 class LayerStack
 {
 public:
@@ -21,7 +18,7 @@ public:
     T& push_layer(Args&&... args)
     {
         static_assert(std::is_base_of_v<Layer, T>, "T must derive from oryx::Layer");
-        auto layer = create_unique<T>(std::forward<Args>(args)...);
+        UniquePtr<T> layer = create_unique<T>(std::forward<Args>(args)...);
         T& ref = *layer;
         m_layers.emplace(m_layers.begin() + m_layer_insert_index, std::move(layer));
         ++m_layer_insert_index;
@@ -33,7 +30,7 @@ public:
     T& push_overlay(Args&&... args)
     {
         static_assert(std::is_base_of_v<Layer, T>, "T must derive from oryx::Layer");
-        auto overlay = create_unique<T>(std::forward<Args>(args)...);
+        UniquePtr<T> overlay = create_unique<T>(std::forward<Args>(args)...);
         T& ref = *overlay;
         m_layers.emplace_back(std::move(overlay));
         ref.attach();
