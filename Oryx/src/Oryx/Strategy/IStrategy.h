@@ -4,8 +4,6 @@
 #include "Oryx/Game/ActionId.h"
 #include "Oryx/Game/Context.h"
 
-#include <typeindex>
-#include <vector>
 
 namespace oryx
 {
@@ -23,5 +21,10 @@ public:
 };
 
 using StrategyRegistry = Registry<IStrategy>;
+
+inline UniquePtr<IStrategy> create_strategy(const std::string& name)
+{
+    return StrategyRegistry::create(name);
+}
 
 } // namespace oryx

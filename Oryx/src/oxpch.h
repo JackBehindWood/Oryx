@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <functional>
 
+#include <typeindex>
+
 #include <cstdint>
 #include <string>
 #include <sstream>

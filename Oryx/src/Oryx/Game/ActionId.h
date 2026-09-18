@@ -7,7 +7,9 @@ using ActionId = uint32_t;
 
 constexpr ActionId INVALID_ACTION = static_cast<ActionId>(-1);
 
-constexpr bool is_valid(ActionId action) 
+constexpr ActionId UNDO_ACTION = INVALID_ACTION - 1;
+
+constexpr bool is_valid(ActionId action)
 { 
     return action != INVALID_ACTION; 
 }

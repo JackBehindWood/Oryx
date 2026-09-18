@@ -2,11 +2,6 @@
 
 #include "Oryx/Core/Base.h"
 
-#include <functional>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 namespace oryx
 {
 

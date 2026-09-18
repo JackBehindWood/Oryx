@@ -82,10 +82,10 @@ oryx::Outcome TicTacToeState::outcome() const
     Mark win = winner();
     if (win != Mark::Empty)
     {
-        int32_t winning_player = (win == Mark::X) ? 0 : 1;
-        int32_t losing_player = 1 - winning_player;
-        result.rewards[static_cast<size_t>(winning_player)] = 1.0;
-        result.rewards[static_cast<size_t>(losing_player)] = -1.0;
+        oryx::PlayerId winning_player = (win == Mark::X) ? 0 : 1;
+        oryx::PlayerId losing_player = 1 - winning_player;
+        result.rewards[winning_player] = 1.0;
+        result.rewards[losing_player] = -1.0;
     }
 
     return result;

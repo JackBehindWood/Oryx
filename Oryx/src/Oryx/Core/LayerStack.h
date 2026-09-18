@@ -3,8 +3,6 @@
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
 
-#include <vector>
-
 namespace oryx
 {
 

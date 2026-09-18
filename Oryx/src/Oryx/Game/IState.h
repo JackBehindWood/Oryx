@@ -2,6 +2,7 @@
 
 #include "Oryx/Game/ActionId.h"
 #include "Oryx/Game/Outcome.h"
+#include "Oryx/Game/PlayerId.h"
 
 namespace oryx
 {
@@ -16,7 +17,7 @@ public:
     virtual void apply(ActionId action) = 0;
     virtual void undo(ActionId action) = 0;
 
-    virtual int32_t current_player() const = 0;
+    virtual PlayerId current_player() const = 0;
 
     virtual bool is_terminal() const = 0;
     virtual Outcome outcome() const = 0;

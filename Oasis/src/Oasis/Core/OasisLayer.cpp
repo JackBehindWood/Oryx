@@ -2,14 +2,24 @@
 
 #include <algorithm>
 #include <iostream>
-#include <typeindex>
+#include <stdexcept>
 
 namespace oasis
 {
 
-OasisLayer::OasisLayer(std::string opponent_arg)
+using oryx::ActionId;
+using oryx::Context;
+using oryx::ExternalStrategy;
+using oryx::IGame;
+using oryx::IState;
+using oryx::IStrategy;
+using oryx::SimulationLayer;
+using oryx::UniquePtr;
+
+OasisLayer::OasisLayer(std::string opponent_arg, std::string simulate_arg)
     : oryx::Layer("OasisLayer")
     , m_opponent_arg(std::move(opponent_arg))
+    , m_simulate_arg(std::move(simulate_arg))
 {
 }
 
@@ -45,16 +55,66 @@ bool OasisLayer::prompt_for_opponent(std::string& out_name) const
 
 void OasisLayer::attach()
 {
-    m_game = oryx::GameRegistry::create("tictactoe");
-    if (!m_game)
+    UniquePtr<IGame> game = oryx::create_game("tictactoe");
+    if (!game)
     {
         OX_ERROR("Failed to create game 'tictactoe' — is it registered?");
         oryx::Application::Get().close();
         return;
     }
 
-    m_state = m_game->new_initial_state();
+    if (!m_simulate_arg.empty())
+    {
+        attach_simulate(std::move(game));
+        return;
+    }
 
+    attach_interactive(std::move(game));
+}
+
+void OasisLayer::attach_simulate(UniquePtr<IGame> game)
+{
+    size_t first_comma = m_simulate_arg.find(',');
+    size_t second_comma = first_comma == std::string::npos ? std::string::npos : m_simulate_arg.find(',', first_comma + 1);
+    if (first_comma == std::string::npos || second_comma == std::string::npos)
+    {
+        OX_ERROR("--simulate expects <strategyA>,<strategyB>,<matchCount>, got '{}'.", m_simulate_arg);
+        oryx::Application::Get().close();
+        return;
+    }
+
+    std::string strategy_a_name = m_simulate_arg.substr(0, first_comma);
+    std::string strategy_b_name = m_simulate_arg.substr(first_comma + 1, second_comma - first_comma - 1);
+    std::string count_string = m_simulate_arg.substr(second_comma + 1);
+
+    if (!oryx::StrategyRegistry::has(strategy_a_name) || !oryx::StrategyRegistry::has(strategy_b_name))
+    {
+        OX_ERROR("--simulate: unknown strategy name(s) '{}', '{}'.", strategy_a_name, strategy_b_name);
+        oryx::Application::Get().close();
+        return;
+    }
+
+    int32_t match_count = 0;
+    try
+    {
+        match_count = std::stoi(count_string);
+    }
+    catch (const std::exception&)
+    {
+        OX_ERROR("--simulate: invalid match count '{}'.", count_string);
+        oryx::Application::Get().close();
+        return;
+    }
+
+    std::vector<UniquePtr<IStrategy>> strategies;
+    strategies.push_back(oryx::StrategyRegistry::create(strategy_a_name));
+    strategies.push_back(oryx::StrategyRegistry::create(strategy_b_name));
+
+    oryx::Application::Get().push_layer<SimulationLayer>(std::move(game), std::move(strategies), match_count); //Note: we should probably move the pushing part to OasisApp.cpp and use an Event to trigger the simulation and simulation setup, but for now this is fine.
+}
+
+void OasisLayer::attach_interactive(UniquePtr<IGame> game)
+{
     std::string opponent_name = m_opponent_arg;
     if (opponent_name.empty())
     {
@@ -72,90 +132,41 @@ void OasisLayer::attach()
         return;
     }
 
-    if (opponent_name != "human")
+    ExternalStrategy::InputProvider human_input = [this](const Context& context) -> ActionId
     {
-        m_opponent = oryx::StrategyRegistry::create(opponent_name);
+        return m_board.read_move(static_cast<const TicTacToeState&>(context.state()));
+    };
 
-        Context validation_context(*m_state);
-        std::vector<std::type_index> missing;
-        for (const std::type_index& capability : m_opponent->required_capabilities())
-        {
-            if (!validation_context.has_capability(capability))
-            {
-                missing.push_back(capability);
-            }
-        }
-        if (!missing.empty())
-        {
-            OX_ERROR("Strategy '{}' requires {} capability(-ies) that game '{}' does not provide.",
-                      opponent_name, missing.size(), m_game->name());
-            oryx::Application::Get().close();
-            return;
-        }
+    std::vector<UniquePtr<IStrategy>> strategies(2);
 
-        oryx::Random random;
-        m_human_player = random.get_bool() ? 0 : 1;
-        OX_INFO("You are playing {} against '{}'.", m_human_player == 0 ? "X" : "O", opponent_name);
-    }
-}
-
-void OasisLayer::update()
-{
-    if (!m_state)
+    if (opponent_name == "human")
     {
-        return;
-    }
-
-    TicTacToeState& state = static_cast<TicTacToeState&>(*m_state);
-    m_board.print(state);
-
-    if (state.is_terminal())
-    {
-        m_board.print_outcome(state.outcome());
-        oryx::Application::Get().close();
-        return;
-    }
-
-    bool human_turn = !m_opponent || state.current_player() == m_human_player;
-
-    ActionId action = oryx::INVALID_ACTION;
-    if (human_turn)
-    {
-        action = m_board.read_move(state);
-
-        if (!oryx::is_valid(action))
-        {
-            OX_INFO("Input closed before the game finished — exiting.");
-            oryx::Application::Get().close();
-            return;
-        }
-
-        if (action == UNDO_ACTION)
-        {
-            if (m_history.empty())
-            {
-                OX_WARN("No moves to undo.");
-                return;
-            }
-            ActionId last_action = m_history.back();
-            m_history.pop_back();
-            state.undo(last_action);
-            return;
-        }
+        strategies[0] = oryx::create_unique<ExternalStrategy>(human_input);
+        strategies[1] = oryx::create_unique<ExternalStrategy>(human_input);
+        OX_INFO("Human vs human.");
     }
     else
     {
-        Context context(state);
-        action = m_opponent->decide(context);
-        OX_INFO("Opponent plays {}.", state.action_to_string(action));
+        UniquePtr<IStrategy> opponent = oryx::StrategyRegistry::create(opponent_name);
+
+        oryx::Random random;
+        int32_t human_player = random.get_bool() ? 0 : 1;
+        strategies[static_cast<size_t>(human_player)] = oryx::create_unique<ExternalStrategy>(human_input);
+        strategies[static_cast<size_t>(1 - human_player)] = std::move(opponent);
+        OX_INFO("You are playing {} against '{}'.", human_player == 0 ? "X" : "O", opponent_name);
     }
 
-    state.apply(action);
-    m_history.push_back(action);
-}
+    SimulationLayer::TurnObserver render = [this](IState& state)
+    {
+        TicTacToeState& tic_tac_toe_state = static_cast<TicTacToeState&>(state);
+        m_board.print(tic_tac_toe_state);
+        if (tic_tac_toe_state.is_terminal())
+        {
+            m_board.print_outcome(tic_tac_toe_state.outcome());
+        }
+    };
 
-void OasisLayer::detach()
-{
+    oryx::Application::Get().push_layer<SimulationLayer>(std::move(game), std::move(strategies), /*match_count=*/1, render);
 }
 
 } // namespace oasis

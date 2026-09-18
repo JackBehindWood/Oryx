@@ -5,11 +5,6 @@
 namespace oryx
 {
 
-// Events are dispatched synchronously: when one occurs it is handed
-// straight to Application::post_event() and must be dealt with then and
-// there. EventType only grows a value once a concrete Event subclass
-// actually needs it (see ARCHITECTURE.md §3.6) - AppTick (AppTickEvent,
-// Oryx/Events/ApplicationEvent.h) is the first.
 enum class EventType
 {
     None = 0,

@@ -34,7 +34,7 @@ public:
         m_current_player = 1 - m_current_player;
     }
 
-    int32_t current_player() const override { return m_current_player; }
+    PlayerId current_player() const override { return m_current_player; }
 
     bool is_terminal() const override { return m_pile == 0; }
 
@@ -46,10 +46,10 @@ public:
         if (result.is_terminal)
         {
             // The player who took the last stone loses.
-            int32_t winner = m_current_player;
-            int32_t loser = 1 - m_current_player;
-            result.rewards[static_cast<size_t>(winner)] = 1.0;
-            result.rewards[static_cast<size_t>(loser)] = -1.0;
+            PlayerId winner = m_current_player;
+            PlayerId loser = 1 - m_current_player;
+            result.rewards[winner] = 1.0;
+            result.rewards[loser] = -1.0;
         }
         return result;
     }
@@ -61,7 +61,7 @@ public:
 
 private:
     uint32_t m_pile;
-    int32_t m_current_player = 0;
+    PlayerId m_current_player = 0;
 };
 
 class DummyGame : public IGame

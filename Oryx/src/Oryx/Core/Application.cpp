@@ -14,6 +14,7 @@ Application::Application(ApplicationCommandLineArgs)
 
 Application::~Application()
 {
+    s_instance = nullptr;
 }
 
 void Application::run()

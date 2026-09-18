@@ -1,10 +1,9 @@
 #pragma once
 
-#include <string_view>
-#include <vector>
-
 #include "Oryx/Core/LayerStack.h"
 #include "Oryx/Events/Event.h"
+
+#include <string_view>
 
 int main(int argc, char** argv);
 

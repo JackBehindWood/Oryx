@@ -8,8 +8,6 @@ namespace oasis
 // Concrete stdin/stdout renderer for TicTacToeState — not behind an
 // interface, since with only one game and one renderer there is nothing
 // yet to abstract over (see DESIGN.md §16 / ARCHITECTURE.md §8).
-constexpr oryx::ActionId UNDO_ACTION = oryx::INVALID_ACTION - 1;
-
 class TicTacToeBoard
 {
 public:

@@ -2,16 +2,9 @@
 
 #include "Oryx/Game/IState.h"
 
-#include <typeindex>
-#include <unordered_map>
-
 namespace oryx
 {
 
-// Non-owning view onto an IState plus explicitly provided capabilities
-// (attached via provide(), not dynamic_cast - a capability can come from
-// anywhere the orchestrator chooses). Provided instances must outlive the
-// Context, same as `state`.
 class Context
 {
 public:

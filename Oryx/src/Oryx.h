@@ -15,12 +15,20 @@
 #include "Oryx/Math/Math.h"
 
 #include "Oryx/Game/ActionId.h"
+#include "Oryx/Game/PlayerId.h"
 #include "Oryx/Game/Outcome.h"
 #include "Oryx/Game/IState.h"
 #include "Oryx/Game/IGame.h"
+#include "Oryx/Game/IActionFeatures.h"
 #include "Oryx/Game/Context.h"
 
 #include "Oryx/Strategy/IStrategy.h"
 #include "Oryx/Strategy/RandomStrategy.h"
 #include "Oryx/Strategy/FirstLegalStrategy.h"
 #include "Oryx/Strategy/MinimaxStrategy.h"
+#include "Oryx/Strategy/ExternalStrategy.h"
+
+#include "Oryx/Simulation/ActionHistory.h"
+#include "Oryx/Simulation/Match.h"
+#include "Oryx/Simulation/BatchRunner.h"
+#include "Oryx/Simulation/SimulationLayer.h"

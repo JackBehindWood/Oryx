@@ -60,7 +60,7 @@ oryx::ActionId TicTacToeBoard::read_move(const TicTacToeState& state) const
 
         if (first_token == "u" || first_token == "undo")
         {
-            return UNDO_ACTION;
+            return oryx::UNDO_ACTION;
         }
 
         try

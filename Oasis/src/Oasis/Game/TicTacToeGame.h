@@ -22,7 +22,7 @@ public:
     void apply(oryx::ActionId action) override;
     void undo(oryx::ActionId action) override;
 
-    int32_t current_player() const override { return m_current_player; }
+    oryx::PlayerId current_player() const override { return m_current_player; }
 
     bool is_terminal() const override;
     oryx::Outcome outcome() const override;
@@ -35,7 +35,18 @@ private:
     Mark winner() const;
 
     oryx::Matrix<3, 3, Mark> m_board;
-    int32_t m_current_player = 0;
+    oryx::PlayerId m_current_player = 0;
+};
+
+// Decodes a TicTacToe ActionId into {row, col} - the worked example for
+// IActionFeatures (ARCHITECTURE.md §14).
+class TicTacToeActionFeatures : public oryx::IActionFeatures
+{
+public:
+    std::vector<int32_t> decode(oryx::ActionId action) const override
+    {
+        return { static_cast<int32_t>(action / 3), static_cast<int32_t>(action % 3) };
+    }
 };
 
 class TicTacToeGame : public oryx::IGame
@@ -48,6 +59,12 @@ public:
 
     std::string name() const override { return "TicTacToe"; }
     int32_t num_players() const override { return 2; }
+
+    oryx::IActionFeatures* action_features() const override
+    {
+        static TicTacToeActionFeatures instance;
+        return &instance;
+    }
 };
 
 } // namespace oasis

@@ -7,32 +7,25 @@
 namespace oasis
 {
 
-using oryx::ActionId;
-using oryx::Context;
-using oryx::IGame;
-using oryx::IState;
-using oryx::UniquePtr;
-
+// Oasis-specific setup only: resolves/prompts for the game and opponent,
+// builds the ExternalStrategy (human input) and render hooks, and pushes
+// SimulationLayer, which owns the actual game/action loop
+// (Oryx/Simulation/SimulationLayer.h).
 class OasisLayer : public oryx::Layer
 {
 public:
-    explicit OasisLayer(std::string opponent_arg = "");
+    explicit OasisLayer(std::string opponent_arg = "", std::string simulate_arg = "");
 
     void attach() override;
-    void update() override;
-    void detach() override;
 
 private:
     bool prompt_for_opponent(std::string& out_name) const;
+    void attach_simulate(oryx::UniquePtr<oryx::IGame> game);
+    void attach_interactive(oryx::UniquePtr<oryx::IGame> game);
 
     std::string m_opponent_arg;
-    UniquePtr<IGame> m_game;
-    UniquePtr<IState> m_state;
+    std::string m_simulate_arg;
     TicTacToeBoard m_board;
-    std::vector<ActionId> m_history;
-
-    UniquePtr<oryx::IStrategy> m_opponent;
-    int32_t m_human_player = 0;
 };
 
 } // namespace oasis
