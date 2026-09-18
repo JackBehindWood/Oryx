@@ -6,7 +6,7 @@ namespace oryx
 {
 
 SimulationLayer::SimulationLayer(UniquePtr<IGame> game,
-                                  std::vector<UniquePtr<IStrategy>> strategies,
+                                  SmallVector<UniquePtr<IStrategy>, 2> strategies,
                                   int32_t match_count,
                                   TurnObserver on_turn)
     : Layer("SimulationLayer")

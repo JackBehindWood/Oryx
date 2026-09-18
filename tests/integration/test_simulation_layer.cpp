@@ -10,7 +10,7 @@ TEST_CASE("SimulationLayer drives a headless batch of Matches through Applicatio
     Application app({ 0, nullptr });
 
     UniquePtr<IGame> game = create_unique<DummyGame>(10);
-    std::vector<UniquePtr<IStrategy>> strategies;
+    SmallVector<UniquePtr<IStrategy>, 2> strategies;
     strategies.push_back(create_unique<DummyGreedyStrategy>());
     strategies.push_back(create_unique<DummyGreedyStrategy>());
 
@@ -41,7 +41,7 @@ TEST_CASE("SimulationLayer stops cleanly when an ExternalStrategy seat's input c
             return 1;
         });
 
-    std::vector<UniquePtr<IStrategy>> strategies;
+    SmallVector<UniquePtr<IStrategy>, 2> strategies;
     strategies.push_back(create_unique<DummyGreedyStrategy>());
     strategies.push_back(std::move(external));
 

@@ -42,7 +42,7 @@ public:
 class MockActionFeatures : public IActionFeatures
 {
 public:
-    std::vector<int32_t> decode(ActionId action) const override { return { static_cast<int32_t>(action), 0 }; }
+    SmallVector<int32_t, 2> decode(ActionId action) const override { return { static_cast<int32_t>(action), 0 }; }
 };
 
 class MockFeatureGame : public DummyGame
@@ -154,7 +154,7 @@ TEST_CASE("Match::build_context attaches IActionFeatures when the game provides 
     Context context = Match::build_context(game, *state);
     IActionFeatures* features = context.get<IActionFeatures>();
     REQUIRE(features != nullptr);
-    CHECK(features->decode(5) == std::vector<int32_t>{ 5, 0 });
+    CHECK(features->decode(5) == SmallVector<int32_t, 2>{ 5, 0 });
 }
 
 TEST_CASE("Match::build_context provides no IActionFeatures when the game doesn't have one")

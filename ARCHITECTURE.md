@@ -570,7 +570,7 @@ to stdout and reading a move from stdin. It is deliberately **not** behind a
 shared `IBoard` interface yet: with only one game and one renderer, an
 interface has no second implementation to justify it (the same reasoning as
 the `Registry<T>` timing decision, §10). `IBoard` should be extracted once
-Phase 11 Graphics actually needs to swap in a graphical renderer
+Phase 10 Graphics actually needs to swap in a graphical renderer
 polymorphically — not before.
 
 ---

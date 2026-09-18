@@ -70,7 +70,7 @@ oryx::ActionId TicTacToeHeuristicStrategy::decide(const oryx::Context& context)
         return blocking;
     }
 
-    std::vector<oryx::ActionId> actions = tic_tac_toe.legal_actions();
+    oryx::ActionList actions = tic_tac_toe.legal_actions();
 
     constexpr oryx::ActionId kCenter = 4;
     if (std::find(actions.begin(), actions.end(), kCenter) != actions.end())

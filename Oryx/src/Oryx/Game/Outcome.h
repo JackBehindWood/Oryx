@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/PlayerId.h"
 
 namespace oryx
 {
 
+// Sized inline for 2 players (DESIGN.md §19); spills to heap past that.
 template<typename T>
 class Rewards
 {
@@ -16,11 +18,11 @@ public:
     T& operator[](PlayerId player) { return m_values[static_cast<size_t>(player)]; }
     const T& operator[](PlayerId player) const { return m_values[static_cast<size_t>(player)]; }
 
-    inline T& at(PlayerId player) { return m_values.at(static_cast<size_t>(player)); }
-    inline const T& at(PlayerId player) const { return m_values.at(static_cast<size_t>(player)); }
+    inline T& at(PlayerId player) { return m_values[static_cast<size_t>(player)]; }
+    inline const T& at(PlayerId player) const { return m_values[static_cast<size_t>(player)]; }
 
 private:
-    std::vector<T> m_values;
+    SmallVector<T, 2> m_values;
 };
 
 struct Outcome

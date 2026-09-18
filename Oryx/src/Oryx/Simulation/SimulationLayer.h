@@ -2,6 +2,7 @@
 
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
+#include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Simulation/BatchRunner.h"
 #include "Oryx/Simulation/Match.h"
@@ -16,7 +17,7 @@ public:
     using TurnObserver = std::function<void(IState& state)>;
 
     SimulationLayer(UniquePtr<IGame> game,
-                     std::vector<UniquePtr<IStrategy>> strategies,
+                     SmallVector<UniquePtr<IStrategy>, 2> strategies,
                      int32_t match_count = 1,
                      TurnObserver on_turn = nullptr);
 
@@ -27,8 +28,8 @@ public:
 
 private:
     UniquePtr<IGame> m_game;
-    std::vector<UniquePtr<IStrategy>> m_strategy_storage;
-    std::vector<IStrategy*> m_strategies;
+    SmallVector<UniquePtr<IStrategy>, 2> m_strategy_storage;
+    SmallVector<IStrategy*, 2> m_strategies;
     int32_t m_match_count;
     TurnObserver m_on_turn;
 

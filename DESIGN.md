@@ -452,6 +452,30 @@ general-purpose pool/arena allocator (no evidence yet that `Match`/
 container is deliberately deferred to a separate change, gated on this
 finding rather than bundled with the audit itself (§20).
 
+**Outcome (2026-09, implemented).** `SmallVector<T, N>` (`Oryx/Containers/SmallVector.h`)
+replaced `std::vector` as `IState::legal_actions()`'s return type
+(`ActionList = SmallVector<ActionId, 9>`) and `Rewards<T>`'s internal storage.
+Re-running `bench_minimax_allocation.cpp`: `legal_actions()`'s share of
+`MinimaxStrategy::decide()` wall time dropped from ~24% to ~6.2% (144,664
+calls, same `DummyGame` workload); the isolated micro-benchmark's ~707ns/call
+heap-vector cost fell to ~31.6ns/call for `ActionList` (~22x — vs. ~1.8ns/call
+for a raw fixed array; some per-push overhead remains, but the heap
+allocation is gone).
+
+Beyond the audited fix, at the user's explicit direction and without separate
+benchmarking (§18/§20 — recorded here rather than silently decided in code),
+the same container was also applied to `Match`/`BatchRunner`/`SimulationLayer`'s
+strategy-holding vectors, `BatchResult::wins` (all sized by `num_players()`,
+inline capacity 2), and `IActionFeatures::decode()` (inline capacity 2).
+`Registry<T>` separately moved from `std::unordered_map` to a new
+open-addressing `FlatHashMap<Key, Value, N>` (`Oryx/Containers/FlatHashMap.h`, over
+a new `Pair<K,V>` type) — also unaudited, since `Registry<T>` is Cold. Both
+containers spill to the heap past their inline capacity, so neither caps
+entry/element counts. Left out of scope: `ActionHistory`, the capability
+vectors (`missing_capabilities()`/`required_capabilities()`), `Registry::names()`,
+game-specific strategy-lookup redesign, and a runtime-configurable-capacity
+sibling to `SmallVector` (no current caller needs one).
+
 ---
 
 # 13. Parallelism
@@ -556,7 +580,7 @@ This allows the same game to run:
 Phase 3's `TicTacToeBoard` (in `Oasis`) is a concrete class, not yet behind
 a shared `IBoard` interface — with one game and one renderer, an interface
 has no second implementation to justify it. `IBoard` is extracted once
-Phase 11 Graphics needs to swap in a graphical renderer polymorphically
+Phase 10 Graphics needs to swap in a graphical renderer polymorphically
 (`ARCHITECTURE.md` §8), following the same don't-build-it-before-it's-needed
 reasoning as the `Registry<T>` timing decision (§19).
 
@@ -642,7 +666,7 @@ rather than silently choosing an architecture in code.
 | Math module                     | Header-only `oryx::Math`: `oryx::math` `<cmath>` wrappers + constants, generic `Vector<N,T>` (+ `Vec2`/`Vec3`/`Vec4` headers), `Matrix<R,C,T>` (+ `Mat2`/`Mat3`/`Mat4`, bounded 2x2/3x3 determinant/inverse, 2D affine transform helpers), `Colour` — widened during Phase 2 planning from the original `Vec2`-only scope, then again for a general vector/matrix/colour pass | Working decision |
 | Extension registration          | Self-registering factories, no central list; generic `Registry<T>` built in Phase 4, covering `IGame` and `IStrategy`, registered via `OX_REGISTER_GAME`/`OX_REGISTER_STRATEGY` macros expanding to a static self-registering object per type | Working decision |
 | Naming conventions              | `snake_case` functions, `PascalCase` classes, `I`-prefix for pure interfaces, data-only structs | Working decision |
-| Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 11 | Working decision (scoped) |
+| Board rendering abstraction     | Concrete `TicTacToeBoard` class (Phase 3); `IBoard` deferred to Phase 10 | Working decision (scoped) |
 | Application layering            | `Layer`/`LayerStack` owned by `Application` (`ARCHITECTURE.md` §3.6); `LayerStack` constructs layers via `push_layer<T>()`/`push_overlay<T>()`; `run()` drives `update()`, events propagate top-down via `Layer::event()` until handled | Working decision |
 | Test tiers beyond Unit          | Integration tier established (`tests/integration/`, same `Tests` binary/doctest, no new premake project); per-game (e.g. Tic-Tac-Toe) unit tests still deferred — "play it" remains sufficient for now | Working decision (scoped) |
 | Simulation model (batched/eval) | `Match` (game + 2 strategies → `Outcome`) and a batch runner (N matches → aggregated win/loss/draw + `Rewards<T>`) in new `Oryx/Simulation` module; `SimulationLayer` (Layer subclass, defined in Oryx core) drives batches via `Application`'s tick loop | Working decision |
@@ -655,7 +679,12 @@ rather than silently choosing an architecture in code.
 | Parallelism model               | Explicitly deferred — Phase 5's batch runner is single-threaded by design; batching proves the API shape, not throughput | Deferred (explicit) |
 | Serialization                   | Not decided           | Open                  |
 | Profiling utility                | `oryx::Instrumentation`/`ScopeTimer` (`Oryx/Debug/Instrumentation.h`) — minimal opt-in wall-clock timing pulled forward from Phase 6 to support the allocation audit below; deliberately scoped to a call-site macro (`OX_PROFILE_SCOPE`) and a queryable registry, no `build benchmark` CLI or dashboard yet (ROADMAP.md §8/§17) | Working decision (scoped) |
-| `IState::legal_actions()` allocation | Audited (§12): fresh heap `std::vector` per call is measurably costly at search-tree scale (~390x a fixed-size array, isolated). Narrow fix (SBO vector-like return type) identified but not yet implemented — separate change, gated on this finding | Open (narrow fix identified) |
+| `IState::legal_actions()` allocation | Implemented (§12): `SmallVector<ActionId, kActionListInlineCapacity>` (`ActionList`, capacity 9) replaces `std::vector` as the return type; `legal_actions()`'s share of `MinimaxStrategy::decide()` wall time measured dropping from ~24% to ~6.2%. Capacity is a single engine-wide ceiling (the return type of a pure-virtual method) measured from TicTacToe's board (9); a future game with a larger branching factor loses the inline fast path silently (still correct - `SmallVector` spills to heap) - re-measure, don't guess, when one is added. `TicTacToeState::legal_actions()` carries an `OX_CORE_ASSERT` tripwire against the capacity, so a board-shape change that breaks the measured bound fails loudly instead of silently regressing | Resolved (capacity scoped to games measured so far, guarded by assert) |
+| SBO container reuse (`Rewards<T>`, strategy vectors, `Registry<T>`) | `Rewards<T>` (separately audited-hot, §12) and `Match`/`BatchRunner`/`SimulationLayer`'s strategy vectors/`BatchResult::wins`/`IActionFeatures::decode()` (sized by `num_players()`, unaudited) moved to `SmallVector`; `Registry<T>` moved from `std::unordered_map` to a new open-addressing `FlatHashMap<Key,Value,N>` + `Pair<K,V>` (unaudited, Cold path) — all user-directed extrapolations beyond §12's evidence | Working decision (unaudited beyond `legal_actions()`) |
+| Runtime-configurable-capacity SBO container | Discussed alongside `SmallVector<T,N>`; deferred since no current caller needs a non-compile-time inline capacity. Re-checked (2026-09 follow-up audit) against a possible pybind11 binding (Phase 7 - calls the same `Registry<T>::register_factory()` as any C++ caller, no new code path) and concurrent registration (no threading model exists yet, §13) - neither adds a caller. Still no runtime-configurable container needed | Open (re-affirmed) |
+| `Registry<T>`/`FlatHashMap`/`SmallVector` thread-safety | None of the three synchronize; registration is expected single-threaded (self-registering static init). Documented in-code rather than enforced, since no concurrent registration path exists yet (§13 - multi-threaded simulation explicitly deferred) | Working decision (documented, unenforced) |
+| `FlatHashMap` erase() | Not implemented; no caller unregisters a game/strategy (process-lifetime singletons, "Extension registration" above). Becomes a real question once Python-side registrants can be garbage-collected mid-process - i.e. at Phase 7, not before | Open (deferred to Phase 7) |
+| Game-specific strategy lookup | `Registry<IStrategy>` keeps its flat namespaced-name convention (`"tictactoe/heuristic"`); a nicer per-game lookup API was raised but not specified | Open (deferred, unchanged from prior scoping) |
 
 ---
 

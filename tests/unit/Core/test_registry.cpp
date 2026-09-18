@@ -68,3 +68,19 @@ TEST_CASE("Register<T>'s constructor performs the registration itself, as OX_REG
     REQUIRE(instance != nullptr);
     CHECK(instance->label() == "B");
 }
+
+TEST_CASE("Registry<T> keeps every entry correct past its inline capacity")
+{
+    using BigRegistry = oryx::Registry<IDummy>;
+
+    for (int32_t i = 0; i < 50; ++i)
+    {
+        BigRegistry::register_factory("big-" + oryx::to_string(static_cast<oryx::ActionId>(i)),
+                                       []() { return oryx::create_unique<DummyA>(); });
+    }
+
+    for (int32_t i = 0; i < 50; ++i)
+    {
+        CHECK(BigRegistry::has("big-" + oryx::to_string(static_cast<oryx::ActionId>(i))));
+    }
+}

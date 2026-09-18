@@ -37,9 +37,9 @@ Experiment Framework
     ↓
 Strategy Observability
     ↓
-Strategy Dashboard
-    ↓
 Graphics & Visualisation
+    ↓
+Strategy Dashboard
     ↓
 Larger Algorithm Ecosystem
     ↓
@@ -227,14 +227,14 @@ scaffold (Phase 1) ahead of this phase's actual content.
 
 A terminal-playable Tic-Tac-Toe: two players alternate entering moves via
 stdin, the board prints to stdout after each move, and the game reports the
-outcome once terminal — no `Graphics` system involved (that's Phase 11).
+outcome once terminal — no `Graphics` system involved (that's Phase 10).
 
 This needs a `TicTacToeBoard` component (in `Oasis`) responsible for both
 rendering the board to stdout and reading a move from stdin. It is a
 **concrete class, not an interface** — with only one game and one renderer,
 a shared `IBoard` interface has no second implementation to justify it yet
 (same reasoning as the `Registry<T>` timing decision in Phase 2). `IBoard`
-gets extracted once Phase 11 Graphics actually needs to swap in a graphical
+gets extracted once Phase 10 Graphics actually needs to swap in a graphical
 renderer polymorphically, per `ARCHITECTURE.md` §8.
 
 ---
@@ -400,7 +400,24 @@ The observability model should be extensible rather than forcing all algorithms 
 
 ---
 
-# 12. Phase 10 — Strategy Dashboard
+# 12. Phase 10 — Graphics & Visualisation
+
+Introduce graphics capabilities where they provide clear value.
+
+Initial focus:
+
+* Board games
+* Grid games
+* Card games
+* Strategy games
+* Simulation visualisation
+* Algorithm visualisation
+
+The graphics system should remain lightweight and specialised to Oryx's use cases.
+
+---
+
+# 13. Phase 11 — Strategy Dashboard
 
 Build a lightweight visual interface for inspecting algorithm behaviour.
 
@@ -415,24 +432,7 @@ Potential visualisations include:
 * Decision traces
 * Algorithm-specific diagnostics
 
-The dashboard should consume observability data and remain separate from the strategy implementation.
-
----
-
-# 13. Phase 11 — Graphics & Visualisation
-
-Introduce graphics capabilities where they provide clear value.
-
-Initial focus:
-
-* Board games
-* Grid games
-* Card games
-* Strategy games
-* Simulation visualisation
-* Algorithm visualisation
-
-The graphics system should remain lightweight and specialised to Oryx's use cases.
+The dashboard should consume observability data and the Phase 10 graphics system, and remain separate from the strategy implementation.
 
 ---
 

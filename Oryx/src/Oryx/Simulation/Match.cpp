@@ -5,7 +5,7 @@
 namespace oryx
 {
 
-Match::Match(const IGame& game, std::vector<IStrategy*> strategies)
+Match::Match(const IGame& game, SmallVector<IStrategy*, 2> strategies)
     : m_game(game)
     , m_strategies(std::move(strategies))
     , m_state(game.new_initial_state())

@@ -12,10 +12,10 @@ class DummyState : public IState
 public:
     explicit DummyState(uint32_t pile_size) : m_pile(pile_size) {}
 
-    std::vector<ActionId> legal_actions() const override
+    ActionList legal_actions() const override
     {
         OX_PROFILE_SCOPE("DummyState::legal_actions");
-        std::vector<ActionId> actions;
+        ActionList actions;
         for (ActionId take = 1; take <= 3 && take <= m_pile; ++take)
         {
             actions.push_back(take);

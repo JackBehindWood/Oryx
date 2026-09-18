@@ -17,7 +17,7 @@ class TicTacToeState : public oryx::IState
 public:
     TicTacToeState() = default;
 
-    std::vector<oryx::ActionId> legal_actions() const override;
+    oryx::ActionList legal_actions() const override;
 
     void apply(oryx::ActionId action) override;
     void undo(oryx::ActionId action) override;
@@ -43,7 +43,7 @@ private:
 class TicTacToeActionFeatures : public oryx::IActionFeatures
 {
 public:
-    std::vector<int32_t> decode(oryx::ActionId action) const override
+    oryx::SmallVector<int32_t, 2> decode(oryx::ActionId action) const override
     {
         return { static_cast<int32_t>(action / 3), static_cast<int32_t>(action % 3) };
     }

@@ -7,7 +7,7 @@ namespace oryx
 
 ActionId FirstLegalStrategy::decide(const Context& context)
 {
-    std::vector<ActionId> actions = context.state().legal_actions();
+    ActionList actions = context.state().legal_actions();
     return actions.empty() ? INVALID_ACTION : actions.front();
 }
 

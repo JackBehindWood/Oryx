@@ -12,7 +12,7 @@ class IState
 public:
     virtual ~IState() = default;
 
-    virtual std::vector<ActionId> legal_actions() const = 0;
+    virtual ActionList legal_actions() const = 0;
 
     virtual void apply(ActionId action) = 0;
     virtual void undo(ActionId action) = 0;

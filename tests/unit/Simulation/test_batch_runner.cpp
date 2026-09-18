@@ -35,7 +35,7 @@ TEST_CASE("accumulate() records a win for the player with the strictly-highest r
     accumulate(result, make_outcome(1.0, -1.0));
 
     CHECK(result.matches == 1);
-    CHECK(result.wins == std::vector<int32_t>{ 1, 0 });
+    CHECK(result.wins == SmallVector<int32_t, 2>{ 1, 0 });
     CHECK(result.draws == 0);
     CHECK(result.rewards[0] == doctest::Approx(1.0));
     CHECK(result.rewards[1] == doctest::Approx(-1.0));
@@ -47,7 +47,7 @@ TEST_CASE("accumulate() records a win for the other player symmetrically")
 
     accumulate(result, make_outcome(-1.0, 1.0));
 
-    CHECK(result.wins == std::vector<int32_t>{ 0, 1 });
+    CHECK(result.wins == SmallVector<int32_t, 2>{ 0, 1 });
 }
 
 TEST_CASE("accumulate() records a draw when no player strictly leads")
@@ -57,7 +57,7 @@ TEST_CASE("accumulate() records a draw when no player strictly leads")
     accumulate(result, make_outcome(0.0, 0.0));
 
     CHECK(result.draws == 1);
-    CHECK(result.wins == std::vector<int32_t>{ 0, 0 });
+    CHECK(result.wins == SmallVector<int32_t, 2>{ 0, 0 });
 }
 
 TEST_CASE("accumulate() sums rewards and matches across repeated calls")
@@ -87,7 +87,7 @@ TEST_CASE("BatchRunner::run aggregates a deterministic pairing correctly")
     BatchResult result = runner.run(5);
 
     CHECK(result.matches == 5);
-    CHECK(result.wins == std::vector<int32_t>{ 5, 0 });
+    CHECK(result.wins == SmallVector<int32_t, 2>{ 5, 0 });
     CHECK(result.draws == 0);
     CHECK(result.rewards[0] == doctest::Approx(5.0));
     CHECK(result.rewards[1] == doctest::Approx(-5.0));

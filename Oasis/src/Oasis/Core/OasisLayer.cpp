@@ -106,7 +106,7 @@ void OasisLayer::attach_simulate(UniquePtr<IGame> game)
         return;
     }
 
-    std::vector<UniquePtr<IStrategy>> strategies;
+    oryx::SmallVector<UniquePtr<IStrategy>, 2> strategies;
     strategies.push_back(oryx::StrategyRegistry::create(strategy_a_name));
     strategies.push_back(oryx::StrategyRegistry::create(strategy_b_name));
 
@@ -137,7 +137,7 @@ void OasisLayer::attach_interactive(UniquePtr<IGame> game)
         return m_board.read_move(static_cast<const TicTacToeState&>(context.state()));
     };
 
-    std::vector<UniquePtr<IStrategy>> strategies(2);
+    oryx::SmallVector<UniquePtr<IStrategy>, 2> strategies(2);
 
     if (opponent_name == "human")
     {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Base.h"
+#include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/Context.h"
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Game/Outcome.h"
@@ -14,7 +15,7 @@ namespace oryx
 class Match
 {
 public:
-    Match(const IGame& game, std::vector<IStrategy*> strategies);
+    Match(const IGame& game, SmallVector<IStrategy*, 2> strategies);
 
     [[nodiscard]] IState& state() const { return *m_state; }
     [[nodiscard]] bool is_terminal() const { return m_state->is_terminal(); }
@@ -43,7 +44,7 @@ private:
     [[nodiscard]] IStrategy& current_strategy() const;
 
     const IGame& m_game;
-    std::vector<IStrategy*> m_strategies;
+    SmallVector<IStrategy*, 2> m_strategies;
     UniquePtr<IState> m_state;
     ActionHistory m_history;
 };

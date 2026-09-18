@@ -79,10 +79,25 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
     auto array_end = std::chrono::high_resolution_clock::now();
     double array_ms = std::chrono::duration<double, std::milli>(array_end - array_start).count();
 
+    // ActionList at the same shape - the real legal_actions() replacement.
+    auto action_list_start = std::chrono::high_resolution_clock::now();
+    for (int32_t i = 0; i < kAllocIterations; ++i)
+    {
+        ActionList actions;
+        actions.push_back(1);
+        actions.push_back(2);
+        actions.push_back(3);
+        sink += actions.size();
+    }
+    auto action_list_end = std::chrono::high_resolution_clock::now();
+    double action_list_ms = std::chrono::duration<double, std::milli>(action_list_end - action_list_start).count();
+
     MESSAGE("std::vector<ActionId> (3 elements) x", kAllocIterations, ": ", vector_ms, " ms");
     MESSAGE("fixed ActionId[3] x", kAllocIterations, ": ", array_ms, " ms");
+    MESSAGE("ActionList (3 elements) x", kAllocIterations, ": ", action_list_ms, " ms");
     MESSAGE("ns/call heap vector: ", (vector_ms * 1'000'000.0) / kAllocIterations);
     MESSAGE("ns/call fixed array: ", (array_ms * 1'000'000.0) / kAllocIterations);
+    MESSAGE("ns/call ActionList: ", (action_list_ms * 1'000'000.0) / kAllocIterations);
 
     CHECK(sink > 0);
 }

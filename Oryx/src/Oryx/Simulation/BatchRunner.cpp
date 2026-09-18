@@ -43,7 +43,7 @@ void accumulate(BatchResult& result, const Outcome& outcome)
     }
 }
 
-BatchRunner::BatchRunner(const IGame& game, std::vector<IStrategy*> strategies)
+BatchRunner::BatchRunner(const IGame& game, SmallVector<IStrategy*, 2> strategies)
     : m_game(game)
     , m_strategies(std::move(strategies))
 {

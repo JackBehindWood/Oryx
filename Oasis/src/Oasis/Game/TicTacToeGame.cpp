@@ -19,9 +19,9 @@ constexpr size_t kLines[8][3][2] = {
 namespace oasis
 {
 
-std::vector<oryx::ActionId> TicTacToeState::legal_actions() const
+oryx::ActionList TicTacToeState::legal_actions() const
 {
-    std::vector<oryx::ActionId> actions;
+    oryx::ActionList actions;
     for (size_t row = 0; row < 3; ++row)
     {
         for (size_t col = 0; col < 3; ++col)
@@ -32,6 +32,8 @@ std::vector<oryx::ActionId> TicTacToeState::legal_actions() const
             }
         }
     }
+    // Trips if this ever changes shape - kActionListInlineCapacity is measured from this exact board (DESIGN.md §12/§19).
+    OX_CORE_ASSERT(actions.size() <= oryx::kActionListInlineCapacity, "TicTacToe legal_actions() exceeded ActionList's inline capacity");
     return actions;
 }
 

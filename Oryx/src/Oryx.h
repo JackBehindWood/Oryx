@@ -9,6 +9,10 @@
 #include "Oryx/Core/Random.h"
 #include "Oryx/Core/Registry.h"
 
+#include "Oryx/Containers/Pair.h"
+#include "Oryx/Containers/SmallVector.h"
+#include "Oryx/Containers/FlatHashMap.h"
+
 #include "Oryx/Events/Event.h"
 #include "Oryx/Events/ApplicationEvent.h"
 

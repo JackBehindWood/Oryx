@@ -38,7 +38,7 @@ void TicTacToeBoard::print(const TicTacToeState& state) const
 
 oryx::ActionId TicTacToeBoard::read_move(const TicTacToeState& state) const
 {
-    std::vector<oryx::ActionId> legal = state.legal_actions();
+    oryx::ActionList legal = state.legal_actions();
     char player_symbol = Utils::symbol(state.current_player() == 0 ? Mark::X : Mark::O);
 
     while (true)
