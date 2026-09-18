@@ -3,6 +3,9 @@ project "Tests"
     kind "ConsoleApp"
     useOryxProjectDefaults()
 
+    pchheader "oxpch.h"
+    pchsource "oxpch.cpp"
+
     files {
         "**.h",
         "**.hpp",

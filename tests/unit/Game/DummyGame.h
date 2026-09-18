@@ -14,6 +14,7 @@ public:
 
     std::vector<ActionId> legal_actions() const override
     {
+        OX_PROFILE_SCOPE("DummyState::legal_actions");
         std::vector<ActionId> actions;
         for (ActionId take = 1; take <= 3 && take <= m_pile; ++take)
         {

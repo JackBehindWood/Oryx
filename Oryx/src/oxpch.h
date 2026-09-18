@@ -22,4 +22,6 @@
 
 #include "Oryx/Core/Log.h"
 
+#include "Oryx/Debug/Instrumentation.h"
+
 #include "Oryx/Math/Math.h"

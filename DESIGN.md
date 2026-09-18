@@ -413,6 +413,45 @@ Likely performance-sensitive areas include:
 
 Performance abstractions should be introduced based on profiling and benchmark evidence.
 
+### Allocation audit (2026-09)
+
+A first pass audited where `Oryx`/`Oasis` actually allocate, using the new
+`oryx::Instrumentation`/`ScopeTimer` utility (`Oryx/Debug/Instrumentation.h`)
+and `tests/benchmark/bench_minimax_allocation.cpp`. Classification:
+
+* **Hot** (scales with search-tree nodes, not just matches/turns):
+  `IState::legal_actions()` — a fresh heap `std::vector<ActionId>` per call,
+  invoked once per node by `MinimaxStrategy`'s unmemoized recursive search
+  (`MinimaxStrategy.cpp`); `Rewards<double>` return-by-value in
+  `MinimaxStrategy::evaluate()` (also a heap vector, via `Outcome.h`).
+* **Warm** (once per turn or per match): `Context`'s
+  `std::unordered_map<std::type_index, void*>` and
+  `Match::missing_capabilities()` (once per `decide()`, i.e. per turn, not
+  per node); `IGame::new_initial_state()` and `ActionHistory`'s two vectors
+  (once per `Match`, in `BatchRunner::run()`'s per-match loop).
+* **Cold** (once per process): `Registry<T>` entries, `IGame`/`IStrategy`
+  construction. `oryx::UniquePtr`/`SharedPtr` (`Base.h`) are thin aliases
+  used only for these one-shot constructions — not implicated here.
+
+Benchmark evidence (DummyGame, pile size 20, full exhaustive Minimax search,
+Debug build, Apple Silicon): 144,664 `legal_actions()` calls took ~24% of
+total `decide()` wall time even with instrumentation overhead included. An
+isolated micro-benchmark comparing a heap `std::vector` holding a
+`legal_actions()`-shaped (<=3 element) result against an equivalent
+fixed-size stack array found ~717 ns/call for the heap vector vs. ~1.8
+ns/call for the array — roughly 390x, purely from heap traffic on a
+result that's always small.
+
+**Decision: narrow fix identified, not yet implemented.** The evidence
+supports a small-buffer-optimized (SBO) vector-like return type for
+`IState::legal_actions()` specifically — sized inline for the branching
+factors seen so far (<=9, e.g. Tic-Tac-Toe/`DummyGame`) — rather than a
+general-purpose pool/arena allocator (no evidence yet that `Match`/
+`BatchRunner`-level allocations are hot enough to justify one) or touching
+`UniquePtr`/`SharedPtr` (not implicated by this audit). Implementing the SBO
+container is deliberately deferred to a separate change, gated on this
+finding rather than bundled with the audit itself (§20).
+
 ---
 
 # 13. Parallelism
@@ -615,6 +654,8 @@ rather than silently choosing an architecture in code.
 | Strategy/Game coupling          | `IStrategy::decide(const Context&)` replaces `decide(const IState&)`; `Context` (`Oryx/Game/Context.h`) wraps `IState&` plus capabilities explicitly attached via `provide<T>()`/`get<T>()` (keyed by `std::type_index`), not `dynamic_cast`-discovered from `State`'s class hierarchy — a capability can come from the game, the engine, or elsewhere. Built ahead of Phase 5 as forward-looking infrastructure (no `Engine`/`Match` yet — `Context` is currently constructed directly in `OasisLayer::attach()`/`update()`); no concrete capability shipped yet, since `RandomStrategy` already covers its own RNG need without one | Working decision |
 | Parallelism model               | Explicitly deferred — Phase 5's batch runner is single-threaded by design; batching proves the API shape, not throughput | Deferred (explicit) |
 | Serialization                   | Not decided           | Open                  |
+| Profiling utility                | `oryx::Instrumentation`/`ScopeTimer` (`Oryx/Debug/Instrumentation.h`) — minimal opt-in wall-clock timing pulled forward from Phase 6 to support the allocation audit below; deliberately scoped to a call-site macro (`OX_PROFILE_SCOPE`) and a queryable registry, no `build benchmark` CLI or dashboard yet (ROADMAP.md §8/§17) | Working decision (scoped) |
+| `IState::legal_actions()` allocation | Audited (§12): fresh heap `std::vector` per call is measurably costly at search-tree scale (~390x a fixed-size array, isolated). Narrow fix (SBO vector-like return type) identified but not yet implemented — separate change, gated on this finding | Open (narrow fix identified) |
 
 ---
 
