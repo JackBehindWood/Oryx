@@ -312,6 +312,14 @@ A new `Oryx/src/Oryx/Simulation/` core module:
   Oasis) that drives a batch through `Application`'s tick loop; `Oasis`
   pushes it onto its `LayerStack` the same way it pushes `OasisLayer` today
   (`ARCHITECTURE.md` §3.6)
+* An action decode/interpretation capability (e.g. `IActionFeatures`),
+  resolved through `Context` like any other capability — `ActionId` stays
+  the opaque wire type (`ARCHITECTURE.md` §3.2/§14, `DESIGN.md` §19); this
+  is the mechanism for a strategy that needs structured access to what an
+  action means, not a reopening of the Action representation decision
+* `Context`/capability construction moves from `OasisLayer` (a stopgap, see
+  `ARCHITECTURE.md` §14) into `Match`, now that a real orchestration entry
+  point exists
 
 This phase is explicitly single-threaded — batching proves the `Match`/
 runner API shape, not throughput. Parallel batch execution is deferred (see

@@ -164,6 +164,17 @@ Action
 ```
 
 Strategies should consume game capabilities through stable abstractions.
+`IStrategy::decide` takes a `Context` (`Oryx/Game/Context.h`), not `IState`
+directly: `Context` wraps the `IState&` plus any capabilities the
+orchestrator explicitly attaches via `provide<T>()`, retrieved via
+`get<T>()`/`has_capability()`. A capability is not discovered via
+`dynamic_cast` against the concrete `State` — it can come from the game, the
+engine, or anywhere else the orchestrator chooses, which is also why
+`RandomStrategy` still owns its own `oryx::Random` directly rather than
+receiving it as a capability. `IStrategy::required_capabilities()` lets a
+strategy declare what it needs so the orchestrator (currently
+`OasisLayer::attach()`, no `Engine`/`Match` yet — see §14) can fail fast with
+a clear diagnostic instead of a null-pointer dereference in search.
 
 Potential strategies include:
 
@@ -764,9 +775,20 @@ further, for this phase's scope:
   `apply()`/`undo()` suffices for Minimax lookahead (§3.2)
 * Strategy randomness wiring — resolved: no `IStrategy` change;
   `RandomStrategy` owns its own `oryx::Random` (§3.3)
+* Capability/`Context` mechanism — resolved ahead of schedule, as
+  forward-looking infrastructure: `IStrategy::decide(const Context&)`,
+  capabilities explicitly `provide()`d rather than `dynamic_cast`-discovered
+  (§3.3, `DESIGN.md` §19). No concrete capability ships yet; construction
+  lives in `OasisLayer` until a real `Engine`/`Match` exists (still open,
+  below)
 
 The following should **not** be considered settled yet:
 
+* Action decode/interpretation capability (e.g. an `IActionFeatures`-style
+  capability exposing structured access to what an `ActionId` means, for a
+  strategy that needs more than the opaque integer) — planned for Phase 5,
+  not yet built; `ActionId` itself stays the opaque wire type (§3.2,
+  `DESIGN.md` §19 "Action representation" — not reopened)
 * Player/agent model beyond strict alternation (chance players,
   simultaneous-move players)
 * Simultaneous actions

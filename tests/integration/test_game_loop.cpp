@@ -13,10 +13,11 @@ Outcome play_dummy_game_to_terminal()
     DummyGame game(10);
     DummyGreedyStrategy strategy;
     UniquePtr<IState> state = game.new_initial_state();
+    Context context(*state);
 
     while (!state->is_terminal())
     {
-        state->apply(strategy.decide(*state));
+        state->apply(strategy.decide(context));
     }
     return state->outcome();
 }
@@ -31,10 +32,11 @@ TEST_CASE("running DummyGreedyStrategy vs itself to terminal via a manual demo l
     DummyGame game(10);
     DummyGreedyStrategy strategy;
     UniquePtr<IState> state = game.new_initial_state();
+    Context context(*state);
 
     while (!state->is_terminal())
     {
-        ActionId action = strategy.decide(*state);
+        ActionId action = strategy.decide(context);
         state->apply(action);
     }
 

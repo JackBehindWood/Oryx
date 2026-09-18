@@ -18,5 +18,9 @@
 #include "Oryx/Game/Outcome.h"
 #include "Oryx/Game/IState.h"
 #include "Oryx/Game/IGame.h"
+#include "Oryx/Game/Context.h"
 
 #include "Oryx/Strategy/IStrategy.h"
+#include "Oryx/Strategy/RandomStrategy.h"
+#include "Oryx/Strategy/FirstLegalStrategy.h"
+#include "Oryx/Strategy/MinimaxStrategy.h"

@@ -84,9 +84,9 @@ private:
 class DummyGreedyStrategy : public IStrategy
 {
 public:
-    ActionId decide(const IState& state) override
+    ActionId decide(const Context& context) override
     {
-        auto actions = state.legal_actions();
+        auto actions = context.state().legal_actions();
         return *std::max_element(actions.begin(), actions.end());
     }
 };

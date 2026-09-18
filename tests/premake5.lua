@@ -23,7 +23,7 @@ project "Tests"
         "SPDLOG_COMPILED_LIB"
     }
 
+    linkOryxWholeArchive()
     links {
-        "Oryx",
         "spdlog",
     }
