@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Benchmark/Timer.h"
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
 #include "Oryx/Containers/SmallVector.h"
@@ -11,27 +12,30 @@
 namespace oryx
 {
 
+class StartSimulationEvent;
+
 class SimulationLayer : public Layer
 {
 public:
     using TurnObserver = std::function<void(IState& state)>;
 
-    SimulationLayer(UniquePtr<IGame> game,
-                     SmallVector<UniquePtr<IStrategy>, 2> strategies,
-                     int32_t match_count = 1,
-                     TurnObserver on_turn = nullptr);
+    explicit SimulationLayer(bool benchmark = false);
 
-    void attach() override;
+    void event(Event& event) override;
     void update() override;
 
     [[nodiscard]] const BatchResult& result() const { return m_result; }
 
 private:
+    bool on_start_simulation(StartSimulationEvent& event);
+
     UniquePtr<IGame> m_game;
     SmallVector<UniquePtr<IStrategy>, 2> m_strategy_storage;
     SmallVector<IStrategy*, 2> m_strategies;
-    int32_t m_match_count;
+    int32_t m_match_count = 0;
     TurnObserver m_on_turn;
+    bool m_benchmark;
+    Timer m_timer;
 
     UniquePtr<Match> m_match;
     int32_t m_completed = 0;

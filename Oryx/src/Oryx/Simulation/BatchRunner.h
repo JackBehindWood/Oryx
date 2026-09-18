@@ -14,6 +14,7 @@ struct BatchResult
     SmallVector<int32_t, 2> wins;
     int32_t draws = 0;
     Rewards<double> rewards{ 0 };
+    int64_t decisions = 0;
 };
 
 void accumulate(BatchResult& result, const Outcome& outcome);

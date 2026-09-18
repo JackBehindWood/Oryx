@@ -8,7 +8,9 @@ namespace oryx
 enum class EventType
 {
     None = 0,
-    AppTick
+    AppTick,
+    StartSimulation,
+    SimulationComplete
 };
 
 enum EventCategory

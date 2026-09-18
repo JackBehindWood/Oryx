@@ -14,7 +14,9 @@ TEST_CASE("SimulationLayer drives a headless batch of Matches through Applicatio
     strategies.push_back(create_unique<DummyGreedyStrategy>());
     strategies.push_back(create_unique<DummyGreedyStrategy>());
 
-    SimulationLayer& layer = app.push_layer<SimulationLayer>(std::move(game), std::move(strategies), /*match_count=*/3);
+    SimulationLayer& layer = app.push_layer<SimulationLayer>();
+    StartSimulationEvent start(std::move(game), std::move(strategies), /*match_count=*/3, /*on_turn=*/nullptr, /*benchmark=*/false);
+    app.post_event(start);
 
     app.run();
 
@@ -45,7 +47,9 @@ TEST_CASE("SimulationLayer stops cleanly when an ExternalStrategy seat's input c
     strategies.push_back(create_unique<DummyGreedyStrategy>());
     strategies.push_back(std::move(external));
 
-    SimulationLayer& layer = app.push_layer<SimulationLayer>(std::move(game), std::move(strategies), /*match_count=*/5);
+    SimulationLayer& layer = app.push_layer<SimulationLayer>();
+    StartSimulationEvent start(std::move(game), std::move(strategies), /*match_count=*/5, /*on_turn=*/nullptr, /*benchmark=*/false);
+    app.post_event(start);
 
     app.run();
 

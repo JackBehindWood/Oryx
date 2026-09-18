@@ -18,12 +18,12 @@ workspace "oryx"
     end
 
     filter "configurations:Debug"
-        defines { "ORYX_DEBUG" }
+        defines { "ORYX_DEBUG", "OX_ENABLE_PROFILING" }
         symbols "On"
         optimize "Off"
 
     filter "configurations:Release"
-        defines { "ORYX_RELEASE" }
+        defines { "ORYX_RELEASE", "OX_ENABLE_PROFILING" }
         optimize "On"
 
     filter "configurations:Dist"

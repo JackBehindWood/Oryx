@@ -51,6 +51,13 @@ public:
 
     static Application& Get() { return *s_instance; }
 
+protected:
+    // Called by post_event() before the layer stack sees the event, so a
+    // concrete Application (e.g. OasisApp) can react to/consume events the
+    // layer-propagation model alone can't reach it for - it isn't itself a
+    // Layer in m_layer_stack.
+    virtual void on_event(Event&) {}
+
 private:
     bool m_running = true;
     LayerStack m_layer_stack;

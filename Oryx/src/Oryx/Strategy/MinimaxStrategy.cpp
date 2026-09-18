@@ -9,6 +9,8 @@ namespace oryx
 
 ActionId MinimaxStrategy::decide(const Context& context)
 {
+    OX_PROFILE_SCOPE("MinimaxStrategy::decide");
+
     // Context::state() yields IState& even through a const Context&; search
     // mutates via apply()/undo() below but always restores before returning.
     IState& mutable_state = context.state();

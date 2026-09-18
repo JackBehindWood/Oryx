@@ -54,6 +54,8 @@ namespace oasis
 
 oryx::ActionId TicTacToeHeuristicStrategy::decide(const oryx::Context& context)
 {
+    OX_PROFILE_SCOPE("TicTacToeHeuristicStrategy::decide");
+
     const TicTacToeState& tic_tac_toe = static_cast<const TicTacToeState&>(context.state());
     Mark my_mark = tic_tac_toe.current_player() == 0 ? Mark::X : Mark::O;
     Mark opponent_mark = (my_mark == Mark::X) ? Mark::O : Mark::X;

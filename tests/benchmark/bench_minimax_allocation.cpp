@@ -19,6 +19,12 @@ constexpr int32_t kAllocIterations = 2'000'000;
 
 } // namespace
 
+// Excluded from the default `build test` run (see build_system/commands/test.py)
+// - these measure wall-clock cost, not correctness, and are slow/noisy in CI.
+// Run explicitly via `build test benchmark`.
+TEST_SUITE("benchmark")
+{
+
 TEST_CASE("Benchmark: MinimaxStrategy exhaustive search allocation cost (DummyGame)")
 {
     Instrumentation::reset();
@@ -101,3 +107,5 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
 
     CHECK(sink > 0);
 }
+
+} // TEST_SUITE("benchmark")

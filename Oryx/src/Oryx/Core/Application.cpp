@@ -30,6 +30,12 @@ void Application::run()
 
 void Application::post_event(Event& event)
 {
+    on_event(event);
+    if (event.handled)
+    {
+        return;
+    }
+
     for (auto it = m_layer_stack.rbegin(); it != m_layer_stack.rend(); ++it)
     {
         if (event.handled)

@@ -5,12 +5,16 @@
 #include "OasisApp.h"
 #include "OasisLayer.h"
 
-namespace {
+#include "Oryx/Events/SimulationEvent.h"
+#include "Oryx/Simulation/SimulationLayer.h"
+
+namespace 
+{
 
 constexpr std::string_view kOpponentFlagPrefix = "--opponent=";
 constexpr std::string_view kSimulateFlagPrefix = "--simulate=";
+constexpr std::string_view kBenchmarkFlag = "--benchmark";
 
-// Empty means "no flag given" - OasisLayer falls back to an interactive prompt.
 std::string parse_opponent_flag(const oryx::ApplicationCommandLineArgs& args)
 {
     for (std::string_view arg : args.unpack())
@@ -23,9 +27,6 @@ std::string parse_opponent_flag(const oryx::ApplicationCommandLineArgs& args)
     return "";
 }
 
-// Empty means "no flag given" - OasisLayer stays on the interactive path.
-// The raw "<strategyA>,<strategyB>,<matchCount>" value is parsed/validated
-// by OasisLayer itself, same division of responsibility as the opponent flag.
 std::string parse_simulate_flag(const oryx::ApplicationCommandLineArgs& args)
 {
     for (std::string_view arg : args.unpack())
@@ -36,6 +37,18 @@ std::string parse_simulate_flag(const oryx::ApplicationCommandLineArgs& args)
         }
     }
     return "";
+}
+
+bool parse_benchmark_flag(const oryx::ApplicationCommandLineArgs& args)
+{
+    for (std::string_view arg : args.unpack())
+    {
+        if (arg == kBenchmarkFlag)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace
@@ -49,7 +62,19 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     OX_CORE_INFO("Oasis — built on Oryx v{}.{}.{}", oryx::VERSION_MAJOR, oryx::VERSION_MINOR, oryx::VERSION_PATCH);
     OX_INFO("Working directory: {}", std::filesystem::current_path().string());
 
-    push_layer<OasisLayer>(parse_opponent_flag(args), parse_simulate_flag(args));
+    push_layer<OasisLayer>(parse_opponent_flag(args), parse_simulate_flag(args), parse_benchmark_flag(args));
+}
+
+void OasisApp::on_event(oryx::Event& event)
+{
+    oryx::EventDispatcher dispatcher(event);
+    dispatcher.dispatch<oryx::StartSimulationEvent>(OX_BIND_EVENT_FN(on_start_simulation));
+}
+
+bool OasisApp::on_start_simulation(oryx::StartSimulationEvent& event)
+{
+    push_layer<oryx::SimulationLayer>(event.benchmark());
+    return false;
 }
 
 } // namespace oasis

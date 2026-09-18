@@ -1,5 +1,8 @@
 #include "OasisLayer.h"
 
+#include "Oryx/Benchmark/BenchmarkReport.h"
+#include "Oryx/Events/SimulationEvent.h"
+
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -16,11 +19,35 @@ using oryx::IStrategy;
 using oryx::SimulationLayer;
 using oryx::UniquePtr;
 
-OasisLayer::OasisLayer(std::string opponent_arg, std::string simulate_arg)
+OasisLayer::OasisLayer(std::string opponent_arg, std::string simulate_arg, bool benchmark_arg)
     : oryx::Layer("OasisLayer")
     , m_opponent_arg(std::move(opponent_arg))
     , m_simulate_arg(std::move(simulate_arg))
+    , m_benchmark_arg(benchmark_arg)
 {
+}
+
+void OasisLayer::event(oryx::Event& event)
+{
+    oryx::EventDispatcher dispatcher(event);
+    dispatcher.dispatch<oryx::SimulationCompleteEvent>(OX_BIND_EVENT_FN(on_simulation_complete));
+}
+
+bool OasisLayer::on_simulation_complete(const oryx::SimulationCompleteEvent& event)
+{
+    // SimulationLayer closes the Application itself right after posting
+    // this - we only report here.
+    if (event.benchmark())
+    {
+        oryx::BenchmarkRunner::Results results{ event.result(), event.elapsed_seconds() };
+        std::cout << oryx::format_benchmark_report(results);
+    }
+    else
+    {
+        OX_CORE_INFO("Simulation complete: {} match(es), {} draw(s).", event.result().matches, event.result().draws);
+    }
+
+    return true;
 }
 
 bool OasisLayer::prompt_for_opponent(std::string& out_name) const
@@ -110,7 +137,8 @@ void OasisLayer::attach_simulate(UniquePtr<IGame> game)
     strategies.push_back(oryx::StrategyRegistry::create(strategy_a_name));
     strategies.push_back(oryx::StrategyRegistry::create(strategy_b_name));
 
-    oryx::Application::Get().push_layer<SimulationLayer>(std::move(game), std::move(strategies), match_count); //Note: we should probably move the pushing part to OasisApp.cpp and use an Event to trigger the simulation and simulation setup, but for now this is fine.
+    oryx::StartSimulationEvent event(std::move(game), std::move(strategies), match_count, /*on_turn=*/nullptr, m_benchmark_arg);
+    oryx::Application::Get().post_event(event);
 }
 
 void OasisLayer::attach_interactive(UniquePtr<IGame> game)
@@ -166,7 +194,8 @@ void OasisLayer::attach_interactive(UniquePtr<IGame> game)
         }
     };
 
-    oryx::Application::Get().push_layer<SimulationLayer>(std::move(game), std::move(strategies), /*match_count=*/1, render);
+    oryx::StartSimulationEvent event(std::move(game), std::move(strategies), /*match_count=*/1, render, m_benchmark_arg);
+    oryx::Application::Get().post_event(event);
 }
 
 } // namespace oasis

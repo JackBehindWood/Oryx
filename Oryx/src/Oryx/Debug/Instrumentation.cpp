@@ -20,6 +20,8 @@ void Instrumentation::record(const std::string& name, double milliseconds)
     ProfileSample& sample = registry()[name];
     ++sample.call_count;
     sample.total_milliseconds += milliseconds;
+    sample.min_milliseconds = std::min(sample.min_milliseconds, milliseconds);
+    sample.max_milliseconds = std::max(sample.max_milliseconds, milliseconds);
 }
 
 void Instrumentation::reset()

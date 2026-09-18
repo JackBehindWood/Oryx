@@ -59,6 +59,7 @@ BatchResult BatchRunner::run(int32_t match_count)
     {
         Match match(m_game, m_strategies);
         accumulate(result, match.play());
+        result.decisions += static_cast<int64_t>(match.history().size());
     }
 
     return result;

@@ -21,6 +21,8 @@ namespace oasis
 
 oryx::ActionList TicTacToeState::legal_actions() const
 {
+    OX_PROFILE_SCOPE("TicTacToeState::legal_actions");
+
     oryx::ActionList actions;
     for (size_t row = 0; row < 3; ++row)
     {

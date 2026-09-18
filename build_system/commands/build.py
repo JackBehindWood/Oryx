@@ -1,4 +1,5 @@
 import subprocess
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -110,15 +111,33 @@ def run_all(ctx: typer.Context):
 
 
 @command(name="run", label="Run — launch the Oasis sandbox executable")
-def run_project(ctx: typer.Context):
+def run_project(
+    ctx: typer.Context,
+    simulate: Optional[str] = typer.Option(
+        None,
+        "--simulate",
+        help="Run a headless <strategyA>,<strategyB>,<matchCount> batch instead of the interactive prompt.",
+    ),
+    benchmark: bool = typer.Option(
+        False,
+        "--benchmark",
+        help="With --simulate: print a timing/throughput/Instrumentation report on completion.",
+    ),
+):
     """Run the compiled Oasis sandbox executable."""
     run: RunContext = ctx.obj
     cfg = run.config
 
     exe_path = cfg.executable_path("oasis")
 
+    args = [str(exe_path)]
+    if simulate:
+        args.append(f"--simulate={simulate}")
+    if benchmark:
+        args.append("--benchmark")
+
     if run.dry_run:
-        console.print(f"[dim][dry-run] would run: {exe_path}[/dim]")
+        console.print(f"[dim][dry-run] would run: {' '.join(args)}[/dim]")
         return
 
     console.print(f"[bold blue]🚀 Running Oasis ({cfg.profile})...[/bold blue]")
@@ -129,7 +148,7 @@ def run_project(ctx: typer.Context):
         raise typer.Exit(code=1)
 
     try:
-        run_command([str(exe_path)], capture_output=False)
+        run_command(args, capture_output=False)
         console.print("\n[bold green]✓ Oasis exited successfully[/bold green]\n")
     except subprocess.CalledProcessError:
         console.print("[bold red]✗ Oasis exited with an error.[/bold red]")

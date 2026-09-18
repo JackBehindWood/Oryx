@@ -3,6 +3,7 @@
 #include "Oryx/Core/Base.h"
 
 #include <chrono>
+#include <limits>
 
 namespace oryx
 {
@@ -11,6 +12,8 @@ struct ProfileSample
 {
     int64_t call_count = 0;
     double total_milliseconds = 0.0;
+    double min_milliseconds = std::numeric_limits<double>::max();
+    double max_milliseconds = 0.0;
 };
 
 class Instrumentation
@@ -37,4 +40,10 @@ private:
 
 } // namespace oryx
 
-#define OX_PROFILE_SCOPE(name) ::oryx::ScopeTimer OX_CONCAT(ox_scope_timer_, __LINE__)(name)
+// Opt-in, same mechanism as OX_ENABLE_ASSERTS (Base.h): only Debug/Release
+// define OX_ENABLE_PROFILING, so a Dist build pays zero per-call-site cost.
+#ifdef OX_ENABLE_PROFILING
+    #define OX_PROFILE_SCOPE(name) ::oryx::ScopeTimer OX_CONCAT(ox_scope_timer_, __LINE__)(name)
+#else
+    #define OX_PROFILE_SCOPE(name)
+#endif
