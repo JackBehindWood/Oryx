@@ -36,7 +36,7 @@ public:
     [[nodiscard]] const ActionHistory& history() const { return m_history; }
 
     // Shared with OasisLayer/SimulationLayer so Context construction and
-    // capability validation live in exactly one place (ARCHITECTURE.md §14).
+    // capability validation live in exactly one place (docs/architecture.md §14).
     static Context build_context(const IGame& game, IState& state);
     static std::vector<std::type_index> missing_capabilities(const IStrategy& strategy, const Context& context);
 

@@ -34,7 +34,7 @@ oryx::ActionList TicTacToeState::legal_actions() const
             }
         }
     }
-    // Trips if this ever changes shape - kActionListInlineCapacity is measured from this exact board (DESIGN.md §12/§19).
+    // Trips if this ever changes shape - kActionListInlineCapacity is measured from this exact board (docs/design/quality.md, decision-log.md).
     OX_CORE_ASSERT(actions.size() <= oryx::kActionListInlineCapacity, "TicTacToe legal_actions() exceeded ActionList's inline capacity");
     return actions;
 }

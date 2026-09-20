@@ -5,7 +5,7 @@
 namespace oasis
 {
 
-// Concrete stdin/stdout renderer; not behind an interface until a second renderer exists (DESIGN.md §16).
+// Concrete stdin/stdout renderer; not behind an interface until a second renderer exists (docs/design/platform.md).
 class TicTacToeBoard
 {
 public:

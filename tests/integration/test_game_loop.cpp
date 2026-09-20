@@ -25,7 +25,7 @@ Outcome play_dummy_game_to_terminal()
 } // namespace
 
 // Relocated from tests/unit/Strategy/test_strategy.cpp: a full game+strategy
-// loop to termination is DESIGN.md §11's "Integration tests: Game + strategy
+// loop to termination is docs/design/quality.md's "Integration tests: Game + strategy
 // execution", not a Strategy unit test.
 TEST_CASE("running DummyGreedyStrategy vs itself to terminal via a manual demo loop reaches a valid Outcome")
 {

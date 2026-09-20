@@ -7,6 +7,8 @@ import tomllib
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = PROJECT_ROOT / "build"
 BIN_DIR = BUILD_DIR / "bin"
+SITE_DIR = PROJECT_ROOT / "site"
+MKDOCS_CONFIG = PROJECT_ROOT / "mkdocs.yml"
 DEFAULT_CONFIG_FILE = PROJECT_ROOT / "oryx.toml"
 DEFAULT_LOCAL_CONFIG_FILE = PROJECT_ROOT / "oryx.local.toml"
 

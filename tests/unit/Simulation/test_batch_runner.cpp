@@ -76,7 +76,7 @@ TEST_CASE("accumulate() sums rewards and matches across repeated calls")
 // leaving pile=1 (a P-position) - whatever the second player does from
 // there, they must take the last stone and lose. So MinimaxStrategy as
 // player 0 always beats FirstLegalStrategy as player 1, deterministically
-// (DESIGN.md §11 - avoid a flaky stochastic assertion).
+// (docs/design/quality.md - avoid a flaky stochastic assertion).
 TEST_CASE("BatchRunner::run aggregates a deterministic pairing correctly")
 {
     DummyGame game(2);

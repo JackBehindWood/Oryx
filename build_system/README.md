@@ -199,7 +199,7 @@ Each command group is a self-contained module under `build_system/commands/`.
 module in that directory via `pkgutil.iter_modules` — dropping in a new file
 is enough, with **no edits needed elsewhere**. To add a new command group
 (e.g. the `benchmark`/`experiment`/`docs`/`explain` commands from
-`ROADMAP.md`):
+`docs/roadmap.md`):
 
 1. Create `build_system/commands/<name>.py` with its own `app = typer.Typer()`,
    a `GROUP_HELP` string, and `command = registry.make_group(app, group="<Name>")`.

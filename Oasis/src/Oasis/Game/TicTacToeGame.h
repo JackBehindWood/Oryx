@@ -40,7 +40,7 @@ private:
 };
 
 // Decodes a TicTacToe ActionId into {row, col} - the worked example for
-// IActionFeatures (ARCHITECTURE.md §14).
+// IActionFeatures (docs/architecture.md §14).
 class TicTacToeActionFeatures : public oryx::IActionFeatures
 {
 public:

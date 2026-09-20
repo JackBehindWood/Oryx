@@ -85,10 +85,10 @@ Define the smallest useful conceptual core.
 
 A reviewed architecture and initial API design.
 
-**Delivered:** see `ARCHITECTURE.md` and `DESIGN.md`, which capture the
+**Delivered:** see [Architecture](architecture.md) and [Design](design/index.md), which capture the
 resolved core model (`IGame`/`IState`/`IStrategy`, `ActionId`,
 `Outcome`/`Rewards<T>`, naming conventions, extension/registration approach)
-and the decision log (`DESIGN.md` §19) recording what's settled versus still
+and the decision log ([Design: Decision Log](design/decision-log.md)) recording what's settled versus still
 open for later phases.
 
 ---
@@ -159,7 +159,7 @@ A reproducible development workflow capable of configuring, building, testing, a
 # 4. Phase 2 — Minimal C++ Core
 
 Build the smallest functional engine, using the interfaces decided during
-the Phase 0 brainstorm (see `ARCHITECTURE.md` §3 and `DESIGN.md` §19 for
+the Phase 0 brainstorm (see [Architecture §3](architecture.md#3-core-components) and [Design: Decision Log](design/decision-log.md) for
 full detail).
 
 ### Components
@@ -180,8 +180,7 @@ full detail).
   constants, generic `Vector<N,T>`/`Matrix<R,C,T>` with `Vec2/3/4` and
   `Mat2/3/4` aliases, bounded 2x2/3x3 determinant/inverse, 2D affine
   transform helpers, a minimal `Colour`), included via `oxpch.h`, scoped
-  to grid/board coordinate and 2D-transform needs (see `ARCHITECTURE.md`
-  §3.4)
+  to grid/board coordinate and 2D-transform needs (see [Architecture §3.4](architecture.md#34-math))
 * Unit testing infrastructure (doctest), validating the above against a
   minimal/dummy game — not Tic-Tac-Toe itself, which is Phase 3's deliverable
 
@@ -189,13 +188,13 @@ full detail).
 
 * No `Simulation`/`Match`/`Runner` class yet — the execution loop (legal
   actions → strategy decides → apply → check terminal → repeat) is proven
-  via tests/a demo loop, not a dedicated abstraction (`ARCHITECTURE.md` §5)
+  via tests/a demo loop, not a dedicated abstraction ([Architecture §5](architecture.md#5-execution-model))
 * No `Registry<T>` — games/strategies will self-register (the principle is
-  decided, `ARCHITECTURE.md` §10), but the mechanism isn't built until a
+  decided, [Architecture §10](architecture.md#10-extension-model)), but the mechanism isn't built until a
   second game/strategy makes manual construction inconvenient
 * No chance/simultaneous player support — strict alternating turns only
 * No concrete `Layer` implementations beyond `Oasis`'s own — `Application`
-  gained a `LayerStack`/`Layer` extension point (`ARCHITECTURE.md` §3.6), but
+  gained a `LayerStack`/`Layer` extension point ([Architecture §3.6](architecture.md#36-application-layers)), but
   `SimulationLayer`, a `PythonScriptingLayer`, a GUI/CLI layer, and
   profiling/benchmarking layers are future direction only, tied to Phases
   6/7/9/11 below
@@ -234,7 +233,7 @@ rendering the board to stdout and reading a move from stdin. It is a
 a shared `IBoard` interface has no second implementation to justify it yet
 (same reasoning as the `Registry<T>` timing decision in Phase 2). `IBoard`
 gets extracted once Phase 10 Graphics actually needs to swap in a graphical
-renderer polymorphically, per `ARCHITECTURE.md` §8.
+renderer polymorphically, per [Architecture §8](architecture.md#8-graphics).
 
 ---
 
@@ -261,15 +260,14 @@ Four strategies, confirmed rather than merely potential:
   depending only on `IState`, living in `Oryx/src/Oryx/Strategy/`
 * A TicTacToe-specific heuristic strategy — living in `Oasis`, for the same
   reason `TicTacToeBoard` stayed concrete/local rather than becoming a core
-  abstraction (`ARCHITECTURE.md` §8)
+  abstraction ([Architecture §8](architecture.md#8-graphics))
 
 Minimax exercises lookahead using the existing `apply()`/`undo()` contract
 directly — depth-first search on the same state object, undoing after each
 branch. No `clone()`/copy-construction is added to `IState` for this.
 
 This phase also builds `Registry<T>`, generic and wired up for both `IGame`
-and `IStrategy` from the start (see `ARCHITECTURE.md` §10 and `DESIGN.md`
-§19). Games and strategies register via `OX_REGISTER_GAME`/
+and `IStrategy` from the start (see [Architecture §10](architecture.md#10-extension-model) and [Design: Decision Log](design/decision-log.md)). Games and strategies register via `OX_REGISTER_GAME`/
 `OX_REGISTER_STRATEGY` macros that expand to a self-registering static
 object per type — no central list, no `__init__.py`-style registration
 file to maintain. Game-specific strategies (like the heuristic above)
@@ -310,19 +308,19 @@ A new `Oryx/src/Oryx/Simulation/` core module:
 * `SimulationLayer` — a concrete `Layer` subclass defined in Oryx core (not
   Oasis) that drives a batch through `Application`'s tick loop; `Oasis`
   pushes it onto its `LayerStack` the same way it pushes `OasisLayer` today
-  (`ARCHITECTURE.md` §3.6)
+  ([Architecture §3.6](architecture.md#36-application-layers))
 * An action decode/interpretation capability (e.g. `IActionFeatures`),
   resolved through `Context` like any other capability — `ActionId` stays
-  the opaque wire type (`ARCHITECTURE.md` §3.2/§14, `DESIGN.md` §19); this
+  the opaque wire type ([Architecture §3.2](architecture.md#32-state)/[§14](architecture.md#14-current-architectural-unknowns), [Design: Decision Log](design/decision-log.md)); this
   is the mechanism for a strategy that needs structured access to what an
   action means, not a reopening of the Action representation decision
 * `Context`/capability construction moves from `OasisLayer` (a stopgap, see
-  `ARCHITECTURE.md` §14) into `Match`, now that a real orchestration entry
+  [Architecture §14](architecture.md#14-current-architectural-unknowns)) into `Match`, now that a real orchestration entry
   point exists
 
 This phase is explicitly single-threaded — batching proves the `Match`/
 runner API shape, not throughput. Parallel batch execution is deferred (see
-`DESIGN.md` §13/§19); the "100,000 games" example above is a target for the
+[Design: Parallelism](design/quality.md#parallelism)/[Decision Log](design/decision-log.md)); the "100,000 games" example above is a target for the
 API to express cleanly, not a performance bar this phase needs to clear.
 
 ---
@@ -529,13 +527,15 @@ build build clean
 build build run
 build test run
 build build all
+build docs build
+build docs serve
+build docs clean
 ```
 
 As corresponding capabilities are implemented, the CLI may grow to support:
 
 ```text
 build experiment
-build docs
 build explain
 ```
 
@@ -546,7 +546,7 @@ than hand-wired lists, so extending the CLI is a matter of adding a
 `commands/<name>.py` module. Optional, per-developer IDE integration
 (`build config init --ide vscode|visual_studio`) and a generic `vendor/<lib>`
 convention for vendored header-only dependencies are part of this layer too —
-see [`build_system/README.md`](build_system/README.md) for details.
+see [`build_system/README.md`](https://github.com/JackBehindWood/oryx/blob/main/build_system/README.md) for details.
 
 ---
 

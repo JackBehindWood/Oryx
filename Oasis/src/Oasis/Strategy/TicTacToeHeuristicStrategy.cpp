@@ -5,7 +5,7 @@
 namespace {
 
 // Duplicated from TicTacToeGame.cpp's private kLines: two call sites don't
-// justify extracting a shared utility yet (DESIGN.md §20).
+// justify extracting a shared utility yet (docs/design/principles.md).
 constexpr size_t kLines[8][3][2] = {
     { { 0, 0 }, { 0, 1 }, { 0, 2 } },
     { { 1, 0 }, { 1, 1 }, { 1, 2 } },

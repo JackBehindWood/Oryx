@@ -25,6 +25,12 @@ dependencies = [
     "questionary>=2.0.0",
 ]
 
+[dependency-groups]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5",
+]
+
 [project.scripts]
 build = "build_system.main:app"
 

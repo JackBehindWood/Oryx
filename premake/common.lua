@@ -11,7 +11,7 @@ function useOryxProjectDefaults()
 end
 
 -- Games/strategies self-register via a static object with no other
--- externally-visible symbol (ARCHITECTURE.md §10). A plain `links "Oryx"`
+-- externally-visible symbol (docs/architecture.md §10). A plain `links "Oryx"`
 -- lets the linker silently drop object files from the libOryx.a archive that
 -- nothing else references, so those registrations never run - use this
 -- instead of `links "Oryx"` in any project that consumes Oryx's registry

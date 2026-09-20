@@ -151,7 +151,7 @@ constexpr Matrix<C, R, T> transpose(const Matrix<R, C, T>& m)
 
 // determinant()/inverse() are deliberately bounded to 2x2 and 3x3 via fully-specialized
 // overloads — this makes calling them on any other size a compile error, rather than a
-// general N x N implementation (out of scope; see ARCHITECTURE.md §3.4).
+// general N x N implementation (out of scope; see docs/architecture.md §3.4).
 template<typename T>
 constexpr T determinant(const Matrix<2, 2, T>& m)
 {

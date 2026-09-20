@@ -82,8 +82,7 @@ htmlcov/
 .tox/
 
 # Documentation build
-docs/_build/
-docs/.doctrees/
+site/
 
 # Local development
 *.swp

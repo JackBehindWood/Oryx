@@ -1,0 +1,53 @@
+site_name: Oryx
+site_url: https://jackbehindwood.github.io/oryx/
+site_description: An open-source engine for games, strategies, simulation, and decision-making.
+repo_url: https://github.com/JackBehindWood/oryx
+docs_dir: docs
+site_dir: site
+strict: true
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+validation:
+  links:
+    not_found: warn
+  anchors: warn
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Design:
+      - design/index.md
+      - Principles: design/principles.md
+      - C++ API: design/cpp-api.md
+      - Python API: design/python-api.md
+      - Determinism: design/determinism.md
+      - Quality: design/quality.md
+      - Observability: design/observability.md
+      - Platform: design/platform.md
+      - Decision Log: design/decision-log.md
+  - Python: python/index.md
+  - Roadmap: roadmap.md

@@ -96,7 +96,7 @@ All actual rules — legal actions, applying actions, terminal detection,
 outcomes — live on `IState` (§3.2), not on `IGame`. A game should be usable
 independently of graphics and the Strategy Dashboard.
 
-See `DESIGN.md` §5 for the naming rationale (`I`-prefix reserved for fully
+See [Design: Naming Conventions](design/cpp-api.md#naming-conventions) for the naming rationale (`I`-prefix reserved for fully
 pure-virtual interfaces).
 
 ---
@@ -127,7 +127,7 @@ action generation (a hot path in search) allocation-free.
 This was validated directly by Phase 4/5's `MinimaxStrategy`: full-tree
 lookahead recurses depth-first on the same `IState` object via `apply()`/
 `undo()`, exactly like every other consumer — no `clone()`/copy-construction
-contract was added to `IState` (`DESIGN.md` §19).
+contract was added to `IState` ([Design: Decision Log](design/decision-log.md)).
 
 `IState` should not:
 
@@ -195,8 +195,7 @@ The architecture should avoid making assumptions that all strategies share the s
 seeded via its own constructor argument — `IStrategy` itself gained no
 seed/RNG parameter. Reproducibility/seed control for a batch is instead
 orchestrated at the `Match`/batch-runner level (`Oryx/Simulation`, §5),
-which decides how to construct and seed strategies for a run (`DESIGN.md`
-§8/§19).
+which decides how to construct and seed strategies for a run ([Design: Randomness](design/determinism.md#randomness)/[Decision Log](design/decision-log.md)).
 
 ---
 
@@ -227,7 +226,7 @@ It now provides:
   `distance`, `distance_squared`, `lerp`, `clamp`, `min`, `max`, `abs`,
   `approx_equal`, `to_string`) forms exist for the operations above where
   a primary receiver makes sense — a deliberate numpy/GLM-style dual API,
-  see the naming-convention exception in `DESIGN.md` §5. `dot`/`cross` and
+  see the naming-convention exception in [Design: Naming Conventions](design/cpp-api.md#naming-conventions). `dot`/`cross` and
   the operators stay free-function-only, matching the original design;
   `distance`/`distance_squared` are a deliberate exception (see the
   comment in `Vector.h`).
@@ -261,10 +260,10 @@ It now provides:
 * `Colour.h` — a minimal, plain data-only `struct Colour { float r, g, b,
   a }` (opaque black by default) with free `operator==`/`operator!=`/
   `approx_equal`/`lerp`. Deliberately **not** given the Vector/Matrix dual
-  member+free-function API — that documented exception (`DESIGN.md` §5)
+  member+free-function API — that documented exception ([Design: Naming Conventions](design/cpp-api.md#naming-conventions))
   is scoped to exactly those two types. No byte-based variant and no
   named-colour palette (`White`/`Black`/...) — deferred until a real
-  renderer/texture-format consumer exists (`DESIGN.md` §20).
+  renderer/texture-format consumer exists ([Design Review Principle](design/principles.md#design-review-principle)).
 * `Math.h` — an umbrella header aggregating the above, included directly
   from the precompiled header (`oxpch.h`), and `Math.cpp` — explicit
   template instantiation of the common `Vector<2|3|4, float|double|int>`
@@ -280,7 +279,7 @@ Determinant/inverse are supported only as the bounded 2×2/3×3 special case
 described above — general N×N determinant/inverse, 4×4 inverse,
 quaternions, a `Matrix4`-based 3D transform pipeline, and other
 higher-dimensional types remain out of scope until a real use case
-demonstrates the requirement (`DESIGN.md` §20).
+demonstrates the requirement ([Design Review Principle](design/principles.md#design-review-principle)).
 
 ---
 
@@ -312,7 +311,7 @@ Application::run()
 
 A `Layer` (`Oryx/Core/Layer.h`) is a base class, not a pure interface, so it
 does not take the `I`-prefix (same exception as `Application` — see
-`DESIGN.md` §5): it mixes concrete state (a `name()`) with virtuals that
+[Design: Naming Conventions](design/cpp-api.md#naming-conventions)): it mixes concrete state (a `name()`) with virtuals that
 default to no-ops (`attach()`, `detach()`, `update()`, `event()`).
 `LayerStack` is responsible for constructing layers — `Application::push_layer<T>(args...)` /
 `push_overlay<T>(args...)` forward to `LayerStack`, which builds `T` via
@@ -368,7 +367,7 @@ any application linking `Oryx` can push `SimulationLayer` onto its own
 GUI/CLI front-end layer, profiling and benchmarking layers — remain
 undecided and unbuilt, and would need the same justification (a genuine
 cross-app need) before following `SimulationLayer`'s core-not-app placement
-(see `ROADMAP.md` Phases 6/7/9/11).
+(see [Roadmap](roadmap.md) Phases 6/7/9/11).
 
 ---
 
@@ -454,7 +453,7 @@ matches → aggregated win/loss/draw counts and aggregate `Rewards<T>`).
 `SimulationLayer` (§3.6), a concrete `Layer` defined in the same module,
 drives a batch through `Application`'s tick loop; `Oasis` pushes it onto
 its `LayerStack` like any other layer. This phase is explicitly
-single-threaded — see `DESIGN.md` §13/§19 — batching proves the `Match`/
+single-threaded — see [Design: Parallelism](design/quality.md#parallelism)/[Decision Log](design/decision-log.md) — batching proves the `Match`/
 runner API shape, not throughput.
 
 ---
@@ -653,7 +652,7 @@ static object runs the actual registration at static-initialization time,
 before `main()`.
 
 Strategies that are game-specific (e.g. Phase 4's TicTacToe heuristic, kept
-in `Oasis` — see `ROADMAP.md` Phase 4) register under a namespaced name
+in `Oasis` — see [Roadmap](roadmap.md) Phase 4) register under a namespaced name
 (`"tictactoe/heuristic"`) rather than a global one (`"random"`).
 `Registry<T>` does not enforce game/strategy compatibility — misusing a
 game-specific strategy against the wrong game is the caller's
@@ -667,7 +666,7 @@ the same way `tests/` does. It is where games, demos, and experiments that
 consume the engine should live, so that this kind of content never needs to be
 compiled into `Oryx` itself. It is currently a scaffold — the smallest possible
 program proving the link works — and is expected to grow into the home for the
-first reference game described in `ROADMAP.md` Phase 3.
+first reference game described in [Roadmap](roadmap.md) Phase 3.
 
 ---
 
@@ -743,7 +742,7 @@ Reproducibility requirements will be refined once the experiment model is design
 
 # 14. Current Architectural Unknowns
 
-The Phase 2 brainstorm (see `DESIGN.md` §19 decision log) resolved the
+The Phase 2 brainstorm (see [Design: Decision Log](design/decision-log.md)) resolved the
 following, at least for the minimal core:
 
 * Exact `Game`/`State` interface — resolved: `IGame` (stateless factory) /
@@ -760,7 +759,7 @@ following, at least for the minimal core:
   now built as a generic, macro-based `Registry<T>` (Phase 4), covering
   both `IGame` and `IStrategy`
 
-The Phase 4/5 brainstorm (see `DESIGN.md` §19 decision log) resolved
+The Phase 4/5 brainstorm (see [Design: Decision Log](design/decision-log.md)) resolved
 further, for this phase's scope:
 
 * `Registry<T>` implementation and timing — resolved: built in Phase 4,
@@ -778,7 +777,7 @@ further, for this phase's scope:
 * Capability/`Context` mechanism — resolved ahead of schedule, as
   forward-looking infrastructure: `IStrategy::decide(const Context&)`,
   capabilities explicitly `provide()`d rather than `dynamic_cast`-discovered
-  (§3.3, `DESIGN.md` §19). No concrete capability ships yet; construction
+  (§3.3, [Design: Decision Log](design/decision-log.md)). No concrete capability ships yet; construction
   lives in `OasisLayer` until a real `Engine`/`Match` exists (still open,
   below)
 
@@ -788,7 +787,7 @@ The following should **not** be considered settled yet:
   capability exposing structured access to what an `ActionId` means, for a
   strategy that needs more than the opaque integer) — planned for Phase 5,
   not yet built; `ActionId` itself stays the opaque wire type (§3.2,
-  `DESIGN.md` §19 "Action representation" — not reopened)
+  [Design: Decision Log](design/decision-log.md) "Action representation" — not reopened)
 * Player/agent model beyond strict alternation (chance players,
   simultaneous-move players)
 * Simultaneous actions
@@ -804,7 +803,7 @@ The following should **not** be considered settled yet:
 * Graphics abstraction
 * Multi-threaded simulation model — explicitly deferred rather than merely
   unaddressed: Phase 5's batch runner is single-threaded by design
-  (`DESIGN.md` §13/§19), not pending a decision
+  ([Design: Parallelism](design/quality.md#parallelism)/[Decision Log](design/decision-log.md)), not pending a decision
 
 These should be addressed systematically rather than solved piecemeal during implementation.
 

@@ -168,8 +168,8 @@ uv run build                          # interactive menu
 uv run build config init --ide vscode # oryx.toml + .vscode/{tasks,launch,...}.json
 uv run build build all                # configure, compile, test
 uv run build build run                # run the Oasis sandbox executable
+uv run build docs serve               # live-preview the documentation site
 build experiment
-build docs
 build explain
 ```
 
@@ -177,7 +177,7 @@ The exact command structure will evolve as the project develops.
 
 `Oasis` is the companion sandbox executable that links against `Oryx` — the
 home for games, demos, and experiments that consume the engine without being
-compiled into it. See [`ARCHITECTURE.md`](ARCHITECTURE.md#10-extension-model) for
+compiled into it. See [the architecture docs](docs/architecture.md#10-extension-model) for
 how it fits into the extension model.
 
 ---
@@ -256,12 +256,21 @@ The project favours **incremental design over speculative implementation**.
 
 ## Documentation
 
-| Document          | Purpose                                                    |
-| ----------------- | ---------------------------------------------------------- |
+| Document               | Purpose                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| `README.md`            | Project overview and getting started                       |
+| `docs/architecture.md` | Architectural structure and component boundaries           |
+| `docs/design/`         | Technical principles, decisions, and open design questions |
+| `docs/roadmap.md`      | Development direction and planned milestones               |
+| `CONTRIBUTING.md`      | Contribution guidelines                                    |
+
+The `docs/` folder is a MkDocs site: run `uv run build docs serve` to preview it locally.
+
+----------------- | ---------------------------------------------------------- |
 | `README.md`       | Project overview and getting started                       |
-| `ARCHITECTURE.md` | Architectural structure and component boundaries           |
-| `DESIGN.md`       | Technical principles, decisions, and open design questions |
-| `ROADMAP.md`      | Development direction and planned milestones               |
+| `docs/architecture.md` | Architectural structure and component boundaries      |
+| `docs/design/`    | Technical principles, decisions, and open design questions |
+| `docs/roadmap.md` | Development direction and planned milestones               |
 | `CONTRIBUTING.md` | Contribution guidelines                                    |
 
 ---

@@ -10,7 +10,7 @@ namespace
 
 // Reuses the pattern from tests/unit/Game/test_capability.cpp - not shared
 // directly since that one lives in an anonymous namespace there too (two
-// call sites don't justify extracting a shared fixture yet, DESIGN.md §20).
+// call sites don't justify extracting a shared fixture yet, docs/design/principles.md).
 class IMockCapability
 {
 public:

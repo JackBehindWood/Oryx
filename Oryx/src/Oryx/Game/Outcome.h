@@ -6,7 +6,7 @@
 namespace oryx
 {
 
-// Sized inline for 2 players (DESIGN.md §19); spills to heap past that.
+// Sized inline for 2 players (docs/design/decision-log.md); spills to heap past that.
 template<typename T>
 class Rewards
 {
