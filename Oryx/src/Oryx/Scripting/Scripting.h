@@ -1,0 +1,15 @@
+#pragma once
+
+#include "Oryx/Scripting/ScriptOrigin.h"
+#include "Oryx/Scripting/ScriptSource.h"
+#include "Oryx/Scripting/ScriptError.h"
+#include "Oryx/Scripting/ScriptDiscovery.h"
+#include "Oryx/Scripting/IScriptRuntime.h"
+#include "Oryx/Scripting/ScriptRuntimeRegistry.h"
+#include "Oryx/Scripting/IScriptedGame.h"
+#include "Oryx/Scripting/IScriptedState.h"
+#include "Oryx/Scripting/IScriptedStrategy.h"
+#include "Oryx/Scripting/ScriptingLayer.h"
+#include "Oryx/Scripting/InitGuard.h"
+#include "Oryx/Scripting/ScriptLog.h"
+#include "Oryx/Scripting/ScriptAssert.h"

@@ -49,11 +49,18 @@ def main(
         "--dry-run",
         help="Print the commands that would run without executing them.",
     ),
+    no_python: bool = typer.Option(
+        False,
+        "--no-python",
+        help="Build without the Python scripting backend (overrides [python] enabled in oryx.toml).",
+    ),
 ):
     """Global context setup executed before running commands."""
     try:
         cfg = BuildConfig.load(config_path)
         cfg.profile = profile
+        if no_python:
+            cfg.python_enabled = False
         cfg.__post_init__()
         ctx.obj = RunContext(config=cfg, config_path=config_path, verbose=verbose, dry_run=dry_run)
     except Exception as err:

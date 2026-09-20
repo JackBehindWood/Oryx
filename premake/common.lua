@@ -17,10 +17,10 @@ end
 -- instead of `links "Oryx"` in any project that consumes Oryx's registry
 -- without directly naming every concrete type (Oasis, Tests).
 function linkOryxWholeArchive()
-    dependson { "Oryx" }
+    -- A project link (not just the linkoptions below) makes the executable relink whenever libOryx changes.
+    links { "Oryx" }
 
     filter "system:windows"
-        links { "Oryx" }
         linkoptions { "/WHOLEARCHIVE:Oryx.lib" }
 
     filter "system:macosx"

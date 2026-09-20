@@ -9,3 +9,4 @@
 
 IncludeDir = {}
 IncludeDir["spdlog"] = "%{_MAIN_SCRIPT_DIR}/Oryx/vendor/spdlog/include"
+IncludeDir["pybind11"] = "%{_MAIN_SCRIPT_DIR}/Oryx/vendor/pybind11/include"

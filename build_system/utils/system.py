@@ -25,7 +25,7 @@ def get_macos_sdk_path():
         return None
 
 
-def run_command(command, cwd=None, capture_output=True):
+def run_command(command, cwd=None, capture_output=True, env=None):
     """
     Run a command and return the completed subprocess result.
 
@@ -37,6 +37,7 @@ def run_command(command, cwd=None, capture_output=True):
         command,
         cwd=str(cwd) if cwd else None,
         capture_output=capture_output,
+        env=env,
         text=True,
         check=True,
     )

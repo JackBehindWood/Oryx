@@ -9,9 +9,15 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    name: build (${{ matrix.os }}, python ${{ matrix.python }})
+    env:
+      # Managed CPython ships a shared libpython, which the embedded scripting backend links.
+      UV_PYTHON_PREFERENCE: only-managed
+      BUILD_FLAGS: ${{ matrix.python == 'off' && '--no-python' || '' }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        python: ["on", "off"]
 
     steps:
     - uses: actions/checkout@v4
@@ -38,14 +44,14 @@ jobs:
       run: uv sync
 
     - name: Configure, compile, and test
-      run: uv run build build all
+      run: uv run build $BUILD_FLAGS build all
 
     - name: Run Oasis sandbox
-      run: uv run build build run
+      run: uv run build $BUILD_FLAGS build run
 
     - name: Benchmark smoke run
       run: |
-        output=$(uv run build build run --simulate=random,first-legal,100 --benchmark)
+        output=$(uv run build $BUILD_FLAGS build run --simulate=random,first-legal,100 --benchmark)
         echo "$output"
         echo "$output" | grep -q "Benchmark report"
 

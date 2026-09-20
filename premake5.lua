@@ -3,6 +3,7 @@
 include "premake/common.lua"
 include "premake/vendor.lua"
 include "premake/dependencies.lua"
+include "premake/python.lua"
 
 workspace "oryx"
 	startproject "Oryx"

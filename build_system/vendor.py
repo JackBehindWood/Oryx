@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from build_system.config import PROJECT_ROOT
+from build_system.config import BuildConfig, PROJECT_ROOT
 
 console = Console()
 
@@ -25,6 +25,9 @@ PROJECT_DIRS = ["Oryx", "Oasis", "tests"]
 # generated <project>/vendor/premake/<lib>.lua build scripts for compiled
 # (non-header-only) vendor libs, alongside the actual <lib>/ checkouts.
 PREMAKE_SUBDIR_NAME = "premake"
+
+# Only needed when the Python backend is built (see premake/python.lua).
+PYTHON_VENDOR_LIBS = {"pybind11"}
 
 
 def vendor_dirs() -> list[Path]:
@@ -39,10 +42,12 @@ def vendor_dirs() -> list[Path]:
     return dirs
 
 
-def missing_vendor_dirs() -> list[Path]:
+def missing_vendor_dirs(cfg: BuildConfig | None = None) -> list[Path]:
     """Vendored library directories that exist but are empty — i.e. the git
-    submodule hasn't been checked out yet."""
-    return [d for d in vendor_dirs() if not any(d.iterdir())]
+    submodule hasn't been checked out yet. Python-only libs are skipped when
+    cfg says Python is off."""
+    skipped = PYTHON_VENDOR_LIBS if cfg is not None and not cfg.python_enabled else set()
+    return [d for d in vendor_dirs() if d.name not in skipped and not any(d.iterdir())]
 
 
 def vendor_include_paths() -> list[str]:
@@ -59,12 +64,12 @@ def vendor_include_paths() -> list[str]:
     return paths
 
 
-def ensure_vendor_dirs() -> None:
+def ensure_vendor_dirs(cfg: BuildConfig | None = None) -> None:
     """Verify every vendored git submodule (doctest today, and any future
     ones under <project>/vendor/<lib>/) is populated; abort with guidance if
     not. Used as the `requires_vendor=True` precondition on
     @registry.command(...) — see build_system/registry.py."""
-    missing = missing_vendor_dirs()
+    missing = missing_vendor_dirs(cfg)
     if not missing:
         return
     for d in missing:

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 import platform
 import re
@@ -60,6 +61,8 @@ class BuildConfig:
     profile: str = "debug"  # debug, release, or dist
     test_suite: TestSuiteConfig = field(default_factory=lambda: TestSuiteConfig(name="Tests"))
     executables: dict[str, ExecutableConfig] = field(default_factory=lambda: dict(DEFAULT_EXECUTABLES))
+    python_enabled: bool = True
+    scripting_paths: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate configuration settings."""
@@ -173,12 +176,17 @@ class BuildConfig:
             default_name = default.name if default else key
             executables[key] = ExecutableConfig(name=entry.get("name", default_name))
 
+        python = data.get("python", {})
+        scripting = data.get("scripting", {})
+
         return cls(
             project_name=project.get("name", cls.project_name),
             build_generator=build.get("generator", cls.build_generator),
             profile=build.get("profile", cls.profile),
             test_suite=test_suite,
             executables=executables,
+            python_enabled=python.get("enabled", True),
+            scripting_paths=list(scripting.get("paths", [])),
         )
 
     def save(self, path: Path = DEFAULT_CONFIG_FILE):
@@ -198,9 +206,21 @@ class BuildConfig:
             lines.append("")
             lines.append(f"[executables.{key}]")
             lines.append(f'name = "{entry.name}"')
-        lines.append("")
+        lines += [
+            "",
+            "[python]",
+            f"enabled = {str(self.python_enabled).lower()}",
+            "",
+            "[scripting]",
+            f"paths = {_toml_list(self.scripting_paths)}",
+            "",
+        ]
 
         path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _toml_list(values: list[str]) -> str:
+    return "[" + ", ".join(f'"{value}"' for value in values) + "]"
 
 
 @dataclass
@@ -221,6 +241,7 @@ class LocalConfig:
     """
     ide_kind: str = "none"
     debugger: str = "lldb"
+    scripting_paths: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         if self.ide_kind not in VALID_IDE_KINDS:
@@ -248,9 +269,11 @@ class LocalConfig:
             data = tomllib.load(file)
 
         ide = data.get("ide", {})
+        scripting = data.get("scripting", {})
         return cls(
             ide_kind=ide.get("kind", cls.ide_kind),
             debugger=ide.get("debugger", cls.debugger),
+            scripting_paths=list(scripting.get("paths", [])),
         )
 
     def save(self, path: Path = DEFAULT_LOCAL_CONFIG_FILE) -> None:
@@ -259,6 +282,19 @@ class LocalConfig:
             "[ide]",
             f'kind = "{self.ide_kind}"',
             f'debugger = "{self.debugger}"',
-            "",
         ]
+        if self.scripting_paths:
+            lines += ["", "[scripting]", f"paths = {_toml_list(self.scripting_paths)}"]
+        lines.append("")
         path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def script_search_path(config: BuildConfig, local: LocalConfig) -> str:
+    """The ORYX_SCRIPT_PATH value: [scripting] paths from oryx.toml then oryx.local.toml,
+    project-root-relative entries resolved, duplicates dropped, os.pathsep-joined."""
+    resolved = []
+    for entry in config.scripting_paths + local.scripting_paths:
+        path = str(Path(entry) if Path(entry).is_absolute() else PROJECT_ROOT / entry)
+        if path not in resolved:
+            resolved.append(path)
+    return os.pathsep.join(resolved)

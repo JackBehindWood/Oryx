@@ -4,3 +4,6 @@
 [submodule "Oryx/vendor/spdlog"]
 	path = Oryx/vendor/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "Oryx/vendor/pybind11"]
+	path = Oryx/vendor/pybind11
+	url = https://github.com/pybind/pybind11.git

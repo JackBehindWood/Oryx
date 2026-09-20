@@ -614,12 +614,12 @@ The Python API should expose concepts useful to researchers and users rather tha
 
 For example, Python users should ideally be able to express experiments naturally without understanding the internal C++ ownership model.
 
-Phase 7 uses one `oryx` API in two hosts. In **Python-as-host**, `import oryx`
-loads a compiled `_oryx` extension (REPL, scripts, notebooks). In
-**C++-as-host**, `Oasis` embeds an interpreter through a Python runtime, a
-private backend (`Oryx/backends/Python/`) selected through the registry (§10),
+Phase 7 uses one `oryx` API in two hosts, built in stages. In
+**C++-as-host** (first), `Oasis` embeds an interpreter through a Python runtime,
+a private backend (`Oryx/backends/Python/`) selected through the registry (§10),
 and a game or strategy defined in a Python file runs in `Oasis` exactly like a
-C++ one. Both hosts share one binding source and, within a process, one
+C++ one. In **Python-as-host** (last), `import oryx` loads a compiled `_oryx`
+extension owned by `Oasis` (REPL, scripts, notebooks). Both hosts share one binding source and, within a process, one
 registry, so a script-registered game appears in `Oasis`'s menu. A Python-defined
 game or strategy is a C++ object (`PyScripted*`) that implements a
 language-agnostic interface from `Oryx/src/Oryx/Scripting/` (`IScriptedGame`

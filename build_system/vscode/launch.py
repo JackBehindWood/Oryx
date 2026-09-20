@@ -3,7 +3,7 @@ import platform
 import shutil
 from pathlib import Path
 
-from build_system.config import BuildConfig, PROJECT_ROOT
+from build_system.config import BuildConfig, LocalConfig, PROJECT_ROOT, script_search_path
 from build_system.utils import load_json, merge_by_key, write_json
 from build_system.vscode.tasks import LABEL_PREFIX, PROFILES
 
@@ -45,6 +45,7 @@ def _configuration(profile: str, cfg: BuildConfig, debugger: str) -> dict:
         "request": "launch",
         "program": str(profile_cfg.executable_path("oasis")),
         "args": [],
+        "env": {"ORYX_SCRIPT_PATH": script_search_path(cfg, LocalConfig.load())},
         "cwd": "${workspaceFolder}",
         "preLaunchTask": f"{LABEL_PREFIX}Compile ({label})",
         "console": "internalConsole" if debugger == "lldb" else "integratedTerminal",

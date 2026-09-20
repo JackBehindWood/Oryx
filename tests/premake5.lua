@@ -32,8 +32,10 @@ project "Tests"
     defines {
         "SPDLOG_COMPILED_LIB"
     }
+    useOryxPython()
 
     linkOryxWholeArchive()
     links {
         "spdlog",
     }
+    linkPython()

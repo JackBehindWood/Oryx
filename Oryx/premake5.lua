@@ -23,3 +23,15 @@ project "Oryx"
     defines {
         "SPDLOG_COMPILED_LIB",
     }
+
+    if pythonEnabled() then
+        files {
+            "backends/Python/**.h",
+            "backends/Python/**.hpp",
+            "backends/Python/**.cpp"
+        }
+        includedirs { "backends/Python" }
+        useOryxPython()
+        useOryxPythonHeaders()
+        useOryxPythonEmbedding()
+    end

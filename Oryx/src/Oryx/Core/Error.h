@@ -23,4 +23,15 @@ private:
     std::string m_detail;
 };
 
+class AssertionError : public Error
+{
+public:
+    explicit AssertionError(const std::string& message)
+        : Error(message)
+    {
+    }
+
+    [[nodiscard]] const char* category() const noexcept override { return "assertion"; }
+};
+
 } // namespace oryx

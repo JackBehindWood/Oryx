@@ -39,3 +39,26 @@ def prune_stale_object_dirs(cfg: BuildConfig) -> list[str]:
             cleaned.append(project)
 
     return cleaned
+
+
+PYTHON_OPTIONS_FILE = BUILD_DIR / ".python-options"
+
+
+def clear_outputs_if_python_changed(python_options: list[str]) -> bool:
+    """Wipe build/bin and build/bin-int when the Python options differ from the last configure.
+
+    Premake's Makefiles don't rebuild an object when only its defines change, and `ar` keeps
+    archive members from a previous build, so toggling --no-python (or moving to another
+    interpreter) would otherwise leave stale objects and a libOryx.a still holding the
+    Python backend.
+    """
+    current = "\n".join(python_options)
+    previous = PYTHON_OPTIONS_FILE.read_text(encoding="utf-8") if PYTHON_OPTIONS_FILE.is_file() else None
+
+    changed = previous is not None and previous != current
+    if changed or (previous is None and (BUILD_DIR / "bin").exists()):
+        remove_directory(BUILD_DIR / "bin")
+        remove_directory(BUILD_DIR / "bin-int")
+
+    PYTHON_OPTIONS_FILE.write_text(current, encoding="utf-8")
+    return changed

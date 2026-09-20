@@ -116,8 +116,7 @@ Oryx/
   (`PlatformDetection.h`, [Decision Log](decision-log.md)), which is why optional
   dependency-bound code such as Python is filed under `backends/`, not `platform/`.
 
-`Oryx/backends/` does not exist yet; it is created together with the first
-backend. See the [Decision Log](decision-log.md) ("Public API vs private backends").
+`Oryx/backends/` holds the Python backend so far. See the [Decision Log](decision-log.md) ("Public API vs private backends").
 
 ## Documentation as a Design Tool
 

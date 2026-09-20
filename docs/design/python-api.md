@@ -47,12 +47,13 @@ Status legend as in the [Decision Log](decision-log.md). The decisions below are
 
 | Topic | Position | Status |
 | ----- | -------- | ------ |
-| Hosts | Both. Python-as-host (`import oryx`, notebooks) and C++-as-host (Oasis embeds an interpreter through a Python runtime). One binding source, `bind_oryx`, is compiled both as the `_oryx` extension module and into `Oryx` for embedding. One process has one registry, so a script-registered game reaches Oasis's menu | Working decision |
-| Build option | Python is on by default and opt-out at build time (`--no-python` / `python = false` in `oryx.toml`). Only `Oryx/backends/Python/` and the `OryxPy` project need pybind11 and `<Python.h>`; when off, Premake excludes both and the rest of Oryx is untouched. CI gets a Python-off leg | Working decision |
+| Hosts | Both, in stages. **Embedded first** (C++-as-host): Oasis embeds an interpreter through a Python runtime, and Python runs as scripting inside Oasis. The **research host** comes last (Python-as-host): `import oryx` from a REPL, script or notebook. One binding source, `bind_oryx`, is compiled into `Oryx` for embedding and later also becomes the `_oryx` extension module. One process has one registry, so a script-registered game reaches Oasis's menu | Working decision (staged) |
+| Build option | Python is on by default and opt-out at build time (`--no-python` / `python = false` in `oryx.toml`). Only `Oryx/backends/Python/` needs pybind11 and `<Python.h>`; when off, Premake adds no Python file, include path, define or link and the rest of Oryx is untouched. `build_system` reads the interpreter's include directory, libpython and prefix from `sysconfig` and passes them to Premake as `--python-*` options (`premake/python.lua`); changing them clears the previous binaries, because Makefiles do not rebuild an object whose defines changed. `Oasis` and `Tests` link libpython through `linkPython()`, since their whole-archive link of `Oryx` pulls in the backend. CI has a Python-off leg | Working decision |
 | pybind11 | Built by Premake; vendored as a git submodule at `Oryx/vendor/pybind11` like every other vendored library ([Platform](platform.md#source-layout-public-api-and-backends)) | Working decision |
-| Extension module | `OryxPy` is a small Premake `SharedLib` producing `_oryx`, which `import oryx` loads outside Oasis (Python can only import shared libraries; Oryx is a static library). It lives beside `Oasis`, whose game sources it compiles directly, and is skipped when Python is off. A user's own C++ games would use a Premake helper that builds a superset module (Oryx plus their games); a shared `libOryx` is the long-term alternative. Exact layout is decided when the build integration lands | Working decision (layout open until then) |
+| Extension module | Research host, last stage. Python can only import shared libraries and Oryx is a static library, so `import oryx` outside Oasis needs a `_oryx` shared library. It is **owned by Oasis** (Oasis is the experiment ground and the example for others) and there is no separate `OryxPy` project; its Premake shape, and how it reuses Oasis's precompiled header, are decided when that stage starts. A user's own C++ games would use a Premake helper that builds a superset module (Oryx plus their games); a shared `libOryx` is the long-term alternative | Working decision (layout open until the research stage) |
 | Private backend | The Python implementation lives in `Oryx/backends/Python/` (`PythonRuntime`, the `PyScripted*` adapters, `bind_oryx`), private per [Source Layout](platform.md#source-layout-public-api-and-backends) | Working decision |
-| Games in Oasis | TicTacToe and its heuristic stay in `Oasis`; `OryxPy` compiles those sources directly, the same precedent as `Tests` | Working decision |
+| Embedded interpreter | `PythonRuntime` starts CPython from a `PyConfig` with no signal handlers and no bytecode written into the user's tree. The interpreter prefix (`OX_PYTHON_HOME`, unless `PYTHONHOME` is set) and the Python package directory (`Oryx/backends/Python`, holding the pure-Python `oryx/` package) (`OX_PYTHON_PACKAGE_DIR`, prepended to `sys.path`) are baked into the backend at configure time, so Tests, Oasis and the IDE work with no environment setup; the binaries are machine-local. The native module `_oryx` is registered explicitly before the interpreter starts (`PyImport_AppendInittab`), not by a static `PYBIND11_EMBEDDED_MODULE`, and the pure-Python `oryx` package re-exports it. Third-party site-packages of the venv are a later concern | Working decision |
+| Games in Oasis | TicTacToe and its heuristic stay in `Oasis`; the research module, being Oasis-owned, compiles those sources directly, the same precedent as `Tests` | Working decision |
 | numpy | Optional (`oryx[numpy]`): bulk numeric data (rewards, batch results, `Vec`/`Mat`) becomes an `ndarray` when installed; tiny data such as `legal_actions()` stays a plain list | Working decision |
 | Config | `[python] enabled` (build option, default true) and `[scripting] paths` (run-time list; `oryx.local.toml` adds personal paths) in `oryx.toml`. Only `build_system` reads TOML; C++ never parses it | Working decision |
 
@@ -66,8 +67,8 @@ Status legend as in the [Decision Log](decision-log.md). The decisions below are
 | Unity-style registration | `class Nim(oryx.Game, id="nim")` registers on import via `__init_subclass__`; typed class fields (`stones: int = 21`) form the schema. `oryx.register_game(...)` remains for factories and lambdas | Working decision |
 | Origin-tagged registration | Research needs notebook-safe re-registration: re-running a cell that redefines `class Nim(oryx.Game, id="nim")` replaces the entry when the origin (language, module, source file) is the same; a clash with an entry of another origin, including a C++ one, is an error unless `overwrite=True`. This lives in a scripting-specific registry over `Registry<IGame>`/`Registry<IStrategy>`, not in the core `Registry<T>`, and is built when the first script-defined registrant exists | Working decision (built with the script-backed types) |
 | Seeding | `simulate(seed=S)`: strategies created by name that declare a `seed` parameter get `S + seat_index`; instances passed in are user-seeded; no change to `IStrategy` or `BatchRunner`; the master seed is recorded in the results | Working decision |
-| Logging and assertions | Exposed as Tier 1 modules. `oryx.log` routes to the client logger so script output interleaves with engine output; `oryx.assertions.check(cond, msg)` logs then raises `OryxAssertionError`, because `OX_ASSERT` traps the process in Debug and would kill the interpreter with no traceback | Working decision |
-| Initialisation and guard | Notebooks and the REPL call `oryx.init()` (it binds the idempotent `oryx::init()`); scripts embedded in Oasis never do, because Oasis's `main()` already did. Only the entry points every session must pass through, `make_game` and `make_strategy`, are guarded: a guard raises `OryxError` naming the function (`make_game() was called before oryx.init()`) instead of lazily initialising. The guard is a zero-lambda NTTP wrapper exposed through a `GUARDED_FUNC(fn)` macro; its check is one inline load with an `[[unlikely]]` branch and an out-of-line cold throw. The message goes in the exception, not the log, because the guard fires exactly when no logger exists. Lands with the bindings (step 5) | Working decision |
+| Logging and assertions | Exposed as Tier 1 modules. The language-agnostic parts live in `Scripting/`: `script_log(level, message)` (always formatted with `"{}"`, so script text is never a format string) and `script_check(condition, message)`, which logs then throws `AssertionError` (`Core/Error.h`) and works in every profile. The Python backend only binds them: `oryx.log.*` routes to the client logger so script output interleaves with engine output (plus a `logging.Handler` bridge, `oryx.log.install()`), and `oryx.assertions.check` raises `OryxAssertionError`. A C++ `OX_ASSERT` is a separate matter, see the assertion hook below | Working decision |
+| Initialisation and guard | The guard machinery is language-agnostic and lives in `Scripting/InitGuard.h`: `OX_GUARDED_FUNC(function, name)` yields a function pointer with the same signature whose check is one inline load with an `[[unlikely]]` branch and an out-of-line cold throw of `oryx::Error` (`oryx.log.info() was called before Oryx was initialised`). It covers every entry point that would otherwise dereference a logger that does not exist yet: `oryx.log.*` and `oryx.assertions.check` now (an unguarded pre-init `oryx.log.info()` would be a null dereference), `make_game`/`make_strategy` when they land. The message goes in the exception, not the log, because the guard fires exactly when no logger exists. Free functions only; the fixed `Args...` signature is required so pybind11 can deduce the Python signature. Scripts embedded in Oasis never call `oryx.init()`, because Oasis's `main()` already did; the `oryx.init()` binding (the idempotent `oryx::init()`) arrives with the research host | Working decision |
 | Module tiers | Tier 1: game, strategy, registry, simulation (`Match`/`BatchRunner`/`BatchResult` and `simulate()`), random, results, log, assertions. Tier 2: math (`Vec`/`Mat` and ndarray), benchmark. Not exposed: `Application`, `Layer`, `Event` | Working direction |
 
 ### The scripting seam
@@ -91,7 +92,7 @@ Status legend as in the [Decision Log](decision-log.md). The decisions below are
 
 Research use is a first-class requirement, not a by-product:
 
-* **Frictionless import:** the normal build places `_oryx` into the `python/oryx/` package so `uv run python`, Jupyter and the REPL can `import oryx` with no path work. Wheels and PyPI are a later packaging phase.
+* **Frictionless import (last stage):** the normal build places `_oryx` into the `Oryx/backends/Python/oryx/` package so `uv run python`, Jupyter and the REPL can `import oryx` with no path work. Wheels and PyPI are a later packaging phase.
 * **Interactive stepping:** the Python `Match` exposes `decide()`/`apply()`/`undo()`/`redo()`/`history`, as the C++ `Match` does.
 * **One-liner simulation:** `oryx.simulate(game, strategies, games=10_000, seed=...)` returns a `BatchResult`; this covers Phase 7's "configure experiments / access statistics" minimally, and full `Experiment` and sweeps stay Phase 8.
 * **Results as data:** `BatchResult` gets `__repr__`/`_repr_html_`, `to_dict()`, numpy arrays, win rates and mean rewards, an optional `to_dataframe()`, and records the seed, configuration and version.
@@ -102,10 +103,10 @@ Research use is a first-class requirement, not a by-product:
 ### Open questions
 
 ```text
-Decision: Open (assertion hook)
-Options: an assertion-handler hook in Core/Assert.h / leave asserts trapping
-Reason unresolved: OX_ASSERT traps in Debug, so a C++ assert reached from a script would kill the interpreter
-Next step: decide with the logging/assertions bindings
+Decision: Decided, built with the research host (assertion hook)
+Choice: a replaceable handler in Core/Assert.h (default unchanged: log and trap). Importing the _oryx extension installs one that throws, so a C++ assert reached from Python surfaces as OryxAssertionError; embedded Oasis never installs it and keeps trapping in the debugger
+Why later: nothing in the embedded host installs it, so it has no user until the research host
+Next step: build it with the research host
 ```
 
 ```text
@@ -130,8 +131,8 @@ Next step: decide with the script-backed types
 ```
 
 ```text
-Decision: Open (OryxPy and Oasis's precompiled header)
-Options: compile Oasis game sources with ospch.h / a separate OryxPy pch / no pch for those sources
-Reason unresolved: OryxPy compiles Oasis's game sources, which expect Oasis's precompiled header
-Next step: decide with the build integration
+Decision: Open (extension module and Oasis's precompiled header)
+Options: compile Oasis game sources into the module with ospch.h / a separate pch / no pch for those sources
+Reason unresolved: the Oasis-owned research module compiles Oasis's game sources, which expect Oasis's precompiled header
+Next step: decide when the research host starts
 ```

@@ -71,6 +71,7 @@ Running `build` with **no command** opens an interactive arrow-key menu (in a re
 | `--profile [debug\|release\|dist]` | `-p` | Active build configuration profile (default: `debug`). |
 | `--verbose` | `-v` | Show full subprocess output and the underlying commands being run. |
 | `--dry-run` | | Print the command that would run without executing it. |
+| `--no-python` | | Build without the Python scripting backend (overrides `[python] enabled` in `oryx.toml`). Python is on by default; `configure` reads the interpreter's paths from `sysconfig` and passes them to Premake, and changing them clears previous binaries. |
 
 ---
 

@@ -373,10 +373,12 @@ Supporting work, in build order:
   `Params` with per-entry schemas in `Registry<T>`
 * A language-agnostic `Scripting/` module and a public `ScriptingLayer`, before
   any Python code exists
-* Build integration: a private `Oryx/backends/Python/` backend, the `_oryx`
-  extension (`OryxPy`), on by default and switchable off
-* Python-as-host bindings, then script-backed types, then the embedded host in
-  `Oasis`
+* Build integration: a private `Oryx/backends/Python/` backend with an embedded
+  interpreter, on by default and switchable off
+* Scripting inside `Oasis` first: log and assertion bindings with an init guard,
+  the core bindings, script-backed types, the Nim milestone
+* The research host last: `import oryx` from a REPL or notebook through an
+  `Oasis`-owned `_oryx` extension
 
 **Milestone:** Nim written in Python, running inside `Oasis`, plus one Python
 strategy that plays both Nim and TicTacToe.

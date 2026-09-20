@@ -84,7 +84,7 @@ def _with_vendor_check(func: Callable) -> Callable:
 
         run = getattr(ctx, "obj", None)
         if not (run is not None and getattr(run, "dry_run", False)):
-            ensure_vendor_dirs()
+            ensure_vendor_dirs(getattr(run, "config", None))
         return func(ctx, *args, **kwargs)
 
     return guarded

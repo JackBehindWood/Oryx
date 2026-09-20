@@ -1,3 +1,4 @@
+import os
 import subprocess
 from typing import Optional
 
@@ -6,10 +7,11 @@ from rich.console import Console
 
 from build_system import registry
 from build_system.compile_commands import generate_compile_commands
-from build_system.config import BUILD_DIR, PROJECT_ROOT, RunContext
+from build_system.config import BUILD_DIR, LocalConfig, PROJECT_ROOT, RunContext, script_search_path
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
-from build_system.setup.stale_objects import prune_stale_object_dirs
+from build_system.setup.python_env import PythonEnvError, premake_python_options
+from build_system.setup.stale_objects import clear_outputs_if_python_changed, prune_stale_object_dirs
 from build_system.utils import remove_directory, run_command
 
 console = Console()
@@ -24,9 +26,15 @@ def configure(ctx: typer.Context):
     run: RunContext = ctx.obj
     cfg = run.config
 
+    try:
+        python_options = premake_python_options(cfg)
+    except PythonEnvError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1)
+
     if run.dry_run:
         premake = get_premake_executable()
-        command_line = [str(premake), cfg.build_generator]
+        command_line = [str(premake), cfg.build_generator, *python_options]
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
@@ -34,7 +42,7 @@ def configure(ctx: typer.Context):
     if not premake:
         raise typer.Exit(code=1)
 
-    command_line = [str(premake), cfg.build_generator]
+    command_line = [str(premake), cfg.build_generator, *python_options]
 
     try:
         with console.status("[bold blue]⚙️ Configuring build...[/bold blue]"):
@@ -45,6 +53,9 @@ def configure(ctx: typer.Context):
     except subprocess.CalledProcessError as error:
         console.print(f"[bold red]✗ Failed to configure build:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
+
+    if clear_outputs_if_python_changed(python_options):
+        console.print("[yellow]⚠️ Python build options changed; cleared previous binaries and objects.[/yellow]\n")
 
     for project in prune_stale_object_dirs(cfg):
         console.print(
@@ -147,8 +158,10 @@ def run_project(
         console.print("  [dim]Run 'build build compile' first.[/dim]")
         raise typer.Exit(code=1)
 
+    env = {**os.environ, "ORYX_SCRIPT_PATH": script_search_path(cfg, LocalConfig.load())}
+
     try:
-        run_command(args, capture_output=False)
+        run_command(args, capture_output=False, env=env)
         console.print("\n[bold green]✓ Oasis exited successfully[/bold green]\n")
     except subprocess.CalledProcessError:
         console.print("[bold red]✗ Oasis exited with an error.[/bold red]")

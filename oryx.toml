@@ -10,3 +10,9 @@ name = "Tests"
 
 [executables.oasis]
 name = "Oasis"
+
+[python]
+enabled = true
+
+[scripting]
+paths = []
