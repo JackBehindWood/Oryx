@@ -11,11 +11,17 @@ namespace
 {
 
 // Pile size tuned so DummyGame's full (unmemoized) exhaustive search tree is
-// comparable in order of magnitude to Tic-Tac-Toe's ~5x10^5 nodes - see
-// DESIGN.md §12/§19 for what this benchmark is evidence for.
+// comparable in order of magnitude to Tic-Tac-Toe's ~5x10^5 nodes.
 constexpr uint32_t kPileSize = 20;
 
 constexpr int32_t kAllocIterations = 2'000'000;
+
+using Clock = std::chrono::steady_clock;
+
+double milliseconds_since(Clock::time_point start)
+{
+    return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+}
 
 } // namespace
 
@@ -27,22 +33,25 @@ TEST_SUITE("benchmark")
 
 TEST_CASE("Benchmark: MinimaxStrategy exhaustive search allocation cost (DummyGame)")
 {
-    Instrumentation::reset();
-
     DummyGame game(kPileSize);
     MinimaxStrategy strategy;
     UniquePtr<IState> state = game.new_initial_state();
     Context context(*state);
 
-    auto search_start = std::chrono::high_resolution_clock::now();
+    Instrumentation::reset();
+    MemoryTracker::reset_peak();
+    MemoryStats memory_before = MemoryTracker::snapshot();
+
+    Clock::time_point search_start = Clock::now();
     ActionId action = strategy.decide(context);
-    auto search_end = std::chrono::high_resolution_clock::now();
-    double search_ms = std::chrono::duration<double, std::milli>(search_end - search_start).count();
+    double search_ms = milliseconds_since(search_start);
+
+    MemoryStats memory = memory_delta(memory_before, MemoryTracker::snapshot());
 
     CHECK(is_valid(action));
 
-    auto results = Instrumentation::results();
-    auto it = results.find("DummyState::legal_actions");
+    const std::unordered_map<std::string_view, ProfileSample>& results = Instrumentation::results();
+    std::unordered_map<std::string_view, ProfileSample>::const_iterator it = results.find("DummyState::legal_actions");
     REQUIRE(it != results.end());
 
     double legal_actions_ms = it->second.total_milliseconds;
@@ -53,18 +62,20 @@ TEST_CASE("Benchmark: MinimaxStrategy exhaustive search allocation cost (DummyGa
     MESSAGE("decide() total ms: ", search_ms);
     MESSAGE("legal_actions() share of decide(): ", (legal_actions_ms / search_ms) * 100.0, "%");
     MESSAGE("ns/call (legal_actions, incl. timer overhead): ", (legal_actions_ms * 1'000'000.0) / static_cast<double>(call_count));
+
+    MESSAGE("decide() allocations: ", memory.allocation_count, ", bytes: ", memory.bytes_allocated, ", peak live: ", memory.peak_live_bytes);
+    MESSAGE("legal_actions() allocations: ", it->second.allocation_count, " over ", call_count, " calls");
 }
 
 TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-shaped result")
 {
     // Isolates pure allocator cost from search logic: builds/destroys a
-    // <=3-element result kAllocIterations times, once via std::vector
-    // (today's IState::legal_actions() return type) and once via a
-    // fixed-size stack array of the same shape - the concrete "what would a
-    // small-vector optimization actually save" number.
+    // <=3-element result kAllocIterations times via std::vector, a fixed
+    // stack array, and ActionList (the real legal_actions() return type).
     volatile size_t sink = 0;
 
-    auto vector_start = std::chrono::high_resolution_clock::now();
+    MemoryStats vector_before = MemoryTracker::snapshot();
+    Clock::time_point vector_start = Clock::now();
     for (int32_t i = 0; i < kAllocIterations; ++i)
     {
         std::vector<ActionId> actions;
@@ -73,20 +84,19 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
         actions.push_back(3);
         sink += actions.size();
     }
-    auto vector_end = std::chrono::high_resolution_clock::now();
-    double vector_ms = std::chrono::duration<double, std::milli>(vector_end - vector_start).count();
+    double vector_ms = milliseconds_since(vector_start);
+    MemoryStats vector_memory = memory_delta(vector_before, MemoryTracker::snapshot());
 
-    auto array_start = std::chrono::high_resolution_clock::now();
+    Clock::time_point array_start = Clock::now();
     for (int32_t i = 0; i < kAllocIterations; ++i)
     {
         ActionId actions[3] = { 1, 2, 3 };
         sink += actions[0] + actions[1] + actions[2];
     }
-    auto array_end = std::chrono::high_resolution_clock::now();
-    double array_ms = std::chrono::duration<double, std::milli>(array_end - array_start).count();
+    double array_ms = milliseconds_since(array_start);
 
-    // ActionList at the same shape - the real legal_actions() replacement.
-    auto action_list_start = std::chrono::high_resolution_clock::now();
+    MemoryStats action_list_before = MemoryTracker::snapshot();
+    Clock::time_point action_list_start = Clock::now();
     for (int32_t i = 0; i < kAllocIterations; ++i)
     {
         ActionList actions;
@@ -95,8 +105,8 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
         actions.push_back(3);
         sink += actions.size();
     }
-    auto action_list_end = std::chrono::high_resolution_clock::now();
-    double action_list_ms = std::chrono::duration<double, std::milli>(action_list_end - action_list_start).count();
+    double action_list_ms = milliseconds_since(action_list_start);
+    MemoryStats action_list_memory = memory_delta(action_list_before, MemoryTracker::snapshot());
 
     MESSAGE("std::vector<ActionId> (3 elements) x", kAllocIterations, ": ", vector_ms, " ms");
     MESSAGE("fixed ActionId[3] x", kAllocIterations, ": ", array_ms, " ms");
@@ -104,6 +114,9 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
     MESSAGE("ns/call heap vector: ", (vector_ms * 1'000'000.0) / kAllocIterations);
     MESSAGE("ns/call fixed array: ", (array_ms * 1'000'000.0) / kAllocIterations);
     MESSAGE("ns/call ActionList: ", (action_list_ms * 1'000'000.0) / kAllocIterations);
+
+    MESSAGE("heap allocations, std::vector: ", vector_memory.allocation_count);
+    MESSAGE("heap allocations, ActionList: ", action_list_memory.allocation_count);
 
     CHECK(sink > 0);
 }

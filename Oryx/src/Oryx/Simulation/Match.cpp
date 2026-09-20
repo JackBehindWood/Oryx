@@ -60,14 +60,20 @@ void Match::apply(ActionId action)
 ActionId Match::undo()
 {
     ActionId action = m_history.undo();
-    m_state->undo(action);
+    if (is_valid(action))
+    {
+        m_state->undo(action);
+    }
     return action;
 }
 
 ActionId Match::redo()
 {
     ActionId action = m_history.redo();
-    m_state->apply(action);
+    if (is_valid(action))
+    {
+        m_state->apply(action);
+    }
     return action;
 }
 

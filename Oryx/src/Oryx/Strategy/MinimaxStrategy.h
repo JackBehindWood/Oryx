@@ -6,9 +6,7 @@
 namespace oryx
 {
 
-// Exhaustive depth-first search using IState::apply()/undo() directly - no
-// state cloning, no memoization/alpha-beta (Tic-Tac-Toe's branching factor
-// makes full-depth search trivial; alpha-beta is Phase 12, ROADMAP.md §14).
+// Exhaustive DFS via IState::apply()/undo(); no cloning, memoization or alpha-beta (Phase 12).
 class MinimaxStrategy : public IStrategy
 {
 public:

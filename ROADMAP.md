@@ -143,7 +143,6 @@ The build system should remain a **thin developer tooling layer** around Premake
 The module may eventually provide commands such as:
 
 ```text
-build benchmark
 build experiment
 build docs
 build explain
@@ -336,10 +335,10 @@ Potential metrics:
 
 * Games per second
 * Decisions per second
-* Nodes explored
-* Memory usage
+* Nodes explored — deferred until a search strategy (Minimax/MCTS) needs it counted
+* Memory usage — implemented: `MemoryTracker` counts allocations/bytes/peak live via a global `operator new` hook (all configs); `MemoryBenchmarkRunner` reports it per run, and `ScopeTimer` per profiled scope when `OX_ENABLE_MEMORY_TRACKING` is defined (Debug/Release)
 * Search time
-* Rollout throughput
+* Rollout throughput — deferred until rollout-based strategies exist
 
 Benchmarks should distinguish algorithmic performance from game outcome quality.
 
@@ -535,7 +534,6 @@ build build all
 As corresponding capabilities are implemented, the CLI may grow to support:
 
 ```text
-build benchmark
 build experiment
 build docs
 build explain

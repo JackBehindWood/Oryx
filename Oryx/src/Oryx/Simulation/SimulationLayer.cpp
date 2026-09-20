@@ -49,10 +49,12 @@ bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
             return true;
         }
     }
+    probe_state.reset();
 
     if (m_benchmark)
     {
         Instrumentation::reset();
+        m_memory_before = MemoryTracker::begin_measurement();
         m_timer.start();
     }
 
@@ -70,17 +72,19 @@ void SimulationLayer::update()
     {
         if (m_completed >= m_match_count)
         {
-            // post_event() is synchronous, so a handler (e.g.
-            // OasisLayer::on_simulation_complete()) gets to report/print
-            // before close() below runs. close() is unconditional - not
-            // every front-end handles this event (e.g. a bare Application in
-            // a test), and without it update() would keep re-entering this
-            // branch and re-posting the event every tick forever.
+            // close() is unconditional: not every front-end handles this event, and update() would otherwise re-post it every tick.
             if (m_benchmark)
             {
                 m_timer.stop();
             }
-            SimulationCompleteEvent event(m_result, m_benchmark, m_benchmark ? m_timer.elapsed_seconds() : 0.0);
+            MemoryBenchmarkRunner::MemoryResults results;
+            results.outcome = m_result;
+            if (m_benchmark)
+            {
+                results.elapsed_seconds = m_timer.elapsed_seconds();
+                results.memory = memory_delta(m_memory_before, MemoryTracker::snapshot());
+            }
+            SimulationCompleteEvent event(std::move(results), m_benchmark);
             Application::Get().post_event(event);
             Application::Get().close();
             return;

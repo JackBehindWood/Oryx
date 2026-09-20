@@ -21,7 +21,7 @@ void Application::run()
 {
     while (m_running)
     {
-        for (auto& layer : m_layer_stack)
+        for (LayerPtr& layer : m_layer_stack)
         {
             layer->update();
         }

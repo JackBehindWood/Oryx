@@ -18,16 +18,16 @@ workspace "oryx"
     end
 
     filter "configurations:Debug"
-        defines { "ORYX_DEBUG", "OX_ENABLE_PROFILING" }
+        defines { "OX_DEBUG", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING" }
         symbols "On"
         optimize "Off"
 
     filter "configurations:Release"
-        defines { "ORYX_RELEASE", "OX_ENABLE_PROFILING" }
+        defines { "OX_RELEASE", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING" }
         optimize "On"
 
     filter "configurations:Dist"
-        defines { "ORYX_DIST" }
+        defines { "OX_DIST" }
         optimize "On"
 
     -- Pin the Windows SDK to whatever's newest on the machine, rather than

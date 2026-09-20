@@ -7,21 +7,23 @@ namespace oryx
 namespace
 {
 
-std::unordered_map<std::string, ProfileSample>& registry()
+std::unordered_map<std::string_view, ProfileSample>& registry()
 {
-    static std::unordered_map<std::string, ProfileSample> instance;
+    static std::unordered_map<std::string_view, ProfileSample> instance;
     return instance;
 }
 
 } // namespace
 
-void Instrumentation::record(const std::string& name, double milliseconds)
+void Instrumentation::record(std::string_view name, double milliseconds, const MemoryStats& memory)
 {
     ProfileSample& sample = registry()[name];
     ++sample.call_count;
     sample.total_milliseconds += milliseconds;
     sample.min_milliseconds = std::min(sample.min_milliseconds, milliseconds);
     sample.max_milliseconds = std::max(sample.max_milliseconds, milliseconds);
+    sample.allocation_count += memory.allocation_count;
+    sample.bytes_allocated += memory.bytes_allocated;
 }
 
 void Instrumentation::reset()
@@ -29,22 +31,29 @@ void Instrumentation::reset()
     registry().clear();
 }
 
-std::unordered_map<std::string, ProfileSample> Instrumentation::results()
+const std::unordered_map<std::string_view, ProfileSample>& Instrumentation::results()
 {
     return registry();
 }
 
-ScopeTimer::ScopeTimer(std::string name)
-    : m_name(std::move(name))
-    , m_start(std::chrono::high_resolution_clock::now())
+ScopeTimer::ScopeTimer(const char* name)
+    : m_name(name)
+#ifdef OX_ENABLE_MEMORY_TRACKING
+    , m_memory_before(MemoryTracker::snapshot())
+#endif
+    , m_start(std::chrono::steady_clock::now())
 {
 }
 
 ScopeTimer::~ScopeTimer()
 {
-    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    MemoryStats memory;
+#ifdef OX_ENABLE_MEMORY_TRACKING
+    memory = memory_delta(m_memory_before, MemoryTracker::snapshot());
+#endif
     double ms = std::chrono::duration<double, std::milli>(end - m_start).count();
-    Instrumentation::record(m_name, ms);
+    Instrumentation::record(m_name, ms, memory);
 }
 
 } // namespace oryx

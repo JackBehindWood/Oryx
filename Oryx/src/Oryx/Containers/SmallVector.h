@@ -5,12 +5,12 @@
 namespace oryx
 {
 
-// N elements inline, spills to heap past N (doubling, like std::vector).
-// NOTE: N is fixed at compile time - a future caller with no good compile-time estimate may want a runtime-configurable inline size instead (see the follow-up audit).
-// Not thread-safe: concurrent mutation (or mutation concurrent with read) is undefined behaviour, same as std::vector.
+// N elements inline, spills to the heap past N (doubling); not thread-safe, same as std::vector.
 template<typename T, size_t N>
 class SmallVector
 {
+    static_assert(N > 0, "SmallVector needs at least one inline slot");
+
 public:
     SmallVector() = default;
 
@@ -89,7 +89,12 @@ public:
 
     void push_back(const T& value)
     {
-        ensure_capacity(m_size + 1);
+        if (m_size == m_capacity)
+        {
+            T copy(value);
+            push_back(std::move(copy));
+            return;
+        }
         new (&m_data[m_size]) T(value);
         ++m_size;
     }
@@ -99,6 +104,12 @@ public:
         ensure_capacity(m_size + 1);
         new (&m_data[m_size]) T(std::move(value));
         ++m_size;
+    }
+
+    void pop_back()
+    {
+        --m_size;
+        m_data[m_size].~T();
     }
 
     void assign(size_t count, const T& value)
@@ -124,6 +135,8 @@ public:
 
     [[nodiscard]] T& front() { return m_data[0]; }
     [[nodiscard]] const T& front() const { return m_data[0]; }
+    [[nodiscard]] T& back() { return m_data[m_size - 1]; }
+    [[nodiscard]] const T& back() const { return m_data[m_size - 1]; }
 
     [[nodiscard]] size_t size() const { return m_size; }
     [[nodiscard]] bool empty() const { return m_size == 0; }

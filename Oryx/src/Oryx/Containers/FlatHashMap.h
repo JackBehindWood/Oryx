@@ -6,7 +6,7 @@
 namespace oryx
 {
 
-//NOTE: having a fixed-size inline buffer for now might be optimal but in the future we should take into account that we don't know the number of entries in advance and we might want to use a dynamic buffer instead. This is a simple implementation of a flat hash map with linear probing and a fixed-size inline buffer for small maps. It grows to the heap when the load factor exceeds X. The capacity must be a power of two for efficient probing.
+// Open-addressing (linear probing) map with N inline slots; grows to the heap past a 0.7 load factor. N must be a power of two.
 // Not thread-safe: insert_or_assign()'s rehash reallocates and moves every entry with no synchronization.
 template<typename Key, typename Value, size_t N>
 class FlatHashMap

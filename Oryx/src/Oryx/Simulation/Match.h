@@ -27,8 +27,8 @@ public:
     [[nodiscard]] ActionId decide() const;
 
     void apply(ActionId action);   // applies to state, records into history
-    ActionId undo();               // IState::undo() + history().undo(), in lockstep
-    ActionId redo();               // IState::apply() + history().redo(), in lockstep
+    ActionId undo();               // IState::undo() + history().undo() in lockstep; INVALID_ACTION if nothing to undo
+    ActionId redo();               // IState::apply() + history().redo() in lockstep; INVALID_ACTION if nothing to redo
 
     // Loops apply(decide()) to termination.
     Outcome play();

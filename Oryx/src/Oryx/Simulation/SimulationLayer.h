@@ -3,6 +3,7 @@
 #include "Oryx/Benchmark/Timer.h"
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
+#include "Oryx/Debug/MemoryTracker.h"
 #include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Simulation/BatchRunner.h"
@@ -36,6 +37,7 @@ private:
     TurnObserver m_on_turn;
     bool m_benchmark;
     Timer m_timer;
+    MemoryStats m_memory_before;
 
     UniquePtr<Match> m_match;
     int32_t m_completed = 0;

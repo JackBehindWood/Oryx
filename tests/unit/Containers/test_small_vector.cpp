@@ -124,3 +124,22 @@ TEST_CASE("SmallVector's contiguous iterators work with standard algorithms")
     }
     CHECK(sum == 23);
 }
+
+TEST_CASE("SmallVector push_back of an element of itself survives the growth it triggers")
+{
+    SmallVector<int32_t, 2> values{ 7, 8 };
+    values.push_back(values[0]);
+
+    CHECK(values.size() == 3);
+    CHECK(values[2] == 7);
+}
+
+TEST_CASE("SmallVector pop_back and back operate on the last element")
+{
+    SmallVector<int32_t, 4> values{ 1, 2, 3 };
+    CHECK(values.back() == 3);
+
+    values.pop_back();
+    CHECK(values.size() == 2);
+    CHECK(values.back() == 2);
+}

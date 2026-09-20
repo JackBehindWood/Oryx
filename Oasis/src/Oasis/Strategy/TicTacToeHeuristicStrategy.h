@@ -5,9 +5,7 @@
 namespace oasis
 {
 
-// Rule-of-thumb strategy, not a search: win if possible, else block, else
-// prefer center, then a corner, then whatever's left. MinimaxStrategy
-// (Oryx/Strategy) already covers the unbeatable case.
+// Rule of thumb, not a search: win, else block, else center, then a corner, then anything.
 class TicTacToeHeuristicStrategy : public oryx::IStrategy
 {
 public:

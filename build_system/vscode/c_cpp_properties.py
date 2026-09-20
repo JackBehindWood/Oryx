@@ -15,9 +15,9 @@ COMPILE_COMMANDS_TOKEN = f"${{workspaceFolder}}/{COMPILE_COMMANDS_FILE.relative_
 # Mirrors the `filter "configurations:<Profile>" defines { ... }` blocks in
 # premake5.lua. Used only as a fallback (see FALLBACK_INCLUDE_PATHS below).
 PROFILE_DEFINES = {
-    "debug": "ORYX_DEBUG",
-    "release": "ORYX_RELEASE",
-    "dist": "ORYX_DIST",
+    "debug": ["OX_DEBUG", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING"],
+    "release": ["OX_RELEASE", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING"],
+    "dist": ["OX_DIST"],
 }
 
 # Fallback only, for before `build build configure` has ever run (or if
@@ -40,7 +40,7 @@ def _fallback_include_paths() -> list[str]:
 
 
 def _defines(cfg: BuildConfig) -> list[str]:
-    return [PROFILE_DEFINES.get(cfg.profile, f"ORYX_{cfg.profile.upper()}")]
+    return PROFILE_DEFINES.get(cfg.profile, [f"OX_{cfg.profile.upper()}"])
 
 
 def _macos_compiler_path() -> str:

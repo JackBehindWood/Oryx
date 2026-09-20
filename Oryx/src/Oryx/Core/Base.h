@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#ifdef ORYX_DEBUG
+#ifdef OX_DEBUG
 	#if defined(OX_PLATFORM_WINDOWS)
 		#define OX_DEBUGBREAK() __debugbreak()
 	#elif defined(OX_PLATFORM_LINUX) || defined(OX_PLATFORM_MACOS)

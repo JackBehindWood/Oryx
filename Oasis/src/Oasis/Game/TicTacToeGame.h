@@ -33,6 +33,7 @@ public:
 
 private:
     Mark winner() const;
+    bool board_full() const;
 
     oryx::Matrix<3, 3, Mark> m_board;
     oryx::PlayerId m_current_player = 0;

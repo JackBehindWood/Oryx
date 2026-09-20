@@ -100,3 +100,8 @@ Thumbs.db
 # miscellaneous
 /graphify-out
 .claude/
+
+# Premake-generated project makefiles (only the workspace Makefile under build/ is canonical)
+Oryx/Makefile
+tests/Makefile
+Oasis/Makefile

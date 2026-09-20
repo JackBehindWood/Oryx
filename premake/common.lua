@@ -27,7 +27,8 @@ function linkOryxWholeArchive()
         linkoptions { "-force_load \"%{wks.location}/bin/" .. outputdir .. "/Oryx/libOryx.a\"" }
 
     filter "system:linux"
-        linkoptions { "-Wl,--whole-archive", "-l:libOryx.a", "-Wl,--no-whole-archive" }
+        links { "pthread" }
+        linkoptions { "-Wl,--whole-archive", "%{wks.location}/bin/" .. outputdir .. "/Oryx/libOryx.a", "-Wl,--no-whole-archive" }
 
     filter {}
 end

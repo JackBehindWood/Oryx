@@ -72,18 +72,33 @@ Mark TicTacToeState::winner() const
     return Mark::Empty;
 }
 
+bool TicTacToeState::board_full() const
+{
+    for (size_t row = 0; row < 3; ++row)
+    {
+        for (size_t col = 0; col < 3; ++col)
+        {
+            if (m_board.at(row, col) == Mark::Empty)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool TicTacToeState::is_terminal() const
 {
-    return winner() != Mark::Empty || legal_actions().empty();
+    return winner() != Mark::Empty || board_full();
 }
 
 oryx::Outcome TicTacToeState::outcome() const
 {
     oryx::Outcome result;
-    result.is_terminal = is_terminal();
     result.rewards = oryx::Rewards<double>(2);
 
     Mark win = winner();
+    result.is_terminal = win != Mark::Empty || board_full();
     if (win != Mark::Empty)
     {
         oryx::PlayerId winning_player = (win == Mark::X) ? 0 : 1;

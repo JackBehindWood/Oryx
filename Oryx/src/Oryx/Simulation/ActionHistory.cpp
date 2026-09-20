@@ -5,33 +5,32 @@ namespace oryx
 
 void ActionHistory::record(ActionId action)
 {
+    while (m_actions.size() > m_cursor)
+    {
+        m_actions.pop_back();
+    }
     m_actions.push_back(action);
-    m_redo_stack.clear();
-}
-
-bool ActionHistory::can_undo() const
-{
-    return !m_actions.empty();
-}
-
-bool ActionHistory::can_redo() const
-{
-    return !m_redo_stack.empty();
+    ++m_cursor;
 }
 
 ActionId ActionHistory::undo()
 {
-    ActionId action = m_actions.back();
-    m_actions.pop_back();
-    m_redo_stack.push_back(action);
-    return action;
+    if (!can_undo())
+    {
+        return INVALID_ACTION;
+    }
+    --m_cursor;
+    return m_actions[m_cursor];
 }
 
 ActionId ActionHistory::redo()
 {
-    ActionId action = m_redo_stack.back();
-    m_redo_stack.pop_back();
-    m_actions.push_back(action);
+    if (!can_redo())
+    {
+        return INVALID_ACTION;
+    }
+    ActionId action = m_actions[m_cursor];
+    ++m_cursor;
     return action;
 }
 

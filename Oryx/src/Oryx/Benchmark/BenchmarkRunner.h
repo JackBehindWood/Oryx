@@ -5,11 +5,7 @@
 namespace oryx
 {
 
-// Headless strategy-vs-strategy benchmark: no Application/Layer needed, so
-// it's usable directly (future Python bindings, tests, tooling). Publicly
-// inherits BatchRunner rather than wrapping it - a BenchmarkRunner *is* a
-// BatchRunner that also times itself, so it reuses the base constructor and
-// game/strategy storage instead of duplicating them.
+// Headless strategy-vs-strategy benchmark: no Application/Layer needed (tests, tooling, future Python bindings).
 class BenchmarkRunner : public BatchRunner
 {
 public:
@@ -19,12 +15,12 @@ public:
     {
         BatchResult outcome;
         double elapsed_seconds = 0.0;
-
-        [[nodiscard]] double matches_per_second() const { return static_cast<double>(outcome.matches) / elapsed_seconds; }
-        [[nodiscard]] double decisions_per_second() const { return static_cast<double>(outcome.decisions) / elapsed_seconds; }
     };
 
     Results run(int32_t match_count);
 };
+
+[[nodiscard]] double matches_per_second(const BenchmarkRunner::Results& results);
+[[nodiscard]] double decisions_per_second(const BenchmarkRunner::Results& results);
 
 } // namespace oryx

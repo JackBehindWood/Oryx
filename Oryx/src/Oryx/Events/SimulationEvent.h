@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Benchmark/MemoryBenchmarkRunner.h"
 #include "Oryx/Events/Event.h"
 #include "Oryx/Simulation/BatchRunner.h"
 #include "Oryx/Simulation/SimulationLayer.h"
@@ -43,24 +44,22 @@ private:
 class SimulationCompleteEvent : public Event
 {
 public:
-    SimulationCompleteEvent(const BatchResult& result, bool benchmark, double elapsed_seconds)
-        : m_result(result)
+    SimulationCompleteEvent(MemoryBenchmarkRunner::MemoryResults results, bool benchmark)
+        : m_results(std::move(results))
         , m_benchmark(benchmark)
-        , m_elapsed_seconds(elapsed_seconds)
     {
     }
 
-    [[nodiscard]] const BatchResult& result() const { return m_result; }
+    [[nodiscard]] const BatchResult& result() const { return m_results.outcome; }
+    [[nodiscard]] const MemoryBenchmarkRunner::MemoryResults& results() const { return m_results; }
     [[nodiscard]] bool benchmark() const { return m_benchmark; }
-    [[nodiscard]] double elapsed_seconds() const { return m_elapsed_seconds; }
 
     OX_EVENT_CLASS_TYPE(SimulationComplete)
     OX_EVENT_CLASS_CATEGORY(EventCategoryApplication)
 
 private:
-    BatchResult m_result;
+    MemoryBenchmarkRunner::MemoryResults m_results;
     bool m_benchmark;
-    double m_elapsed_seconds;
 };
 
 } // namespace oryx

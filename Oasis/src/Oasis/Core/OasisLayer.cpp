@@ -39,8 +39,7 @@ bool OasisLayer::on_simulation_complete(const oryx::SimulationCompleteEvent& eve
     // this - we only report here.
     if (event.benchmark())
     {
-        oryx::BenchmarkRunner::Results results{ event.result(), event.elapsed_seconds() };
-        std::cout << oryx::format_benchmark_report(results);
+        std::cout << oryx::format_benchmark_report(event.results());
     }
     else
     {

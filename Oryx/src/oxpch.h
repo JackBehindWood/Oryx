@@ -13,10 +13,9 @@
 #include <cstdint>
 #include <string>
 #include <sstream>
-#include <array>
+#include <span>
 #include <vector>
 #include <unordered_map>
-#include <unordered_set>
 
 #include "Oryx/Core/Base.h"
 

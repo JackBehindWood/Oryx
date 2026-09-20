@@ -14,7 +14,7 @@ void Log::init()
     s_core_logger = spdlog::stdout_color_mt("ORYX");
     s_client_logger = spdlog::stdout_color_mt("APP");
 
-#ifdef ORYX_DEBUG
+#ifdef OX_DEBUG
     s_core_logger->set_level(spdlog::level::trace);
     s_client_logger->set_level(spdlog::level::trace);
 #else

@@ -4,10 +4,10 @@
 #include <iostream>
 #include <limits>
 
-namespace Utils
+namespace
 {
 
-static char symbol(oasis::Mark mark)
+char symbol(oasis::Mark mark)
 {
     switch (mark)
     {
@@ -26,9 +26,9 @@ void TicTacToeBoard::print(const TicTacToeState& state) const
 {
     for (size_t row = 0; row < 3; ++row)
     {
-        std::cout << " " << Utils::symbol(state.mark_at(row, 0))
-                   << " | " << Utils::symbol(state.mark_at(row, 1))
-                   << " | " << Utils::symbol(state.mark_at(row, 2)) << "\n";
+        std::cout << " " << symbol(state.mark_at(row, 0))
+                   << " | " << symbol(state.mark_at(row, 1))
+                   << " | " << symbol(state.mark_at(row, 2)) << "\n";
         if (row < 2)
         {
             std::cout << "---+---+---\n";
@@ -39,7 +39,7 @@ void TicTacToeBoard::print(const TicTacToeState& state) const
 oryx::ActionId TicTacToeBoard::read_move(const TicTacToeState& state) const
 {
     oryx::ActionList legal = state.legal_actions();
-    char player_symbol = Utils::symbol(state.current_player() == 0 ? Mark::X : Mark::O);
+    char player_symbol = symbol(state.current_player() == 0 ? Mark::X : Mark::O);
 
     while (true)
     {
@@ -77,7 +77,7 @@ oryx::ActionId TicTacToeBoard::read_move(const TicTacToeState& state) const
                 }
             }
         }
-        catch (const std::invalid_argument&) {}
+        catch (const std::exception&) {}
 
         std::cout << "That cell isn't available. Try again.\n";
     }

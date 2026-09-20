@@ -15,7 +15,7 @@ enum class EventType
 
 enum EventCategory
 {
-    None = 0,
+    EventCategoryNone = 0,
     EventCategoryApplication = BIT(0)
 };
 

@@ -1,9 +1,13 @@
 #pragma once
 
+#include "Oryx/Containers/Pair.h"
+#include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/IState.h"
 
 namespace oryx
 {
+
+constexpr size_t kContextInlineCapabilities = 4;
 
 class Context
 {
@@ -27,24 +31,47 @@ public:
     template<typename Capability>
     void provide(Capability* instance)
     {
-        m_capabilities[capability_type<Capability>()] = instance;
+        std::type_index type = capability_type<Capability>();
+        for (Entry& entry : m_capabilities)
+        {
+            if (entry.key == type)
+            {
+                entry.value = instance;
+                return;
+            }
+        }
+        m_capabilities.push_back(Entry{ type, instance });
     }
 
     template<typename Capability>
     [[nodiscard]] Capability* get() const
     {
-        auto it = m_capabilities.find(capability_type<Capability>());
-        return it != m_capabilities.end() ? static_cast<Capability*>(it->second) : nullptr;
+        const Entry* entry = find_capability(capability_type<Capability>());
+        return entry != nullptr ? static_cast<Capability*>(entry->value) : nullptr;
     }
 
     [[nodiscard]] bool has_capability(std::type_index capability) const
     {
-        return m_capabilities.find(capability) != m_capabilities.end();
+        return find_capability(capability) != nullptr;
     }
 
 private:
+    using Entry = Pair<std::type_index, void*>;
+
+    [[nodiscard]] const Entry* find_capability(std::type_index capability) const
+    {
+        for (const Entry& entry : m_capabilities)
+        {
+            if (entry.key == capability)
+            {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
+
     IState& m_state;
-    std::unordered_map<std::type_index, void*> m_capabilities;
+    SmallVector<Entry, kContextInlineCapabilities> m_capabilities;
 };
 
 } // namespace oryx

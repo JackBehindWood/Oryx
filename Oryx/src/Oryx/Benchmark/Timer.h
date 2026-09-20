@@ -5,15 +5,12 @@
 namespace oryx
 {
 
-// A plain stopwatch for timing a whole benchmark run (e.g. a batch of
-// matches). Always compiled in - this measures the benchmark's own work,
-// not a per-call-site hot loop, so it isn't gated by OX_ENABLE_PROFILING
-// the way Debug/Instrumentation.h's ScopeTimer is.
+// Always compiled in (unlike ScopeTimer): it times a whole benchmark run, not a per-call-site hot loop.
 class Timer
 {
 public:
-    void start() { m_start = std::chrono::high_resolution_clock::now(); }
-    void stop() { m_end = std::chrono::high_resolution_clock::now(); }
+    void start() { m_start = std::chrono::steady_clock::now(); }
+    void stop() { m_end = std::chrono::steady_clock::now(); }
 
     [[nodiscard]] double elapsed_seconds() const
     {
@@ -21,8 +18,8 @@ public:
     }
 
 private:
-    std::chrono::high_resolution_clock::time_point m_start{};
-    std::chrono::high_resolution_clock::time_point m_end{};
+    std::chrono::steady_clock::time_point m_start{};
+    std::chrono::steady_clock::time_point m_end{};
 };
 
 } // namespace oryx

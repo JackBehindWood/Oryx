@@ -3,10 +3,6 @@
 #include "Oryx/Core/LayerStack.h"
 #include "Oryx/Events/Event.h"
 
-#include <string_view>
-
-int main(int argc, char** argv);
-
 namespace oryx
 {
 
@@ -18,17 +14,6 @@ struct ApplicationCommandLineArgs
     const char* operator[](int32_t index) const
     {
         return args[index];
-    }
-
-    std::vector<std::string_view> unpack() const
-    {
-        std::vector<std::string_view> result;
-        result.reserve(count);
-        for (int32_t i = 0; i < count; ++i)
-        {
-            result.emplace_back(args[i]);
-        }
-        return result;
     }
 };
 
@@ -52,10 +37,7 @@ public:
     static Application& Get() { return *s_instance; }
 
 protected:
-    // Called by post_event() before the layer stack sees the event, so a
-    // concrete Application (e.g. OasisApp) can react to/consume events the
-    // layer-propagation model alone can't reach it for - it isn't itself a
-    // Layer in m_layer_stack.
+    // Runs before the layer stack sees the event, so a concrete Application (not itself a Layer) can react to it.
     virtual void on_event(Event&) {}
 
 private:
@@ -63,7 +45,6 @@ private:
     LayerStack m_layer_stack;
 
     static Application* s_instance;
-	friend int ::main(int argc, char** argv);
 };
 
 // Implemented by the client application (e.g. Oasis).

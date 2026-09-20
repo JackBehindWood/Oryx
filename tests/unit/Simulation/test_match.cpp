@@ -131,6 +131,20 @@ TEST_CASE("Match::undo/redo reverse and reapply the last action in lockstep with
     CHECK_FALSE(match.history().can_redo());
 }
 
+TEST_CASE("Match::undo and redo are no-ops returning INVALID_ACTION when there is nothing to undo or redo")
+{
+    DummyGame game(10);
+    DummyGreedyStrategy strategy_a;
+    DummyGreedyStrategy strategy_b;
+    Match match(game, { &strategy_a, &strategy_b });
+
+    PlayerId player = match.current_player();
+    CHECK(match.undo() == INVALID_ACTION);
+    CHECK(match.redo() == INVALID_ACTION);
+    CHECK(match.current_player() == player);
+    CHECK(match.history().empty());
+}
+
 TEST_CASE("Match::missing_capabilities flags a capability the Context doesn't provide")
 {
     DummyState state(10);

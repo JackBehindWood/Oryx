@@ -15,35 +15,24 @@ constexpr std::string_view kOpponentFlagPrefix = "--opponent=";
 constexpr std::string_view kSimulateFlagPrefix = "--simulate=";
 constexpr std::string_view kBenchmarkFlag = "--benchmark";
 
-std::string parse_opponent_flag(const oryx::ApplicationCommandLineArgs& args)
+std::string flag_value(const oryx::ApplicationCommandLineArgs& args, std::string_view prefix)
 {
-    for (std::string_view arg : args.unpack())
+    for (int32_t i = 0; i < args.count; ++i)
     {
-        if (arg.substr(0, kOpponentFlagPrefix.size()) == kOpponentFlagPrefix)
+        std::string_view arg = args[i];
+        if (arg.substr(0, prefix.size()) == prefix)
         {
-            return std::string(arg.substr(kOpponentFlagPrefix.size()));
+            return std::string(arg.substr(prefix.size()));
         }
     }
     return "";
 }
 
-std::string parse_simulate_flag(const oryx::ApplicationCommandLineArgs& args)
+bool has_flag(const oryx::ApplicationCommandLineArgs& args, std::string_view flag)
 {
-    for (std::string_view arg : args.unpack())
+    for (int32_t i = 0; i < args.count; ++i)
     {
-        if (arg.substr(0, kSimulateFlagPrefix.size()) == kSimulateFlagPrefix)
-        {
-            return std::string(arg.substr(kSimulateFlagPrefix.size()));
-        }
-    }
-    return "";
-}
-
-bool parse_benchmark_flag(const oryx::ApplicationCommandLineArgs& args)
-{
-    for (std::string_view arg : args.unpack())
-    {
-        if (arg == kBenchmarkFlag)
+        if (std::string_view(args[i]) == flag)
         {
             return true;
         }
@@ -62,7 +51,7 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     OX_CORE_INFO("Oasis — built on Oryx v{}.{}.{}", oryx::VERSION_MAJOR, oryx::VERSION_MINOR, oryx::VERSION_PATCH);
     OX_INFO("Working directory: {}", std::filesystem::current_path().string());
 
-    push_layer<OasisLayer>(parse_opponent_flag(args), parse_simulate_flag(args), parse_benchmark_flag(args));
+    push_layer<OasisLayer>(flag_value(args, kOpponentFlagPrefix), flag_value(args, kSimulateFlagPrefix), has_flag(args, kBenchmarkFlag));
 }
 
 void OasisApp::on_event(oryx::Event& event)

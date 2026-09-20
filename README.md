@@ -168,7 +168,6 @@ uv run build                          # interactive menu
 uv run build config init --ide vscode # oryx.toml + .vscode/{tasks,launch,...}.json
 uv run build build all                # configure, compile, test
 uv run build build run                # run the Oasis sandbox executable
-build benchmark
 build experiment
 build docs
 build explain
