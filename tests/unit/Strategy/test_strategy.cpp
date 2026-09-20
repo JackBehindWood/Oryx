@@ -83,3 +83,40 @@ TEST_CASE("MinimaxStrategy finds the only optimal move from a pile of 10")
     MinimaxStrategy strategy;
     CHECK(strategy.decide(context) == 1);
 }
+
+TEST_CASE("The registered random strategy takes a seed param and matches a directly seeded RandomStrategy")
+{
+    DummyGame game(10);
+    UniquePtr<IState> state = game.new_initial_state();
+    Context context(*state);
+
+    UniquePtr<IStrategy> from_registry = StrategyRegistry::create("random", { { "seed", int64_t{ 42 } } });
+    UniquePtr<IStrategy> other_from_registry = StrategyRegistry::create("random", { { "seed", int64_t{ 42 } } });
+    RandomStrategy direct(/*seed=*/42);
+    REQUIRE(from_registry != nullptr);
+    REQUIRE(other_from_registry != nullptr);
+
+    for (int32_t i = 0; i < 10; ++i)
+    {
+        ActionId expected = direct.decide(context);
+        CHECK(from_registry->decide(context) == expected);
+        CHECK(other_from_registry->decide(context) == expected);
+    }
+}
+
+TEST_CASE("The registered random strategy can be created without a seed")
+{
+    CHECK(StrategyRegistry::create("random") != nullptr);
+}
+
+TEST_CASE("The registered random strategy rejects an unknown param naming the key")
+{
+    CHECK_THROWS_WITH_AS(StrategyRegistry::create("random", { { "sed", int64_t{ 1 } } }), doctest::Contains("'sed'"), ParamError);
+    CHECK_THROWS_AS(StrategyRegistry::create("random", { { "seed", std::string("one") } }), ParamError);
+}
+
+TEST_CASE("Strategies without params reject any param")
+{
+    CHECK_THROWS_WITH_AS(StrategyRegistry::create("minimax", { { "depth", int64_t{ 3 } } }), doctest::Contains("'depth'"), ParamError);
+    CHECK_THROWS_AS(StrategyRegistry::create("first-legal", { { "depth", int64_t{ 3 } } }), ParamError);
+}

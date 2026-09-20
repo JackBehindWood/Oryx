@@ -25,9 +25,9 @@ public:
 
 using GameRegistry = Registry<IGame>;
 
-inline UniquePtr<IGame> create_game(const std::string& name)
+inline UniquePtr<IGame> create_game(const std::string& name, const Params& params = {})
 {
-    return GameRegistry::create(name);
+    return GameRegistry::create(name, params);
 }
 
 } // namespace oryx

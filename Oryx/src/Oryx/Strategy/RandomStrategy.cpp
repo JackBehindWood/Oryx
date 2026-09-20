@@ -5,6 +5,14 @@
 namespace oryx
 {
 
+RandomStrategy::RandomStrategy(const Params& params)
+{
+    if (has_param(params, "seed"))
+    {
+        m_random.seed(static_cast<uint64_t>(get_param<int64_t>(params, "seed")));
+    }
+}
+
 ActionId RandomStrategy::decide(const Context& context)
 {
     OX_PROFILE_SCOPE("RandomStrategy::decide");
@@ -20,4 +28,6 @@ ActionId RandomStrategy::decide(const Context& context)
 
 } // namespace oryx
 
-OX_REGISTER_STRATEGY(oryx::RandomStrategy, "random")
+OX_REGISTER_STRATEGY(oryx::RandomStrategy, "random",
+    { oryx::param_without_default("seed", oryx::ParamType::Int, "Seed for the generator; omit for a non-deterministic one") },
+    "Uniformly random legal action")

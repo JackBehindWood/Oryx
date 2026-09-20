@@ -15,4 +15,4 @@ ActionId FirstLegalStrategy::decide(const Context& context)
 
 } // namespace oryx
 
-OX_REGISTER_STRATEGY(oryx::FirstLegalStrategy, "first-legal")
+OX_REGISTER_STRATEGY(oryx::FirstLegalStrategy, "first-legal", {}, "First legal action, in the order the game lists them")

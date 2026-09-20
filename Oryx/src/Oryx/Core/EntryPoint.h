@@ -7,7 +7,7 @@ extern oryx::Application* oryx::create_application(oryx::ApplicationCommandLineA
 
 int main(int argc, char** argv)
 {
-    oryx::Log::init();
+    oryx::init();
 
     oryx::Application* app = oryx::create_application({ argc, argv });
     app->run();

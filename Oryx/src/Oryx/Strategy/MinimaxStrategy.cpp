@@ -66,4 +66,4 @@ Rewards<double> MinimaxStrategy::evaluate(IState& state) const
 
 } // namespace oryx
 
-OX_REGISTER_STRATEGY(oryx::MinimaxStrategy, "minimax")
+OX_REGISTER_STRATEGY(oryx::MinimaxStrategy, "minimax", {}, "Exhaustive depth-first search via apply()/undo()")

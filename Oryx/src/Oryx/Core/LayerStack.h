@@ -20,7 +20,7 @@ public:
         T& ref = *layer;
         m_layers.emplace(m_layers.begin() + m_layer_insert_index, std::move(layer));
         ++m_layer_insert_index;
-        ref.attach();
+        invoke(ref, "attach", [&ref] { ref.attach(); });
         return ref;
     }
 
@@ -31,9 +31,12 @@ public:
         UniquePtr<T> overlay = create_unique<T>(std::forward<Args>(args)...);
         T& ref = *overlay;
         m_layers.emplace_back(std::move(overlay));
-        ref.attach();
+        invoke(ref, "attach", [&ref] { ref.attach(); });
         return ref;
     }
+
+    void update();
+    void dispatch_event(Event& event);
 
     std::vector<LayerPtr>::iterator begin() { return m_layers.begin(); }
     std::vector<LayerPtr>::iterator end() { return m_layers.end(); }
@@ -41,6 +44,8 @@ public:
     std::vector<LayerPtr>::reverse_iterator rend() { return m_layers.rend(); }
 
 private:
+    void invoke(Layer& layer, std::string_view phase, const std::function<void()>& fn);
+
     std::vector<LayerPtr> m_layers;
     size_t m_layer_insert_index = 0;
 };

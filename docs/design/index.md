@@ -15,7 +15,7 @@ The decisions here are working assumptions until reviewed during the project's d
 | ---- | ------ |
 | [Principles](principles.md) | Design goals, Game != Strategy != Engine, composition, small interfaces, the design review principle |
 | [C++ API](cpp-api.md) | Naming conventions, math module, error handling |
-| [Python API](python-api.md) | Python API design and the binding layer |
+| [Python API](python-api.md) | Python API design, the binding layer, and the Phase 7 scripting and research decisions |
 | [Determinism](determinism.md) | Randomness, determinism and reproducibility |
 | [Quality](quality.md) | Testing, performance and the allocation audit, parallelism |
 | [Observability](observability.md) | Optional strategy observability |

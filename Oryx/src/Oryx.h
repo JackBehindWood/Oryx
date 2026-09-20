@@ -6,6 +6,8 @@
 #include "Oryx/Core/Application.h"
 #include "Oryx/Core/Layer.h"
 #include "Oryx/Core/LayerStack.h"
+#include "Oryx/Core/Error.h"
+#include "Oryx/Core/Params.h"
 #include "Oryx/Core/Random.h"
 #include "Oryx/Core/Registry.h"
 
@@ -37,3 +39,14 @@
 #include "Oryx/Simulation/Match.h"
 #include "Oryx/Simulation/BatchRunner.h"
 #include "Oryx/Simulation/SimulationLayer.h"
+
+#include "Oryx/Scripting/ScriptOrigin.h"
+#include "Oryx/Scripting/ScriptSource.h"
+#include "Oryx/Scripting/ScriptError.h"
+#include "Oryx/Scripting/ScriptDiscovery.h"
+#include "Oryx/Scripting/IScriptRuntime.h"
+#include "Oryx/Scripting/ScriptRuntimeRegistry.h"
+#include "Oryx/Scripting/IScriptedGame.h"
+#include "Oryx/Scripting/IScriptedState.h"
+#include "Oryx/Scripting/IScriptedStrategy.h"
+#include "Oryx/Scripting/ScriptingLayer.h"

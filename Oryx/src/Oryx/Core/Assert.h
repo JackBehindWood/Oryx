@@ -2,7 +2,6 @@
 
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Log.h"
-#include <filesystem>
 
 #ifdef OX_ENABLE_ASSERTS
 

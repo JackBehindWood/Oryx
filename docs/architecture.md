@@ -363,11 +363,27 @@ core rather than in an app — a departure from `OasisLayer` being the only
 concrete `Layer` so far. This is justified because driving a batch of
 simulations is Engine responsibility, not specific to the `Oasis` demo app:
 any application linking `Oryx` can push `SimulationLayer` onto its own
-`LayerStack`. Other plausible future layers — a `PythonScriptingLayer`, a
-GUI/CLI front-end layer, profiling and benchmarking layers — remain
-undecided and unbuilt, and would need the same justification (a genuine
-cross-app need) before following `SimulationLayer`'s core-not-app placement
-(see [Roadmap](roadmap.md) Phases 6/7/9/11).
+`LayerStack`.
+
+`ScriptingLayer` (Phase 7, `Oryx/src/Oryx/Scripting/`) is the second concrete
+`Layer` defined in Oryx core, with the same justification: hosting user scripts
+is not specific to the `Oasis` demo app, and any application linking `Oryx`
+can push it to embed scripting. It is language-agnostic — it discovers script
+sources, creates one runtime per language through a registry of
+`IScriptRuntime` implementations (§10), and loads the sources into them. A
+language backend such as Python (`Oryx/backends/Python/`, private) registers
+itself as a runtime, so neither the layer nor any application names a language
+and there is no `PythonScriptingLayer` ([Design: Python API](design/python-api.md#the-scripting-seam)).
+Other plausible future layers — a GUI/CLI front-end layer, profiling and
+benchmarking layers — remain undecided and unbuilt, and would need the same
+justification (a genuine cross-app need) before following `SimulationLayer`'s
+core-not-app placement (see [Roadmap](roadmap.md) Phases 6/9/11).
+
+`LayerStack` is also where errors are caught. It calls a layer's `attach()`,
+`update()`, `event()` and `detach()` through one guarded call: a layer that
+throws an `oryx::Error` is logged once and disabled, and the application and
+the other layers keep running. Code below the layer boundary throws and never
+catches ([Design: Error Handling](design/cpp-api.md#error-handling)).
 
 ---
 
@@ -598,6 +614,21 @@ The Python API should expose concepts useful to researchers and users rather tha
 
 For example, Python users should ideally be able to express experiments naturally without understanding the internal C++ ownership model.
 
+Phase 7 uses one `oryx` API in two hosts. In **Python-as-host**, `import oryx`
+loads a compiled `_oryx` extension (REPL, scripts, notebooks). In
+**C++-as-host**, `Oasis` embeds an interpreter through a Python runtime, a
+private backend (`Oryx/backends/Python/`) selected through the registry (§10),
+and a game or strategy defined in a Python file runs in `Oasis` exactly like a
+C++ one. Both hosts share one binding source and, within a process, one
+registry, so a script-registered game appears in `Oasis`'s menu. A Python-defined
+game or strategy is a C++ object (`PyScripted*`) that implements a
+language-agnostic interface from `Oryx/src/Oryx/Scripting/` (`IScriptedGame`
+and friends) and forwards to the script under the GIL; a borrowed `IState&`
+never outlives the `decide()` call it was handed to, and a script exception
+becomes a `ScriptError` that ends that match, never the application. The
+decisions, their status and the open questions are in
+[Design: Python API](design/python-api.md).
+
 ---
 
 # 10. Extension Model
@@ -650,6 +681,23 @@ macro line per type instead of hand-writing a registrar struct. The macro
 expansion happens at that translation unit's compile time; the resulting
 static object runs the actual registration at static-initialization time,
 before `main()`.
+
+Construction takes parameters: `Registry<T>::create(name, Params)`, where
+`Params` is a string-keyed map of `bool`/`int64`/`double`/`string`. A
+registration may declare a schema (keys, types, defaults) and a description,
+which the registry stores as the entry's `EntryInfo`; `create()` validates the
+supplied `Params` against it, fills in defaults, and throws a `ParamError`
+naming the offending key. Unknown names still return `nullptr`. Strategies that
+take a seed declare a `seed` parameter (`RandomStrategy` does).
+
+Script-language backends register the same way: a `PythonRuntime` self-registers
+as `"python"` in a registry of `IScriptRuntime` (`OX_REGISTER_SCRIPT_RUNTIME`),
+and the public `ScriptingLayer` (§3.6) finds it by language, so consumers never
+name a backend type. Games and strategies defined by scripts register into the
+same `Registry<IGame>`/`Registry<IStrategy>` as C++ ones; tracking where an
+entry came from, so that re-running a notebook cell replaces its own entry but
+not a C++ one, is built with the first script-defined registrant and lives in a
+scripting-specific registry rather than in `Registry<T>`.
 
 Strategies that are game-specific (e.g. Phase 4's TicTacToe heuristic, kept
 in `Oasis` — see [Roadmap](roadmap.md) Phase 4) register under a namespaced name
@@ -781,6 +829,24 @@ further, for this phase's scope:
   lives in `OasisLayer` until a real `Engine`/`Match` exists (still open,
   below)
 
+The Phase 7 brainstorm (see [Design: Python API](design/python-api.md) and
+the [Decision Log](design/decision-log.md)) resolved, for scripting scope:
+
+* Construction parameters — resolved: `Registry<T>::create(name, Params)`, a
+  per-entry schema and description (`EntryInfo`), validated with errors that
+  name the key (§10)
+* Python ownership/lifetime, scoped to scripting — resolved: script-backed
+  adapters hold the script object and forward under the GIL; a borrowed state
+  never outlives `decide()`; script-held factories are released before
+  interpreter finalisation; a script exception aborts that match, never the
+  application (§9)
+* Error handling — resolved for new code: inner code throws `oryx::Error`,
+  layer boundaries catch, log and disable the layer ([Design: Error
+  Handling](design/cpp-api.md#error-handling), §3.6)
+* Scripting host model — resolved: a language-agnostic `Scripting/` module and
+  a public `ScriptingLayer`, with language backends registered as runtimes
+  (§3.6, §10)
+
 The following should **not** be considered settled yet:
 
 * Action decode/interpretation capability (e.g. an `IActionFeatures`-style
@@ -798,7 +864,9 @@ The following should **not** be considered settled yet:
 * Experiment representation
 * Observability protocol
 * Dashboard transport
-* Python ownership/lifetime semantics
+* Python ownership/lifetime beyond the scripting layer's scoped rules
+  (below): how a pure-Python host owns C++ objects handed back to it, and
+  interpreter-finalisation ordering
 * Serialization
 * Graphics abstraction
 * Multi-threaded simulation model — explicitly deferred rather than merely

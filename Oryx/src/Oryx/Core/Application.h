@@ -6,6 +6,12 @@
 namespace oryx
 {
 
+inline bool g_initialised = false;
+
+[[nodiscard]] inline bool is_initialised() noexcept { return g_initialised; }
+
+void init();
+
 struct ApplicationCommandLineArgs
 {
     int32_t count = 0;

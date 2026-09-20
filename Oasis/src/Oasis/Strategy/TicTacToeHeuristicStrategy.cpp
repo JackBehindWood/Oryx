@@ -94,4 +94,4 @@ oryx::ActionId TicTacToeHeuristicStrategy::decide(const oryx::Context& context)
 
 } // namespace oasis
 
-OX_REGISTER_STRATEGY(oasis::TicTacToeHeuristicStrategy, "tictactoe/heuristic")
+OX_REGISTER_STRATEGY(oasis::TicTacToeHeuristicStrategy, "tictactoe/heuristic", {}, "Win, else block, else center, then a corner, then anything")

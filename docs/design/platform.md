@@ -85,6 +85,40 @@ experiments built on top of the engine have a home that is not the engine
 itself — the same reasoning behind keeping the CLI a thin orchestration layer
 rather than absorbing Premake's responsibilities.
 
+## Source Layout: Public API and Backends
+
+Inside the `Oryx` project, the folder a file lives in says who may depend on it:
+
+```text
+Oryx/
+├── src/        public API: the only include path consumers get
+├── backends/   private: optional and platform-specific implementations
+│   ├── Python/     (first backend, Phase 7)
+│   ├── MacOS/      (platform-specific code, when needed)
+│   └── Metal/, GLFW/ ...   (graphics backends, Phase 10)
+└── vendor/     every vendored third-party library, backends included
+```
+
+* `Oryx/src` is the public API. Consumers such as `Oasis`, `tests`, and
+  third-party projects see only this include path.
+* `Oryx/backends/<Name>/` is private implementation code. Public headers never
+  include from it; a backend implements an interface declared in `Oryx/src`
+  (for example, a Python runtime implementing a language-agnostic
+  `IScriptRuntime`) and is selected through the existing self-registering
+  factory mechanism ([Architecture §10](../architecture.md#10-extension-model)), so consumers never name a backend type.
+* Backends are compiled into the `Oryx` library by Premake: a build option
+  turns an optional backend (such as Python) on or off, and an OS filter
+  selects platform-specific ones. Turning one off leaves the rest of `Oryx`
+  untouched.
+* All vendored libraries live in `Oryx/vendor`, never in a per-backend vendor
+  folder.
+* The word "platform" in this project already means operating-system support
+  (`PlatformDetection.h`, [Decision Log](decision-log.md)), which is why optional
+  dependency-bound code such as Python is filed under `backends/`, not `platform/`.
+
+`Oryx/backends/` does not exist yet; it is created together with the first
+backend. See the [Decision Log](decision-log.md) ("Public API vs private backends").
+
 ## Documentation as a Design Tool
 
 Documentation is not only for users.

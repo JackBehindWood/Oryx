@@ -11,9 +11,15 @@
 #include <typeindex>
 
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <map>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <span>
+#include <variant>
 #include <vector>
 #include <unordered_map>
 

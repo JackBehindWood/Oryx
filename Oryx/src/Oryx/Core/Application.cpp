@@ -4,6 +4,17 @@
 namespace oryx 
 {
 
+void init()
+{
+    if (g_initialised)
+    {
+        return;
+    }
+
+    Log::init();
+    g_initialised = true;
+}
+
 Application* Application::s_instance = nullptr;
 
 Application::Application(ApplicationCommandLineArgs)
@@ -21,10 +32,7 @@ void Application::run()
 {
     while (m_running)
     {
-        for (LayerPtr& layer : m_layer_stack)
-        {
-            layer->update();
-        }
+        m_layer_stack.update();
     }
 }
 
@@ -36,14 +44,7 @@ void Application::post_event(Event& event)
         return;
     }
 
-    for (auto it = m_layer_stack.rbegin(); it != m_layer_stack.rend(); ++it)
-    {
-        if (event.handled)
-        {
-            break;
-        }
-        (*it)->event(event);
-    }
+    m_layer_stack.dispatch_event(event);
 }
 
 } // namespace oryx

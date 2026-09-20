@@ -195,7 +195,7 @@ full detail).
 * No chance/simultaneous player support — strict alternating turns only
 * No concrete `Layer` implementations beyond `Oasis`'s own — `Application`
   gained a `LayerStack`/`Layer` extension point ([Architecture §3.6](architecture.md#36-application-layers)), but
-  `SimulationLayer`, a `PythonScriptingLayer`, a GUI/CLI layer, and
+  `SimulationLayer`, a `ScriptingLayer`, a GUI/CLI layer, and
   profiling/benchmarking layers are future direction only, tied to Phases
   6/7/9/11 below
 
@@ -356,6 +356,34 @@ Initial goals:
 * Access statistics
 
 Python should provide a natural interface for experimentation rather than expose the entire C++ implementation.
+
+The phase has two faces of one `oryx` API ([Design: Python API](design/python-api.md)):
+
+* **Python scripting, Unity-style.** A game or strategy defined in a Python file
+  runs inside the C++ `Oasis` executable exactly like a C++ one, found by a
+  zero-config scan for `*.oryx.py`.
+* **Research and prototyping.** `import oryx` from a REPL, script or notebook,
+  with registries, `Match`, `simulate()`, and results as data; a Python
+  prototype can later be ported to C++ behind the same registry id.
+
+Supporting work, in build order:
+
+* Documentation of the decisions ([Decision Log](design/decision-log.md))
+* An error system (`oryx::Error`, caught at layer boundaries) and construction
+  `Params` with per-entry schemas in `Registry<T>`
+* A language-agnostic `Scripting/` module and a public `ScriptingLayer`, before
+  any Python code exists
+* Build integration: a private `Oryx/backends/Python/` backend, the `_oryx`
+  extension (`OryxPy`), on by default and switchable off
+* Python-as-host bindings, then script-backed types, then the embedded host in
+  `Oasis`
+
+**Milestone:** Nim written in Python, running inside `Oasis`, plus one Python
+strategy that plays both Nim and TicTacToe.
+
+Out of Phase 7: wheels/PyPI packaging, a helper for users' own C++ game
+modules, other script languages, and the Phase 8 `Experiment` framework built
+on top of the Python package.
 
 ---
 
