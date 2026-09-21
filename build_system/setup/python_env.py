@@ -6,6 +6,7 @@ the --python-* options declared in premake/python.lua.
 """
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import platform
 import sys
@@ -24,6 +25,7 @@ class PythonBuildInfo:
     lib_dir: Path
     lib_name: str
     home: Path
+    site_packages: tuple[Path, ...]
 
 
 PACKAGE_DIR = PROJECT_ROOT / "Oryx" / "backends" / "Python"
@@ -42,6 +44,11 @@ def _unix_library(lib_dir: Path) -> tuple[Path, str]:
     return lib_dir / file_name, stem
 
 
+def _site_packages() -> tuple[Path, ...]:
+    paths = sysconfig.get_paths()
+    return tuple(dict.fromkeys(Path(paths[key]) for key in ("purelib", "platlib")))
+
+
 def python_build_info() -> PythonBuildInfo:
     home = Path(sys.base_prefix)
     include_dir = Path(sysconfig.get_config_var("INCLUDEPY") or sysconfig.get_paths()["include"])
@@ -58,7 +65,7 @@ def python_build_info() -> PythonBuildInfo:
     if not library.is_file() or library.suffix == ".a":
         raise PythonEnvError(f"No shared libpython at {library}. {_NO_LIBPYTHON_HINT}")
 
-    return PythonBuildInfo(include_dir=include_dir, lib_dir=lib_dir, lib_name=lib_name, home=home)
+    return PythonBuildInfo(include_dir=include_dir, lib_dir=lib_dir, lib_name=lib_name, home=home, site_packages=_site_packages())
 
 
 def premake_python_options(cfg: BuildConfig) -> list[str]:
@@ -72,4 +79,14 @@ def premake_python_options(cfg: BuildConfig) -> list[str]:
         f"--python-lib={info.lib_name}",
         f"--python-home={info.home.as_posix()}",
         f"--python-package-dir={PACKAGE_DIR.as_posix()}",
+        f"--python-site-packages={os.pathsep.join(path.as_posix() for path in info.site_packages)}",
     ]
+
+
+def embedding_defines(info: PythonBuildInfo) -> dict[str, str]:
+    """The string macros premake/python.lua bakes into the backend, for IDE fallbacks."""
+    return {
+        "OX_PYTHON_HOME": info.home.as_posix(),
+        "OX_PYTHON_PACKAGE_DIR": PACKAGE_DIR.as_posix(),
+        "OX_PYTHON_SITE_PACKAGES": os.pathsep.join(path.as_posix() for path in info.site_packages),
+    }

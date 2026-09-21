@@ -14,6 +14,7 @@ public:
     void stop() override {}
     void load(const ScriptSource&) override {}
     void reload(const ScriptSource&) override {}
+    void unload() override {}
 };
 
 class RegisteredRuntimeB : public RegisteredRuntimeA

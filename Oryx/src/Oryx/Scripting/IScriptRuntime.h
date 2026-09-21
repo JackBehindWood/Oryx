@@ -19,6 +19,9 @@ public:
 
     virtual void load(const ScriptSource& source) = 0;
     virtual void reload(const ScriptSource& source) = 0;
+
+    // Drops every game and strategy this runtime's scripts registered, so a reload can re-register them.
+    virtual void unload() = 0;
 };
 
 } // namespace oryx

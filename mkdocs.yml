@@ -49,5 +49,7 @@ nav:
       - Observability: design/observability.md
       - Platform: design/platform.md
       - Decision Log: design/decision-log.md
-  - Python: python/index.md
+  - Python:
+      - python/index.md
+      - Scripting in Oasis: python/scripting.md
   - Roadmap: roadmap.md

@@ -50,17 +50,21 @@ def missing_vendor_dirs(cfg: BuildConfig | None = None) -> list[Path]:
     return [d for d in vendor_dirs() if d.name not in skipped and not any(d.iterdir())]
 
 
-def vendor_include_paths() -> list[str]:
-    """Best-effort IntelliSense include paths for every vendored lib: the
-    vendor dir itself, plus — mirroring useVendorHeader's `headerSubdir`
-    convention — a same-named subdirectory one level in, if present."""
+def vendor_include_paths(cfg: BuildConfig | None = None) -> list[str]:
+    """Best-effort IntelliSense include paths for every vendored lib, mirroring
+    the IncludeDir entries in premake/dependencies.lua: `<lib>/include` when it
+    exists (spdlog, pybind11), otherwise — like useVendorHeader's `headerSubdir`
+    — the vendor dir plus a same-named subdirectory one level in (doctest).
+    Python-only libs are skipped when cfg says Python is off."""
+    skipped = PYTHON_VENDOR_LIBS if cfg is not None and not cfg.python_enabled else set()
     paths = []
     for d in vendor_dirs():
-        rel = d.relative_to(PROJECT_ROOT).as_posix()
-        paths.append(f"${{workspaceFolder}}/{rel}")
+        if d.name in skipped:
+            continue
+        include = d / "include"
         nested = d / d.name
-        if nested.is_dir():
-            paths.append(f"${{workspaceFolder}}/{rel}/{d.name}")
+        headers = [include] if include.is_dir() else [d] + ([nested] if nested.is_dir() else [])
+        paths.extend(f"${{workspaceFolder}}/{h.relative_to(PROJECT_ROOT).as_posix()}" for h in headers)
     return paths
 
 

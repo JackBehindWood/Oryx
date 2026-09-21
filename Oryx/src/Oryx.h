@@ -18,6 +18,7 @@
 #include "Oryx/Events/Event.h"
 #include "Oryx/Events/ApplicationEvent.h"
 #include "Oryx/Events/SimulationEvent.h"
+#include "Oryx/Events/ScriptEvent.h"
 
 #include "Oryx/Math/Math.h"
 

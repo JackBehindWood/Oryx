@@ -93,18 +93,6 @@ std::string run_script(const std::string& body, const std::string& file_name = "
     return read_file(marker);
 }
 
-std::filesystem::path repo_file(const std::string& relative)
-{
-    for (std::filesystem::path dir = std::filesystem::current_path(); dir.has_parent_path() && dir != dir.parent_path(); dir = dir.parent_path())
-    {
-        if (std::filesystem::exists(dir / relative))
-        {
-            return dir / relative;
-        }
-    }
-    throw std::runtime_error("cannot find " + relative + " above the working directory");
-}
-
 std::string with_nim(const std::string& body)
 {
     return std::string(kNim) + body;

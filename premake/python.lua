@@ -38,6 +38,12 @@ newoption {
     description = "Directory holding the pure-Python oryx package, baked in as the embedded sys.path entry",
 }
 
+newoption {
+    trigger = "python-site-packages",
+    value = "paths",
+    description = "Path-separator list of the venv's site-packages, baked in and appended to the embedded sys.path",
+}
+
 function pythonEnabled()
     return _OPTIONS["no-python"] == nil
 end
@@ -78,6 +84,7 @@ function useOryxPythonEmbedding()
     defines {
         'OX_PYTHON_HOME="' .. requirePythonOption("python-home") .. '"',
         'OX_PYTHON_PACKAGE_DIR="' .. requirePythonOption("python-package-dir") .. '"',
+        'OX_PYTHON_SITE_PACKAGES="' .. requirePythonOption("python-site-packages") .. '"',
     }
 end
 

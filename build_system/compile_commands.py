@@ -25,19 +25,22 @@ def _compile_entries(make_file: Path, config_token: str) -> list[dict]:
     """Dry-run a generated gmake project file and pull out one compile_commands.json
     entry per translation unit from the fully-resolved compiler invocations `make`
     prints — real ground truth, not a re-implementation of Premake's flag logic."""
+    # -k: a fresh build has no linked libs yet; make still prints every compile line before stopping there.
     try:
-        result = run_command(
-            ["make", "-n", "-B", "-f", make_file.name, f"config={config_token}"],
+        output = run_command(
+            ["make", "-n", "-B", "-k", "-f", make_file.name, f"config={config_token}"],
             cwd=BUILD_DIR,
-        )
+        ).stdout
     except subprocess.CalledProcessError as error:
-        console.print(f"[yellow]⚠️ Skipping {make_file.name}: {error.stderr or error}[/yellow]")
-        return []
+        output = error.stdout or ""
+        if " -c " not in output:
+            console.print(f"[yellow]⚠️ Skipping {make_file.name}: {error.stderr or error}[/yellow]")
+            return []
 
     sdk = get_macos_sdk_path() if platform.system() == "Darwin" else None
 
     entries = []
-    for line in result.stdout.splitlines():
+    for line in output.splitlines():
         try:
             tokens = shlex.split(line)
         except ValueError:

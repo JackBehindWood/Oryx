@@ -34,6 +34,18 @@ inline std::string read_file(const std::filesystem::path& file)
     return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
 }
 
+inline std::filesystem::path repo_file(const std::string& relative)
+{
+    for (std::filesystem::path dir = std::filesystem::current_path(); dir.has_parent_path() && dir != dir.parent_path(); dir = dir.parent_path())
+    {
+        if (std::filesystem::exists(dir / relative))
+        {
+            return dir / relative;
+        }
+    }
+    throw std::runtime_error("cannot find " + relative + " above the working directory");
+}
+
 inline UniquePtr<IScriptRuntime> python_runtime()
 {
     return ScriptRuntimeRegistry::create("python");

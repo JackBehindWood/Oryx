@@ -5,6 +5,7 @@ from pathlib import Path
 
 from build_system.compile_commands import COMPILE_COMMANDS_FILE
 from build_system.config import BuildConfig, PROJECT_ROOT
+from build_system.setup.python_env import PythonEnvError, embedding_defines, python_build_info
 from build_system.utils import get_macos_sdk_path, load_json, merge_by_key, write_json
 from build_system.vendor import vendor_include_paths
 
@@ -20,6 +21,9 @@ PROFILE_DEFINES = {
     "dist": ["OX_DIST"],
 }
 
+# Mirrors the always-on defines in the projects' premake5.lua files.
+BASE_DEFINES = ["SPDLOG_COMPILED_LIB"]
+
 # Fallback only, for before `build build configure` has ever run (or if
 # compile_commands.json is otherwise missing). Real per-project accuracy comes
 # from compile_commands.json — generated straight from Premake's own resolved
@@ -32,15 +36,40 @@ FALLBACK_INCLUDE_PATHS = [
     "${workspaceFolder}/tests",
 ]
 
+# Private Python backend (Oryx/backends/Python), compiled into Oryx only when Python is on.
+PYTHON_BACKEND_INCLUDE_PATH = "${workspaceFolder}/Oryx/backends/Python"
 
-def _fallback_include_paths() -> list[str]:
-    # Appends every <project>/vendor/<lib>/ dir discovered on disk (see
-    # build_system/vendor.py) instead of hardcoding doctest's path here.
-    return FALLBACK_INCLUDE_PATHS + vendor_include_paths()
+
+def _python_build_info(cfg: BuildConfig):
+    # None when Python is off, or when no usable interpreter is found: the IDE fallback simply omits the CPython bits.
+    if not cfg.python_enabled:
+        return None
+    try:
+        return python_build_info()
+    except PythonEnvError:
+        return None
+
+
+def _fallback_include_paths(cfg: BuildConfig) -> list[str]:
+    # Appends every <project>/vendor/<lib>/ header dir discovered on disk (see
+    # build_system/vendor.py) instead of hardcoding each library's path here.
+    paths = FALLBACK_INCLUDE_PATHS + vendor_include_paths(cfg)
+    if cfg.python_enabled:
+        paths.append(PYTHON_BACKEND_INCLUDE_PATH)
+        info = _python_build_info(cfg)
+        if info is not None:
+            paths.append(info.include_dir.as_posix())
+    return paths
 
 
 def _defines(cfg: BuildConfig) -> list[str]:
-    return PROFILE_DEFINES.get(cfg.profile, [f"OX_{cfg.profile.upper()}"])
+    defines = BASE_DEFINES + PROFILE_DEFINES.get(cfg.profile, [f"OX_{cfg.profile.upper()}"])
+    if cfg.python_enabled:
+        defines.append("OX_ENABLE_PYTHON")
+        info = _python_build_info(cfg)
+        if info is not None:
+            defines.extend(f'{name}="{value}"' for name, value in embedding_defines(info).items())
+    return defines
 
 
 def _macos_compiler_path() -> str:
@@ -61,7 +90,7 @@ def _homebrew_include_path(intellisense_mode: str) -> str:
 def _macos_configuration(name: str, intellisense_mode: str, cfg: BuildConfig) -> dict:
     sdk = get_macos_sdk_path()
     sdk_includes = [f"{sdk}/usr/include/c++/v1", f"{sdk}/usr/include"] if sdk else []
-    include_paths = _fallback_include_paths()
+    include_paths = _fallback_include_paths(cfg)
 
     return {
         "name": name,
@@ -82,7 +111,7 @@ def _macos_configuration(name: str, intellisense_mode: str, cfg: BuildConfig) ->
 
 def _linux_configuration(cfg: BuildConfig) -> dict:
     compiler_path = shutil.which("g++") or shutil.which("clang++") or "/usr/bin/g++"
-    include_paths = _fallback_include_paths()
+    include_paths = _fallback_include_paths(cfg)
 
     return {
         "name": "Linux",
@@ -101,7 +130,7 @@ def _linux_configuration(cfg: BuildConfig) -> dict:
 
 
 def _windows_configuration(cfg: BuildConfig) -> dict:
-    include_paths = _fallback_include_paths()
+    include_paths = _fallback_include_paths(cfg)
 
     return {
         "name": "Windows",

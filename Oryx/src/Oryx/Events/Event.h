@@ -10,7 +10,8 @@ enum class EventType
     None = 0,
     AppTick,
     StartSimulation,
-    SimulationComplete
+    SimulationComplete,
+    ReloadScripts
 };
 
 enum EventCategory

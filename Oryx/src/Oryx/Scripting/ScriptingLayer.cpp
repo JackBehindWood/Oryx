@@ -2,6 +2,7 @@
 #include "Oryx/Scripting/ScriptingLayer.h"
 
 #include "Oryx/Core/Error.h"
+#include "Oryx/Events/ScriptEvent.h"
 #include "Oryx/Scripting/ScriptRuntimeRegistry.h"
 
 namespace oryx
@@ -15,12 +16,12 @@ std::string describe(const ScriptSource& source)
     return source.kind == ScriptSourceKind::Module ? "module '" + source.target + "'" : "script '" + source.target + "'";
 }
 
-void load_source(IScriptRuntime& runtime, const ScriptSource& source)
+void load_source(IScriptRuntime& runtime, const ScriptSource& source, bool reloading)
 {
     try
     {
-        runtime.load(source);
-        OX_CORE_INFO("ScriptingLayer: loaded {} with the {} runtime.", describe(source), runtime.language());
+        reloading ? runtime.reload(source) : runtime.load(source);
+        OX_CORE_INFO("ScriptingLayer: {} {} with the {} runtime.", reloading ? "reloaded" : "loaded", describe(source), runtime.language());
     }
     catch (const Error& error)
     {
@@ -67,6 +68,21 @@ void ScriptingLayer::attach()
         OX_CORE_TRACE("ScriptingLayer: no script runtime is registered.");
     }
 
+    sync_runtimes();
+}
+
+void ScriptingLayer::event(Event& event)
+{
+    EventDispatcher dispatcher(event);
+    dispatcher.dispatch<ReloadScriptsEvent>([this](ReloadScriptsEvent&)
+    {
+        sync_runtimes();
+        return false;
+    });
+}
+
+std::vector<ScriptSource> ScriptingLayer::discover() const
+{
     std::vector<ScriptFilePattern> patterns;
     for (const UniquePtr<IScriptRuntime>& runtime : m_runtimes)
     {
@@ -96,6 +112,12 @@ void ScriptingLayer::attach()
             report_unmatched(source, m_runtimes.size());
         }
     }
+    return sources;
+}
+
+void ScriptingLayer::sync_runtimes()
+{
+    std::vector<ScriptSource> sources = discover();
 
     for (UniquePtr<IScriptRuntime>& runtime : m_runtimes)
     {
@@ -107,16 +129,26 @@ void ScriptingLayer::attach()
                 own_sources.push_back(&source);
             }
         }
-        if (own_sources.empty())
+
+        bool running = std::find(m_started.begin(), m_started.end(), runtime.get()) != m_started.end();
+        if (!running && own_sources.empty())
         {
             continue;
         }
 
-        runtime->start();
-        m_started.push_back(runtime.get());
+        if (running)
+        {
+            runtime->unload();
+        }
+        else
+        {
+            runtime->start();
+            m_started.push_back(runtime.get());
+        }
+
         for (const ScriptSource* source : own_sources)
         {
-            load_source(*runtime, *source);
+            load_source(*runtime, *source, running);
         }
     }
 }

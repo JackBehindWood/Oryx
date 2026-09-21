@@ -22,6 +22,7 @@ public:
 
     void load(const ScriptSource& source) override;
     void reload(const ScriptSource& source) override;
+    void unload() override;
 
 private:
     bool m_running = false;

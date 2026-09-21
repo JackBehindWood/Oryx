@@ -6,6 +6,7 @@
 
 #include <pybind11/embed.h>
 
+#include "Oryx/Scripting/ScriptDiscovery.h"
 #include "Oryx/Scripting/ScriptError.h"
 #include "Oryx/Scripting/ScriptRegistry.h"
 #include "Oryx/Scripting/ScriptRuntimeRegistry.h"
@@ -42,6 +43,23 @@ std::string script_module_name(const std::filesystem::path& file)
         }
     }
     return kScriptModulePrefix + stem;
+}
+
+void extend_search_path()
+{
+    py::list search_path = py::module_::import("sys").attr("path");
+    search_path.attr("insert")(0, OX_PYTHON_PACKAGE_DIR);
+
+    std::error_code error;
+    std::filesystem::path root = std::filesystem::current_path(error);
+    if (!error)
+    {
+        search_path.append(root.string());
+    }
+    for (const std::string& site_packages : split_search_path(OX_PYTHON_SITE_PACKAGES))
+    {
+        search_path.append(site_packages);
+    }
 }
 
 void load_file(const std::string& target)
@@ -138,7 +156,7 @@ void PythonRuntime::start()
     {
         python::register_oryx_module();
         py::initialize_interpreter(&config, 0, nullptr, false);
-        py::module_::import("sys").attr("path").attr("insert")(0, OX_PYTHON_PACKAGE_DIR);
+        extend_search_path();
     }
     catch (const std::runtime_error& error)
     {
@@ -154,7 +172,7 @@ void PythonRuntime::stop()
         return;
     }
 
-    unregister_scripted("python");
+    unload();
     py::finalize_interpreter();
     m_running = false;
 }
@@ -175,6 +193,11 @@ void PythonRuntime::reload(const ScriptSource& source)
         throw ScriptError("PythonRuntime::reload() was called before start()");
     }
     run_source(source, true);
+}
+
+void PythonRuntime::unload()
+{
+    unregister_scripted("python");
 }
 
 OX_REGISTER_SCRIPT_RUNTIME(PythonRuntime, "python")

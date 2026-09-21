@@ -134,6 +134,16 @@ def run_project(
         "--benchmark",
         help="With --simulate: print a timing/throughput/Instrumentation report on completion.",
     ),
+    game: Optional[str] = typer.Option(
+        None,
+        "--game",
+        help="Registered game id to play (built in or script-defined); prompts when omitted.",
+    ),
+    opponent: Optional[str] = typer.Option(
+        None,
+        "--opponent",
+        help="Opponent strategy id, or 'human'; prompts when omitted.",
+    ),
 ):
     """Run the compiled Oasis sandbox executable."""
     run: RunContext = ctx.obj
@@ -142,6 +152,10 @@ def run_project(
     exe_path = cfg.executable_path("oasis")
 
     args = [str(exe_path)]
+    if game:
+        args.append(f"--game={game}")
+    if opponent:
+        args.append(f"--opponent={opponent}")
     if simulate:
         args.append(f"--simulate={simulate}")
     if benchmark:

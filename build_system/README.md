@@ -96,7 +96,7 @@ Handles build lifecycle, Premake configuration, and binary compilation.
 | --- | --- |
 | `build configure` | Ensures local Premake5 binary exists and generates project build files. |
 | `build compile` | Compiles engine binaries for the targeted configuration profile. |
-| `build run` | Runs the compiled `Oasis` sandbox executable. |
+| `build run` | Runs the compiled `Oasis` sandbox executable (`--game`, `--opponent`, `--simulate`, `--benchmark` are forwarded). |
 | `build clean` | Removes the entire `build/` directory (binaries, object files, generated Makefiles, and `compile_commands.json`). |
 | `build all` | Executes `configure`, `compile`, and unit test commands sequentially. |
 
@@ -303,7 +303,9 @@ bespoke, hand-wired path per library:
   `requires_vendor=True` command flag above) flags submodules that haven't
   been checked out, and `vendor_include_paths()` feeds the VS Code
   IntelliSense fallback paths and search excludes generically, instead of a
-  hardcoded doctest-specific path.
+  hardcoded doctest-specific path. With Python on, the fallback also adds
+  `Oryx/backends/Python` (backend + the `oryx` package), pybind11, the
+  interpreter's `Python.h` directory and the baked `OX_PYTHON_*` defines.
 
 To vendor a new library: add it as a git submodule under `<project>/vendor/<lib>/`,
 add `useVendorHeader("<lib>")` (with a second argument if its header sits in

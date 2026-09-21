@@ -154,3 +154,76 @@ TEST_CASE("ScriptingLayer with no runtimes attaches harmlessly")
 
     CHECK_FALSE(layer.is_disabled());
 }
+
+TEST_CASE("ScriptingLayer reload unloads each running runtime and reloads its sources in discovery order")
+{
+    TempDir dir;
+    dir.write("a.alpha.txt");
+    dir.write("b.alpha.txt");
+    std::vector<std::string> log;
+
+    LayerStack stack;
+    stack.push_layer<ScriptingLayer>(options_for(dir), two_runtimes(log));
+    log.clear();
+
+    ReloadScriptsEvent event;
+    stack.dispatch_event(event);
+
+    CHECK(log == std::vector<std::string>{ "alpha:unload", "alpha:reload:a.alpha.txt", "alpha:reload:b.alpha.txt" });
+    CHECK_FALSE(event.handled);
+}
+
+TEST_CASE("ScriptingLayer reload discovers new sources and starts a runtime that had none")
+{
+    TempDir dir;
+    dir.write("a.alpha.txt");
+    std::vector<std::string> log;
+
+    LayerStack stack;
+    stack.push_layer<ScriptingLayer>(options_for(dir), two_runtimes(log));
+    log.clear();
+
+    dir.write("c.beta.txt");
+    dir.write("b.alpha.txt");
+    ReloadScriptsEvent event;
+    stack.dispatch_event(event);
+
+    CHECK(log == std::vector<std::string>{ "alpha:unload", "alpha:reload:a.alpha.txt", "alpha:reload:b.alpha.txt",
+                                           "beta:start", "beta:load:c.beta.txt" });
+}
+
+TEST_CASE("ScriptingLayer reload still unloads a runtime whose sources were all deleted")
+{
+    TempDir dir;
+    std::filesystem::path file = dir.write("a.alpha.txt");
+    std::vector<std::string> log;
+
+    LayerStack stack;
+    stack.push_layer<ScriptingLayer>(options_for(dir), one_runtime(log));
+    log.clear();
+
+    std::filesystem::remove(file);
+    ReloadScriptsEvent event;
+    stack.dispatch_event(event);
+
+    CHECK(log == std::vector<std::string>{ "alpha:unload" });
+}
+
+TEST_CASE("ScriptingLayer reload logs a script's error and keeps reloading the remaining sources")
+{
+    TempDir dir;
+    dir.write("a.alpha.txt");
+    dir.write("b-broken.alpha.txt");
+    dir.write("c.alpha.txt");
+    std::vector<std::string> log;
+
+    LayerStack stack;
+    ScriptingLayer& layer = stack.push_layer<ScriptingLayer>(options_for(dir), one_runtime(log));
+    log.clear();
+
+    ReloadScriptsEvent event;
+    stack.dispatch_event(event);
+
+    CHECK_FALSE(layer.is_disabled());
+    CHECK(log == std::vector<std::string>{ "alpha:unload", "alpha:reload:a.alpha.txt", "alpha:reload:b-broken.alpha.txt", "alpha:reload:c.alpha.txt" });
+}

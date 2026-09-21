@@ -62,8 +62,58 @@ std::vector<std::string> strategies_for(const std::string& game)
     return sorted(std::move(names));
 }
 
-bool prompt_for_choice(const std::string& what, const std::vector<std::string>& names, std::string& out_name)
+using InfoLookup = std::function<const oryx::EntryInfo*(const std::string&)>;
+
+std::string display(const oryx::ParamValue& value)
 {
+    return std::visit([](const auto& held) -> std::string
+    {
+        using Held = std::decay_t<decltype(held)>;
+        if constexpr (std::is_same_v<Held, bool>)
+        {
+            return held ? "true" : "false";
+        }
+        else if constexpr (std::is_same_v<Held, std::string>)
+        {
+            return held;
+        }
+        else
+        {
+            std::ostringstream stream;
+            stream << held;
+            return stream.str();
+        }
+    }, value);
+}
+
+std::string describe_entry(const std::string& name, const oryx::EntryInfo* info)
+{
+    std::string line = "  " + name;
+    if (info == nullptr)
+    {
+        return line;
+    }
+
+    if (!info->description.empty())
+    {
+        line += " - " + info->description;
+    }
+
+    std::string params;
+    for (const oryx::ParamSpec& spec : info->schema)
+    {
+        params += (params.empty() ? "" : ", ") + spec.name + (spec.has_default ? "=" + display(spec.default_value) : " (no default)");
+    }
+    return params.empty() ? line : line + " [" + params + "]";
+}
+
+bool prompt_for_choice(const std::string& what, const std::vector<std::string>& names, const InfoLookup& info, std::string& out_name)
+{
+    for (const std::string& name : names)
+    {
+        std::cout << describe_entry(name, info(name)) << "\n";
+    }
+
     while (true)
     {
         std::cout << "Choose " << what << " - " << joined(names) << ": ";
@@ -155,7 +205,7 @@ bool OasisLayer::choose_game(std::string& out_name) const
         return true;
     }
 
-    if (!prompt_for_choice("a game", names, out_name))
+    if (!prompt_for_choice("a game", names, [](const std::string& name) { return oryx::GameRegistry::info(name); }, out_name))
     {
         OX_INFO("Input closed before a game was chosen — exiting.");
         return false;
@@ -248,7 +298,7 @@ void OasisLayer::attach_interactive(const std::string& game_name, UniquePtr<IGam
     std::string opponent_name = m_opponent_arg;
     if (opponent_name.empty())
     {
-        if (!prompt_for_choice("an opponent", opponents, opponent_name))
+        if (!prompt_for_choice("an opponent", opponents, [](const std::string& name) { return oryx::StrategyRegistry::info(name); }, opponent_name))
         {
             OX_INFO("Input closed before an opponent was chosen — exiting.");
             oryx::Application::Get().close();

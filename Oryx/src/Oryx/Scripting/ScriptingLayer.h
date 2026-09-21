@@ -15,8 +15,12 @@ public:
 
     void attach() override;
     void detach() override;
+    void event(Event& event) override;
 
 private:
+    [[nodiscard]] std::vector<ScriptSource> discover() const;
+    void sync_runtimes();
+
     ScriptDiscoveryOptions m_options;
     std::vector<UniquePtr<IScriptRuntime>> m_runtimes;
     std::vector<IScriptRuntime*> m_started;

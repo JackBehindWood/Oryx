@@ -77,6 +77,7 @@ public:
     }
 
     void reload(const ScriptSource& source) override { m_log.push_back(m_language + ":reload:" + label(source)); }
+    void unload() override { m_log.push_back(m_language + ":unload"); }
 
 private:
     static std::string label(const ScriptSource& source)
