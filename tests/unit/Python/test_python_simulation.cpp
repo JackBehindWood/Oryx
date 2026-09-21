@@ -46,7 +46,7 @@ std::string run_script(const std::string& body)
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("script.oryx.py", marker_prelude(marker) + "import oryx\n" + body);
+    std::filesystem::path script = dir.write("script.py", marker_prelude(marker) + "import oryx\n" + body);
 
     RunningPython python;
     python.load(script);
@@ -73,6 +73,25 @@ TEST_CASE("oryx.Match steps a game by hand with undo, redo and history")
         "mark(state.action_to_string(4))\n");
 
     CHECK(output == "[0, 1, 2, 3, 4, 5, 6, 7, 8]|[4]11|0|4None4[4]|row 2, col 2");
+}
+
+TEST_CASE("the state handle of a match is read-only, so the match history cannot be bypassed")
+{
+    std::string output = run_script(
+        "match = oryx.Match('tictactoe', ['first-legal', 'first-legal'])\n"
+        "state = match.state()\n"
+        "match.apply(4)\n"
+        "for call in (lambda: state.apply(0), lambda: state.undo(4)):\n"
+        "    try:\n"
+        "        call()\n"
+        "    except oryx.OryxError as e:\n"
+        "        mark(str(e) + ';')\n"
+        "mark(str(match.undo()) + str(match.history()) + str(state.legal_actions()))\n");
+
+    CHECK(output ==
+          "this state belongs to a match and is read-only: use match.apply() and match.undo();"
+          "this state belongs to a match and is read-only: use match.apply() and match.undo();"
+          "4[][0, 1, 2, 3, 4, 5, 6, 7, 8]");
 }
 
 TEST_CASE("oryx.Match rejects illegal actions and mismatched strategy counts without touching the state")

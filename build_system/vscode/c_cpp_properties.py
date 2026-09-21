@@ -5,7 +5,7 @@ from pathlib import Path
 
 from build_system.compile_commands import COMPILE_COMMANDS_FILE
 from build_system.config import BuildConfig, PROJECT_ROOT
-from build_system.setup.python_env import PythonEnvError, embedding_defines, python_build_info
+from build_system.setup.python_env import PYTHON_CONFIG_HEADER, PythonEnvError, python_build_info
 from build_system.utils import get_macos_sdk_path, load_json, merge_by_key, write_json
 from build_system.vendor import vendor_include_paths
 
@@ -56,6 +56,7 @@ def _fallback_include_paths(cfg: BuildConfig) -> list[str]:
     paths = FALLBACK_INCLUDE_PATHS + vendor_include_paths(cfg)
     if cfg.python_enabled:
         paths.append(PYTHON_BACKEND_INCLUDE_PATH)
+        paths.append(PYTHON_CONFIG_HEADER.parent.as_posix())
         info = _python_build_info(cfg)
         if info is not None:
             paths.append(info.include_dir.as_posix())
@@ -66,9 +67,6 @@ def _defines(cfg: BuildConfig) -> list[str]:
     defines = BASE_DEFINES + PROFILE_DEFINES.get(cfg.profile, [f"OX_{cfg.profile.upper()}"])
     if cfg.python_enabled:
         defines.append("OX_ENABLE_PYTHON")
-        info = _python_build_info(cfg)
-        if info is not None:
-            defines.extend(f'{name}="{value}"' for name, value in embedding_defines(info).items())
     return defines
 
 

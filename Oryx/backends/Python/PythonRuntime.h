@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Scripting/IScriptRuntime.h"
+#include "Oryx/Scripting/Interfaces/IScriptRuntime.h"
 
 namespace oryx
 {
@@ -15,7 +15,9 @@ public:
     PythonRuntime& operator=(const PythonRuntime&) = delete;
 
     std::string language() const override;
-    std::vector<std::string> file_patterns() const override;
+    std::vector<std::string> file_extensions() const override;
+
+    bool running() const override { return m_running; }
 
     void start() override;
     void stop() override;
@@ -25,7 +27,11 @@ public:
     void unload() override;
 
 private:
+    void run_source(const ScriptSource& source, bool reload);
+    void add_root(const std::string& root);
+
     bool m_running = false;
+    std::vector<std::string> m_roots;
 };
 
 } // namespace oryx

@@ -42,6 +42,7 @@ workspace "oryx"
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 group "Dependencies"
+    include "Oryx/vendor/premake/yaml-cpp.lua"
     include "Oryx/vendor/premake/spdlog.lua"
 group ""
 

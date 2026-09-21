@@ -42,6 +42,5 @@ build-backend = "hatchling.build"
 packages = ["build_system"]
 
 [tool.pyright]
-extraPaths = ["Oryx/backends/Python"]
 stubPath = "Oryx/backends/Python/stubs"
 reportMissingModuleSource = "none"

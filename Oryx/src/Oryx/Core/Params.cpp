@@ -34,9 +34,9 @@ std::string known_keys(const ParamSchema& schema)
     return keys;
 }
 
-ParamSpec make_spec(std::string name, ParamType type, ParamValue default_value, bool has_default, std::string description)
+ParamSpec make_spec(std::string name, ParamType type, ParamValue default_value, bool has_default, std::string description, bool required = false)
 {
-    return ParamSpec{ std::move(name), type, std::move(default_value), has_default, std::move(description) };
+    return ParamSpec{ std::move(name), type, std::move(default_value), has_default, std::move(description), required };
 }
 
 } // namespace
@@ -83,6 +83,24 @@ ParamSpec param_without_default(std::string name, ParamType type, std::string de
     return make_spec(std::move(name), type, ParamValue{}, false, std::move(description));
 }
 
+ParamSpec required_param(std::string name, ParamType type, std::string description)
+{
+    return make_spec(std::move(name), type, ParamValue{}, false, std::move(description), true);
+}
+
+std::vector<std::string> required_param_names(const ParamSchema& schema)
+{
+    std::vector<std::string> names;
+    for (const ParamSpec& spec : schema)
+    {
+        if (spec.required)
+        {
+            names.push_back(spec.name);
+        }
+    }
+    return names;
+}
+
 Params resolve_params(const std::string& entry, const ParamSchema& schema, const Params& provided)
 {
     Params resolved;
@@ -112,9 +130,17 @@ Params resolve_params(const std::string& entry, const ParamSchema& schema, const
 
     for (const ParamSpec& spec : schema)
     {
-        if (spec.has_default && !has_param(resolved, spec.name))
+        if (has_param(resolved, spec.name))
+        {
+            continue;
+        }
+        if (spec.has_default)
         {
             resolved.emplace(spec.name, spec.default_value);
+        }
+        else if (spec.required)
+        {
+            throw ParamError(entry, spec.name, "is required");
         }
     }
 

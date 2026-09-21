@@ -12,7 +12,7 @@ TEST_CASE("oryx.make_game and make_strategy create registered C++ entries; list 
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("registry.oryx.py", marker_prelude(marker) +
+    std::filesystem::path script = dir.write("registry.py", marker_prelude(marker) +
         "import oryx\n"
         "game = oryx.make_game('tictactoe')\n"
         "mark(game.name() + '|' + str(game.num_players()) + '|')\n"
@@ -20,20 +20,20 @@ TEST_CASE("oryx.make_game and make_strategy create registered C++ entries; list 
         "assert isinstance(oryx.make_strategy('random', seed=3), oryx.StrategyHandle)\n"
         "info = oryx.describe_strategy('random')\n"
         "param = info['params'][0]\n"
-        "mark(info['description'] + '|' + param['name'] + '|' + param['type'] + '|' + str('default' in param) + '|')\n"
+        "mark(info['description'] + '|' + param['name'] + '|' + param['type'] + '|' + str('default' in param) + '|' + str(param['required']) + '|')\n"
         "mark(str(oryx.describe_game('tictactoe')['params']))\n");
 
     RunningPython python;
     python.load(script);
 
-    CHECK(read_file(marker) == "TicTacToe|2|True|True|Uniformly random legal action|seed|int|False|[]");
+    CHECK(read_file(marker) == "TicTacToe|2|True|True|Uniformly random legal action|seed|int|False|False|[]");
 }
 
 TEST_CASE("oryx.make_* raise OryxError for unknown names and ParamError naming the offending key")
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("errors.oryx.py", marker_prelude(marker) +
+    std::filesystem::path script = dir.write("errors.py", marker_prelude(marker) +
         "import oryx\n"
         "def attempt(call):\n"
         "    try:\n"
@@ -61,7 +61,7 @@ TEST_CASE("the registry, simulation and Random entry points raise OryxError befo
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("guard.oryx.py", marker_prelude(marker) +
+    std::filesystem::path script = dir.write("guard.py", marker_prelude(marker) +
         "import oryx\n"
         "calls = {\n"
         "    'oryx.make_game': lambda: oryx.make_game('tictactoe'),\n"

@@ -9,8 +9,12 @@ namespace oryx
 class LayerStack
 {
 public:
+    using DisabledHandler = std::function<void(Layer& layer, std::string_view phase)>;
+
     LayerStack() = default;
     ~LayerStack();
+
+    void set_disabled_handler(DisabledHandler handler) { m_on_disabled = std::move(handler); }
 
     template<typename T, typename... Args>
     T& push_layer(Args&&... args)
@@ -48,6 +52,7 @@ private:
 
     std::vector<LayerPtr> m_layers;
     size_t m_layer_insert_index = 0;
+    DisabledHandler m_on_disabled;
 };
 
 } // namespace oryx

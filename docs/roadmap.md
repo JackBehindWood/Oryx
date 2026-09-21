@@ -360,8 +360,8 @@ Python should provide a natural interface for experimentation rather than expose
 The phase has two faces of one `oryx` API ([Design: Python API](design/python-api.md)):
 
 * **Python scripting, Unity-style.** A game or strategy defined in a Python file
-  runs inside the C++ `Oasis` executable exactly like a C++ one, found by a
-  zero-config scan for `*.oryx.py`.
+  runs inside the C++ `Oasis` executable exactly like a C++ one, found under
+  the script roots that the `oryx.yaml` settings file names.
 * **Research and prototyping.** `import oryx` from a REPL, script or notebook,
   with registries, `Match`, `simulate()`, and results as data; a Python
   prototype can later be ported to C++ behind the same registry id.

@@ -3,18 +3,15 @@
 
 #include "Oryx/Core/Error.h"
 #include "Oryx/Events/ScriptEvent.h"
-#include "Oryx/Scripting/ScriptRuntimeRegistry.h"
+#include "Oryx/Scripting/Registry/ScriptRuntimeRegistry.h"
+#include "Oryx/Scripting/ScriptSettings.h"
+#include "Oryx/Scripting/Support/ScriptUtil.h"
 
 namespace oryx
 {
 
 namespace
 {
-
-std::string describe(const ScriptSource& source)
-{
-    return source.kind == ScriptSourceKind::Module ? "module '" + source.target + "'" : "script '" + source.target + "'";
-}
 
 void load_source(IScriptRuntime& runtime, const ScriptSource& source, bool reloading)
 {
@@ -50,11 +47,11 @@ void report_unmatched(const ScriptSource& source, size_t runtime_count)
 } // namespace
 
 ScriptingLayer::ScriptingLayer(ScriptDiscoveryOptions options)
-    : ScriptingLayer(std::move(options), ScriptRuntimeRegistry::create_all())
+    : ScriptingLayer(std::move(options), ScriptRuntimeRegistry::runtimes())
 {
 }
 
-ScriptingLayer::ScriptingLayer(ScriptDiscoveryOptions options, std::vector<UniquePtr<IScriptRuntime>> runtimes)
+ScriptingLayer::ScriptingLayer(ScriptDiscoveryOptions options, std::vector<IScriptRuntime*> runtimes)
     : Layer("ScriptingLayer")
     , m_options(std::move(options))
     , m_runtimes(std::move(runtimes))
@@ -76,6 +73,14 @@ void ScriptingLayer::event(Event& event)
     EventDispatcher dispatcher(event);
     dispatcher.dispatch<ReloadScriptsEvent>([this](ReloadScriptsEvent&)
     {
+        try
+        {
+            reload_settings();
+        }
+        catch (const SettingsError& error)
+        {
+            error.log();
+        }
         sync_runtimes();
         return false;
     });
@@ -83,16 +88,23 @@ void ScriptingLayer::event(Event& event)
 
 std::vector<ScriptSource> ScriptingLayer::discover() const
 {
-    std::vector<ScriptFilePattern> patterns;
-    for (const UniquePtr<IScriptRuntime>& runtime : m_runtimes)
+    std::vector<ScriptFileExtension> extensions;
+    for (const IScriptRuntime* runtime : m_runtimes)
     {
-        for (const std::string& pattern : runtime->file_patterns())
+        for (const std::string& extension : runtime->file_extensions())
         {
-            patterns.push_back(ScriptFilePattern{ runtime->language(), pattern });
+            extensions.push_back(ScriptFileExtension{ runtime->language(), extension });
         }
     }
 
-    std::vector<ScriptSource> sources = discover_scripts(m_options, patterns);
+    ScriptDiscoveryOptions options = m_options;
+    const std::vector<std::filesystem::path>& configured = settings_of<ScriptSettings>().roots;
+    for (size_t i = 0; i < configured.size(); ++i)
+    {
+        options.roots.insert(options.roots.begin() + static_cast<std::ptrdiff_t>(i), configured[i].string());
+    }
+
+    std::vector<ScriptSource> sources = discover_scripts(options, extensions);
 
     if (m_runtimes.size() == 1)
     {
@@ -119,7 +131,7 @@ void ScriptingLayer::sync_runtimes()
 {
     std::vector<ScriptSource> sources = discover();
 
-    for (UniquePtr<IScriptRuntime>& runtime : m_runtimes)
+    for (IScriptRuntime* runtime : m_runtimes)
     {
         std::vector<const ScriptSource*> own_sources;
         for (const ScriptSource& source : sources)
@@ -130,7 +142,7 @@ void ScriptingLayer::sync_runtimes()
             }
         }
 
-        bool running = std::find(m_started.begin(), m_started.end(), runtime.get()) != m_started.end();
+        bool running = runtime->running();
         if (!running && own_sources.empty())
         {
             continue;
@@ -142,24 +154,13 @@ void ScriptingLayer::sync_runtimes()
         }
         else
         {
-            runtime->start();
-            m_started.push_back(runtime.get());
+            ScriptRuntimeRegistry::start(*runtime);
         }
 
         for (const ScriptSource* source : own_sources)
         {
             load_source(*runtime, *source, running);
         }
-    }
-}
-
-void ScriptingLayer::detach()
-{
-    while (!m_started.empty())
-    {
-        IScriptRuntime* runtime = m_started.back();
-        m_started.pop_back();
-        runtime->stop();
     }
 }
 

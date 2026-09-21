@@ -7,3 +7,6 @@
 [submodule "Oryx/vendor/pybind11"]
 	path = Oryx/vendor/pybind11
 	url = https://github.com/pybind/pybind11.git
+[submodule "Oryx/vendor/yaml-cpp"]
+	path = Oryx/vendor/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git

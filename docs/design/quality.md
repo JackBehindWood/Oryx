@@ -119,6 +119,21 @@ vectors (`missing_capabilities()`/`required_capabilities()`), `Registry::names()
 game-specific strategy-lookup redesign, and a runtime-configurable-capacity
 sibling to `SmallVector` (no current caller needs one).
 
+### Python adapter cost (2026-09)
+
+`tests/benchmark/bench_python_adapters.cpp` (built when Python is on; run `Tests --test-suite=benchmark --test-case="Benchmark: Python*,Benchmark: end-to-end*"`) times the C++ adapter around a Python `NimState` and Python strategies. Apple M3, CPython 3.11, median of runs; ns per call from C++ into Python:
+
+| Call | first implementation, Release | current, Release | current, Debug |
+| ---- | ----------------------------- | ---------------- | -------------- |
+| `legal_actions` | 298 | 153 | 280 |
+| `current_player` / `is_terminal` | 85 / 84 | 23 / 24 | 63 / 53 |
+| `outcome` | 281 | 99 | 540 |
+| `apply` / `undo` | 100 / 100 | 41 / 40 | 84 / 85 |
+| `decide` (Python strategy, first legal action) | 1232 | 513 | 6960 |
+| Python Monte Carlo on Python Nim, decisions/s | 730 | 1290 | 194 |
+
+The speed-up has two sources. The backend restructure removed per-call string building, the generic argument and result casting and the bound-method allocation: each scripted class gets a method table once (compile-time method sets, `PyObject_Vectorcall`) and results are converted through the C API. Then one measured cache: a scripted state remembers its last `legal_actions()` until its own `apply`/`undo`, because the legality check of `apply()` asked the script for the same list a moment after the strategy had (+17 to +18 % on Python Monte Carlo and on the end-to-end Python Nim batch). Measured and **not** kept because they are within run-to-run noise (1 to 4 %): skipping `PyGILState_Ensure` when the GIL is already held, and link-time optimisation of Release. A reusable `Context` was not tried, because it would make a stashed handle from an earlier `decide()` valid again. Debug is 2 to 5 times slower than Release for this path (pybind11 checks and unoptimised adapters), so changes are judged on Release. A Python-defined game or state stays the slow path (D22): C++ games with Python strategies and all-C++ batches are the fast ones.
+
 ## Parallelism
 
 Large-scale simulation is an important potential workload.

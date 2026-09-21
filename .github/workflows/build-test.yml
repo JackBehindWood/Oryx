@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    name: build (${{ matrix.os }}, python ${{ matrix.python }})
+    name: build (${{ matrix.os }}, python ${{ matrix.python }}, CPython ${{ matrix.py }})
     env:
       # Managed CPython ships a shared libpython, which the embedded scripting backend links.
       UV_PYTHON_PREFERENCE: only-managed
@@ -18,6 +18,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python: ["on", "off"]
+        py: ["3.11"]
+        include:
+          # Newest CPython: annotations are evaluated lazily from 3.14 on.
+          - os: ubuntu-latest
+            python: "on"
+            py: "3.14"
 
     steps:
     - uses: actions/checkout@v4
@@ -39,6 +45,9 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         brew install make
+
+    - name: Select CPython
+      run: echo "UV_PYTHON=${{ matrix.py }}" >> "$GITHUB_ENV"
 
     - name: Install dependencies
       run: uv sync

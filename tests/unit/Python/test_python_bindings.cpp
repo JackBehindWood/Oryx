@@ -11,7 +11,7 @@ using namespace oryx::test;
 TEST_CASE("oryx.log routes each level to the client logger without treating the text as a format string")
 {
     TempDir dir;
-    std::filesystem::path script = dir.write("log.oryx.py",
+    std::filesystem::path script = dir.write("log.py",
         "import oryx\n"
         "oryx.log.trace('t')\n"
         "oryx.log.info('i')\n"
@@ -29,7 +29,7 @@ TEST_CASE("oryx.log routes each level to the client logger without treating the 
 TEST_CASE("oryx.log.install bridges the standard logging module to the client logger")
 {
     TempDir dir;
-    std::filesystem::path script = dir.write("bridge.oryx.py",
+    std::filesystem::path script = dir.write("bridge.py",
         "import logging, oryx\n"
         "oryx.log.install()\n"
         "game = logging.getLogger('game')\n"
@@ -51,7 +51,7 @@ TEST_CASE("oryx.assertions.check passes silently and raises OryxAssertionError a
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("check.oryx.py", marker_prelude(marker) +
+    std::filesystem::path script = dir.write("check.py", marker_prelude(marker) +
         "import oryx\n"
         "oryx.assertions.check(True, 'fine')\n"
         "try:\n"
@@ -71,7 +71,7 @@ TEST_CASE("oryx.assertions.check passes silently and raises OryxAssertionError a
 TEST_CASE("an uncaught failed check surfaces from load as a ScriptError naming the exception")
 {
     TempDir dir;
-    std::filesystem::path script = dir.write("uncaught.oryx.py", "import oryx\noryx.assertions.check(False, 'nope')\n");
+    std::filesystem::path script = dir.write("uncaught.py", "import oryx\noryx.assertions.check(False, 'nope')\n");
 
     ClientLogCapture capture;
     RunningPython python;
@@ -92,7 +92,7 @@ TEST_CASE("oryx.log and oryx.assertions raise OryxError before Oryx is initialis
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("guard.oryx.py", marker_prelude(marker) +
+    std::filesystem::path script = dir.write("guard.py", marker_prelude(marker) +
         "import oryx\n"
         "for call in (lambda: oryx.log.info('x'), lambda: oryx.assertions.check(True)):\n"
         "    try:\n"
@@ -115,24 +115,26 @@ TEST_CASE("the Python exception types mirror the C++ error hierarchy")
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("hierarchy.oryx.py", marker_prelude(marker) +
+    std::filesystem::path script = dir.write("hierarchy.py", marker_prelude(marker) +
         "import oryx\n"
         "for kind in (oryx.ParamError, oryx.ScriptError, oryx.OryxAssertionError):\n"
         "    assert issubclass(kind, oryx.OryxError)\n"
         "assert issubclass(oryx.OryxError, Exception)\n"
+        "assert oryx.errors.OryxError is oryx.OryxError\n"
+        "assert oryx.simulation.Match is oryx.Match and oryx.registry.make_game is oryx.make_game and oryx.game.Game is oryx.Game and oryx.random.Random is oryx.Random\n"
         "mark(oryx.OryxError.__module__)\n");
 
     RunningPython python;
     python.load(script);
 
-    CHECK(read_file(marker) == "oryx");
+    CHECK(read_file(marker) == "oryx.errors");
 }
 
 TEST_CASE("the embedded module survives an interpreter restart")
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("again.oryx.py", marker_prelude(marker) + "import oryx\nmark('ok;')\n");
+    std::filesystem::path script = dir.write("again.py", marker_prelude(marker) + "import oryx\nmark('ok;')\n");
 
     for (int32_t i = 0; i < 2; ++i)
     {

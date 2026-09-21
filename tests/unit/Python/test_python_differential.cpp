@@ -165,8 +165,8 @@ TEST_CASE("a Python Nim and its C++ port produce identical batch results under i
 {
     ScopedCppNim cpp_nim;
     RunningPython python;
-    python.load(repo_file("Oasis/scripts/nim.oryx.py"));
-    python.load(repo_file("Oasis/scripts/monte_carlo.oryx.py"));
+    python.load(repo_file("Oasis/scripts/nim.py"));
+    python.load(repo_file("Oasis/scripts/monte_carlo.py"));
 
     const Config configs[] = {
         { 21, 3, "random", "random", 40 },
@@ -206,7 +206,7 @@ TEST_CASE("a Python Nim and its C++ port stay in lockstep through random play, a
 {
     ScopedCppNim cpp_nim;
     RunningPython python;
-    python.load(repo_file("Oasis/scripts/nim.oryx.py"));
+    python.load(repo_file("Oasis/scripts/nim.py"));
 
     for (int64_t max_take : { 2, 3, 5 })
     {

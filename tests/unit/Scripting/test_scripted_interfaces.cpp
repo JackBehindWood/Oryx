@@ -5,7 +5,7 @@
 namespace
 {
 
-const oryx::ScriptOrigin kOrigin{ "python", "nim", "scripts/nim.oryx.py" };
+const oryx::ScriptOrigin kOrigin{ "python", "nim", "scripts/nim.py" };
 
 class StubScriptedState : public oryx::IScriptedState
 {

@@ -13,6 +13,3 @@ name = "Oasis"
 
 [python]
 enabled = true
-
-[scripting]
-paths = []

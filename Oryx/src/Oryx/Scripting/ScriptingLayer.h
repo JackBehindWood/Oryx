@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Layer.h"
-#include "Oryx/Scripting/IScriptRuntime.h"
+#include "Oryx/Scripting/Interfaces/IScriptRuntime.h"
 #include "Oryx/Scripting/ScriptDiscovery.h"
 
 namespace oryx
@@ -11,10 +11,10 @@ class ScriptingLayer : public Layer
 {
 public:
     explicit ScriptingLayer(ScriptDiscoveryOptions options = {});
-    ScriptingLayer(ScriptDiscoveryOptions options, std::vector<UniquePtr<IScriptRuntime>> runtimes);
+    // Drives the runtimes without owning them (the registry owns real ones, tests own their fakes); oryx::shutdown() stops them.
+    ScriptingLayer(ScriptDiscoveryOptions options, std::vector<IScriptRuntime*> runtimes);
 
     void attach() override;
-    void detach() override;
     void event(Event& event) override;
 
 private:
@@ -22,8 +22,7 @@ private:
     void sync_runtimes();
 
     ScriptDiscoveryOptions m_options;
-    std::vector<UniquePtr<IScriptRuntime>> m_runtimes;
-    std::vector<IScriptRuntime*> m_started;
+    std::vector<IScriptRuntime*> m_runtimes;
 };
 
 } // namespace oryx

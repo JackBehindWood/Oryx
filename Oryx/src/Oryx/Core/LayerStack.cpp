@@ -7,6 +7,7 @@ namespace oryx
 
 LayerStack::~LayerStack()
 {
+    m_on_disabled = nullptr; // the owning Application is already being destroyed
     for (auto it = m_layers.rbegin(); it != m_layers.rend(); ++it)
     {
         Layer& layer = **it;
@@ -59,6 +60,11 @@ void LayerStack::invoke(Layer& layer, std::string_view phase, const std::functio
 
     layer.disable();
     OX_CORE_ERROR("Layer '{}' disabled after an error in {}().", layer.name(), phase);
+
+    if (m_on_disabled)
+    {
+        m_on_disabled(layer, phase);
+    }
 }
 
 } // namespace oryx

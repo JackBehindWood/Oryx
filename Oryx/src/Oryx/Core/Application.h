@@ -12,6 +12,10 @@ inline bool g_initialised = false;
 
 void init();
 
+// Hooks run once, in reverse registration order, from shutdown() - after the Application (and so every layer) is destroyed.
+void register_shutdown_hook(std::function<void()> hook);
+void shutdown();
+
 struct ApplicationCommandLineArgs
 {
     int32_t count = 0;
@@ -30,7 +34,17 @@ public:
     virtual ~Application();
 
     void run();
-    void close() { m_running = false; }
+
+    void close(int32_t exit_code = 0)
+    {
+        m_running = false;
+        if (m_exit_code == 0)
+        {
+            m_exit_code = exit_code;
+        }
+    }
+
+    [[nodiscard]] int32_t exit_code() const { return m_exit_code; }
 
     template<typename T, typename... Args>
     T& push_layer(Args&&... args) { return m_layer_stack.push_layer<T>(std::forward<Args>(args)...); }
@@ -46,8 +60,12 @@ protected:
     // Runs before the layer stack sees the event, so a concrete Application (not itself a Layer) can react to it.
     virtual void on_event(Event&) {}
 
+    // Runs after LayerStack disabled a layer that threw in attach/update/event; the default keeps the application running.
+    virtual void on_layer_disabled(Layer&, std::string_view /*phase*/) {}
+
 private:
     bool m_running = true;
+    int32_t m_exit_code = 0;
     LayerStack m_layer_stack;
 
     static Application* s_instance;

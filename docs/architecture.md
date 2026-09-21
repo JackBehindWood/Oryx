@@ -381,9 +381,37 @@ core-not-app placement (see [Roadmap](roadmap.md) Phases 6/9/11).
 
 `LayerStack` is also where errors are caught. It calls a layer's `attach()`,
 `update()`, `event()` and `detach()` through one guarded call: a layer that
-throws an `oryx::Error` is logged once and disabled, and the application and
-the other layers keep running. Code below the layer boundary throws and never
+throws an `oryx::Error` is logged once and disabled, and the other layers keep
+running. The `Application` is told through the virtual `on_layer_disabled()`
+hook (never during `detach`): the default carries on, and `OasisApp` closes
+with a non-zero exit code so a failed layer ends the run instead of leaving an
+empty update loop spinning. Code below the layer boundary throws and never
 catches ([Design: Error Handling](design/cpp-api.md#error-handling)).
+
+`main()` (`EntryPoint.h`) is the outermost boundary: `oryx::init()`, load the
+settings, create the `Application`, `run()`, destroy it, then
+`oryx::shutdown()`, which runs the registered shutdown hooks (for example
+stopping a script runtime) once every layer and object that depends on them is
+gone.
+
+### Settings
+
+A global, sectioned settings file read by C++. `--settings=<file>`, else the
+default file the application registered (`OX_REGISTER_DEFAULT_SETTINGS_FILE`;
+Oasis registers `Oasis/oryx.yaml`), else `oryx.yaml` in the working directory,
+holds one mapping per section; a missing default file means every section
+keeps its defaults, and there is no personal override layer. A module owns its section: it defines a default-constructible
+data struct and a `read_settings(T&, const SettingsNode&)` next to it and
+registers it with `OX_REGISTER_SETTINGS(Type, "name")`, in the same
+self-registering style as games, strategies and script runtimes (§10), so Core
+names no section. `settings_of<T>()` returns the current values; keys a reader
+never asks for, and sections nobody registered, are warned about
+automatically; a malformed file or a wrong value is a `SettingsError` and the
+previous values stay in place (also on `reload_settings()`). Scripting's
+`scripting:` section (`ScriptSettings::roots`) is the first user. The format is
+YAML through yaml-cpp, which is also the intended serialisation format (§14
+keeps the serialisation design open); the library's headers are private to
+`Core/Settings.cpp`.
 
 ---
 
@@ -867,7 +895,8 @@ The following should **not** be considered settled yet:
 * Python ownership/lifetime beyond the scripting layer's scoped rules
   (below): how a pure-Python host owns C++ objects handed back to it, and
   interpreter-finalisation ordering
-* Serialization
+* Serialization — YAML (yaml-cpp, already used by the settings system) is the
+  intended format; what is serialised, schemas and versioning are undecided
 * Graphics abstraction
 * Multi-threaded simulation model — explicitly deferred rather than merely
   unaddressed: Phase 5's batch runner is single-threaded by design

@@ -8,6 +8,7 @@
 #include "Oryx/Core/LayerStack.h"
 #include "Oryx/Core/Error.h"
 #include "Oryx/Core/Params.h"
+#include "Oryx/Core/Settings.h"
 #include "Oryx/Core/Random.h"
 #include "Oryx/Core/Registry.h"
 
@@ -42,3 +43,5 @@
 #include "Oryx/Simulation/SimulationLayer.h"
 
 #include "Oryx/Scripting/Scripting.h"
+#include "Oryx/Scripting/ScriptingLayer.h"
+

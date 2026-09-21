@@ -8,5 +8,6 @@
 -- `uv run build vendor add ... --kind static-lib`.
 
 IncludeDir = {}
+IncludeDir["yaml-cpp"] = "%{_MAIN_SCRIPT_DIR}/Oryx/vendor/yaml-cpp/include"
 IncludeDir["spdlog"] = "%{_MAIN_SCRIPT_DIR}/Oryx/vendor/spdlog/include"
 IncludeDir["pybind11"] = "%{_MAIN_SCRIPT_DIR}/Oryx/vendor/pybind11/include"

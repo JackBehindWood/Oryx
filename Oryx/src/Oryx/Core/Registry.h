@@ -39,7 +39,9 @@ public:
         {
             return nullptr;
         }
-        return entry->factory(resolve_params(name, entry->info.schema, params));
+        // A copy, because a factory may register entries and rehash the map that holds it.
+        Factory factory = entry->factory;
+        return factory(resolve_params(name, entry->info.schema, params));
     }
 
     [[nodiscard]] static bool has(const std::string& name)

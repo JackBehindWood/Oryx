@@ -229,7 +229,7 @@ def insert_static_lib_wiring(
     snippets = [
         f'include "{include_path}"  # in the root premake5.lua\'s group "Dependencies"',
         f'IncludeDir["{name}"] = "{includedir_expr}"  # in premake/dependencies.lua',
-        f'"%{{IncludeDir.{name}}}"  # add to {project}/premake5.lua\'s includedirs {{ ... }} block',
+        f'"%{{IncludeDir["{name}"]}}"  # add to {project}/premake5.lua\'s includedirs {{ ... }} block',
         f'"{name}"  # add to {project}/premake5.lua\'s links {{ ... }} block (create one if none exists)',
     ]
     snippets += [
@@ -245,7 +245,7 @@ def insert_static_lib_wiring(
     path = PROJECT_ROOT / project / "premake5.lua"
     text = path.read_text(encoding="utf-8")
 
-    with_includedirs = _insert_into_brace_list(text, "includedirs", f"%{{IncludeDir.{name}}}")
+    with_includedirs = _insert_into_brace_list(text, "includedirs", f"%{{IncludeDir['{name}']}}")
     if with_includedirs is None:
         return False, snippets
     text = with_includedirs

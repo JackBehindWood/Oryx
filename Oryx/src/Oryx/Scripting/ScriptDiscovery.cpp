@@ -9,8 +9,7 @@ namespace
 
 constexpr std::string_view kScriptFlag = "--script";
 constexpr std::string_view kModuleFlag = "--module";
-constexpr const char* kSearchPathVariable = "ORYX_SCRIPT_PATH";
-constexpr char kPathSeparator = std::filesystem::path::preferred_separator == '/' ? ':' : ';';
+constexpr std::string_view kRootFlag = "--script-root";
 
 void collect_flag_values(const ApplicationCommandLineArgs& args, std::string_view flag, std::vector<std::string>& out)
 {
@@ -23,6 +22,10 @@ void collect_flag_values(const ApplicationCommandLineArgs& args, std::string_vie
             {
                 out.emplace_back(args[++i]);
             }
+            else
+            {
+                OX_CORE_WARN("ScriptDiscovery: {} needs a value - ignoring it.", flag);
+            }
         }
         else if (arg.size() > flag.size() && arg.substr(0, flag.size()) == flag && arg[flag.size()] == '=')
         {
@@ -31,33 +34,16 @@ void collect_flag_values(const ApplicationCommandLineArgs& args, std::string_vie
     }
 }
 
-std::string extension_of(std::string_view pattern)
+std::string language_for(const std::filesystem::path& file, const std::vector<ScriptFileExtension>& extensions)
 {
-    size_t dot = pattern.rfind('.');
-    return dot == std::string_view::npos ? "" : std::string(pattern.substr(dot));
-}
-
-std::string language_for_file_name(const std::string& file_name, const std::vector<ScriptFilePattern>& patterns)
-{
-    for (const ScriptFilePattern& entry : patterns)
-    {
-        if (matches_pattern(file_name, entry.pattern))
-        {
-            return entry.language;
-        }
-    }
-    return "";
-}
-
-std::string language_for_extension(const std::string& extension, const std::vector<ScriptFilePattern>& patterns)
-{
+    std::string extension = file.extension().string();
     if (extension.empty())
     {
         return "";
     }
-    for (const ScriptFilePattern& entry : patterns)
+    for (const ScriptFileExtension& entry : extensions)
     {
-        if (extension_of(entry.pattern) == extension)
+        if (entry.extension == extension)
         {
             return entry.language;
         }
@@ -65,12 +51,12 @@ std::string language_for_extension(const std::string& extension, const std::vect
     return "";
 }
 
-std::filesystem::path resolve_path(const std::filesystem::path& root, const std::string& entry)
+std::filesystem::path resolve_path(const std::filesystem::path& base, const std::string& entry)
 {
     std::filesystem::path path(entry);
     if (path.is_relative())
     {
-        path = root / path;
+        path = base / path;
     }
 
     std::error_code error;
@@ -78,41 +64,34 @@ std::filesystem::path resolve_path(const std::filesystem::path& root, const std:
     return error ? path.lexically_normal() : canonical;
 }
 
-bool is_skipped_directory(const std::filesystem::path& directory)
+bool is_helper(const std::filesystem::path& path)
 {
-    std::string name = directory.filename().string();
-    if (name == ".git" || name == ".venv" || name == "venv" || name == "build" || name.starts_with("bin"))
-    {
-        return true;
-    }
-
-    std::error_code error;
-    return std::filesystem::exists(directory / "pyvenv.cfg", error);
+    std::string name = path.filename().string();
+    return name.starts_with('_') || name.starts_with('.');
 }
 
-std::vector<std::filesystem::path> scan_directory(const std::filesystem::path& directory,
-                                                  const std::vector<ScriptFilePattern>& patterns)
+bool is_inside(const std::filesystem::path& path, const std::filesystem::path& directory)
+{
+    std::filesystem::path relative = path.lexically_relative(directory);
+    return !relative.empty() && *relative.begin() != "..";
+}
+
+std::vector<std::filesystem::path> scripts_under(const std::filesystem::path& root, const std::vector<ScriptFileExtension>& extensions)
 {
     std::vector<std::filesystem::path> found;
-    if (patterns.empty())
-    {
-        return found;
-    }
-
     std::error_code error;
     std::filesystem::recursive_directory_iterator end;
-    std::filesystem::recursive_directory_iterator it(directory, std::filesystem::directory_options::skip_permission_denied, error);
+    std::filesystem::recursive_directory_iterator it(root, std::filesystem::directory_options::skip_permission_denied, error);
     for (; !error && it != end; it.increment(error))
     {
-        std::error_code entry_error;
-        if (it->is_directory(entry_error))
+        if (is_helper(it->path()))
         {
-            if (is_skipped_directory(it->path()))
-            {
-                it.disable_recursion_pending();
-            }
+            it.disable_recursion_pending();
+            continue;
         }
-        else if (it->is_regular_file(entry_error) && !language_for_file_name(it->path().filename().string(), patterns).empty())
+
+        std::error_code entry_error;
+        if (it->is_regular_file(entry_error) && !language_for(it->path(), extensions).empty())
         {
             found.push_back(it->path());
         }
@@ -122,20 +101,14 @@ std::vector<std::filesystem::path> scan_directory(const std::filesystem::path& d
     return found;
 }
 
-void add_source(std::vector<ScriptSource>& sources, std::vector<std::string>& seen, ScriptSourceKind kind, const std::string& target, const std::string& language)
+void add_file(std::vector<ScriptSource>& sources, const std::filesystem::path& file, const std::string& language, const std::filesystem::path& root)
 {
-    std::string key = (kind == ScriptSourceKind::Module ? "module:" : "file:") + target;
-    if (std::find(seen.begin(), seen.end(), key) != seen.end())
+    std::string target = file.string();
+    bool seen = std::any_of(sources.begin(), sources.end(), [&target](const ScriptSource& source) { return source.kind == ScriptSourceKind::File && source.target == target; });
+    if (!seen)
     {
-        return;
+        sources.push_back(ScriptSource{ ScriptSourceKind::File, target, language, root.string() });
     }
-    seen.push_back(key);
-    sources.push_back(ScriptSource{ kind, target, language });
-}
-
-void add_file(std::vector<ScriptSource>& sources, std::vector<std::string>& seen, const std::filesystem::path& path, const std::string& language)
-{
-    add_source(sources, seen, ScriptSourceKind::File, path.string(), language);
 }
 
 } // namespace
@@ -145,114 +118,53 @@ ScriptDiscoveryOptions script_options(const ApplicationCommandLineArgs& args)
     ScriptDiscoveryOptions options;
     collect_flag_values(args, kScriptFlag, options.script_files);
     collect_flag_values(args, kModuleFlag, options.modules);
-
-    const char* search_path = std::getenv(kSearchPathVariable);
-    if (search_path != nullptr)
-    {
-        options.search_paths = split_search_path(search_path);
-    }
+    collect_flag_values(args, kRootFlag, options.roots);
 
     std::error_code error;
     options.root = std::filesystem::current_path(error);
     return options;
 }
 
-std::vector<std::string> split_search_path(std::string_view search_path)
+std::vector<ScriptSource> discover_scripts(const ScriptDiscoveryOptions& options, const std::vector<ScriptFileExtension>& extensions)
 {
-    std::vector<std::string> entries;
-    size_t start = 0;
-    while (start <= search_path.size())
+    std::vector<std::filesystem::path> roots;
+    for (const std::string& entry : options.roots)
     {
-        size_t end = search_path.find(kPathSeparator, start);
-        if (end == std::string_view::npos)
+        std::filesystem::path root = resolve_path(options.root, entry);
+        std::error_code error;
+        if (!std::filesystem::is_directory(root, error))
         {
-            end = search_path.size();
+            OX_CORE_WARN("ScriptDiscovery: script root '{}' is not a directory - skipping it.", root.string());
+            continue;
         }
-        if (end > start)
+        if (std::find(roots.begin(), roots.end(), root) == roots.end())
         {
-            entries.emplace_back(search_path.substr(start, end - start));
-        }
-        start = end + 1;
-    }
-    return entries;
-}
-
-bool matches_pattern(std::string_view file_name, std::string_view pattern)
-{
-    constexpr size_t kNoStar = std::string_view::npos;
-    size_t name_index = 0;
-    size_t pattern_index = 0;
-    size_t star_index = kNoStar;
-    size_t star_match = 0;
-
-    while (name_index < file_name.size())
-    {
-        if (pattern_index < pattern.size() && pattern[pattern_index] == '*')
-        {
-            star_index = pattern_index++;
-            star_match = name_index;
-        }
-        else if (pattern_index < pattern.size() && pattern[pattern_index] == file_name[name_index])
-        {
-            ++pattern_index;
-            ++name_index;
-        }
-        else if (star_index != kNoStar)
-        {
-            pattern_index = star_index + 1;
-            name_index = ++star_match;
-        }
-        else
-        {
-            return false;
+            roots.push_back(root);
         }
     }
 
-    while (pattern_index < pattern.size() && pattern[pattern_index] == '*')
-    {
-        ++pattern_index;
-    }
-    return pattern_index == pattern.size();
-}
-
-std::vector<ScriptSource> discover_scripts(const ScriptDiscoveryOptions& options, const std::vector<ScriptFilePattern>& patterns)
-{
     std::vector<ScriptSource> sources;
-    std::vector<std::string> seen;
-
-    for (const std::string& file : options.script_files)
+    for (const std::string& entry : options.script_files)
     {
-        std::filesystem::path path = resolve_path(options.root, file);
-        add_file(sources, seen, path, language_for_extension(path.extension().string(), patterns));
+        std::filesystem::path file = resolve_path(options.root, entry);
+        auto owner = std::find_if(roots.begin(), roots.end(), [&file](const std::filesystem::path& root) { return is_inside(file, root); });
+        add_file(sources, file, language_for(file, extensions), owner == roots.end() ? file.parent_path() : *owner);
     }
 
     for (const std::string& module : options.modules)
     {
-        add_source(sources, seen, ScriptSourceKind::Module, module, "");
-    }
-
-    for (const std::string& entry : options.search_paths)
-    {
-        std::filesystem::path path = resolve_path(options.root, entry);
-        std::error_code error;
-        if (std::filesystem::is_directory(path, error))
+        bool seen = std::any_of(sources.begin(), sources.end(), [&module](const ScriptSource& source) { return source.kind == ScriptSourceKind::Module && source.target == module; });
+        if (!seen)
         {
-            for (const std::filesystem::path& found : scan_directory(path, patterns))
-            {
-                add_file(sources, seen, resolve_path(options.root, found.string()), language_for_file_name(found.filename().string(), patterns));
-            }
-        }
-        else
-        {
-            add_file(sources, seen, path, language_for_extension(path.extension().string(), patterns));
+            sources.push_back(ScriptSource{ ScriptSourceKind::Module, module, "", "" });
         }
     }
 
-    if (!options.root.empty())
+    for (const std::filesystem::path& root : roots)
     {
-        for (const std::filesystem::path& found : scan_directory(options.root, patterns))
+        for (const std::filesystem::path& file : scripts_under(root, extensions))
         {
-            add_file(sources, seen, resolve_path(options.root, found.string()), language_for_file_name(found.filename().string(), patterns));
+            add_file(sources, file, language_for(file, extensions), root);
         }
     }
 

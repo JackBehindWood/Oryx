@@ -7,24 +7,25 @@
 namespace oryx::test
 {
 
-// Swaps the client logger for one writing "<level>|<message>" lines into a string; restores it on destruction.
-class ClientLogCapture
+// Swaps a logger for one writing "<level>|<message>" lines into a string; restores it on destruction.
+class LogCapture
 {
 public:
-    ClientLogCapture()
-        : m_previous(Log::get_client_logger())
+    explicit LogCapture(std::shared_ptr<spdlog::logger>& target)
+        : m_target(target)
+        , m_previous(target)
     {
         std::shared_ptr<spdlog::sinks::ostream_sink_mt> sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(m_stream, true);
         sink->set_pattern("%l|%v");
         std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>("capture", sink);
         logger->set_level(spdlog::level::trace);
-        Log::get_client_logger() = logger;
+        m_target = logger;
     }
 
-    ~ClientLogCapture() { Log::get_client_logger() = m_previous; }
+    ~LogCapture() { m_target = m_previous; }
 
-    ClientLogCapture(const ClientLogCapture&) = delete;
-    ClientLogCapture& operator=(const ClientLogCapture&) = delete;
+    LogCapture(const LogCapture&) = delete;
+    LogCapture& operator=(const LogCapture&) = delete;
 
     [[nodiscard]] std::vector<std::string> lines() const
     {
@@ -39,7 +40,26 @@ public:
 
 private:
     std::ostringstream m_stream;
+    std::shared_ptr<spdlog::logger>& m_target;
     std::shared_ptr<spdlog::logger> m_previous;
+};
+
+class ClientLogCapture : public LogCapture
+{
+public:
+    ClientLogCapture()
+        : LogCapture(Log::get_client_logger())
+    {
+    }
+};
+
+class CoreLogCapture : public LogCapture
+{
+public:
+    CoreLogCapture()
+        : LogCapture(Log::get_core_logger())
+    {
+    }
 };
 
 // Makes is_initialised() false for the scope so init guards can be exercised.

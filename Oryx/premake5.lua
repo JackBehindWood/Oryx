@@ -12,11 +12,13 @@ project "Oryx"
     }
 
     includedirs {
+        "%{IncludeDir['yaml-cpp']}",
         "%{IncludeDir.spdlog}",
         "src"
     }
 
     links {
+        "yaml-cpp",
         "spdlog",
     }
 

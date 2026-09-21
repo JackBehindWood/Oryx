@@ -1,24 +1,49 @@
 #pragma once
 
-#include "PythonSupport.h"
+#include "Interop/PyMethods.h"
 
-#include "Oryx/Scripting/IScriptedGame.h"
-#include "Oryx/Scripting/IScriptedState.h"
-#include "Oryx/Scripting/IScriptedStrategy.h"
+#include "Oryx/Core/Params.h"
+#include "Oryx/Scripting/Interfaces/IScriptedGame.h"
+#include "Oryx/Scripting/Interfaces/IScriptedState.h"
+#include "Oryx/Scripting/Interfaces/IScriptedStrategy.h"
 
 namespace oryx::python
 {
 
-// Names a Python class's home: its module and, when it has one, the file that module was loaded from.
-[[nodiscard]] ScriptOrigin origin_of_class(const pybind11::handle& cls);
+// What every adapter shares: the script's object, its class's method table and where it came from.
+template<typename Set>
+class PyAdapter
+{
+protected:
+    PyAdapter(PyRef object, SharedPtr<const ScriptOrigin> origin)
+        : m_object(std::move(object))
+        , m_methods(load_methods())
+        , m_origin(std::move(origin))
+    {
+    }
 
-// Typed class fields (bool/int/float/str) become parameters; a class value is the default. Throws ScriptError for anything else.
-[[nodiscard]] ParamSchema schema_of_class(const pybind11::handle& cls);
+    template<FixedString Name, typename Result = void, typename... Args>
+    Result call(const Args&... args) const
+    {
+        return call_method<Set, Name, Result>(m_object, *m_methods, args...);
+    }
 
-class PyScriptedState : public IScriptedState
+    PyScriptObject m_object;
+    SharedPtr<const PyClassMethods> m_methods;
+    SharedPtr<const ScriptOrigin> m_origin;
+
+private:
+    [[nodiscard]] SharedPtr<const PyClassMethods> load_methods() const
+    {
+        PyGil gil;
+        return class_methods_for<Set>(m_object.get());
+    }
+};
+
+class PyScriptedState : public IScriptedState, private PyAdapter<StateMethods>
 {
 public:
-    PyScriptedState(pybind11::object state, SharedPtr<const ScriptOrigin> origin, size_t player_count);
+    PyScriptedState(PyRef state, SharedPtr<const ScriptOrigin> origin, size_t player_count);
 
     ActionList legal_actions() const override;
     void apply(ActionId action) override;
@@ -31,15 +56,16 @@ public:
     const ScriptOrigin& origin() const override { return *m_origin; }
 
 private:
-    ScriptObject m_state;
-    SharedPtr<const ScriptOrigin> m_origin;
     size_t m_player_count;
+    // Valid until apply() or undo(): a state changes only through them, and apply() legality-checks the list legal_actions() just returned.
+    mutable ActionList m_legal_actions;
+    mutable bool m_legal_actions_valid = false;
 };
 
-class PyScriptedGame : public IScriptedGame
+class PyScriptedGame : public IScriptedGame, private PyAdapter<GameMethods>
 {
 public:
-    PyScriptedGame(pybind11::object game, SharedPtr<const ScriptOrigin> origin, ParamSchema schema);
+    PyScriptedGame(PyRef game, SharedPtr<const ScriptOrigin> origin, ParamSchema schema);
 
     UniquePtr<IState> new_initial_state() const override;
     std::string name() const override { return m_name; }
@@ -49,48 +75,19 @@ public:
     const ParamSchema& param_schema() const override { return m_schema; }
 
 private:
-    ScriptObject m_game;
-    SharedPtr<const ScriptOrigin> m_origin;
     ParamSchema m_schema;
     std::string m_name;
-    int32_t m_num_players;
+    int32_t m_num_players = 0;
 };
 
-// What a Python strategy's decide() receives: valid only until decide() returns.
-class PyContext
+class PyScriptedStrategy : public IScriptedStrategy, private PyAdapter<StrategyMethods>
 {
 public:
-    explicit PyContext(const Context& context);
-
-    [[nodiscard]] SharedPtr<PyState> state() const;
-    [[nodiscard]] IActionFeatures* action_features() const;
-    void invalidate();
-
-private:
-    SharedPtr<PyState> m_state;
-    IActionFeatures* m_features;
-    bool m_valid = true;
-};
-
-class PyScriptedStrategy : public IScriptedStrategy
-{
-public:
-    PyScriptedStrategy(pybind11::object strategy, SharedPtr<const ScriptOrigin> origin);
+    PyScriptedStrategy(PyRef strategy, SharedPtr<const ScriptOrigin> origin);
 
     ActionId decide(const Context& context) override;
 
     const ScriptOrigin& origin() const override { return *m_origin; }
-
-private:
-    ScriptObject m_strategy;
-    SharedPtr<const ScriptOrigin> m_origin;
 };
-
-// Wrap an instance of a class deriving from oryx.Game / oryx.Strategy.
-[[nodiscard]] SharedPtr<IGame> adapt_game(const pybind11::object& instance);
-[[nodiscard]] SharedPtr<IStrategy> adapt_strategy(const pybind11::object& instance);
-
-[[nodiscard]] bool is_script_game(const pybind11::handle& value);
-[[nodiscard]] bool is_script_strategy(const pybind11::handle& value);
 
 } // namespace oryx::python

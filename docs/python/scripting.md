@@ -6,7 +6,7 @@ Python is on by default. Build with `--no-python` to leave it out; Oasis then ha
 
 ## Try it
 
-The repository ships two example scripts in `Oasis/scripts/`: Nim and a Monte Carlo strategy that plays both Nim and TicTacToe.
+The repository ships two example scripts in `Oasis/scripts/` (`nim.py` and `monte_carlo.py`): Nim and a Monte Carlo strategy that plays both Nim and TicTacToe. `Oasis/oryx.yaml` points Oasis at that directory.
 
 ```bash
 uv run build build run                                   # menu: pick a game, then an opponent
@@ -15,7 +15,7 @@ uv run build build run --game nim --simulate=monte-carlo,first-legal,20
 uv run build build run --simulate=monte-carlo,tictactoe/heuristic,20
 ```
 
-The menu prints each entry's description and its parameters with their defaults, for example `nim - Players alternate ... [stones=21, max_take=3]`.
+The menu prints each entry's description and its parameters with their defaults, for example `nim - Players alternate ... [stones=21, max_take=3]`. An entry with a required parameter (a typed field with no default) is left out of the menus, because Oasis cannot supply parameters yet; naming one with `--game` or `--opponent` reports which parameters it needs.
 
 ## A game
 
@@ -93,25 +93,33 @@ Because a strategy only uses the state interface, one script plays every game, w
 
 ## Where scripts are found
 
-Sources are combined and de-duplicated in this order:
+A script is a plain `.py` file under a **script root**. The roots come from the settings file, `oryx.yaml`. Oasis reads `Oasis/oryx.yaml` (relative to the working directory, which is the repository root), or the file named by `--settings=<file>`; an application that registers no file of its own gets `oryx.yaml` from the working directory. `Oasis/oryx.yaml` is:
 
-1. `--script <file>` and `--module <name>` on the command line.
-2. The `ORYX_SCRIPT_PATH` list of files and directories. `uv run build` sets it from `[scripting] paths` in `oryx.toml` and `oryx.local.toml`, and puts it in the generated VS Code launch configuration.
-3. A recursive scan of the working directory for `*.oryx.py`, skipping `.git`, virtual environments, `build/` and `bin*/`. Put a script anywhere in the repository and it is found with no configuration.
+```yaml
+scripting:
+  roots:
+    - scripts
+```
 
-The project root and the virtual environment's `site-packages` are on the interpreter's `sys.path`, so a script can import a helper module that sits in the project or a package you installed with `uv`.
+Relative entries are relative to the settings file. You can add roots for one run with `--script-root <dir>`, load a single file with `--script <file>` (a file outside every root is imported from its own directory), or import an installed module with `--module <name>`. Nothing is scanned when no root is configured, and a root that does not exist is warned about and skipped.
+
+Every `.py` file under a root is loaded, in path order, and imported by its real dotted name (`Oasis/scripts/nim.py` is `nim`, `scripts/deeper/alpha.py` is `deeper.alpha`). Each root is on `sys.path`, so scripts can import each other, and the virtual environment's `site-packages` is on it too, so a script can import a package you installed with `uv`. A file or directory whose name starts with `_` or `.` is a helper: other scripts can import it (`import _common`) but it is never loaded on its own.
+
+A script that a standard-library module or another root shadows (a `random.py`, or two roots that both define `nim.py`) is reported with the file and the module that won; rename the script. A script's name cannot contain a dot.
+
+A script also runs on its own with `python nim.py` when `oryx` is importable. The settings file is checked as it loads: an unknown section or key is warned about with its line, and a malformed file or a wrong value is reported and Oasis runs on the defaults.
 
 ## When a script goes wrong
 
-An exception in a script never takes Oasis down. A script that fails to import is logged with its Python traceback and skipped; the remaining scripts still load. A method that raises during a match ends that match with the traceback, and a strategy that returns an illegal action is reported the same way. Registering an id that already exists is an error unless the class asks for it with `id="nim", overwrite=True`; loading the same script again simply replaces its own entries.
+An exception in a script never takes Oasis down as an unresponsive process. A script that fails to import is logged with its Python traceback and skipped; the remaining scripts still load. A method that raises during a match ends that match: the traceback is logged and Oasis exits with a non-zero status (a strategy that returns an illegal action, including the invalid-action sentinel, is reported the same way, and a method that returns the wrong type says which method and which type). Registering an id that already exists is an error unless the class asks for it with `id="nim", overwrite=True`; loading the same script again replaces its own entries.
 
 ## Reloading
 
-Reloading re-runs discovery and loads every script again, so edited scripts take effect and new files appear; entries a script no longer defines disappear. It is triggered by posting a `ReloadScriptsEvent` to the application, which `ScriptingLayer` handles. Oasis has no command for it yet. Helper modules that a script imports are not re-imported.
+Reloading reloads the settings file, re-runs discovery and loads every script again, so edited scripts take effect, new files and new roots appear, and entries a script no longer defines disappear. Helper modules are imported again too, so what they register comes back. It is triggered by posting a `ReloadScriptsEvent` to the application, which `ScriptingLayer` handles; Oasis has no command for it yet. A script with an error is logged and its entries stay gone until it is fixed, while the others reload. An `oryx.yaml` that no longer parses keeps the previous settings.
 
 ## Speed
 
-A game or strategy written in Python is correct but slow inside a hot loop: every `apply`, `undo` and `legal_actions` call crosses from C++ into Python. C++ games with Python strategies, and batches where every participant is C++, stay on the fast path. Prototype in Python, then port to C++ behind the same id: the parameters and the registry id stay the same, so nothing that names the game changes, and running both under identical seeds and comparing the batch results shows whether the port agrees.
+A game or strategy written in Python is correct but slow inside a hot loop: every `apply`, `undo` and `legal_actions` call crosses from C++ into Python (tens of nanoseconds each, and `legal_actions` is remembered until the next `apply` or `undo`, so a state should change only through them). C++ games with Python strategies, and batches where every participant is C++, stay on the fast path. Prototype in Python, then port to C++ behind the same id: the parameters and the registry id stay the same, so nothing that names the game changes, and running both under identical seeds and comparing the batch results shows whether the port agrees.
 
 ## Not yet
 

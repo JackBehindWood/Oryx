@@ -26,24 +26,6 @@ newoption {
     description = "Python library to link, without the lib prefix or extension (e.g. python3.11)",
 }
 
-newoption {
-    trigger = "python-home",
-    value = "path",
-    description = "Prefix holding the interpreter's standard library, baked in as the embedded PYTHONHOME",
-}
-
-newoption {
-    trigger = "python-package-dir",
-    value = "path",
-    description = "Directory holding the pure-Python oryx package, baked in as the embedded sys.path entry",
-}
-
-newoption {
-    trigger = "python-site-packages",
-    value = "paths",
-    description = "Path-separator list of the venv's site-packages, baked in and appended to the embedded sys.path",
-}
-
 function pythonEnabled()
     return _OPTIONS["no-python"] == nil
 end
@@ -75,17 +57,14 @@ function useOryxPythonHeaders()
     }
 end
 
--- Baked into the backend so any binary linking Oryx can start the embedded interpreter with no env setup.
+-- The embedded interpreter's home and site-packages live in build/generated/PythonConfig.h (written by
+-- `uv run build`), so any binary linking Oryx can start it with no env setup; only PythonRuntime.cpp includes it.
 function useOryxPythonEmbedding()
     if not pythonEnabled() then
         return
     end
 
-    defines {
-        'OX_PYTHON_HOME="' .. requirePythonOption("python-home") .. '"',
-        'OX_PYTHON_PACKAGE_DIR="' .. requirePythonOption("python-package-dir") .. '"',
-        'OX_PYTHON_SITE_PACKAGES="' .. requirePythonOption("python-site-packages") .. '"',
-    }
+    includedirs { "%{wks.location}/generated" }
 end
 
 -- Whole-archive linking pulls the backend's libpython references into every consumer of Oryx.

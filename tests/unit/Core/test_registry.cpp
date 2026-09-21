@@ -2,6 +2,8 @@
 
 #include "Oryx.h"
 
+#include "unit/Game/DummyGame.h"
+
 namespace
 {
 
@@ -202,4 +204,27 @@ TEST_CASE("Registry<T>::unregister_factory removes a name and reports whether it
     CHECK_FALSE(DummyRegistry::has("dummy-temporary"));
     CHECK(DummyRegistry::create("dummy-temporary") == nullptr);
     CHECK_FALSE(DummyRegistry::unregister_factory("dummy-temporary"));
+}
+
+TEST_CASE("a factory may register and replace entries, including its own, while it runs")
+{
+    oryx::GameRegistry::register_factory("reentrant", [](const oryx::Params&) -> oryx::UniquePtr<oryx::IGame>
+    {
+        for (int32_t i = 0; i < 64; ++i)
+        {
+            oryx::GameRegistry::register_factory("reentrant-filler-" + std::to_string(i), [](const oryx::Params&) -> oryx::UniquePtr<oryx::IGame> { return nullptr; });
+        }
+        oryx::GameRegistry::register_factory("reentrant", [](const oryx::Params&) -> oryx::UniquePtr<oryx::IGame> { return nullptr; });
+        return oryx::create_unique<oryx::test::DummyGame>(3);
+    });
+
+    oryx::UniquePtr<oryx::IGame> game = oryx::GameRegistry::create("reentrant");
+    CHECK(game != nullptr);
+    CHECK(oryx::GameRegistry::create("reentrant") == nullptr);
+
+    oryx::GameRegistry::unregister_factory("reentrant");
+    for (int32_t i = 0; i < 64; ++i)
+    {
+        oryx::GameRegistry::unregister_factory("reentrant-filler-" + std::to_string(i));
+    }
 }

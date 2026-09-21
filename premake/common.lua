@@ -18,7 +18,7 @@ end
 -- without directly naming every concrete type (Oasis, Tests).
 function linkOryxWholeArchive()
     -- A project link (not just the linkoptions below) makes the executable relink whenever libOryx changes.
-    links { "Oryx" }
+    links { "Oryx", "yaml-cpp" }
 
     filter "system:windows"
         linkoptions { "/WHOLEARCHIVE:Oryx.lib" }

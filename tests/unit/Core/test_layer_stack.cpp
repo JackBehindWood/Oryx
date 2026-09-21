@@ -270,3 +270,37 @@ TEST_CASE("A layer that throws in detach does not stop the remaining layers from
 
     CHECK(log == std::vector<std::string>{ "B:detach", "F:detach", "A:detach" });
 }
+
+TEST_CASE("The disabled handler reports a layer that failed in attach, update or event, and never one that failed in detach")
+{
+    std::vector<std::string> log;
+    std::vector<std::string> reported;
+    {
+        oryx::LayerStack stack;
+        stack.set_disabled_handler([&reported](oryx::Layer& layer, std::string_view phase) { reported.push_back(layer.name() + ":" + std::string(phase)); });
+
+        stack.push_layer<FailingLayer>("AttachFail", log, Phase::Attach);
+        stack.push_layer<FailingLayer>("UpdateFail", log, Phase::Update);
+        stack.push_layer<FailingLayer>("EventFail", log, Phase::Event);
+        stack.push_layer<FailingLayer>("DetachFail", log, Phase::Detach);
+        stack.update();
+        NullEvent event;
+        stack.dispatch_event(event);
+
+        CHECK(reported == std::vector<std::string>{ "AttachFail:attach", "UpdateFail:update", "EventFail:event" });
+    }
+
+    CHECK(reported.size() == 3);
+}
+
+TEST_CASE("A healthy layer never reaches the disabled handler")
+{
+    std::vector<std::string> log;
+    bool called = false;
+    oryx::LayerStack stack;
+    stack.set_disabled_handler([&called](oryx::Layer&, std::string_view) { called = true; });
+    stack.push_layer<RecordingLayer>("A", log);
+    stack.update();
+
+    CHECK_FALSE(called);
+}

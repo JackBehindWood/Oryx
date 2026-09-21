@@ -18,10 +18,6 @@ int main(int argc, char** argv)
     context.applyCommandLine(argc, argv);
 
     int result = context.run();
-    if (context.shouldExit())
-    {
-        return result;
-    }
-
+    oryx::shutdown();
     return result;
 }

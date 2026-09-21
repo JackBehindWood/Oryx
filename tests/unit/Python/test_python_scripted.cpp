@@ -82,7 +82,7 @@ const char* const kMonteCarlo =
     "            state.undo(action)\n"
     "        return reward\n";
 
-std::string run_script(const std::string& body, const std::string& file_name = "nim.oryx.py")
+std::string run_script(const std::string& body, const std::string& file_name = "nim.py")
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
@@ -118,12 +118,12 @@ TEST_CASE("a class deriving from oryx.Game registers with a schema built from it
         "info = oryx.describe_game('nim')\n"
         "mark(info['description'] + '|' + str(info['params']) + '|')\n"
         "origin = info['origin']\n"
-        "mark(origin['language'] + '|' + origin['module'] + '|' + str(origin['source_file'].endswith('nim.oryx.py')))\n"));
+        "mark(origin['language'] + '|' + origin['module'] + '|' + str(origin['source_file'].endswith('nim.py')))\n"));
 
     CHECK(output ==
           "Take turns removing stones; the last taker wins.|"
-          "[{'name': 'stones', 'type': 'int', 'description': '', 'default': 21}, {'name': 'max_take', 'type': 'int', 'description': '', 'default': 3}]|"
-          "python|oryx_script_nim|True");
+          "[{'name': 'stones', 'type': 'int', 'description': '', 'required': False, 'default': 21}, {'name': 'max_take', 'type': 'int', 'description': '', 'required': False, 'default': 3}]|"
+          "python|nim|True");
 }
 
 TEST_CASE("make_game builds a Python game from keyword parameters and validates them")
@@ -190,15 +190,15 @@ TEST_CASE("the Oasis example scripts register Nim and a Monte Carlo strategy tha
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path check = dir.write("check.oryx.py", marker_prelude(marker) +
+    std::filesystem::path check = dir.write("check.py", marker_prelude(marker) +
         "import oryx\n"
         "nim = oryx.simulate('nim', ['monte-carlo', 'first-legal'], games=10)\n"
         "tictactoe = oryx.simulate('tictactoe', ['monte-carlo', 'first-legal'], games=10)\n"
         "mark(f'{nim.wins[0]}|{tictactoe.wins[0]}|' + oryx.describe_game('nim')['origin']['source_file'])\n");
 
     RunningPython python;
-    python.load(repo_file("Oasis/scripts/nim.oryx.py"));
-    python.load(repo_file("Oasis/scripts/monte_carlo.oryx.py"));
+    python.load(repo_file("Oasis/scripts/nim.py"));
+    python.load(repo_file("Oasis/scripts/monte_carlo.py"));
     python.load(check);
 
     std::string output = read_file(marker);
@@ -207,7 +207,7 @@ TEST_CASE("the Oasis example scripts register Nim and a Monte Carlo strategy tha
     REQUIRE(second != std::string::npos);
     CHECK(std::stoi(output.substr(0, first)) >= 8);
     CHECK(std::stoi(output.substr(first + 1, second - first - 1)) >= 8);
-    CHECK(output.find("Oasis/scripts/nim.oryx.py") != std::string::npos);
+    CHECK(output.find("Oasis/scripts/nim.py") != std::string::npos);
 }
 
 TEST_CASE("a strategy's parameters are set before __init__ runs and simulate seeds strategies that declare seed")
@@ -220,7 +220,7 @@ TEST_CASE("a strategy's parameters are set before __init__ runs and simulate see
 
     CHECK(output ==
           "True|True|"
-          "[{'name': 'playouts', 'type': 'int', 'description': '', 'default': 30}, {'name': 'seed', 'type': 'int', 'description': '', 'default': 1}]");
+          "[{'name': 'playouts', 'type': 'int', 'description': '', 'required': False, 'default': 30}, {'name': 'seed', 'type': 'int', 'description': '', 'required': False, 'default': 1}]");
 }
 
 TEST_CASE("re-running the same script replaces its entries; another origin needs overwrite=True")
@@ -228,7 +228,7 @@ TEST_CASE("re-running the same script replaces its entries; another origin needs
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
     std::string report = "mark(str(oryx.describe_game('nim')['params'][0]['default']) + ';')\n";
-    std::filesystem::path script = dir.write("nim.oryx.py", marker_prelude(marker) + kNim + report);
+    std::filesystem::path script = dir.write("nim.py", marker_prelude(marker) + kNim + report);
 
     RunningPython python;
     python.load(script);
@@ -236,13 +236,13 @@ TEST_CASE("re-running the same script replaces its entries; another origin needs
 
     std::string edited = kNim;
     edited.replace(edited.find("stones: int = 21"), std::string("stones: int = 21").size(), "stones: int = 5");
-    dir.write("nim.oryx.py", marker_prelude(marker) + edited + report);
-    python.load(script);
+    dir.write("nim.py", marker_prelude(marker) + edited + report);
+    python.reload(script);
     CHECK(read_file(marker) == "21;5;");
     std::vector<std::string> names = GameRegistry::names();
     CHECK(std::count(names.begin(), names.end(), "nim") == 1);
 
-    std::filesystem::path rival = dir.write("rival.oryx.py",
+    std::filesystem::path rival = dir.write("rival.py",
         "import oryx\n"
         "class Rival(oryx.Game, id='nim'):\n"
         "    num_players = 2\n"
@@ -254,10 +254,10 @@ TEST_CASE("re-running the same script replaces its entries; another origin needs
     }
     catch (const ScriptError& error)
     {
-        CHECK(error.traceback().find("the game 'nim' is already registered by python module 'oryx_script_nim'") != std::string::npos);
+        CHECK(error.traceback().find("the game 'nim' is already registered by python module 'nim'") != std::string::npos);
     }
 
-    std::filesystem::path forced = dir.write("forced.oryx.py", marker_prelude(marker) +
+    std::filesystem::path forced = dir.write("forced.py", marker_prelude(marker) +
         "import oryx\n"
         "class Forced(oryx.Game, id='nim', overwrite=True):\n"
         "    num_players = 2\n"
@@ -265,13 +265,13 @@ TEST_CASE("re-running the same script replaces its entries; another origin needs
         "mark(oryx.describe_game('nim')['origin']['module'])\n");
     python.load(forced);
 
-    CHECK(read_file(marker) == "21;5;oryx_script_forced");
+    CHECK(read_file(marker) == "21;5;forced");
 }
 
 TEST_CASE("a script cannot silently replace a C++ game")
 {
     TempDir dir;
-    std::filesystem::path script = dir.write("clash.oryx.py",
+    std::filesystem::path script = dir.write("clash.py",
         "import oryx\n"
         "class Impostor(oryx.Game, id='tictactoe'):\n"
         "    num_players = 2\n"
@@ -409,6 +409,197 @@ TEST_CASE("the lent context exposes the game's action features")
     CHECK(output == "[1, 2];");
 }
 
+TEST_CASE("a state class missing a required method is reported when the state is created, naming the method")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class Broken(oryx.Game, id='broken'):\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return BrokenState()\n"
+        "class BrokenState:\n"
+        "    def apply(self, action): pass\n"
+        "try:\n"
+        "    oryx.make_game('broken').new_initial_state()\n"
+        "except oryx.ScriptError as e:\n"
+        "    mark(str(e))\n");
+
+    CHECK(output == "state class 'BrokenState' must define legal_actions()");
+}
+
+TEST_CASE("a script method returning the wrong type is a ScriptError naming the method and the type")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class Wrong(oryx.Game, id='wrong'):\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return WrongState()\n"
+        "class WrongState(oryx.State):\n"
+        "    def legal_actions(self): return 'nope'\n"
+        "    def apply(self, action): pass\n"
+        "    def undo(self, action): pass\n"
+        "    def current_player(self): return 'zero'\n"
+        "    def is_terminal(self): return []\n"
+        "    def outcome(self): return [0.0, 0.0]\n"
+        "state = oryx.make_game('wrong').new_initial_state()\n"
+        "for call in (state.legal_actions, state.current_player, state.is_terminal):\n"
+        "    try:\n"
+        "        call()\n"
+        "    except oryx.ScriptError as e:\n"
+        "        mark(str(e) + ';')\n");
+
+    CHECK(output ==
+          "state.legal_actions(): expected a sequence of ints, got str;"
+          "state.current_player(): expected an int, got str;"
+          "state.is_terminal(): expected a bool, got list;");
+}
+
+TEST_CASE("action features stashed by a strategy cannot be used after decide() returns")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "stash = {}\n"
+        "class Keeper(oryx.Strategy, id='keeper'):\n"
+        "    def decide(self, context):\n"
+        "        stash['features'] = context.action_features\n"
+        "        mark(str(stash['features'].decode(5)) + ';')\n"
+        "        return context.state.legal_actions()[0]\n"
+        "match = oryx.Match('tictactoe', ['keeper', 'first-legal'])\n"
+        "match.decide()\n"
+        "try:\n"
+        "    stash['features'].decode(5)\n"
+        "except oryx.OryxError as e:\n"
+        "    mark(str(e))\n");
+
+    CHECK(output == "[1, 2];this action features is no longer valid: it was only lent to the strategy for the duration of decide()");
+}
+
+TEST_CASE("a game without action features gives the strategy None")
+{
+    std::string output = run_script(with_nim(
+        "class Peek(oryx.Strategy, id='peek'):\n"
+        "    def decide(self, context):\n"
+        "        mark(str(context.action_features))\n"
+        "        return context.state.legal_actions()[0]\n"
+        "oryx.Match('nim', ['peek', 'first-legal']).decide()\n"));
+
+    CHECK(output == "None");
+}
+
+TEST_CASE("a Python strategy returning the invalid-action sentinel is a ScriptError")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class Sentinel(oryx.Strategy, id='sentinel'):\n"
+        "    def decide(self, context): return 4294967295\n"
+        "match = oryx.Match('tictactoe', ['sentinel', 'first-legal'])\n"
+        "try:\n"
+        "    match.play()\n"
+        "except oryx.ScriptError as e:\n"
+        "    mark(str(e))\n");
+
+    CHECK(output == "strategy.decide() returned an illegal action: action 4294967295 is not legal in this state");
+}
+
+TEST_CASE("a game whose new_initial_state returns something that is not a state fails with a ScriptError naming it")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class NoState(oryx.Game, id='no-state'):\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return None\n"
+        "try:\n"
+        "    oryx.make_game('no-state').new_initial_state()\n"
+        "except oryx.ScriptError as e:\n"
+        "    mark(str(e))\n");
+
+    CHECK(output == "game.new_initial_state(): expected a state, got NoneType");
+}
+
+TEST_CASE("register_game rejects a factory that is not callable, and a class that gives an empty id")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "for attempt in (lambda: oryx.register_game('bad-factory', 42),\n"
+        "                lambda: exec(\"class E(oryx.Game, id=''):\\n    num_players = 2\\n    def new_initial_state(self): pass\", {'oryx': oryx})):\n"
+        "    try:\n"
+        "        attempt()\n"
+        "    except oryx.ScriptError as e:\n"
+        "        mark(str(e) + ';')\n");
+
+    CHECK(output ==
+          "the factory for the game 'bad-factory' must be callable, got 'int';"
+          "class E: id cannot be empty;");
+}
+
+TEST_CASE("parameters accept any object that behaves as an int or a float, such as a numpy scalar")
+{
+    std::string output = run_script(with_nim(
+        "class Index:\n"
+        "    def __index__(self): return 7\n"
+        "class Real:\n"
+        "    def __float__(self): return 2.5\n"
+        "class Scaled(oryx.Game, id='scaled'):\n"
+        "    scale: float = 1.0\n"
+        "    stones: int = 3\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return None\n"
+        "game = oryx.make_game('nim', stones=Index())\n"
+        "mark(str(len(game.new_initial_state().legal_actions())) + '|')\n"
+        "oryx.make_game('scaled', scale=Real(), stones=Index())\n"));
+
+    CHECK(output == "3|");
+}
+
+TEST_CASE("string annotations, as produced by `from __future__ import annotations`, still declare parameters")
+{
+    TempDir dir;
+    std::filesystem::path marker = dir.path() / "marker.txt";
+    std::filesystem::path script = dir.write("lazy.py",
+        "from __future__ import annotations\n" + marker_prelude(marker) +
+        "import oryx\n"
+        "class Lazy(oryx.Game, id='lazy'):\n"
+        "    stones: int = 4\n"
+        "    label: str\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return None\n"
+        "mark(str([(p['name'], p['type'], p['required']) for p in oryx.describe_game('lazy')['params']]))\n");
+
+    RunningPython python;
+    python.load(script);
+
+    CHECK(read_file(marker) == "[('stones', 'int', False), ('label', 'string', True)]");
+}
+
+TEST_CASE("legal_actions is asked of the script once per position: apply's legality check reuses it, apply and undo refresh it")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "calls = [0]\n"
+        "class Counting(oryx.Game, id='counting'):\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return CountingState()\n"
+        "class CountingState(oryx.State):\n"
+        "    def __init__(self): self.stones = 5\n"
+        "    def legal_actions(self):\n"
+        "        calls[0] += 1\n"
+        "        return [1, 2] if self.stones > 1 else [1]\n"
+        "    def apply(self, action): self.stones -= action\n"
+        "    def undo(self, action): self.stones += action\n"
+        "    def current_player(self): return 0\n"
+        "    def is_terminal(self): return self.stones == 0\n"
+        "    def outcome(self): return [0.0, 0.0]\n"
+        "state = oryx.make_game('counting').new_initial_state()\n"
+        "state.legal_actions(); state.legal_actions()\n"
+        "mark(str(calls[0]))\n"
+        "state.apply(2)\n"
+        "mark(str(calls[0]))\n"
+        "mark(str(state.legal_actions()) + str(calls[0]))\n"
+        "state.undo(2)\n"
+        "mark(str(state.legal_actions()) + str(calls[0]))\n");
+
+    CHECK(output == "11" "[1, 2]2" "[1, 2]3");
+}
+
 TEST_CASE("oryx.State supplies a default action_to_string")
 {
     std::string output = run_script(
@@ -440,15 +631,33 @@ TEST_CASE("register_game and register_strategy register factory functions with p
         "    mark(str(e))\n"));
 
     CHECK(output ==
-          "Small nim[{'name': 'stones', 'type': 'int', 'description': '', 'default': 7}, {'name': 'label', 'type': 'string', 'description': ''}]oryx_script_nim|"
+          "Small nim[{'name': 'stones', 'type': 'int', 'description': '', 'required': False, 'default': 7}, {'name': 'label', 'type': 'string', 'description': '', 'required': True}]nim|"
           "[1, 2, 3]|"
           "'nim-small': parameter 'label' is required");
+}
+
+TEST_CASE("a typed field without a class value is a required parameter that make_game enforces")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class Needy(oryx.Game, id='needy'):\n"
+        "    stones: int\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return None\n"
+        "mark(str(oryx.describe_game('needy')['params'][0]['required']) + '|')\n"
+        "try:\n"
+        "    oryx.make_game('needy')\n"
+        "except oryx.ParamError as e:\n"
+        "    mark(str(e))\n");
+
+    CHECK(output == "True|'needy': parameter 'stones' is required");
+    CHECK(GameRegistry::has("needy") == false);
 }
 
 TEST_CASE("script entries are removed when the runtime stops, and come back on the next start")
 {
     TempDir dir;
-    std::filesystem::path script = dir.write("nim.oryx.py", kNim);
+    std::filesystem::path script = dir.write("nim.py", kNim);
 
     {
         RunningPython python;

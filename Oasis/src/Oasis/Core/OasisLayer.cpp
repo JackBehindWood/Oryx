@@ -42,6 +42,20 @@ std::string joined(const std::vector<std::string>& names)
     return result;
 }
 
+bool needs_params(const oryx::EntryInfo* info)
+{
+    return info != nullptr && !oryx::required_param_names(info->schema).empty();
+}
+
+// Oasis has no way to supply parameters yet, so an entry with required ones cannot be created.
+void require_creatable(const char* what, const std::string& name, const oryx::EntryInfo* info)
+{
+    if (needs_params(info))
+    {
+        throw oryx::Error(std::string(what) + " '" + name + "' has required parameters (" + joined(oryx::required_param_names(info->schema)) + ") that Oasis cannot supply yet");
+    }
+}
+
 // A strategy named "<game>/<name>" only understands that game's states; unprefixed strategies play anything.
 bool fits_game(const std::string& strategy, const std::string& game)
 {
@@ -54,7 +68,7 @@ std::vector<std::string> strategies_for(const std::string& game)
     std::vector<std::string> names;
     for (const std::string& name : oryx::StrategyRegistry::names())
     {
-        if (fits_game(name, game))
+        if (fits_game(name, game) && !needs_params(oryx::StrategyRegistry::info(name)))
         {
             names.push_back(name);
         }
@@ -86,6 +100,15 @@ std::string display(const oryx::ParamValue& value)
     }, value);
 }
 
+std::string describe_param(const oryx::ParamSpec& spec)
+{
+    if (spec.has_default)
+    {
+        return spec.name + "=" + display(spec.default_value);
+    }
+    return spec.name + (spec.required ? " (required)" : " (no default)");
+}
+
 std::string describe_entry(const std::string& name, const oryx::EntryInfo* info)
 {
     std::string line = "  " + name;
@@ -102,7 +125,7 @@ std::string describe_entry(const std::string& name, const oryx::EntryInfo* info)
     std::string params;
     for (const oryx::ParamSpec& spec : info->schema)
     {
-        params += (params.empty() ? "" : ", ") + spec.name + (spec.has_default ? "=" + display(spec.default_value) : " (no default)");
+        params += (params.empty() ? "" : ", ") + describe_param(spec);
     }
     return params.empty() ? line : line + " [" + params + "]";
 }
@@ -179,7 +202,14 @@ bool OasisLayer::on_simulation_complete(const oryx::SimulationCompleteEvent& eve
 
 bool OasisLayer::choose_game(std::string& out_name) const
 {
-    std::vector<std::string> names = sorted(oryx::GameRegistry::names());
+    std::vector<std::string> names;
+    for (const std::string& name : sorted(oryx::GameRegistry::names()))
+    {
+        if (!needs_params(oryx::GameRegistry::info(name)))
+        {
+            names.push_back(name);
+        }
+    }
 
     if (!m_game_arg.empty())
     {
@@ -188,13 +218,14 @@ bool OasisLayer::choose_game(std::string& out_name) const
             OX_ERROR("Unknown --game '{}' — registered games: {}.", m_game_arg, joined(names));
             return false;
         }
+        require_creatable("game", m_game_arg, oryx::GameRegistry::info(m_game_arg));
         out_name = m_game_arg;
         return true;
     }
 
     if (names.empty())
     {
-        OX_ERROR("No game is registered.");
+        OX_ERROR("No game without required parameters is registered.");
         return false;
     }
 
@@ -253,6 +284,9 @@ void OasisLayer::attach_simulate(const std::string& game_name, UniquePtr<IGame> 
     std::string strategy_b_name = m_simulate_arg.substr(first_comma + 1, second_comma - first_comma - 1);
     std::string count_string = m_simulate_arg.substr(second_comma + 1);
 
+    require_creatable("strategy", strategy_a_name, oryx::StrategyRegistry::info(strategy_a_name));
+    require_creatable("strategy", strategy_b_name, oryx::StrategyRegistry::info(strategy_b_name));
+
     std::vector<std::string> available = strategies_for(game_name);
     bool known = std::find(available.begin(), available.end(), strategy_a_name) != available.end() &&
                  std::find(available.begin(), available.end(), strategy_b_name) != available.end();
@@ -305,11 +339,15 @@ void OasisLayer::attach_interactive(const std::string& game_name, UniquePtr<IGam
             return;
         }
     }
-    else if (std::find(opponents.begin(), opponents.end(), opponent_name) == opponents.end())
+    else
     {
-        OX_ERROR("Unknown --opponent '{}' for '{}' — must be one of: {}.", opponent_name, game_name, joined(opponents));
-        oryx::Application::Get().close();
-        return;
+        require_creatable("opponent", opponent_name, oryx::StrategyRegistry::info(opponent_name));
+        if (std::find(opponents.begin(), opponents.end(), opponent_name) == opponents.end())
+        {
+            OX_ERROR("Unknown --opponent '{}' for '{}' — must be one of: {}.", opponent_name, game_name, joined(opponents));
+            oryx::Application::Get().close();
+            return;
+        }
     }
 
     bool tic_tac_toe = game_name == kTicTacToe;

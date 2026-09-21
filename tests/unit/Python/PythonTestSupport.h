@@ -4,12 +4,20 @@
 
 #ifdef OX_ENABLE_PYTHON
 
+namespace oryx::python
+{
+
+// Defined in the private Python backend (Oryx/backends/Python), which Tests does not include.
+[[nodiscard]] int64_t live_script_objects();
+
+} // namespace oryx::python
+
 namespace oryx::test
 {
 
 inline ScriptSource file_source(const std::filesystem::path& file)
 {
-    return ScriptSource{ ScriptSourceKind::File, file.string(), "python" };
+    return ScriptSource{ ScriptSourceKind::File, file.string(), "python", file.parent_path().string() };
 }
 
 inline ScriptSource module_source(const std::string& name)
@@ -67,6 +75,7 @@ public:
     RunningPython& operator=(const RunningPython&) = delete;
 
     void load(const std::filesystem::path& file) { m_runtime->load(file_source(file)); }
+    void reload(const std::filesystem::path& file) { m_runtime->reload(file_source(file)); }
 
 private:
     UniquePtr<IScriptRuntime> m_runtime;

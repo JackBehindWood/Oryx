@@ -60,6 +60,11 @@ void OasisApp::on_event(oryx::Event& event)
     dispatcher.dispatch<oryx::StartSimulationEvent>(OX_BIND_EVENT_FN(on_start_simulation));
 }
 
+void OasisApp::on_layer_disabled(oryx::Layer&, std::string_view)
+{
+    close(1);
+}
+
 bool OasisApp::on_start_simulation(oryx::StartSimulationEvent& event)
 {
     push_layer<oryx::SimulationLayer>(event.benchmark());

@@ -9,7 +9,6 @@ namespace oryx
 using ParamValue = std::variant<bool, int64_t, double, std::string>;
 using Params = std::map<std::string, ParamValue>;
 
-// Enumerator order matches ParamValue's alternatives.
 enum class ParamType
 {
     Bool,
@@ -18,6 +17,12 @@ enum class ParamType
     String
 };
 
+static_assert(std::variant_size_v<ParamValue> == 4);
+static_assert(std::is_same_v<std::variant_alternative_t<static_cast<size_t>(ParamType::Bool), ParamValue>, bool>);
+static_assert(std::is_same_v<std::variant_alternative_t<static_cast<size_t>(ParamType::Int), ParamValue>, int64_t>);
+static_assert(std::is_same_v<std::variant_alternative_t<static_cast<size_t>(ParamType::Double), ParamValue>, double>);
+static_assert(std::is_same_v<std::variant_alternative_t<static_cast<size_t>(ParamType::String), ParamValue>, std::string>);
+
 struct ParamSpec
 {
     std::string name;
@@ -25,6 +30,7 @@ struct ParamSpec
     ParamValue default_value;
     bool has_default = false;
     std::string description;
+    bool required = false;
 };
 
 using ParamSchema = std::vector<ParamSpec>;
@@ -54,6 +60,9 @@ private:
 [[nodiscard]] ParamSpec double_param(std::string name, double default_value, std::string description = "");
 [[nodiscard]] ParamSpec string_param(std::string name, std::string default_value, std::string description = "");
 [[nodiscard]] ParamSpec param_without_default(std::string name, ParamType type, std::string description = "");
+[[nodiscard]] ParamSpec required_param(std::string name, ParamType type, std::string description = "");
+
+[[nodiscard]] std::vector<std::string> required_param_names(const ParamSchema& schema);
 
 [[nodiscard]] Params resolve_params(const std::string& entry, const ParamSchema& schema, const Params& provided);
 

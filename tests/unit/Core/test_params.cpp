@@ -53,6 +53,47 @@ TEST_CASE("resolve_params leaves a param without a default absent unless it is s
     CHECK(oryx::get_param<int64_t>(supplied, "seed") == 7);
 }
 
+TEST_CASE("resolve_params rejects a missing required param and accepts it once supplied")
+{
+    oryx::ParamSchema schema = { oryx::int_param("stones", 21), oryx::required_param("label", oryx::ParamType::String) };
+
+    CHECK(error_message(schema, {}) == "'nim': parameter 'label' is required");
+
+    oryx::Params resolved = oryx::resolve_params("nim", schema, { { "label", std::string("x") } });
+    CHECK(oryx::get_param<std::string>(resolved, "label") == "x");
+    CHECK(oryx::get_param<int64_t>(resolved, "stones") == 21);
+}
+
+TEST_CASE("resolve_params reports a mistyped required param before it reports a missing one")
+{
+    oryx::ParamSchema schema = { oryx::required_param("a", oryx::ParamType::Int), oryx::required_param("b", oryx::ParamType::Int) };
+
+    CHECK(error_message(schema, { { "a", std::string("x") } }) == "'nim': parameter 'a' expects int but got string");
+    CHECK(error_message(schema, { { "a", int64_t{ 1 } } }) == "'nim': parameter 'b' is required");
+}
+
+TEST_CASE("required_param is required, param_without_default is optional, and neither has a default")
+{
+    oryx::ParamSpec required = oryx::required_param("a", oryx::ParamType::Bool, "doc");
+    oryx::ParamSpec optional = oryx::param_without_default("b", oryx::ParamType::Bool);
+
+    CHECK(required.required);
+    CHECK_FALSE(required.has_default);
+    CHECK(required.description == "doc");
+    CHECK_FALSE(optional.required);
+    CHECK_FALSE(optional.has_default);
+    CHECK_FALSE(oryx::int_param("c", 1).required);
+}
+
+TEST_CASE("required_param_names lists only the required params, in schema order")
+{
+    oryx::ParamSchema schema = { oryx::required_param("z", oryx::ParamType::Int), oryx::int_param("m", 1), oryx::param_without_default("n", oryx::ParamType::Int), oryx::required_param("a", oryx::ParamType::Bool) };
+
+    CHECK(oryx::required_param_names(schema) == std::vector<std::string>{ "z", "a" });
+    CHECK(oryx::required_param_names(nim_schema()).empty());
+    CHECK(oryx::required_param_names({}).empty());
+}
+
 TEST_CASE("resolve_params lets supplied values override defaults")
 {
     oryx::Params resolved = oryx::resolve_params("nim", nim_schema(), { { "stones", int64_t{ 15 } }, { "label", std::string("custom") } });
