@@ -9,6 +9,7 @@
 #include "Oryx/Scripting/IScriptedGame.h"
 #include "Oryx/Scripting/IScriptedState.h"
 #include "Oryx/Scripting/IScriptedStrategy.h"
+#include "Oryx/Scripting/ScriptRegistry.h"
 #include "Oryx/Scripting/ScriptingLayer.h"
 #include "Oryx/Scripting/InitGuard.h"
 #include "Oryx/Scripting/ScriptLog.h"

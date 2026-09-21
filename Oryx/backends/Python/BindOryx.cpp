@@ -12,6 +12,11 @@ void bind_oryx(py::module_& module)
     bind_errors(module);
     bind_log(module);
     bind_assertions(module);
+    bind_game(module);
+    bind_registry(module);
+    bind_simulation(module);
+    bind_random(module);
+    bind_scripted(module);
 }
 
 } // namespace oryx::python

@@ -2,10 +2,12 @@
 #include "PythonRuntime.h"
 
 #include "BindOryx.h"
+#include "PythonSupport.h"
 
 #include <pybind11/embed.h>
 
 #include "Oryx/Scripting/ScriptError.h"
+#include "Oryx/Scripting/ScriptRegistry.h"
 #include "Oryx/Scripting/ScriptRuntimeRegistry.h"
 
 namespace py = pybind11;
@@ -17,12 +19,6 @@ namespace
 {
 
 constexpr const char* kScriptModulePrefix = "oryx_script_";
-
-ScriptError to_script_error(const py::error_already_set& error, const std::string& context)
-{
-    std::string detail = error.what();
-    return ScriptError(context + ": " + detail.substr(0, detail.find('\n')), detail);
-}
 
 void set_config_string(PyConfig& config, wchar_t** field, const char* value)
 {
@@ -100,7 +96,7 @@ void run_source(const ScriptSource& source, bool reload)
     }
     catch (const py::error_already_set& error)
     {
-        throw to_script_error(error, "PythonRuntime: could not " + std::string(reload ? "reload" : "load") + " '" + source.target + "'");
+        throw python::to_script_error(error, "PythonRuntime: could not " + std::string(reload ? "reload" : "load") + " '" + source.target + "'");
     }
 }
 
@@ -158,6 +154,7 @@ void PythonRuntime::stop()
         return;
     }
 
+    unregister_scripted("python");
     py::finalize_interpreter();
     m_running = false;
 }

@@ -9,6 +9,7 @@
 namespace 
 {
 
+constexpr std::string_view kGameFlagPrefix = "--game=";
 constexpr std::string_view kOpponentFlagPrefix = "--opponent=";
 constexpr std::string_view kSimulateFlagPrefix = "--simulate=";
 constexpr std::string_view kBenchmarkFlag = "--benchmark";
@@ -50,7 +51,7 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     OX_INFO("Working directory: {}", std::filesystem::current_path().string());
 
     push_layer<oryx::ScriptingLayer>(oryx::script_options(args));
-    push_layer<OasisLayer>(flag_value(args, kOpponentFlagPrefix), flag_value(args, kSimulateFlagPrefix), has_flag(args, kBenchmarkFlag));
+    push_layer<OasisLayer>(flag_value(args, kGameFlagPrefix), flag_value(args, kOpponentFlagPrefix), flag_value(args, kSimulateFlagPrefix), has_flag(args, kBenchmarkFlag));
 }
 
 void OasisApp::on_event(oryx::Event& event)

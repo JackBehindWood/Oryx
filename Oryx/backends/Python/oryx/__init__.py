@@ -1,7 +1,61 @@
 """Oryx scripting API. Native pieces come from the embedded ``_oryx`` module."""
 
-from _oryx import OryxAssertionError, OryxError, ParamError, ScriptError
+from _oryx import (
+    ActionFeatures,
+    BatchResult,
+    BatchRunner,
+    Context,
+    Game,
+    Match,
+    GameHandle,
+    StateHandle,
+    StrategyHandle,
+    OryxAssertionError,
+    OryxError,
+    ParamError,
+    Random,
+    ScriptError,
+    State,
+    Strategy,
+    describe_game,
+    describe_strategy,
+    list_games,
+    list_strategies,
+    make_game,
+    make_strategy,
+    register_game,
+    register_strategy,
+    simulate,
+)
 
 from . import assertions, log
 
-__all__ = ["OryxAssertionError", "OryxError", "ParamError", "ScriptError", "assertions", "log"]
+__all__ = [
+    "ActionFeatures",
+    "BatchResult",
+    "BatchRunner",
+    "Context",
+    "Game",
+    "Match",
+    "GameHandle",
+    "StateHandle",
+    "StrategyHandle",
+    "OryxAssertionError",
+    "OryxError",
+    "ParamError",
+    "Random",
+    "ScriptError",
+    "State",
+    "Strategy",
+    "assertions",
+    "describe_game",
+    "describe_strategy",
+    "list_games",
+    "list_strategies",
+    "log",
+    "make_game",
+    "make_strategy",
+    "register_game",
+    "register_strategy",
+    "simulate",
+]

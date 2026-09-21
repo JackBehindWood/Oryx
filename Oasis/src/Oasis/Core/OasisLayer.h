@@ -10,17 +10,18 @@ namespace oasis
 class OasisLayer : public oryx::Layer
 {
 public:
-    explicit OasisLayer(std::string opponent_arg = "", std::string simulate_arg = "", bool benchmark_arg = false);
+    explicit OasisLayer(std::string game_arg = "", std::string opponent_arg = "", std::string simulate_arg = "", bool benchmark_arg = false);
 
     void attach() override;
     void event(oryx::Event& event) override;
 
 private:
-    bool prompt_for_opponent(std::string& out_name) const;
-    void attach_simulate(oryx::UniquePtr<oryx::IGame> game);
-    void attach_interactive(oryx::UniquePtr<oryx::IGame> game);
+    bool choose_game(std::string& out_name) const;
+    void attach_simulate(const std::string& game_name, oryx::UniquePtr<oryx::IGame> game);
+    void attach_interactive(const std::string& game_name, oryx::UniquePtr<oryx::IGame> game);
     bool on_simulation_complete(const oryx::SimulationCompleteEvent& event);
 
+    std::string m_game_arg;
     std::string m_opponent_arg;
     std::string m_simulate_arg;
     bool m_benchmark_arg;

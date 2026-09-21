@@ -26,6 +26,12 @@ public:
         entries().insert_or_assign(name, Entry{ std::move(factory), std::move(info) });
     }
 
+    // Returns whether the name was registered.
+    static bool unregister_factory(const std::string& name)
+    {
+        return entries().erase(name);
+    }
+
     [[nodiscard]] static UniquePtr<T> create(const std::string& name, const Params& params = {})
     {
         const Entry* entry = entries().find(name);

@@ -193,3 +193,13 @@ TEST_CASE("Registering a name again replaces its factory and info")
     CHECK(DummyRegistry::create("dummy-replaced")->label() == "B");
     CHECK(DummyRegistry::info("dummy-replaced")->description == "second");
 }
+
+TEST_CASE("Registry<T>::unregister_factory removes a name and reports whether it was registered")
+{
+    DummyRegistry::register_factory("dummy-temporary", [](const oryx::Params&) { return oryx::create_unique<DummyA>(); });
+
+    CHECK(DummyRegistry::unregister_factory("dummy-temporary"));
+    CHECK_FALSE(DummyRegistry::has("dummy-temporary"));
+    CHECK(DummyRegistry::create("dummy-temporary") == nullptr);
+    CHECK_FALSE(DummyRegistry::unregister_factory("dummy-temporary"));
+}

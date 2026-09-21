@@ -41,6 +41,38 @@ public:
         }
     }
 
+    // Backward-shift deletion keeps every remaining key reachable from its home slot without tombstones; returns whether the key existed.
+    bool erase(const Key& key)
+    {
+        size_t hole = probe_for(key);
+        if (!m_occupied[hole])
+        {
+            return false;
+        }
+
+        m_slots[hole].~Pair<Key, Value>();
+        m_occupied[hole] = false;
+        --m_count;
+
+        size_t mask = m_capacity - 1;
+        for (size_t next = (hole + 1) & mask; m_occupied[next]; next = (next + 1) & mask)
+        {
+            size_t home = std::hash<Key>{}(m_slots[next].key) & mask;
+            bool reachable_past_hole = hole <= next ? (hole < home && home <= next) : (hole < home || home <= next);
+            if (reachable_past_hole)
+            {
+                continue;
+            }
+
+            new (&m_slots[hole]) Pair<Key, Value>(std::move(m_slots[next]));
+            m_slots[next].~Pair<Key, Value>();
+            m_occupied[hole] = true;
+            m_occupied[next] = false;
+            hole = next;
+        }
+        return true;
+    }
+
     [[nodiscard]] Value* find(const Key& key)
     {
         size_t index = probe_for(key);
