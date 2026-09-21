@@ -1,6 +1,6 @@
 import subprocess
 
-from ..config import BUILD_DIR, BuildConfig
+from ..config import BUILD_DIR, PROJECT_ROOT, BuildConfig
 from ..utils import remove_directory, run_command
 
 
@@ -62,3 +62,57 @@ def clear_outputs_if_python_changed(python_options: list[str]) -> bool:
 
     PYTHON_OPTIONS_FILE.write_text(current, encoding="utf-8")
     return changed
+
+
+SOURCE_MANIFEST_FILE = BUILD_DIR / ".sources"
+SOURCE_ROOTS = {"Oryx/src": "Oryx", "Oryx/backends": "Oryx", "Oasis": "Oasis", "tests": "Tests"}
+SOURCE_SUFFIXES = {".cpp", ".c", ".mm"}
+SKIPPED_DIRS = {"vendor", "build", "bin", "bin-int", ".git", "__pycache__"}
+
+
+def source_manifest() -> list[str]:
+    """Every compiled source file Premake globs into a project, as sorted repo-relative paths."""
+    sources = []
+    for root in SOURCE_ROOTS:
+        base = PROJECT_ROOT / root
+        for path in base.rglob("*") if base.is_dir() else []:
+            relative = path.relative_to(base)
+            if path.suffix in SOURCE_SUFFIXES and not SKIPPED_DIRS.intersection(relative.parts[:-1]):
+                sources.append(path.relative_to(PROJECT_ROOT).as_posix())
+    return sorted(sources)
+
+
+def _recorded_sources() -> list[str] | None:
+    if not SOURCE_MANIFEST_FILE.is_file():
+        return None
+    return SOURCE_MANIFEST_FILE.read_text(encoding="utf-8").splitlines()
+
+
+def sources_changed() -> bool:
+    """True when a source file was added or removed since the last configure, so the generated Makefiles are stale."""
+    return _recorded_sources() != source_manifest()
+
+
+def clear_outputs_of_removed_sources() -> list[str]:
+    """Delete the binaries of every project that lost a source file since the last configure.
+
+    Premake regenerates the object list, but `ar` keeps the archive member of a removed source
+    (the link then fails on symbols that no longer exist) and an executable is not relinked just
+    because it lost an object (a deleted test would keep running from the old binary). Removing
+    the project's binaries makes Make archive or link them again from the current objects.
+    """
+    previous = _recorded_sources()
+    if previous is None:
+        return []
+
+    removed = set(previous) - set(source_manifest())
+    projects = sorted({project for root, project in SOURCE_ROOTS.items() for path in removed if path.startswith(root + "/")})
+    for project in projects:
+        for output_dir in (BUILD_DIR / "bin").glob(f"*/{project}"):
+            remove_directory(output_dir)
+    return projects
+
+
+def record_source_manifest() -> None:
+    SOURCE_MANIFEST_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SOURCE_MANIFEST_FILE.write_text("\n".join(source_manifest()), encoding="utf-8")

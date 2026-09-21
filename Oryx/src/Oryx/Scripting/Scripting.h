@@ -4,8 +4,6 @@
 #include "Oryx/Scripting/Support/ScriptSource.h"
 #include "Oryx/Scripting/Support/ScriptError.h"
 #include "Oryx/Scripting/Support/InitGuard.h"
-#include "Oryx/Scripting/Support/ScriptLog.h"
-#include "Oryx/Scripting/Support/ScriptAssert.h"
 #include "Oryx/Scripting/Support/ScriptLease.h"
 #include "Oryx/Scripting/Support/ScriptUtil.h"
 

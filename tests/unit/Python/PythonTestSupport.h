@@ -81,6 +81,18 @@ private:
     UniquePtr<IScriptRuntime> m_runtime;
 };
 
+// Runs `body` after `import oryx` with mark() available and returns what it marked.
+inline std::string run_oryx_script(const std::string& body)
+{
+    TempDir dir;
+    std::filesystem::path marker = dir.path() / "marker.txt";
+    std::filesystem::path script = dir.write("script.py", marker_prelude(marker) + "import oryx\n" + body);
+
+    RunningPython python;
+    python.load(script);
+    return read_file(marker);
+}
+
 } // namespace oryx::test
 
 #endif

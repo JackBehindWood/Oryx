@@ -12,6 +12,8 @@ class Log
 public:
     static void init();
 
+    static void message(spdlog::level::level_enum level, std::string_view text);
+
     static std::shared_ptr<spdlog::logger>& get_core_logger() { return s_core_logger; }
     static std::shared_ptr<spdlog::logger>& get_client_logger() { return s_client_logger; }
 

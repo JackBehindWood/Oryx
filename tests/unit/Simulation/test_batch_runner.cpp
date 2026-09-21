@@ -92,3 +92,27 @@ TEST_CASE("BatchRunner::run aggregates a deterministic pairing correctly")
     CHECK(result.rewards[0] == doctest::Approx(5.0));
     CHECK(result.rewards[1] == doctest::Approx(-5.0));
 }
+
+TEST_CASE("win_rate, draw_rate and mean_reward divide by the matches played")
+{
+    BatchResult result = make_result();
+    accumulate(result, make_outcome(1.0, -1.0));
+    accumulate(result, make_outcome(1.0, -1.0));
+    accumulate(result, make_outcome(0.0, 0.0));
+    accumulate(result, make_outcome(-1.0, 1.0));
+
+    CHECK(win_rate(result, 0) == doctest::Approx(0.5));
+    CHECK(win_rate(result, 1) == doctest::Approx(0.25));
+    CHECK(draw_rate(result) == doctest::Approx(0.25));
+    CHECK(mean_reward(result, 0) == doctest::Approx(0.25));
+    CHECK(mean_reward(result, 1) == doctest::Approx(-0.25));
+}
+
+TEST_CASE("the rates of an empty batch are zero")
+{
+    BatchResult result = make_result();
+
+    CHECK(win_rate(result, 0) == 0.0);
+    CHECK(draw_rate(result) == 0.0);
+    CHECK(mean_reward(result, 1) == 0.0);
+}

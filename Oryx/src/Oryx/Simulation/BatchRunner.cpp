@@ -43,6 +43,21 @@ void accumulate(BatchResult& result, const Outcome& outcome)
     }
 }
 
+double win_rate(const BatchResult& result, PlayerId player)
+{
+    return result.matches == 0 ? 0.0 : static_cast<double>(result.wins[static_cast<size_t>(player)]) / result.matches;
+}
+
+double draw_rate(const BatchResult& result)
+{
+    return result.matches == 0 ? 0.0 : static_cast<double>(result.draws) / result.matches;
+}
+
+double mean_reward(const BatchResult& result, PlayerId player)
+{
+    return result.matches == 0 ? 0.0 : result.rewards[player] / result.matches;
+}
+
 BatchRunner::BatchRunner(const IGame& game, SmallVector<IStrategy*, 2> strategies)
     : m_game(game)
     , m_strategies(std::move(strategies))

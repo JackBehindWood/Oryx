@@ -26,10 +26,17 @@ dependencies = [
 ]
 
 [dependency-groups]
+research = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+]
 docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-material>=9.5",
 ]
+
+[tool.uv]
+default-groups = ["research", "docs"]
 
 [project.scripts]
 build = "build_system.main:app"

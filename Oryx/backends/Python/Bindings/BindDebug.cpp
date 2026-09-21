@@ -2,7 +2,6 @@
 #include "Bindings/BindOryx.h"
 
 #include "Oryx/Scripting/Support/InitGuard.h"
-#include "Oryx/Scripting/Support/ScriptLog.h"
 
 namespace py = pybind11;
 
@@ -17,41 +16,48 @@ constexpr int32_t kLoggingWarning = 30;
 constexpr int32_t kLoggingError = 40;
 constexpr int32_t kLoggingCritical = 50;
 
-inline void log_trace(std::string_view message) { script_log(ScriptLogLevel::Trace, message); }
-inline void log_info(std::string_view message) { script_log(ScriptLogLevel::Info, message); }
-inline void log_warn(std::string_view message) { script_log(ScriptLogLevel::Warn, message); }
-inline void log_error(std::string_view message) { script_log(ScriptLogLevel::Error, message); }
-inline void log_critical(std::string_view message) { script_log(ScriptLogLevel::Critical, message); }
+template<spdlog::level::level_enum Level>
+void log_at(std::string_view message)
+{
+    Log::message(Level, message);
+}
 
-void log_record(int32_t logging_level, std::string_view message)
+spdlog::level::level_enum level_from_logging(int32_t logging_level)
 {
     if (logging_level >= kLoggingCritical)
     {
-        log_critical(message);
+        return spdlog::level::critical;
     }
-    else if (logging_level >= kLoggingError)
+    if (logging_level >= kLoggingError)
     {
-        log_error(message);
+        return spdlog::level::err;
     }
-    else if (logging_level >= kLoggingWarning)
+    if (logging_level >= kLoggingWarning)
     {
-        log_warn(message);
+        return spdlog::level::warn;
     }
-    else if (logging_level >= kLoggingInfo)
+    if (logging_level >= kLoggingInfo)
     {
-        log_info(message);
+        return spdlog::level::info;
     }
-    else
-    {
-        log_trace(message);
-    }
+    return spdlog::level::trace;
+}
+
+void log_record(int32_t logging_level, std::string_view message)
+{
+    Log::message(level_from_logging(logging_level), message);
+}
+
+void check_assertion(bool condition, std::string_view message)
+{
+    check(condition, message);
 }
 
 // A logging.Handler subclass has to be a Python class; it is built here so the package needs no .py file.
 py::object make_handler_class(const py::module_& logging)
 {
     py::dict members;
-    members["__module__"] = "oryx.log";
+    members["__module__"] = "oryx.debug";
     members["__doc__"] = "Forwards ``logging`` records to Oryx's client logger.";
     py::object handler = py::module_::import("builtins").attr("type")("Handler", py::make_tuple(logging.attr("Handler")), members);
 
@@ -66,7 +72,7 @@ py::object make_handler_class(const py::module_& logging)
             try
             {
                 std::string text = self.attr("format")(record).cast<std::string>();
-                OX_GUARDED_FUNC(log_record, "oryx.log.Handler.emit")(record.attr("levelno").cast<int32_t>(), text);
+                OX_GUARDED_FUNC(log_record, "oryx.debug.Handler.emit")(record.attr("levelno").cast<int32_t>(), text);
             }
             catch (const std::exception&)
             {
@@ -79,20 +85,21 @@ py::object make_handler_class(const py::module_& logging)
 
 } // namespace
 
-void bind_log(py::module_& module)
+void bind_debug(py::module_& module)
 {
-    py::module_ log = module.def_submodule("log", "Routes messages to Oryx's client logger.");
-    log.def("trace", OX_GUARDED_FUNC(log_trace, "oryx.log.trace"), py::arg("message"));
-    log.def("info", OX_GUARDED_FUNC(log_info, "oryx.log.info"), py::arg("message"));
-    log.def("warn", OX_GUARDED_FUNC(log_warn, "oryx.log.warn"), py::arg("message"));
-    log.def("error", OX_GUARDED_FUNC(log_error, "oryx.log.error"), py::arg("message"));
-    log.def("critical", OX_GUARDED_FUNC(log_critical, "oryx.log.critical"), py::arg("message"));
+    py::module_ debug = module.def_submodule("debug", "Logging to Oryx's client logger and checks that raise OryxAssertionError instead of trapping the process.");
+    debug.def("trace", OX_GUARDED_FUNC(log_at<spdlog::level::trace>, "oryx.debug.trace"), py::arg("message"));
+    debug.def("info", OX_GUARDED_FUNC(log_at<spdlog::level::info>, "oryx.debug.info"), py::arg("message"));
+    debug.def("warn", OX_GUARDED_FUNC(log_at<spdlog::level::warn>, "oryx.debug.warn"), py::arg("message"));
+    debug.def("error", OX_GUARDED_FUNC(log_at<spdlog::level::err>, "oryx.debug.error"), py::arg("message"));
+    debug.def("critical", OX_GUARDED_FUNC(log_at<spdlog::level::critical>, "oryx.debug.critical"), py::arg("message"));
+    debug.def("check", OX_GUARDED_FUNC(check_assertion, "oryx.debug.check"), py::arg("condition"), py::arg("message") = "");
 
     py::module_ logging = py::module_::import("logging");
     py::object handler = make_handler_class(logging);
-    log.attr("Handler") = handler;
+    debug.attr("Handler") = handler;
 
-    log.def("install", [logging, handler](const py::object& logger, int32_t level)
+    debug.def("install", [logging, handler](const py::object& logger, int32_t level)
         {
             py::object instance = handler(level);
             (logger.is_none() ? logging.attr("getLogger")() : logger).attr("addHandler")(instance);

@@ -375,8 +375,9 @@ Supporting work, in build order:
   any Python code exists
 * Build integration: a private `Oryx/backends/Python/` backend with an embedded
   interpreter, on by default and switchable off
-* Scripting inside `Oasis` first: log and assertion bindings with an init guard,
-  the core bindings, script-backed types, the Nim milestone
+* Scripting inside `Oasis` first: debug (log and check) bindings with an init guard,
+  the core bindings, script-backed types, the Nim milestone, then results as
+  data and the math and benchmark modules
 * The research host last: `import oryx` from a REPL or notebook through an
   `Oasis`-owned `_oryx` extension
 

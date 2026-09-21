@@ -1,9 +1,11 @@
-from . import assertions as assertions
+from . import benchmark as benchmark
+from . import debug as debug
 from . import errors as errors
 from . import game as game
-from . import log as log
+from . import math as math
 from . import random as random
 from . import registry as registry
+from . import results as results
 from . import simulation as simulation
 from .errors import OryxAssertionError as OryxAssertionError
 from .errors import OryxError as OryxError
@@ -26,7 +28,7 @@ from .registry import make_game as make_game
 from .registry import make_strategy as make_strategy
 from .registry import register_game as register_game
 from .registry import register_strategy as register_strategy
-from .simulation import BatchResult as BatchResult
+from .results import BatchResult as BatchResult
 from .simulation import BatchRunner as BatchRunner
 from .simulation import Match as Match
 from .simulation import simulate as simulate

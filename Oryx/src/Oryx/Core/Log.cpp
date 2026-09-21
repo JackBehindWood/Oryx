@@ -23,4 +23,9 @@ void Log::init()
 #endif
 }
 
+void Log::message(spdlog::level::level_enum level, std::string_view text)
+{
+    s_client_logger->log(level, "{}", text);
+}
+
 } // namespace oryx

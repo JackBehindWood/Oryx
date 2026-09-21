@@ -10,7 +10,13 @@ from build_system.config import BUILD_DIR, PROJECT_ROOT, RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
 from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
-from build_system.setup.stale_objects import clear_outputs_if_python_changed, prune_stale_object_dirs
+from build_system.setup.stale_objects import (
+    clear_outputs_if_python_changed,
+    clear_outputs_of_removed_sources,
+    prune_stale_object_dirs,
+    record_source_manifest,
+    sources_changed,
+)
 from build_system.utils import remove_directory, run_command
 
 console = Console()
@@ -60,6 +66,10 @@ def configure(ctx: typer.Context):
     if clear_outputs_if_python_changed(python_options):
         console.print("[yellow]⚠️ Python build options changed; cleared previous binaries and objects.[/yellow]\n")
 
+    for project in clear_outputs_of_removed_sources():
+        console.print(f"[yellow]⚠️ Cleared {project} binaries (a source file was removed).[/yellow]\n")
+    record_source_manifest()
+
     for project in prune_stale_object_dirs(cfg):
         console.print(
             f"[yellow]⚠️ Cleared stale object cache for {project} "
@@ -78,6 +88,10 @@ def compile_project(ctx: typer.Context):
     """Compile the engine binaries for the targeted configuration."""
     run: RunContext = ctx.obj
     cfg = run.config
+
+    if not run.dry_run and sources_changed():
+        console.print("[yellow]⚠️ Source files were added or removed; regenerating build files first.[/yellow]\n")
+        ctx.invoke(configure, ctx)
 
     try:
         command_line = build_compile_command(cfg, BUILD_DIR)

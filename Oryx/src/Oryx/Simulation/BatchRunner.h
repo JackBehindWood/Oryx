@@ -19,6 +19,11 @@ struct BatchResult
 
 void accumulate(BatchResult& result, const Outcome& outcome);
 
+// Shares of the matches played; 0 for an empty batch.
+[[nodiscard]] double win_rate(const BatchResult& result, PlayerId player);
+[[nodiscard]] double draw_rate(const BatchResult& result);
+[[nodiscard]] double mean_reward(const BatchResult& result, PlayerId player);
+
 class BatchRunner
 {
 public:

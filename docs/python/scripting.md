@@ -117,6 +117,12 @@ An exception in a script never takes Oasis down as an unresponsive process. A sc
 
 Reloading reloads the settings file, re-runs discovery and loads every script again, so edited scripts take effect, new files and new roots appear, and entries a script no longer defines disappear. Helper modules are imported again too, so what they register comes back. It is triggered by posting a `ReloadScriptsEvent` to the application, which `ScriptingLayer` handles; Oasis has no command for it yet. A script with an error is logged and its entries stay gone until it is fixed, while the others reload. An `oryx.yaml` that no longer parses keeps the previous settings.
 
+## Helpers for scripts
+
+* `oryx.debug`: `trace`, `info`, `warn`, `error` and `critical` write to Oasis's client log (the text is never a format string), `install()` sends the standard `logging` module there too, and `check(condition, message)` raises `OryxAssertionError` in every build instead of stopping the process.
+* `oryx.math`: `Vec2/3/4`, `Mat2/3/4` and scalar helpers (`clamp`, `lerp`, `radians`, ...), all over floats.
+* `oryx.simulate(...)` returns a `BatchResult` with win rates, mean rewards, the run's metadata and `to_dict()`; `oryx.benchmark.benchmark(...)` adds timing and throughput. `to_numpy()` and `to_dataframe()` need numpy or pandas installed (`uv sync` installs them for development).
+
 ## Speed
 
 A game or strategy written in Python is correct but slow inside a hot loop: every `apply`, `undo` and `legal_actions` call crosses from C++ into Python (tens of nanoseconds each, and `legal_actions` is remembered until the next `apply` or `undo`, so a state should change only through them). C++ games with Python strategies, and batches where every participant is C++, stay on the fast path. Prototype in Python, then port to C++ behind the same id: the parameters and the registry id stay the same, so nothing that names the game changes, and running both under identical seeds and comparing the batch results shows whether the port agrees.

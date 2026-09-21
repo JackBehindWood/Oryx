@@ -94,8 +94,8 @@ Handles build lifecycle, Premake configuration, and binary compilation.
 
 | Command | Description |
 | --- | --- |
-| `build configure` | Ensures local Premake5 binary exists and generates project build files. |
-| `build compile` | Compiles engine binaries for the targeted configuration profile. |
+| `build configure` | Ensures local Premake5 binary exists and generates project build files. Records the compiled source files in `build/.sources`; when a source was removed since the last run it deletes that project's binaries so a stale archive member or executable cannot survive. |
+| `build compile` | Compiles engine binaries for the targeted configuration profile. Runs `configure` first when a source file was added or removed since the last configure. |
 | `build run` | Runs the compiled `Oasis` sandbox executable (`--game`, `--opponent`, `--simulate`, `--benchmark` are forwarded). |
 | `build clean` | Removes the entire `build/` directory (binaries, object files, generated Makefiles, and `compile_commands.json`). |
 | `build all` | Executes `configure`, `compile`, and unit test commands sequentially. |
