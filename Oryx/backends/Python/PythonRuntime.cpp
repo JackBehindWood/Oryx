@@ -5,6 +5,7 @@
 #include "Interop/PyScriptObject.h"
 #include "PythonContext.h"
 #include "PythonConfig.h"
+#include "PythonHost.h"
 #include "PythonLanguage.h"
 #include "Support/PyUtil.h"
 
@@ -204,6 +205,7 @@ void PythonRuntime::start()
     {
         python::register_oryx_module();
         py::initialize_interpreter(&config, 0, nullptr, false);
+        python::mark_embedded_host();
         extend_search_path();
     }
     catch (const std::exception& error)

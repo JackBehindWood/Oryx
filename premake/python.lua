@@ -67,6 +67,32 @@ function useOryxPythonEmbedding()
     includedirs { "%{wks.location}/generated" }
 end
 
+-- Whole-archiving Oryx/yaml-cpp/spdlog into OryxPython needs -fPIC on Linux. Gated on Python
+-- being enabled so a Python-off Linux build is untouched.
+function useOryxPythonPIC()
+    if pythonEnabled() then
+        filter "system:linux"
+            pic "On"
+        filter {}
+    end
+end
+
+-- OryxPython is a plain Python extension module, not an embedding host like Oasis/Tests: it must
+-- NOT link libpython directly. Doing so gives it its own separate, never-initialised copy of the
+-- interpreter's runtime state (distinct from the one the importing process already set up), and
+-- pybind11's PyGILState_Ensure() segfaults dereferencing that copy's uninitialised _PyRuntime.
+-- Its Python C-API symbol references stay unresolved at link time and are satisfied by the host
+-- process at import (dlopen) instead - the same as every other compiled Python extension.
+function linkPythonExtension()
+    if not pythonEnabled() then
+        return
+    end
+
+    filter "system:macosx"
+        linkoptions { "-undefined dynamic_lookup" }
+    filter {}
+end
+
 -- Whole-archive linking pulls the backend's libpython references into every consumer of Oryx.
 function linkPython()
     if not pythonEnabled() then

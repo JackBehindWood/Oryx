@@ -34,6 +34,9 @@ docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-material>=9.5",
 ]
+stubs = [
+    "pybind11-stubgen>=2.5",
+]
 
 [tool.uv]
 default-groups = ["research", "docs"]

@@ -646,8 +646,11 @@ Phase 7 uses one `oryx` API in two hosts, built in stages. In
 **C++-as-host** (first), `Oasis` embeds an interpreter through a Python runtime,
 a private backend (`Oryx/backends/Python/`) selected through the registry (§10),
 and a game or strategy defined in a Python file runs in `Oasis` exactly like a
-C++ one. In **Python-as-host** (last), `import oryx` loads a compiled `_oryx`
-extension owned by `Oasis` (REPL, scripts, notebooks). Both hosts share one binding source and, within a process, one
+C++ one. In **Python-as-host** (last), `import oryx` loads a compiled `oryx`
+extension built by its own top-level, **Oryx-only** `OryxPython/` project — no
+Oasis coupling, so `Oasis`'s own compiled-in games (TicTacToe) are not reachable
+from a bare `import oryx`; a Python-defined game such as Nim still is, being a
+plain script. Both hosts share one binding source and, within a process, one
 registry, so a script-registered game appears in `Oasis`'s menu. A Python-defined
 game or strategy is a C++ object (`PyScripted*`) that implements a
 language-agnostic interface from `Oryx/src/Oryx/Scripting/` (`IScriptedGame`

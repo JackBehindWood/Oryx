@@ -20,3 +20,5 @@ project "yaml-cpp"
     includedirs {
         "../yaml-cpp/include"
     }
+
+    useOryxPythonPIC()

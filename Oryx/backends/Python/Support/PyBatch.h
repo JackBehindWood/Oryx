@@ -40,4 +40,10 @@ using Strategies = std::vector<SharedPtr<IStrategy>>;
 // Throws unless the strategies can play the game; returns whether the GIL has to stay held while they do.
 [[nodiscard]] bool holds_gil_for(const IGame& game, const std::vector<IStrategy*>& strategies);
 
+// Runs match_count matches in adaptive, timer-based chunks, releasing the GIL around each chunk
+// unless holds_gil, and checking for a pending Ctrl-C between chunks (raises KeyboardInterrupt,
+// discarding the partial batch). Chunk size targets ~50ms so interrupt latency stays roughly
+// constant regardless of per-match cost; a fixed chunk count could not do that.
+[[nodiscard]] BatchResult run_interruptible(BatchRunner& runner, int32_t match_count, bool holds_gil);
+
 } // namespace oryx::python

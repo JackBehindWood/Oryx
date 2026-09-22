@@ -18,6 +18,8 @@ struct BatchResult
 };
 
 void accumulate(BatchResult& result, const Outcome& outcome);
+// Sizes an empty `result` from `other` first, so a chunked run merged piece by piece equals one run.
+void merge(BatchResult& result, const BatchResult& other);
 
 // Shares of the matches played; 0 for an empty batch.
 [[nodiscard]] double win_rate(const BatchResult& result, PlayerId player);

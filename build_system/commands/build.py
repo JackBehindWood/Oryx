@@ -10,6 +10,7 @@ from build_system.config import BUILD_DIR, PROJECT_ROOT, RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
 from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
+from build_system.setup.python_extension import install_extension_pth
 from build_system.setup.stale_objects import (
     clear_outputs_if_python_changed,
     clear_outputs_of_removed_sources,
@@ -112,6 +113,9 @@ def compile_project(ctx: typer.Context):
     except subprocess.CalledProcessError as error:
         console.print(f"[bold red]✗ Build failed:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
+
+    if cfg.python_enabled:
+        install_extension_pth(cfg.binary_path / "OryxPython")
 
 
 @command(name="clean", label="Clean — remove build artifacts")

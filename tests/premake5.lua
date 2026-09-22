@@ -30,7 +30,13 @@ project "Tests"
     }
 
     defines {
-        "SPDLOG_COMPILED_LIB"
+        "SPDLOG_COMPILED_LIB",
+        -- A literal path, deliberately not %{wks.location}-based: that token (like every
+        -- location-relative token) resolves relative to the generated build file's own
+        -- directory (build/), which is right for targetdir/objdir (make runs from there) but
+        -- wrong here - this is read by compiled code at run time, when the process's cwd is
+        -- wherever it was launched from (repo root, under uv run build test / build all).
+        "OX_BUILD_OUTPUT_DIR=\"" .. "build/bin/" .. outputdir .. "\"",
     }
     useOryxPython()
 

@@ -134,6 +134,42 @@ TEST_CASE("strategies are registered and tracked separately from games")
     CHECK(scripted_game_origin("test-greedy") == nullptr);
 }
 
+TEST_CASE("overwriting a C++ entry restores it once the scripted runtime unregisters")
+{
+    ScriptRegistryCleanup cleanup;
+    StrategyRegistry::register_factory("test-cpp-strategy", [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "original C++" });
+
+    register_scripted_strategy("test-cpp-strategy", kNim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "scripted" }, true);
+    CHECK(StrategyRegistry::info("test-cpp-strategy")->description == "scripted");
+    CHECK(scripted_strategy_origin("test-cpp-strategy") != nullptr);
+
+    unregister_scripted("fake");
+
+    REQUIRE(StrategyRegistry::has("test-cpp-strategy"));
+    CHECK(StrategyRegistry::info("test-cpp-strategy")->description == "original C++");
+    CHECK(scripted_strategy_origin("test-cpp-strategy") == nullptr);
+
+    StrategyRegistry::unregister_factory("test-cpp-strategy");
+}
+
+TEST_CASE("a chain of overwrites restores only the immediately-clobbered entry")
+{
+    ScriptRegistryCleanup cleanup;
+    StrategyRegistry::register_factory("test-chain", [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "original C++" });
+
+    register_scripted_strategy("test-chain", kNim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "fake" }, true);
+    register_scripted_strategy("test-chain", kLua, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "lua" }, true);
+
+    unregister_scripted("lua");
+
+    REQUIRE(StrategyRegistry::has("test-chain"));
+    CHECK(StrategyRegistry::info("test-chain")->description == "fake");
+    REQUIRE(scripted_strategy_origin("test-chain") != nullptr);
+    CHECK(*scripted_strategy_origin("test-chain") == kNim);
+
+    StrategyRegistry::unregister_factory("test-chain");
+}
+
 TEST_CASE("unregister_scripted drops only the entries of one language")
 {
     ScriptRegistryCleanup cleanup;

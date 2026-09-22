@@ -26,6 +26,8 @@ project "Oryx"
         "SPDLOG_COMPILED_LIB",
     }
 
+    useOryxPythonPIC()
+
     if pythonEnabled() then
         files {
             "backends/Python/**.h",

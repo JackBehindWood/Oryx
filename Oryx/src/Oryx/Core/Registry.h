@@ -55,6 +55,12 @@ public:
         return entry == nullptr ? nullptr : &entry->info;
     }
 
+    [[nodiscard]] static Factory factory(const std::string& name)
+    {
+        const Entry* entry = entries().find(name);
+        return entry == nullptr ? Factory{} : entry->factory;
+    }
+
     // Unordered - callers that need a stable order (e.g. a menu) sort it themselves.
     static std::vector<std::string> names()
     {

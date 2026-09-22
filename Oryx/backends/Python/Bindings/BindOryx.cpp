@@ -1,6 +1,11 @@
 #include "oxpch.h"
 #include "Bindings/BindOryx.h"
 
+#include "Oryx/Core/Application.h"
+#include "Oryx/Core/Assert.h"
+#include "Oryx/Core/Error.h"
+#include "PythonHost.h"
+
 namespace py = pybind11;
 
 namespace oryx::python
@@ -40,6 +45,26 @@ void bind_oryx(py::module_& module)
     reexport(module, "results", { "BatchResult" });
     reexport(module, "simulation", { "Match", "BatchRunner", "simulate" });
     reexport(module, "random", { "Random" });
+
+    module.def("init", []()
+    {
+#if OX_PYTHON_ENFORCE_HOST_GUARD
+        if (is_embedded_host())
+        {
+            throw Error("oryx.init() must not be called inside an embedding host (e.g. Oasis); "
+                        "it already initialised Oryx before the interpreter started.");
+        }
+#endif
+        init();
+        set_assertion_handler(&throw_on_assertion);
+    },
+    "Initialises Oryx for a standalone Python process (idempotent) and installs the throwing "
+    "assertion handler, so a C++ assert reached from Python raises OryxAssertionError instead of "
+    "logging and trapping. Raises if called inside an embedding host such as Oasis.");
+
+    module.def("is_embedded_host", &is_embedded_host,
+        "True when running inside an embedding host such as Oasis; false for a standalone "
+        "research-host process.");
 }
 
 } // namespace oryx::python

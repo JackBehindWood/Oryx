@@ -24,3 +24,5 @@ project "spdlog"
     defines {
         "SPDLOG_COMPILED_LIB",
     }
+
+    useOryxPythonPIC()

@@ -43,6 +43,24 @@ void accumulate(BatchResult& result, const Outcome& outcome)
     }
 }
 
+void merge(BatchResult& result, const BatchResult& other)
+{
+    if (result.wins.size() != other.wins.size())
+    {
+        result.wins.assign(other.wins.size(), 0);
+        result.rewards = Rewards<double>(other.wins.size());
+    }
+
+    result.matches += other.matches;
+    for (size_t player = 0; player < other.wins.size(); ++player)
+    {
+        result.wins[player] += other.wins[player];
+        result.rewards[static_cast<PlayerId>(player)] += other.rewards[static_cast<PlayerId>(player)];
+    }
+    result.draws += other.draws;
+    result.decisions += other.decisions;
+}
+
 double win_rate(const BatchResult& result, PlayerId player)
 {
     return result.matches == 0 ? 0.0 : static_cast<double>(result.wins[static_cast<size_t>(player)]) / result.matches;

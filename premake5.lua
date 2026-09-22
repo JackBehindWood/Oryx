@@ -54,6 +54,12 @@ group "Apps"
     include "Oasis"
 group ""
 
+group "Bindings"
+    if pythonEnabled() then
+        include "OryxPython"
+    end
+group ""
+
 group "Tests"
     include "tests"
 group ""

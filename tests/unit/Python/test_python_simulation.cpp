@@ -198,4 +198,22 @@ TEST_CASE("oryx.simulate releases the GIL for an all-C++ batch")
     CHECK_FALSE(g_probe_saw_gil);
 }
 
+TEST_CASE("oryx.simulate is interruptible mid-batch for an all-C++ game")
+{
+    // Calibrated so a regression costs a couple of seconds, not a hang; the batch releases the
+    // GIL (previous test), so the only way the pending interrupt is ever observed is
+    // run_interruptible's own PyErr_CheckSignals() between chunks.
+    std::string output = run_script(
+        "import signal, threading, _thread\n"
+        "signal.signal(signal.SIGINT, signal.default_int_handler)\n"
+        "threading.Timer(0.05, _thread.interrupt_main).start()\n"
+        "try:\n"
+        "    oryx.simulate('tictactoe', ['random', 'random'], games=2_000_000)\n"
+        "    mark('not interrupted')\n"
+        "except KeyboardInterrupt:\n"
+        "    mark('interrupted')\n");
+
+    CHECK(output == "interrupted");
+}
+
 #endif

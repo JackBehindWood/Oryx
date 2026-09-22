@@ -3,8 +3,9 @@
 
 #include "Support/PyBatch.h"
 #include "Support/PyResolve.h"
-#include "Oryx/Benchmark/MemoryBenchmarkRunner.h"
+#include "Oryx/Benchmark/BenchmarkRunner.h"
 #include "Oryx/Benchmark/Timer.h"
+#include "Oryx/Debug/MemoryTracker.h"
 #include "Oryx/Scripting/Support/InitGuard.h"
 
 namespace py = pybind11;
@@ -23,17 +24,6 @@ struct PyBenchmarkResult
     MemoryStats memory;
 };
 
-template<typename Runner>
-auto run_released(Runner& runner, int32_t games, bool holds_gil)
-{
-    if (holds_gil)
-    {
-        return runner.run(games);
-    }
-    py::gil_scoped_release release;
-    return runner.run(games);
-}
-
 PyBenchmarkResult benchmark(const py::object& game, const py::sequence& strategies, int32_t games, const py::object& seed, bool memory)
 {
     if (games < 0)
@@ -46,22 +36,26 @@ PyBenchmarkResult benchmark(const py::object& game, const py::sequence& strategi
     std::vector<IStrategy*> raw = raw_pointers(participants);
     bool holds_gil = holds_gil_for(*resolved, raw);
 
+    // BenchmarkRunner::run()/MemoryBenchmarkRunner::run() time and (for memory) snapshot the
+    // whole batch as one monolithic call, which doesn't compose with chunked interruption (each
+    // chunk would reset the timer/instrumentation). Do that instrumentation here, once, around
+    // the whole interruptible loop instead, using the plain BatchRunner base directly.
+    BatchRunner runner(*resolved, to_small_vector(raw));
+
+    Instrumentation::reset();
+    MemoryStats memory_before = memory ? MemoryTracker::begin_measurement() : MemoryStats{};
+    Timer timer;
+    timer.start();
+    BatchResult outcome = run_interruptible(runner, games, holds_gil);
+    timer.stop();
+
     PyBenchmarkResult result;
+    result.outcome.counts = outcome;
+    result.elapsed_seconds = timer.elapsed_seconds();
     if (memory)
     {
-        MemoryBenchmarkRunner runner(*resolved, to_small_vector(raw));
-        MemoryBenchmarkRunner::MemoryResults results = run_released(runner, games, holds_gil);
-        result.outcome.counts = results.outcome;
-        result.elapsed_seconds = results.elapsed_seconds;
         result.has_memory = true;
-        result.memory = results.memory;
-    }
-    else
-    {
-        BenchmarkRunner runner(*resolved, to_small_vector(raw));
-        BenchmarkRunner::Results results = run_released(runner, games, holds_gil);
-        result.outcome.counts = results.outcome;
-        result.elapsed_seconds = results.elapsed_seconds;
+        result.memory = memory_delta(memory_before, MemoryTracker::snapshot());
     }
     result.outcome.has_metadata = true;
     result.outcome.metadata = make_metadata(*resolved, strategies, games, seed);

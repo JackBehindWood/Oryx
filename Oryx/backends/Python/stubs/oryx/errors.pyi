@@ -1,8 +1,13 @@
+"""
+Exceptions Oryx raises.
+"""
+from __future__ import annotations
+__all__: list[str] = ['OryxAssertionError', 'OryxError', 'ParamError', 'ScriptError']
+class OryxAssertionError(OryxError):
+    pass
 class OryxError(Exception):
-    detail: str
-
+    pass
 class ParamError(OryxError):
-    key: str
-
-class ScriptError(OryxError): ...
-class OryxAssertionError(OryxError): ...
+    pass
+class ScriptError(OryxError):
+    pass

@@ -11,6 +11,7 @@
 
 #include <typeindex>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>

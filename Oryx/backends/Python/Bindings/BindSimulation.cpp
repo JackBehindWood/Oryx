@@ -68,16 +68,7 @@ public:
 
     PyBatchResult run(int32_t match_count)
     {
-        if (match_count < 0)
-        {
-            throw Error("the number of matches cannot be negative");
-        }
-        if (m_holds_gil)
-        {
-            return PyBatchResult{ m_runner.run(match_count), {}, false };
-        }
-        py::gil_scoped_release release;
-        return PyBatchResult{ m_runner.run(match_count), {}, false };
+        return PyBatchResult{ run_interruptible(m_runner, match_count, m_holds_gil), {}, false };
     }
 
 private:
