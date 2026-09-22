@@ -1,3 +1,4 @@
 scripting:
+  enabled: true
   roots:
     - scripts

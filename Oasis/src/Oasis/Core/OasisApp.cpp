@@ -4,6 +4,7 @@
 #include "OasisLayer.h"
 
 #include "Oryx/Events/SimulationEvent.h"
+#include "Oryx/Scripting/ScriptSettings.h"
 #include "Oryx/Simulation/SimulationLayer.h"
 
 namespace 
@@ -50,7 +51,10 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     OX_CORE_INFO("Oasis — built on Oryx v{}.{}.{}", oryx::VERSION_MAJOR, oryx::VERSION_MINOR, oryx::VERSION_PATCH);
     OX_INFO("Working directory: {}", std::filesystem::current_path().string());
 
-    push_layer<oryx::ScriptingLayer>(oryx::script_options(args));
+    if (oryx::settings_of<oryx::ScriptSettings>().enabled)
+    {
+        push_layer<oryx::ScriptingLayer>(oryx::script_options(args));
+    }
     push_layer<OasisLayer>(flag_value(args, kGameFlagPrefix), flag_value(args, kOpponentFlagPrefix), flag_value(args, kSimulateFlagPrefix), has_flag(args, kBenchmarkFlag));
 }
 
