@@ -1,6 +1,8 @@
 #include "oxpch.h"
 #include "Oryx/Debug/Instrumentation.h"
 
+#include "Oryx/Memory/DefaultAllocator.h"
+
 namespace oryx
 {
 
@@ -39,7 +41,7 @@ const std::unordered_map<std::string_view, ProfileSample>& Instrumentation::resu
 ScopeTimer::ScopeTimer(const char* name)
     : m_name(name)
 #ifdef OX_ENABLE_MEMORY_TRACKING
-    , m_memory_before(MemoryTracker::snapshot())
+    , m_memory_before(default_allocator_stats())
 #endif
     , m_start(std::chrono::steady_clock::now())
 {
@@ -50,7 +52,7 @@ ScopeTimer::~ScopeTimer()
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     MemoryStats memory;
 #ifdef OX_ENABLE_MEMORY_TRACKING
-    memory = memory_delta(m_memory_before, MemoryTracker::snapshot());
+    memory = memory_delta(m_memory_before, default_allocator_stats());
 #endif
     double ms = std::chrono::duration<double, std::milli>(end - m_start).count();
     Instrumentation::record(m_name, ms, memory);

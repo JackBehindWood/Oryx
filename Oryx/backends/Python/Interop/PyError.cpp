@@ -16,6 +16,7 @@ void throw_python_error(const std::string& context)
     }
     catch (const py::error_already_set& error)
     {
+        rethrow_if_interpreter_control(error);
         throw to_script_error(error, context);
     }
 }

@@ -4,6 +4,7 @@
 #include <pybind11/stl.h>
 
 #include "Support/PyBatch.h"
+#include "Support/PyTypeHints.h"
 #include "Oryx/Scripting/Support/ScriptUtil.h"
 
 namespace py = pybind11;
@@ -39,16 +40,11 @@ std::vector<double> mean_rewards_of(const PyBatchResult& result)
     return means;
 }
 
-std::string version_string()
-{
-    return std::to_string(VERSION_MAJOR) + "." + std::to_string(VERSION_MINOR) + "." + std::to_string(VERSION_PATCH);
-}
-
-py::object metadata_of(const PyBatchResult& result)
+hints::OptionalAnyDict metadata_of(const PyBatchResult& result)
 {
     if (!result.has_metadata)
     {
-        return py::none();
+        return hints::OptionalAnyDict(py::none());
     }
     py::dict metadata;
     metadata["game"] = result.metadata.game;
@@ -56,7 +52,7 @@ py::object metadata_of(const PyBatchResult& result)
     metadata["games"] = result.metadata.games;
     metadata["seed"] = result.metadata.seeded ? py::cast(result.metadata.seed) : py::none();
     metadata["oryx_version"] = version_string();
-    return metadata;
+    return hints::OptionalAnyDict(metadata);
 }
 
 py::dict to_dict(const PyBatchResult& result)

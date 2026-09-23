@@ -3,6 +3,7 @@
 
 #include "PyScripted.h"
 #include "PythonContext.h"
+#include "PythonLanguage.h"
 #include "Support/PyHandles.h"
 #include "Support/PySchema.h"
 #include "Support/PyUtil.h"
@@ -42,8 +43,46 @@ bool is_script_strategy(const py::handle& value)
     return PythonContext::current().is_strategy(value.ptr());
 }
 
-SharedPtr<IGame> resolve_game(const py::object& spec)
+py::object registry_name_of(const py::object& spec)
 {
+    const PythonContext& context = PythonContext::current();
+    if (!context.is_game_class(spec.ptr()) && !context.is_strategy_class(spec.ptr()))
+    {
+        return spec;
+    }
+
+    py::object own = spec.attr("__dict__");
+    if (!own.contains(kRegisteredIdAttribute))
+    {
+        std::string name = spec.attr("__name__").cast<std::string>();
+        throw Error("the class " + name + " is not registered; give it an id (`class " + name + "(..., id=\"...\")`) to pass the class itself");
+    }
+    return own[kRegisteredIdAttribute];
+}
+
+py::list strategy_specs(const py::object& spec, int32_t seats)
+{
+    py::list specs;
+    if (PyList_Check(spec.ptr()) || PyTuple_Check(spec.ptr()))
+    {
+        for (const py::handle& entry : spec)
+        {
+            specs.append(registry_name_of(py::reinterpret_borrow<py::object>(entry)));
+        }
+        return specs;
+    }
+
+    py::object single = registry_name_of(spec);
+    for (int32_t seat = 0; seat < seats; ++seat)
+    {
+        specs.append(single);
+    }
+    return specs;
+}
+
+SharedPtr<IGame> resolve_game(const py::object& game_spec)
+{
+    py::object spec = registry_name_of(game_spec);
     if (py::isinstance<py::str>(spec))
     {
         std::string name = spec.cast<std::string>();
@@ -65,8 +104,9 @@ SharedPtr<IGame> resolve_game(const py::object& spec)
     throw Error("expected a game name or a game, got '" + type_name_of(spec) + "'");
 }
 
-SharedPtr<IStrategy> resolve_strategy(const py::object& spec, const Params& name_params)
+SharedPtr<IStrategy> resolve_strategy(const py::object& strategy_spec, const Params& name_params)
 {
+    py::object spec = registry_name_of(strategy_spec);
     if (py::isinstance<py::str>(spec))
     {
         std::string name = spec.cast<std::string>();

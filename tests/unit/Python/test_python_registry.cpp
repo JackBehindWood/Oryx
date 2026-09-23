@@ -57,7 +57,7 @@ TEST_CASE("oryx.make_* raise OryxError for unknown names and ParamError naming t
     CHECK(output.find("OryxError:-:no strategy is registered as 'nope'") != std::string::npos);
 }
 
-TEST_CASE("the registry, simulation and Random entry points raise OryxError before Oryx is initialised")
+TEST_CASE("the registry, simulation and Random entry points raise NotInitialisedError before Oryx is initialised")
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
@@ -78,7 +78,7 @@ TEST_CASE("the registry, simulation and Random entry points raise OryxError befo
         "    try:\n"
         "        call()\n"
         "        mark(name + ' ran;')\n"
-        "    except oryx.OryxError as e:\n"
+        "    except oryx.NotInitialisedError as e:\n"
         "        mark(str(e) + ';')\n");
 
     RunningPython python;

@@ -10,88 +10,106 @@ namespace
 {
 
 template<typename T>
-FlatHashMap<std::string, ScriptOrigin, 16>& origins()
-{
-    static FlatHashMap<std::string, ScriptOrigin, 16> instance;
-    return instance;
-}
-
-// A clobbered entry's factory/info, plus its origin (had_origin false for a C++ entry) so
-// restoring it also restores whether it counts as scripted and by whom.
-template<typename T>
-struct StashedEntry
+struct ClobberedLayer
 {
     typename Registry<T>::Factory factory;
     EntryInfo info;
-    bool had_origin = false;
+    bool scripted = false;
     ScriptOrigin origin;
 };
 
-// What overwrite=True clobbered, so unregister_language can put it back. Only ever holds the
-// immediately-clobbered entry per id: a chain of overwrites (A overwrites C++, B overwrites A)
-// restores A's factory when B's runtime stops, not the original C++ one - one stash slot per id,
-// documented as an acceptable limit rather than a bug.
 template<typename T>
-FlatHashMap<std::string, StashedEntry<T>, 16>& overwritten()
+struct ScriptedEntry
 {
-    static FlatHashMap<std::string, StashedEntry<T>, 16> instance;
+    ScriptOrigin origin;
+    std::vector<ClobberedLayer<T>> clobbered;
+};
+
+template<typename T>
+FlatHashMap<std::string, ScriptedEntry<T>, 16>& scripted_entries()
+{
+    static FlatHashMap<std::string, ScriptedEntry<T>, 16> instance;
     return instance;
+}
+
+// A direct Registry<T>::unregister_factory bypasses this table, so its entry is dropped on the next lookup.
+template<typename T>
+ScriptedEntry<T>* find_scripted(const std::string& id)
+{
+    ScriptedEntry<T>* entry = scripted_entries<T>().find(id);
+    if (entry != nullptr && !Registry<T>::has(id))
+    {
+        scripted_entries<T>().erase(id);
+        return nullptr;
+    }
+    return entry;
 }
 
 template<typename T>
 void register_scripted(const char* kind, const std::string& id, const ScriptOrigin& origin, typename Registry<T>::Factory factory, EntryInfo info, bool overwrite)
 {
-    const ScriptOrigin* existing_origin = origins<T>().find(id);
-    if (Registry<T>::has(id) && !overwrite)
+    ScriptedEntry<T>* existing = find_scripted<T>(id);
+    bool registered = Registry<T>::has(id);
+    bool same_origin = existing != nullptr && existing->origin == origin;
+    if (registered && !same_origin && !overwrite)
     {
-        if (existing_origin == nullptr)
-        {
-            throw ScriptError(std::string("the ") + kind + " '" + id + "' is already registered by C++; pass overwrite=True to replace it");
-        }
-        if (*existing_origin != origin)
-        {
-            throw ScriptError(std::string("the ") + kind + " '" + id + "' is already registered by " + describe(*existing_origin) + "; pass overwrite=True to replace it");
-        }
+        std::string owner = existing == nullptr ? std::string("C++") : describe(existing->origin);
+        throw ScriptError(std::string("the ") + kind + " '" + id + "' is already registered by " + owner + "; pass overwrite=True to replace it");
     }
 
-    // Always overwrites any earlier stash on a fresh cross-origin clobber, so a chain of
-    // overwrites keeps only the immediately-clobbered entry, not the first one ever displaced.
-    bool clobbers_other_origin = Registry<T>::has(id) && (existing_origin == nullptr || *existing_origin != origin);
-    if (clobbers_other_origin)
+    ScriptedEntry<T> entry;
+    if (existing != nullptr)
     {
-        StashedEntry<T> stashed{ Registry<T>::factory(id), *Registry<T>::info(id), existing_origin != nullptr, existing_origin != nullptr ? *existing_origin : ScriptOrigin{} };
-        overwritten<T>().insert_or_assign(id, std::move(stashed));
+        entry = std::move(*existing);
     }
+    if (registered && !same_origin)
+    {
+        entry.clobbered.push_back(ClobberedLayer<T>{ Registry<T>::factory(id), *Registry<T>::info(id), existing != nullptr, entry.origin });
+        std::erase_if(entry.clobbered, [&origin](const ClobberedLayer<T>& layer) { return layer.scripted && layer.origin == origin; });
+    }
+    entry.origin = origin;
 
     Registry<T>::register_factory(id, std::move(factory), std::move(info));
-    origins<T>().insert_or_assign(id, origin);
+    scripted_entries<T>().insert_or_assign(id, std::move(entry));
 }
 
 template<typename T>
 void unregister_language(const std::string& language)
 {
     std::vector<std::string> ids;
-    origins<T>().for_each([&](const std::string& id, const ScriptOrigin& origin)
-    {
-        if (origin.language == language)
-        {
-            ids.push_back(id);
-        }
-    });
+    scripted_entries<T>().for_each([&ids](const std::string& id, const ScriptedEntry<T>&) { ids.push_back(id); });
 
     for (const std::string& id : ids)
     {
-        Registry<T>::unregister_factory(id);
-        origins<T>().erase(id);
-
-        if (const StashedEntry<T>* stashed = overwritten<T>().find(id))
+        ScriptedEntry<T>* entry = find_scripted<T>(id);
+        if (entry == nullptr)
         {
-            Registry<T>::register_factory(id, stashed->factory, stashed->info);
-            if (stashed->had_origin)
-            {
-                origins<T>().insert_or_assign(id, stashed->origin);
-            }
-            overwritten<T>().erase(id);
+            continue;
+        }
+
+        std::erase_if(entry->clobbered, [&language](const ClobberedLayer<T>& layer) { return layer.scripted && layer.origin.language == language; });
+        if (entry->origin.language != language)
+        {
+            continue;
+        }
+
+        if (entry->clobbered.empty())
+        {
+            Registry<T>::unregister_factory(id);
+            scripted_entries<T>().erase(id);
+            continue;
+        }
+
+        ClobberedLayer<T> restored = std::move(entry->clobbered.back());
+        entry->clobbered.pop_back();
+        Registry<T>::register_factory(id, std::move(restored.factory), std::move(restored.info));
+        if (restored.scripted)
+        {
+            entry->origin = std::move(restored.origin);
+        }
+        else
+        {
+            scripted_entries<T>().erase(id);
         }
     }
 }
@@ -116,12 +134,14 @@ void unregister_scripted(const std::string& language)
 
 const ScriptOrigin* scripted_game_origin(const std::string& id)
 {
-    return origins<IGame>().find(id);
+    const ScriptedEntry<IGame>* entry = find_scripted<IGame>(id);
+    return entry == nullptr ? nullptr : &entry->origin;
 }
 
 const ScriptOrigin* scripted_strategy_origin(const std::string& id)
 {
-    return origins<IStrategy>().find(id);
+    const ScriptedEntry<IStrategy>* entry = find_scripted<IStrategy>(id);
+    return entry == nullptr ? nullptr : &entry->origin;
 }
 
 } // namespace oryx

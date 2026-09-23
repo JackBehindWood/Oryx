@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Interop/PyHolder.h"
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Game/IActionFeatures.h"
 #include "Oryx/Game/IState.h"

@@ -24,13 +24,16 @@ SharedPtr<PyState> new_initial_state(const PyGame& game)
 void bind_game(py::module_& module)
 {
     py::module_ game_module = module.def_submodule("game", "Games, states and strategies, whether implemented in C++ or in a script.");
-    py::class_<PyGame>(game_module, "GameHandle", "A game owned by the engine, whether it is implemented in C++ or in a script.")
+    py::class_<PyGame> game_handle(game_module, "GameHandle", "A game owned by the engine, whether it is implemented in C++ or in a script.");
+    py::class_<PyState, SharedPtr<PyState>> state_handle(game_module, "StateHandle", "A game state driven by the engine; a state lent to a strategy is only valid during decide().");
+
+    game_handle
         .def("name", [](const PyGame& game) { return game.get()->name(); })
         .def("num_players", [](const PyGame& game) { return game.get()->num_players(); })
         .def("new_initial_state", &new_initial_state)
         .def("__repr__", [](const PyGame& game) { return "<oryx.GameHandle '" + game.get()->name() + "'>"; });
 
-    py::class_<PyState, SharedPtr<PyState>>(game_module, "StateHandle", "A game state driven by the engine; a state lent to a strategy is only valid during decide().")
+    state_handle
         .def("legal_actions", &PyState::legal_actions)
         .def("apply", &PyState::apply, py::arg("action"))
         .def("undo", &PyState::undo, py::arg("action"))

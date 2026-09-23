@@ -41,6 +41,7 @@ project "Tests"
     useOryxPython()
 
     linkOryxWholeArchive()
+    useOryxAllocationCensus()
     links {
         "spdlog",
     }

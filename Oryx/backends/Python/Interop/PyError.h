@@ -5,7 +5,7 @@
 namespace oryx::python
 {
 
-// Turns the Python exception that is currently set into a ScriptError carrying its traceback; the GIL must be held.
+// Turns the Python exception that is currently set into a ScriptError carrying its traceback (interpreter-control exceptions pass through); the GIL must be held.
 [[noreturn]] void throw_python_error(const std::string& context);
 
 // "<context>: expected <expected>, got <type of object>".

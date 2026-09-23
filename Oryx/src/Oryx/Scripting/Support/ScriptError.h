@@ -18,4 +18,15 @@ public:
     [[nodiscard]] const std::string& traceback() const { return detail(); }
 };
 
+class IllegalActionError : public ScriptError
+{
+public:
+    explicit IllegalActionError(const std::string& message)
+        : ScriptError(message)
+    {
+    }
+
+    [[nodiscard]] const char* category() const noexcept override { return "illegal_action"; }
+};
+
 } // namespace oryx

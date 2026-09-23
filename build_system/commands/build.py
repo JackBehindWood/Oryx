@@ -10,7 +10,7 @@ from build_system.config import BUILD_DIR, PROJECT_ROOT, RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
 from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
-from build_system.setup.python_extension import install_extension_pth
+from build_system.setup.python_extension import install_extension_pth, remove_extension_pth
 from build_system.setup.stale_objects import (
     clear_outputs_if_python_changed,
     clear_outputs_of_removed_sources,
@@ -117,8 +117,12 @@ def compile_project(ctx: typer.Context):
         console.print(f"[bold red]✗ Build failed:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
 
-    if cfg.python_enabled:
+    if cfg.python_enabled and not cfg.sanitize:
         install_extension_pth(cfg.binary_path / "OryxPython")
+    elif remove_extension_pth():
+        # A sanitized oryx.so needs the ASan runtime preloaded, which a plain `python` never has.
+        reason = "a --sanitize extension can't be imported by plain python" if cfg.python_enabled else "this build has no Python extension"
+        console.print(f"[dim]Removed the venv's `import oryx` path: {reason}; a normal build restores it.[/dim]\n")
 
 
 @command(name="clean", label="Clean — remove build artifacts")
@@ -134,6 +138,8 @@ def clean(ctx: typer.Context):
     if BUILD_DIR.exists():
         remove_directory(BUILD_DIR)
         console.print(f"[green]✓ Removed directory:[/green] {BUILD_DIR}")
+    if remove_extension_pth():
+        console.print("[green]✓ Removed the venv's `import oryx` path[/green]")
 
 
 @command(name="all", label="All — configure, compile, and test")

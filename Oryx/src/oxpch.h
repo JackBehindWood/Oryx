@@ -4,8 +4,11 @@
 
 #include <iostream>
 #include <memory>
+#include <new>
 #include <utility>
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <iomanip>
 #include <functional>
 
@@ -13,12 +16,14 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <sstream>
 #include <span>
 #include <variant>

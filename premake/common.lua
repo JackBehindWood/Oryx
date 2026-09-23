@@ -1,6 +1,4 @@
--- Shared per-project defaults. Included once from the root premake5.lua;
--- every project's premake5.lua then calls useOryxProjectDefaults() instead
--- of repeating language/cppdialect/staticruntime/targetdir/objdir lines.
+-- Shared per-project defaults, so each project doesn't repeat language/dialect/runtime/output-dir lines.
 function useOryxProjectDefaults()
     language "C++"
     cppdialect "C++20"
@@ -14,13 +12,10 @@ end
 
 newoption {
     trigger = "sanitize",
-    description = "Build with AddressSanitizer + UndefinedBehaviorSanitizer (opt-in dev/CI tool; keeps the profile's own optimize/symbols settings, so it still exercises Release/Dist codegen when built with --profile release|dist)",
+    description = "Build with AddressSanitizer + UndefinedBehaviorSanitizer (opt-in dev/CI tool; keeps the profile's optimize level so it still exercises Release/Dist codegen, forces debug symbols on for readable reports; the allocation census stays linked, so ASan's new/delete-mismatch check is inactive)",
 }
 
--- Opt-in, keeps whatever optimize/symbols the active configuration already has - a Release/Dist
--- build under --sanitize still runs through the optimizer, which is the point: some bugs only
--- reproduce once the optimizer is on, and a sanitizer build is how you catch them at the actual
--- faulting read/write instead of wherever the corruption happens to be noticed downstream.
+-- Keeps the profile's optimize level on purpose: some bugs only reproduce with the optimizer (decision log, "Sanitizer builds").
 function useOryxSanitizers()
     if _OPTIONS["sanitize"] == nil then
         return
@@ -31,12 +26,17 @@ function useOryxSanitizers()
     symbols "On"
 end
 
--- Games/strategies self-register via a static object with no other
--- externally-visible symbol (docs/architecture.md §10). A plain `links "Oryx"`
--- lets the linker silently drop object files from the libOryx.a archive that
--- nothing else references, so those registrations never run - use this
--- instead of `links "Oryx"` in any project that consumes Oryx's registry
--- without directly naming every concrete type (Oasis, Tests).
+-- Executables only: a library (libOryx.a, the oryx extension) must not replace operator new inside its host process.
+function useOryxAllocationCensus()
+    files { "%{_MAIN_SCRIPT_DIR}/Oryx/backends/Program/AllocationCensus.cpp" }
+    includedirs { "%{_MAIN_SCRIPT_DIR}/Oryx/src" }
+
+    filter "files:**/AllocationCensus.cpp"
+        flags { "NoPCH" }
+    filter {}
+end
+
+-- Whole archive, because self-registering objects have no other referenced symbol and a plain `links "Oryx"` would drop them.
 function linkOryxWholeArchive()
     -- A project link (not just the linkoptions below) makes the executable relink whenever libOryx changes.
     links { "Oryx", "yaml-cpp" }

@@ -2,7 +2,7 @@
 Timing and memory measurements of simulations.
 """
 from __future__ import annotations
-import collections.abc
+import oryx.game
 import oryx.results
 import typing
 __all__: list[str] = ['BenchmarkResult', 'MemoryStats', 'Timer', 'benchmark']
@@ -22,7 +22,7 @@ class BenchmarkResult:
     def matches_per_second(self) -> float:
         ...
     @property
-    def memory(self) -> typing.Any:
+    def memory(self) -> oryx.benchmark.MemoryStats | None:
         """
         MemoryStats when benchmark(..., memory=True), else None.
         """
@@ -31,7 +31,7 @@ class BenchmarkResult:
         ...
 class MemoryStats:
     """
-    C++ heap allocations made by Oryx during a run; Python's own allocator is not counted.
+    Oryx objects allocated during a run, counted exactly by Oryx's default allocator; Python's allocator and third-party C++ allocations are not counted.
     """
     def __repr__(self) -> str:
         ...
@@ -70,7 +70,7 @@ class Timer:
     @property
     def elapsed_seconds(self) -> float:
         ...
-def benchmark(game: typing.Any, strategies: collections.abc.Sequence, games: typing.SupportsInt | typing.SupportsIndex = 1000, seed: typing.Any = None, memory: bool = False) -> BenchmarkResult:
+def benchmark(game: str | oryx.game.GameHandle | oryx.game.Game | type[oryx.game.Game], strategies: str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy] | collections.abc.Sequence[str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy]], games: typing.SupportsInt | typing.SupportsIndex = 1000, seed: int | None = None, memory: bool = False) -> BenchmarkResult:
     """
     Plays `games` matches like simulate() and reports the time taken; memory=True also counts C++ allocations.
     """

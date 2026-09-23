@@ -5,10 +5,13 @@
 namespace oryx::python
 {
 
-// Adds the native module to the interpreter's builtin table; must run before the interpreter starts.
+// Adds the native module to the embedded interpreter's builtin table; must run before the interpreter starts.
 void register_oryx_module();
 
+// Everything both hosts share; the research host adds init() on top (OryxPython/src/Module.cpp).
 void bind_oryx(pybind11::module_& module);
+
+[[nodiscard]] std::string version_string();
 
 void bind_errors(pybind11::module_& module);
 void bind_debug(pybind11::module_& module);

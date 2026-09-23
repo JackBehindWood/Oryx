@@ -24,10 +24,12 @@ class Game:
     """
     Base class of games defined in Python: `class Nim(oryx.Game, id="nim")` registers on import.
     """
-    @staticmethod
-    def __init_subclass__(*args, **kwargs):
+    @classmethod
+    def __init_subclass__(cls: typing.Any, *, id: str | None = None, overwrite: bool = False, **kwargs) -> None:
+        ...
+    def new_initial_state(self) -> State:
         """
-        (arg0: object, **kwargs) -> None
+        Returns the state a match starts from.
         """
 class GameHandle:
     """
@@ -37,16 +39,40 @@ class GameHandle:
         ...
     def name(self) -> str:
         ...
-    def new_initial_state(self) -> ...:
+    def new_initial_state(self) -> StateHandle:
         ...
     def num_players(self) -> int:
         ...
 class State:
     """
-    Optional base class of states; supplies a default action_to_string().
+    Optional base class of states: typed method stubs and a default action_to_string().
     """
     def action_to_string(self, action: typing.SupportsInt | typing.SupportsIndex) -> str:
         ...
+    def apply(self, action: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        Plays an action.
+        """
+    def current_player(self) -> int:
+        """
+        The player to move.
+        """
+    def is_terminal(self) -> bool:
+        """
+        Whether the game is over.
+        """
+    def legal_actions(self) -> list[int]:
+        """
+        The actions the current player may take.
+        """
+    def outcome(self) -> list[float]:
+        """
+        One reward per player.
+        """
+    def undo(self, action: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        Takes back the action that was played last.
+        """
 class StateHandle:
     """
     A game state driven by the engine; a state lent to a strategy is only valid during decide().
@@ -69,10 +95,12 @@ class Strategy:
     """
     Base class of strategies defined in Python: `class Greedy(oryx.Strategy, id="greedy")` registers on import.
     """
-    @staticmethod
-    def __init_subclass__(*args, **kwargs):
+    @classmethod
+    def __init_subclass__(cls: typing.Any, *, id: str | None = None, overwrite: bool = False, **kwargs) -> None:
+        ...
+    def decide(self, context: Context) -> int:
         """
-        (arg0: object, **kwargs) -> None
+        Returns the action to play; `context.state` is only valid during the call.
         """
 class StrategyHandle:
     """

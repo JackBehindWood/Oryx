@@ -2,6 +2,7 @@
 #include "PythonContext.h"
 
 #include "PythonLanguage.h"
+#include "Oryx/Core/Error.h"
 
 #include "Interop/PyMethods.h"
 
@@ -17,9 +18,11 @@ UniquePtr<PythonContext>& instance()
     return context;
 }
 
+bool g_shut_down = false;
+
 } // namespace
 
-PythonContext::PythonContext()
+PythonContext::PythonContext(Token)
 {
     PyRef module = PyRef::steal(PyImport_ImportModule(kModuleName));
     if (!module)
@@ -36,14 +39,21 @@ PythonContext::PythonContext()
     {
         throw_python_error("the native oryx module has no Game, Strategy and State");
     }
+    collect_placeholders<GameMethods>(m_game.get());
+    collect_placeholders<StrategyMethods>(m_strategy.get());
+    collect_placeholders<StateMethods>(m_state.get());
 }
 
 PythonContext& PythonContext::current()
 {
     UniquePtr<PythonContext>& context = instance();
+    if (g_shut_down) [[unlikely]]
+    {
+        throw Error("oryx is shutting down: the interpreter is being finalised");
+    }
     if (!context)
     {
-        context.reset(new PythonContext());
+        context = create_unique<PythonContext>(Token{});
     }
     return *context;
 }
@@ -54,6 +64,12 @@ void PythonContext::reset()
     instance().reset();
 }
 
+void PythonContext::shut_down()
+{
+    reset();
+    g_shut_down = true;
+}
+
 bool PythonContext::is_game(PyObject* value) const
 {
     return PyObject_IsInstance(value, m_game.get()) == 1;
@@ -62,6 +78,35 @@ bool PythonContext::is_game(PyObject* value) const
 bool PythonContext::is_strategy(PyObject* value) const
 {
     return PyObject_IsInstance(value, m_strategy.get()) == 1;
+}
+
+bool PythonContext::is_game_class(PyObject* value) const
+{
+    return PyType_Check(value) && PyObject_IsSubclass(value, m_game.get()) == 1;
+}
+
+bool PythonContext::is_strategy_class(PyObject* value) const
+{
+    return PyType_Check(value) && PyObject_IsSubclass(value, m_strategy.get()) == 1;
+}
+
+bool PythonContext::is_placeholder(PyObject* attribute) const
+{
+    return std::any_of(m_placeholders.begin(), m_placeholders.end(), [attribute](const PyRef& placeholder) { return placeholder.get() == attribute; });
+}
+
+template<typename Methods>
+void PythonContext::collect_placeholders(PyObject* base)
+{
+    PyObject* own = reinterpret_cast<PyTypeObject*>(base)->tp_dict;
+    for (size_t i = 0; i < Methods::required; ++i)
+    {
+        std::string name(Methods::names[i]);
+        if (PyObject* found = PyDict_GetItemString(own, name.c_str()))
+        {
+            m_placeholders.push_back(PyRef::borrow(found));
+        }
+    }
 }
 
 bool PythonContext::is_base_class(PyObject* cls) const

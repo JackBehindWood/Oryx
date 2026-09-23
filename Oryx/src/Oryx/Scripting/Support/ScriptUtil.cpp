@@ -32,7 +32,7 @@ void check_legal(const IState& state, ActionId action, std::string_view context)
     }
 
     std::string message = "action " + to_string(action) + " is not legal in this state";
-    throw ScriptError(context.empty() ? message : std::string(context) + ": " + message);
+    throw IllegalActionError(context.empty() ? message : std::string(context) + ": " + message);
 }
 
 Outcome outcome_from_rewards(std::span<const double> rewards, size_t player_count, bool terminal)

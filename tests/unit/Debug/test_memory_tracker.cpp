@@ -1,6 +1,9 @@
 #include "doctest.h"
 
+#include "Oryx/Debug/MemoryTracker.h"
+
 #include "unit/Game/DummyGame.h"
+#include "unit/MemoryTestSupport.h"
 
 using namespace oryx;
 using namespace oryx::test;
@@ -23,6 +26,11 @@ struct alignas(64) OverAligned
 
 } // namespace
 
+TEST_CASE("MemoryTracker is installed in an Oryx executable")
+{
+    CHECK(MemoryTracker::is_installed());
+}
+
 TEST_CASE("MemoryTracker counts a new/delete pair and returns live bytes to baseline")
 {
     MemoryStats before = MemoryTracker::snapshot();
@@ -32,9 +40,7 @@ TEST_CASE("MemoryTracker counts a new/delete pair and returns live bytes to base
     delete value;
     MemoryStats after = memory_delta(before, MemoryTracker::snapshot());
 
-    // bytes_allocated/bytes_freed/live_bytes come from the allocator's own usable-size
-    // bookkeeping (not a requested-size header - see MemoryTracker.cpp), so a small request can
-    // round up to the allocator's smallest bucket; check "at least", not an exact match.
+    // Sizes are the platform allocator's usable sizes (AllocationCensus.cpp), so a small request can round up.
     CHECK(during.allocation_count == 1);
     CHECK(during.bytes_allocated >= sizeof(int32_t));
     CHECK(during.live_bytes >= static_cast<int64_t>(sizeof(int32_t)));
@@ -71,6 +77,41 @@ TEST_CASE("MemoryTracker honours over-aligned allocations")
     CHECK(delta.live_bytes == 0);
 }
 
+TEST_CASE("MemoryTracker balances counts and bytes across every new/delete form")
+{
+    constexpr int32_t kRounds = 64;
+
+    MemoryStats before = MemoryTracker::snapshot();
+    for (int32_t round = 0; round < kRounds; ++round)
+    {
+        int64_t* scalar = new int64_t(round);
+        escape(scalar);
+        char* array = new char[static_cast<size_t>(round) * 24 + 1];
+        escape(array);
+        int32_t* nothrow = new (std::nothrow) int32_t(round);
+        escape(nothrow);
+        OverAligned* aligned = new OverAligned;
+        escape(aligned);
+        std::vector<int64_t> grown;
+        for (int32_t i = 0; i <= round; ++i)
+        {
+            grown.push_back(i);
+        }
+        escape(grown.data());
+
+        delete aligned;
+        delete nothrow;
+        delete[] array;
+        delete scalar;
+    }
+    MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
+
+    CHECK(delta.allocation_count > 0);
+    CHECK(delta.allocation_count == delta.deallocation_count);
+    CHECK(delta.bytes_allocated == delta.bytes_freed);
+    CHECK(delta.live_bytes == 0);
+}
+
 TEST_CASE("MemoryTracker reports peak growth above the starting live bytes after reset_peak")
 {
     constexpr size_t kBlockBytes = 4096;
@@ -88,16 +129,16 @@ TEST_CASE("MemoryTracker reports peak growth above the starting live bytes after
 
 TEST_CASE("Allocation budget: ActionList within its inline capacity never touches the heap")
 {
-    MemoryStats before = MemoryTracker::snapshot();
+    MemoryStats before = all_allocations();
     ActionList actions;
     for (ActionId action = 0; action < kActionListInlineCapacity; ++action)
     {
         actions.push_back(action);
     }
-    MemoryStats inline_delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats inline_delta = memory_delta(before, all_allocations());
 
     actions.push_back(kActionListInlineCapacity);
-    MemoryStats spilled_delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats spilled_delta = memory_delta(before, all_allocations());
 
     CHECK(inline_delta.allocation_count == 0);
     CHECK(spilled_delta.allocation_count == 1);
@@ -105,12 +146,12 @@ TEST_CASE("Allocation budget: ActionList within its inline capacity never touche
 
 TEST_CASE("Allocation budget: two-player Rewards construct and copy never touch the heap")
 {
-    MemoryStats before = MemoryTracker::snapshot();
+    MemoryStats before = all_allocations();
     Rewards<double> rewards(2);
     rewards[0] = 1.0;
     Rewards<double> copy = rewards;
     escape(&copy);
-    MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats delta = memory_delta(before, all_allocations());
 
     CHECK(delta.allocation_count == 0);
 }
@@ -125,11 +166,11 @@ TEST_CASE("Allocation budget: providing capabilities to a Context never touches 
     DummyGame game(3);
     UniquePtr<IState> state = game.new_initial_state();
 
-    MemoryStats before = MemoryTracker::snapshot();
+    MemoryStats before = all_allocations();
     Context context(*state);
     context.provide<IActionFeatures>(&features);
     Context moved = std::move(context);
-    MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats delta = memory_delta(before, all_allocations());
 
     CHECK(moved.has<IActionFeatures>());
     CHECK(delta.allocation_count == 0);
@@ -143,10 +184,10 @@ TEST_CASE("Allocation budget: a whole Match allocates only its initial state")
 
     Match(game, { &strategy_a, &strategy_b }).play();
 
-    MemoryStats before = MemoryTracker::snapshot();
+    MemoryStats before = all_allocations();
     Match match(game, { &strategy_a, &strategy_b });
     match.play();
-    MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats delta = memory_delta(before, all_allocations());
 
     CHECK(delta.allocation_count == 1);
 }
@@ -160,9 +201,9 @@ TEST_CASE("Allocation budget: MinimaxStrategy::decide performs no heap allocatio
 
     strategy.decide(context);
 
-    MemoryStats before = MemoryTracker::snapshot();
+    MemoryStats before = all_allocations();
     ActionId action = strategy.decide(context);
-    MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats delta = memory_delta(before, all_allocations());
 
     CHECK(is_valid(action));
     CHECK(delta.allocation_count == 0);

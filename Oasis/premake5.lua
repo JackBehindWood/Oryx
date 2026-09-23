@@ -27,6 +27,7 @@ project "Oasis"
     }
 
     linkOryxWholeArchive()
+    useOryxAllocationCensus()
     links {
         "spdlog",
     }

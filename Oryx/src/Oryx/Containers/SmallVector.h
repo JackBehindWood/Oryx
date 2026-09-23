@@ -1,11 +1,12 @@
 #pragma once
 
 #include "Oryx/Core/Base.h"
+#include "Oryx/Memory/DefaultAllocator.h"
 
 namespace oryx
 {
 
-// N elements inline, spills to the heap past N (doubling); not thread-safe, same as std::vector.
+// N elements inline, spills to its allocator (the default pool unless given one) past N, doubling; not thread-safe, same as std::vector.
 template<typename T, size_t N>
 class SmallVector
 {
@@ -13,6 +14,11 @@ class SmallVector
 
 public:
     SmallVector() = default;
+
+    explicit SmallVector(IAllocator& allocator)
+        : m_allocator(&allocator)
+    {
+    }
 
     explicit SmallVector(size_t count)
     {
@@ -42,6 +48,7 @@ public:
     }
 
     SmallVector(const SmallVector& other)
+        : m_allocator(other.m_allocator)
     {
         reserve(other.m_size);
         for (size_t i = 0; i < other.m_size; ++i)
@@ -181,11 +188,21 @@ private:
         }
     }
 
+    // Resolved on first spill, so the inline-only common case never touches the default allocator.
+    IAllocator& allocator()
+    {
+        if (m_allocator == nullptr)
+        {
+            m_allocator = &default_allocator();
+        }
+        return *m_allocator;
+    }
+
     void free_heap()
     {
         if (m_is_heap)
         {
-            ::operator delete(m_data);
+            m_allocator->deallocate(m_data, m_capacity * sizeof(T), alignof(T));
             m_data = inline_data();
             m_capacity = N;
             m_is_heap = false;
@@ -194,7 +211,7 @@ private:
 
     void grow_to(size_t new_capacity)
     {
-        T* new_data = static_cast<T*>(::operator new(new_capacity * sizeof(T)));
+        T* new_data = static_cast<T*>(allocator().allocate(new_capacity * sizeof(T), alignof(T)));
         for (size_t i = 0; i < m_size; ++i)
         {
             new (&new_data[i]) T(std::move(m_data[i]));
@@ -225,6 +242,7 @@ private:
     {
         if (other.m_is_heap)
         {
+            m_allocator = other.m_allocator;
             m_data = other.m_data;
             m_capacity = other.m_capacity;
             m_is_heap = true;
@@ -254,6 +272,7 @@ private:
     T* m_data = inline_data();
     size_t m_size = 0;
     size_t m_capacity = N;
+    IAllocator* m_allocator = nullptr;
     bool m_is_heap = false;
 };
 

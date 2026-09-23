@@ -4,7 +4,18 @@ from pathlib import Path
 import sysconfig
 
 
+def _pth_path() -> Path:
+    return Path(sysconfig.get_path("purelib")) / "oryx_research_host.pth"
+
+
 def install_extension_pth(extension_dir: Path) -> None:
-    site_packages = Path(sysconfig.get_path("purelib"))
-    pth = site_packages / "oryx_research_host.pth"
-    pth.write_text(str(extension_dir.resolve()) + "\n", encoding="utf-8")
+    _pth_path().write_text(str(extension_dir.resolve()) + "\n", encoding="utf-8")
+
+
+def remove_extension_pth() -> bool:
+    """Returns whether a .pth file was there to remove."""
+    pth = _pth_path()
+    if not pth.exists():
+        return False
+    pth.unlink()
+    return True

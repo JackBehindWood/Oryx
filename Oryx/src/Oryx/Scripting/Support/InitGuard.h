@@ -1,10 +1,22 @@
 #pragma once
 
 #include "Oryx/Core/Application.h"
+#include "Oryx/Core/Error.h"
 #include "Oryx/Core/FixedString.h"
 
 namespace oryx
 {
+
+class NotInitialisedError : public Error
+{
+public:
+    explicit NotInitialisedError(const std::string& message)
+        : Error(message)
+    {
+    }
+
+    [[nodiscard]] const char* category() const noexcept override { return "not_initialised"; }
+};
 
 [[noreturn]] void throw_not_initialised(std::string_view function_name);
 
@@ -26,5 +38,5 @@ struct Guarded<Function, Name, Result (*)(Args...)>
 
 } // namespace oryx
 
-// Yields a function pointer with the same signature that throws oryx::Error instead of running before oryx::init(); free functions only.
+// Yields a function pointer with the same signature that throws oryx::NotInitialisedError instead of running before oryx::init(); free functions only.
 #define OX_GUARDED_FUNC(function, name) (&::oryx::Guarded<&function, ::oryx::FixedString(name)>::call)

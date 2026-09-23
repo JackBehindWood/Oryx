@@ -1,27 +1,29 @@
 #pragma once
 
+#include "Oryx/Memory/MemoryStats.h"
+
 namespace oryx
 {
 
-struct MemoryStats
-{
-    uint64_t allocation_count = 0;
-    uint64_t deallocation_count = 0;
-    uint64_t bytes_allocated = 0;
-    uint64_t bytes_freed = 0;
-    int64_t live_bytes = 0;
-    int64_t peak_live_bytes = 0;
-};
-
+// The whole-program allocation census, fed by the global operator new replacement that Oryx executables link.
 class MemoryTracker
 {
 public:
     static MemoryStats snapshot();
     static void reset_peak();
     static MemoryStats begin_measurement();
+    // False where no executable linked the replacement (Oryx/backends/Program), e.g. the standalone oryx module.
+    static bool is_installed();
 };
 
-// peak_live_bytes is the peak growth above before.live_bytes, so take `before` from begin_measurement().
-MemoryStats memory_delta(const MemoryStats& before, const MemoryStats& after);
+namespace detail
+{
+
+inline constinit MemoryCounters g_census;
+
+inline void record_allocation(size_t size) { g_census.record_allocation(size); }
+inline void record_deallocation(size_t size) { g_census.record_deallocation(size); }
+
+} // namespace detail
 
 } // namespace oryx

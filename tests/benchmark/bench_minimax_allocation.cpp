@@ -1,5 +1,9 @@
 #include "doctest.h"
 
+#include "Oryx/Debug/MemoryTracker.h"
+#include "Oryx/Memory/DefaultAllocator.h"
+#include "unit/MemoryTestSupport.h"
+
 #include "unit/Game/DummyGame.h"
 
 #include <chrono>
@@ -10,8 +14,7 @@ using namespace oryx::test;
 namespace
 {
 
-// Pile size tuned so DummyGame's full (unmemoized) exhaustive search tree is
-// comparable in order of magnitude to Tic-Tac-Toe's ~5x10^5 nodes.
+// A search tree about the size of Tic-Tac-Toe's (~5x10^5 nodes).
 constexpr uint32_t kPileSize = 20;
 
 constexpr int32_t kAllocIterations = 2'000'000;
@@ -25,9 +28,7 @@ double milliseconds_since(Clock::time_point start)
 
 } // namespace
 
-// Excluded from the default `build test` run (see build_system/commands/test.py)
-// - these measure wall-clock cost, not correctness, and are slow/noisy in CI.
-// Run explicitly via `build test benchmark`.
+// Not in the default `build test` run (wall-clock, noisy in CI); run with `build test benchmark`.
 TEST_SUITE("benchmark")
 {
 
@@ -40,13 +41,14 @@ TEST_CASE("Benchmark: MinimaxStrategy exhaustive search allocation cost (DummyGa
 
     Instrumentation::reset();
     MemoryTracker::reset_peak();
-    MemoryStats memory_before = MemoryTracker::snapshot();
+    default_allocator().counters().reset_peak();
+    MemoryStats memory_before = oryx::test::all_allocations();
 
     Clock::time_point search_start = Clock::now();
     ActionId action = strategy.decide(context);
     double search_ms = milliseconds_since(search_start);
 
-    MemoryStats memory = memory_delta(memory_before, MemoryTracker::snapshot());
+    MemoryStats memory = memory_delta(memory_before, oryx::test::all_allocations());
 
     CHECK(is_valid(action));
 
@@ -63,15 +65,13 @@ TEST_CASE("Benchmark: MinimaxStrategy exhaustive search allocation cost (DummyGa
     MESSAGE("legal_actions() share of decide(): ", (legal_actions_ms / search_ms) * 100.0, "%");
     MESSAGE("ns/call (legal_actions, incl. timer overhead): ", (legal_actions_ms * 1'000'000.0) / static_cast<double>(call_count));
 
-    MESSAGE("decide() allocations: ", memory.allocation_count, ", bytes: ", memory.bytes_allocated, ", peak live: ", memory.peak_live_bytes);
+    MESSAGE("decide() allocations: ", memory.allocation_count, ", bytes: ", memory.bytes_allocated, ", peak live (upper bound): ", memory.peak_live_bytes);
     MESSAGE("legal_actions() allocations: ", it->second.allocation_count, " over ", call_count, " calls");
 }
 
 TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-shaped result")
 {
-    // Isolates pure allocator cost from search logic: builds/destroys a
-    // <=3-element result kAllocIterations times via std::vector, a fixed
-    // stack array, and ActionList (the real legal_actions() return type).
+    // Pure allocation cost of a legal_actions()-shaped result: std::vector vs a stack array vs ActionList.
     volatile size_t sink = 0;
 
     MemoryStats vector_before = MemoryTracker::snapshot();

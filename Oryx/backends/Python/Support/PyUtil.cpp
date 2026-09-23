@@ -19,4 +19,15 @@ ScriptError to_script_error(const py::error_already_set& error, const std::strin
     return script_error(context, detail.substr(0, detail.find('\n')), detail);
 }
 
+void rethrow_if_interpreter_control(const py::error_already_set& error)
+{
+    for (PyObject* type : { PyExc_KeyboardInterrupt, PyExc_SystemExit, PyExc_GeneratorExit, PyExc_MemoryError, PyExc_RecursionError })
+    {
+        if (error.matches(type))
+        {
+            throw error;
+        }
+    }
+}
+
 } // namespace oryx::python

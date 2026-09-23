@@ -358,7 +358,7 @@ TEST_CASE("an exception in a Python method surfaces as ScriptError with its trac
     CHECK(output == "state.apply(): RuntimeError: kaboom|True");
 }
 
-TEST_CASE("a Python strategy returning an illegal action is a ScriptError, not a corrupted game")
+TEST_CASE("a Python strategy returning an illegal action is an IllegalActionError, not a corrupted game")
 {
     std::string output = run_script(
         "import oryx\n"
@@ -367,10 +367,35 @@ TEST_CASE("a Python strategy returning an illegal action is a ScriptError, not a
         "match = oryx.Match('tictactoe', ['cheat', 'first-legal'])\n"
         "try:\n"
         "    match.play()\n"
-        "except oryx.ScriptError as e:\n"
+        "except oryx.IllegalActionError as e:\n"
         "    mark(str(e) + '|' + str(match.history()))\n");
 
     CHECK(output == "strategy.decide() returned an illegal action: action 99 is not legal in this state|[]");
+}
+
+TEST_CASE("interpreter-control exceptions from a script reach the Python caller untouched")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class Stop(oryx.Strategy, id='stop'):\n"
+        "    raised = None\n"
+        "    def decide(self, context): raise Stop.raised\n"
+        "class Refuses(oryx.Strategy, id='refuses'):\n"
+        "    def __init__(self): raise SystemExit(2)\n"
+        "    def decide(self, context): return 0\n"
+        "def attempt(kind, call):\n"
+        "    try:\n"
+        "        call()\n"
+        "    except kind:\n"
+        "        mark(kind.__name__ + ';')\n"
+        "    except oryx.OryxError as e:\n"
+        "        mark('wrapped ' + kind.__name__ + ';')\n"
+        "for kind in (KeyboardInterrupt, SystemExit, GeneratorExit, MemoryError, RecursionError, ValueError):\n"
+        "    Stop.raised = kind\n"
+        "    attempt(kind, lambda: oryx.Match('tictactoe', ['stop', 'first-legal']).play())\n"
+        "attempt(SystemExit, lambda: oryx.make_strategy('refuses'))\n");
+
+    CHECK(output == "KeyboardInterrupt;SystemExit;GeneratorExit;MemoryError;RecursionError;wrapped ValueError;SystemExit;");
 }
 
 TEST_CASE("the state lent to decide() cannot be used after decide() returns")
@@ -686,6 +711,67 @@ TEST_CASE("the GIL stays held while any participant is a Python script")
 
     StrategyRegistry::unregister_factory("test/gil-probe");
     CHECK(g_probe_saw_gil);
+}
+
+TEST_CASE("the base classes' placeholder methods raise NotImplementedError and never count as definitions")
+{
+    std::string output = run_script(
+        "import oryx\n"
+        "class Lazy(oryx.Strategy):\n"
+        "    pass\n"
+        "try:\n"
+        "    Lazy().decide(None)\n"
+        "except NotImplementedError as e:\n"
+        "    mark(str(e) + ';')\n"
+        "class HalfState(oryx.State):\n"
+        "    def apply(self, action): pass\n"
+        "class Half(oryx.Game, id='half'):\n"
+        "    num_players = 2\n"
+        "    def new_initial_state(self): return HalfState()\n"
+        "try:\n"
+        "    oryx.make_game('half').new_initial_state()\n"
+        "except oryx.ScriptError as e:\n"
+        "    mark(str(e))\n");
+
+    CHECK(output == "Lazy must define decide();state class 'HalfState' must define legal_actions()");
+}
+
+TEST_CASE("Match, simulate and benchmark accept registered classes, and one strategy fills every seat")
+{
+    std::string output = run_script(with_nim(std::string(kMonteCarlo) +
+        "match = oryx.Match(Nim, [MonteCarlo, 'random'])\n"
+        "mark(str(match.state().current_player()) + ';')\n"
+        "result = oryx.simulate(Nim, MonteCarlo, games=4, seed=3)\n"
+        "mark(str(result.metadata['strategies']) + ';')\n"
+        "mark(str(oryx.simulate('nim', ('random', 'first-legal'), games=2).metadata['strategies']) + ';')\n"
+        "mark(str(oryx.benchmark.benchmark(Nim, 'random', games=2).outcome.matches) + ';')\n"
+        "mark(str(oryx.Match('tictactoe', oryx.make_strategy('first-legal')).play()) + ';')\n"
+        "mark(oryx.describe_strategy(MonteCarlo)['name'] + ':' + str(oryx.simulate(Nim, [oryx.make_strategy(MonteCarlo, playouts=2), 'random'], games=2).matches) + ';')\n"
+        "class Unregistered(oryx.Strategy):\n"
+        "    def decide(self, context): return 1\n"
+        "try:\n"
+        "    oryx.Match(Nim, Unregistered)\n"
+        "except oryx.OryxError as e:\n"
+        "    mark(str(e))\n"));
+
+    CHECK(output ==
+          "0;"
+          "['monte-carlo', 'monte-carlo'];"
+          "['random', 'first-legal'];"
+          "2;"
+          "[1.0, -1.0];"
+          "monte-carlo:2;"
+          "the class Unregistered is not registered; give it an id (`class Unregistered(..., id=\"...\")`) to pass the class itself");
+}
+
+TEST_CASE("a class resolves through its registry entry, so seeding by name applies to it")
+{
+    std::string output = run_script(with_nim(std::string(kMonteCarlo) +
+        "by_class = oryx.simulate(Nim, [MonteCarlo, 'random'], games=6, seed=11)\n"
+        "by_name = oryx.simulate('nim', ['monte-carlo', 'random'], games=6, seed=11)\n"
+        "mark(str(by_class.wins == by_name.wins and by_class.decisions == by_name.decisions))\n"));
+
+    CHECK(output == "True");
 }
 
 #endif

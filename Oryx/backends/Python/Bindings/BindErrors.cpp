@@ -16,11 +16,15 @@ PyObject* g_error_type = nullptr;
 PyObject* g_param_error_type = nullptr;
 PyObject* g_script_error_type = nullptr;
 PyObject* g_assertion_error_type = nullptr;
+PyObject* g_settings_error_type = nullptr;
+PyObject* g_illegal_action_error_type = nullptr;
+PyObject* g_not_initialised_error_type = nullptr;
 
-PyObject* add_exception(py::module_& module, const char* name, PyObject* base)
+PyObject* add_exception(py::module_& module, const char* name, PyObject* base, PyObject* builtin = nullptr)
 {
     std::string qualified = std::string("oryx.errors.") + name;
-    PyObject* type = PyErr_NewException(qualified.c_str(), base, nullptr);
+    py::object bases = builtin == nullptr ? py::reinterpret_borrow<py::object>(base) : py::make_tuple(py::handle(base), py::handle(builtin));
+    PyObject* type = PyErr_NewException(qualified.c_str(), bases.ptr(), nullptr);
     if (!type)
     {
         throw py::error_already_set();
@@ -43,6 +47,18 @@ PyObject* exception_type_for(const Error& error)
     if (category == "assertion")
     {
         return g_assertion_error_type;
+    }
+    if (category == "settings")
+    {
+        return g_settings_error_type;
+    }
+    if (category == "illegal_action")
+    {
+        return g_illegal_action_error_type;
+    }
+    if (category == "not_initialised")
+    {
+        return g_not_initialised_error_type;
     }
     return g_error_type;
 }
@@ -77,9 +93,12 @@ void bind_errors(py::module_& module)
 {
     py::module_ errors = module.def_submodule("errors", "Exceptions Oryx raises.");
     g_error_type = add_exception(errors, "OryxError", PyExc_Exception);
-    g_param_error_type = add_exception(errors, "ParamError", g_error_type);
+    g_param_error_type = add_exception(errors, "ParamError", g_error_type, PyExc_ValueError);
     g_script_error_type = add_exception(errors, "ScriptError", g_error_type);
-    g_assertion_error_type = add_exception(errors, "OryxAssertionError", g_error_type);
+    g_assertion_error_type = add_exception(errors, "OryxAssertionError", g_error_type, PyExc_AssertionError);
+    g_settings_error_type = add_exception(errors, "SettingsError", g_error_type);
+    g_illegal_action_error_type = add_exception(errors, "IllegalActionError", g_script_error_type, PyExc_ValueError);
+    g_not_initialised_error_type = add_exception(errors, "NotInitialisedError", g_error_type, PyExc_RuntimeError);
 
     py::register_exception_translator(&translate_error);
 }

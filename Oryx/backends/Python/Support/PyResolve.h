@@ -16,7 +16,13 @@ namespace oryx::python
 [[nodiscard]] bool is_script_game(const pybind11::handle& value);
 [[nodiscard]] bool is_script_strategy(const pybind11::handle& value);
 
-// Accepts a registry name, or a native/Python-defined game.
+// A registered oryx.Game/oryx.Strategy subclass as its registry name; any other value is returned unchanged.
+[[nodiscard]] pybind11::object registry_name_of(const pybind11::object& spec);
+
+// One entry per seat: a list or tuple is taken as it is, anything else (a name, class, handle or instance) fills every seat.
+[[nodiscard]] pybind11::list strategy_specs(const pybind11::object& spec, int32_t seats);
+
+// Accepts a registry name, a registered class, or a native/Python-defined game.
 [[nodiscard]] SharedPtr<IGame> resolve_game(const pybind11::object& spec);
 // A registry name is created with `name_params`.
 [[nodiscard]] SharedPtr<IStrategy> resolve_strategy(const pybind11::object& spec, const Params& name_params = {});

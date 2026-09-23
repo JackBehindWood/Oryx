@@ -5,8 +5,8 @@
 #include "Interop/PyScriptObject.h"
 #include "PythonContext.h"
 #include "PythonConfig.h"
-#include "PythonHost.h"
 #include "PythonLanguage.h"
+#include "Support/PyScripts.h"
 #include "Support/PyUtil.h"
 
 #include <pybind11/embed.h>
@@ -120,51 +120,6 @@ void purge_modules(const std::vector<std::string>& roots)
     py::module_::import("importlib").attr("invalidate_caches")();
 }
 
-// The dotted name a script is imported by: its path below its root, without the extension.
-std::string module_name_of(const ScriptSource& source)
-{
-    std::filesystem::path relative = std::filesystem::path(source.target).lexically_relative(source.root);
-    relative.replace_extension();
-
-    std::string name;
-    for (const std::filesystem::path& part : relative)
-    {
-        if (part.string().find('.') != std::string::npos)
-        {
-            throw ScriptError("PythonRuntime: cannot import '" + source.target + "': a script's name cannot contain a dot");
-        }
-        name += (name.empty() ? "" : ".") + part.string();
-    }
-    return name;
-}
-
-void import_file(const ScriptSource& source, bool reload)
-{
-    std::string name = module_name_of(source);
-    py::object modules = py::module_::import("sys").attr("modules");
-    py::module_ importlib = py::module_::import("importlib");
-    py::object module = reload && modules.contains(name.c_str()) ? importlib.attr("reload")(modules[name.c_str()]) : importlib.attr("import_module")(name);
-
-    py::object file = py::getattr(module, "__file__", py::none());
-    std::error_code error;
-    if (!py::isinstance<py::str>(file) || !std::filesystem::equivalent(file.cast<std::string>(), source.target, error))
-    {
-        std::string other = py::isinstance<py::str>(file) ? " (" + file.cast<std::string>() + ")" : "";
-        throw ScriptError("PythonRuntime: script '" + source.target + "' is shadowed by the module '" + name + "'" + other + "; rename the script");
-    }
-}
-
-void import_module(const std::string& target, bool reload)
-{
-    py::object modules = py::module_::import("sys").attr("modules");
-    if (reload && modules.contains(target.c_str()))
-    {
-        py::module_::import("importlib").attr("reload")(modules[target.c_str()]);
-        return;
-    }
-    py::module_::import(target.c_str());
-}
-
 } // namespace
 
 PythonRuntime::~PythonRuntime()
@@ -205,7 +160,6 @@ void PythonRuntime::start()
     {
         python::register_oryx_module();
         py::initialize_interpreter(&config, 0, nullptr, false);
-        python::mark_embedded_host();
         extend_search_path();
     }
     catch (const std::exception& error)
@@ -247,18 +201,11 @@ void PythonRuntime::run_source(const ScriptSource& source, bool reload)
 {
     try
     {
-        if (source.kind == ScriptSourceKind::Module)
+        if (source.kind == ScriptSourceKind::File)
         {
-            import_module(source.target, reload);
-            return;
+            add_root(source.root);
         }
-
-        if (source.root.empty())
-        {
-            throw ScriptError("PythonRuntime: the script '" + source.target + "' has no root to import it from");
-        }
-        add_root(source.root);
-        import_file(source, reload);
+        python::import_script(source, reload);
     }
     catch (const py::error_already_set& error)
     {
@@ -273,9 +220,7 @@ void PythonRuntime::add_root(const std::string& root)
         return;
     }
 
-    py::list search_path = py::module_::import("sys").attr("path");
-    search_path.append(root);
-    py::module_::import("importlib").attr("invalidate_caches")();
+    python::add_search_root(root);
     m_roots.push_back(root);
 }
 

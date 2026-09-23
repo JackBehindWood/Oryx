@@ -15,9 +15,9 @@ command = registry.make_group(app, group="Python")
 
 @command(name="stubs", label="Stubs — regenerate the oryx extension's .pyi files")
 def generate_stubs(ctx: typer.Context):
-    """Regenerates Oryx/backends/Python/stubs/oryx/*.pyi from the built extension."""
+    """Regenerates OryxPython/stubs/oryx/*.pyi from the built extension."""
     run: RunContext = ctx.obj
-    command_line = ["uv", "run", "--group", "stubs", "python", "-m", "pybind11_stubgen", "oryx", "-o", "Oryx/backends/Python/stubs"]
+    command_line = ["uv", "run", "--group", "stubs", "python", "-m", "pybind11_stubgen", "oryx", "-o", "OryxPython/stubs"]
 
     if run.dry_run:
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")

@@ -129,10 +129,32 @@ sibling to `SmallVector` (no current caller needs one).
 | `current_player` / `is_terminal` | 85 / 84 | 23 / 24 | 63 / 53 |
 | `outcome` | 281 | 99 | 540 |
 | `apply` / `undo` | 100 / 100 | 41 / 40 | 84 / 85 |
-| `decide` (Python strategy, first legal action) | 1232 | 513 | 6960 |
+| `decide` (Python strategy, first legal action) | 1232 | 504 | 6960 |
 | Python Monte Carlo on Python Nim, decisions/s | 730 | 1290 | 194 |
 
 The speed-up has two sources. The backend restructure removed per-call string building, the generic argument and result casting and the bound-method allocation: each scripted class gets a method table once (compile-time method sets, `PyObject_Vectorcall`) and results are converted through the C API. Then one measured cache: a scripted state remembers its last `legal_actions()` until its own `apply`/`undo`, because the legality check of `apply()` asked the script for the same list a moment after the strategy had (+17 to +18 % on Python Monte Carlo and on the end-to-end Python Nim batch). Measured and **not** kept because they are within run-to-run noise (1 to 4 %): skipping `PyGILState_Ensure` when the GIL is already held, and link-time optimisation of Release. A reusable `Context` was not tried, because it would make a stashed handle from an earlier `decide()` valid again. Debug is 2 to 5 times slower than Release for this path (pybind11 checks and unoptimised adapters), so changes are judged on Release. A Python-defined game or state stays the slow path (D22): C++ games with Python strategies and all-C++ batches are the fast ones.
+
+### Allocator module (2026-09, step 13)
+
+`decide` has been through three states, all Release, measured on the same machine:
+
+| State | `decide` ns |
+| ----- | ----------- |
+| After the backend restructure and the legal-actions cache | 510 |
+| The allocation census sizes every free through `malloc_size` (the fix for the Release `import oryx` crash) | 587 |
+| Oryx objects from the size-class pool, freed with their exact size ([Memory Allocator](memory-allocator.md)) | 504 |
+
+The `decide` path allocates three small objects per call (`ScriptLease`, `PyContext`, `PyState`). The census cost about 77 ns of it (confirmed by stubbing the size lookup). The pool removes the lookup entirely, because every Oryx pointer frees through the allocator recorded in its block, with the size it asked for.
+
+Each switch was gated by an **interleaved** A/B: two binaries run alternately, 12 to 15 times each, medians compared. Samples taken minutes apart drifted by 1 to 2 %, and a first, non-interleaved comparison showed a regression that disappeared once interleaved. Results against the previous step:
+
+| Step | `decide` | end-to-end Nim batch |
+| ---- | -------- | -------------------- |
+| Own `UniquePtr`/`SharedPtr`, still on the heap | 593 → 584 | within noise |
+| The pool as the default, every memory report on its counts | 576 → 515 | −0.4 % pool share, inside the ±2 % spread |
+| Containers on the allocator | 515 → 504 | within noise |
+
+One routing detail was measurable: choosing the size class with a loop and a `%` per request cost about 1 % end to end, so it became two compile-time lookup tables. Memory reports now count Oryx objects exactly (the pool's counts), including in the Python extension (`oryx.benchmark(memory=True)`); the census remains the whole-program number in executables.
 
 ## Parallelism
 

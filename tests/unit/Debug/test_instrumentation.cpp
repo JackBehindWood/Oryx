@@ -40,21 +40,18 @@ TEST_CASE("Instrumentation::reset clears every recorded scope")
 }
 
 #ifdef OX_ENABLE_MEMORY_TRACKING
-TEST_CASE("ScopeTimer attributes heap allocations made inside the scope to that scope")
+TEST_CASE("ScopeTimer attributes Oryx allocations made inside the scope to that scope")
 {
     Instrumentation::reset();
     {
         ScopeTimer timer("test::allocating_scope");
-        int32_t* value = new int32_t(1);
-        g_escape = value;
-        delete value;
+        UniquePtr<int32_t> value = create_unique<int32_t>(1);
+        g_escape = value.get();
     }
 
     const ProfileSample& sample = Instrumentation::results().at("test::allocating_scope");
     CHECK(sample.allocation_count == 1);
-    // The tracker reports the allocator's usable size, not the requested size, so a small
-    // request can round up to the allocator's smallest bucket.
-    CHECK(sample.bytes_allocated >= sizeof(int32_t));
+    CHECK(sample.bytes_allocated == detail::BlockLayout<int32_t>::size);
 }
 #endif // OX_ENABLE_MEMORY_TRACKING
 

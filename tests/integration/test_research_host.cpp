@@ -14,14 +14,10 @@ using namespace oryx::test;
 namespace
 {
 
-int run_python(const std::string& code)
+int run_python(const std::string& code, const std::string& environment = "")
 {
-    // Resolves against the subprocess's own PATH, not this process's interpreter. Under `uv run
-    // build test`/`build build all` (the only supported way to run this suite - CLAUDE.md), `uv
-    // run` puts the venv's python first on PATH, so this finds the interpreter the `.pth` file
-    // (step 2) was written into. It would resolve elsewhere if this binary were run directly
-    // outside `uv run`.
-    std::string command = "python -c \"" + code + "\"";
+    // `python` from PATH: under `uv run` that is the venv interpreter the research-host .pth lives in.
+    std::string command = environment + "python -c \"" + code + "\"";
     return std::system(command.c_str());
 }
 
@@ -30,9 +26,7 @@ std::filesystem::path extension_path()
     return std::filesystem::path(OX_BUILD_OUTPUT_DIR) / "OryxPython";
 }
 
-// A --sanitize build's oryx.so requires the sanitizer runtime preloaded into whatever process
-// dlopen()s it; the plain `python` subprocess run_python() spawns has no way to get that, so it
-// always fails to import a sanitized extension - not a real regression, just untestable this way.
+// A sanitized oryx.so needs the ASan runtime preloaded, which the plain `python` subprocess never has.
 bool can_run_python_extension()
 {
     if (!std::filesystem::exists(extension_path()))
@@ -53,6 +47,11 @@ bool can_run_python_extension()
     return true;
 }
 
+std::string expected_version()
+{
+    return std::to_string(VERSION_MAJOR) + "." + std::to_string(VERSION_MINOR) + "." + std::to_string(VERSION_PATCH);
+}
+
 } // namespace
 
 TEST_SUITE("integration")
@@ -67,20 +66,100 @@ TEST_CASE("research host: import oryx works standalone")
     CHECK(run_python("import oryx; oryx.init()") == 0);
 }
 
-TEST_CASE("research host: init() refuses to run inside an embedding host")
+TEST_CASE("research host: the embedded host has __version__ but no init()")
 {
-    // The embedded-host half of the guard: Tests links Oryx the same way Oasis does
-    // (linkOryxWholeArchive), so PythonRuntime::start() marks this an embedding host too, and
-    // oryx.init() must refuse exactly as it would inside Oasis.
-    std::string output = run_oryx_script(
-        "try:\n"
-        "    oryx.init()\n"
-        "    mark('not raised')\n"
-        "except oryx.errors.OryxError as e:\n"
-        "    mark('raised: ' + str(e))\n");
+    std::string output = run_oryx_script("mark(str(hasattr(oryx, 'init')) + ' ' + oryx.__version__)\n");
 
-    CHECK(output.find("raised: ") == 0);
-    CHECK(output.find("must not be called inside an embedding host") != std::string::npos);
+    CHECK(output == "False " + expected_version());
+}
+
+TEST_CASE("research host: oryx.__version__ matches the C++ version")
+{
+    if (!can_run_python_extension())
+    {
+        return;
+    }
+    CHECK(run_python("import oryx, sys; sys.exit(0 if oryx.__version__ == '" + expected_version() + "' else 1)") == 0);
+}
+
+TEST_CASE("research host: the context cannot be re-created once the atexit teardown ran")
+{
+    if (!can_run_python_extension())
+    {
+        return;
+    }
+    int status = run_python(
+        "import atexit, os\n"
+        "def late():\n"
+        "    import oryx\n"
+        "    try:\n"
+        "        class Late(oryx.Strategy, id='late'):\n"
+        "            def decide(self, context): return 0\n"
+        "    except oryx.OryxError as e:\n"
+        "        os._exit(0 if 'shutting down' in str(e) else 4)\n"
+        "    os._exit(3)\n"
+        "atexit.register(late)\n"
+        "import oryx\n"
+        "oryx.init()\n"
+        "class Early(oryx.Strategy, id='early'):\n"
+        "    def decide(self, context): return 0\n");
+    CHECK(status == 0);
+}
+
+TEST_CASE("research host: benchmark(memory=True) counts Oryx's own allocations and balances them")
+{
+    if (!can_run_python_extension())
+    {
+        return;
+    }
+    std::filesystem::path scripts_dir = repo_file("Oasis/scripts");
+    int status = run_python(
+        "import sys; sys.path.insert(0, r'" + scripts_dir.string() + "')\n"
+        "import oryx, nim\n"
+        "oryx.init()\n"
+        "assert oryx.benchmark.benchmark('nim', ['random', 'random'], games=5).memory is None\n"
+        "m = oryx.benchmark.benchmark('nim', ['random', 'random'], games=20, memory=True).memory\n"
+        "sys.exit(0 if m.allocation_count > 0 and m.allocation_count == m.deallocation_count and m.live_bytes == 0 else 1)");
+    CHECK(status == 0);
+}
+
+TEST_CASE("research host: init() loads the scripts of the nearest oryx.yaml, an explicit settings file, or nothing")
+{
+    if (!can_run_python_extension())
+    {
+        return;
+    }
+    TempDir dir;
+    dir.write("project/scripts/pile.py", "import oryx\nclass Pile(oryx.Game, id='pile'):\n    num_players = 2\n    def new_initial_state(self): return None\n");
+    dir.write("project/oryx.yaml", "scripting:\n  roots:\n    - scripts\n");
+    std::filesystem::create_directories(dir.path() / "project" / "notebooks");
+    std::filesystem::create_directories(dir.path() / "elsewhere");
+
+    std::string nested = (dir.path() / "project" / "notebooks").string();
+    std::string elsewhere = (dir.path() / "elsewhere").string();
+    std::string settings = (dir.path() / "project" / "oryx.yaml").string();
+
+    CHECK(run_python("import os, sys; os.chdir(r'" + nested + "'); import oryx; oryx.init(); sys.exit(0 if 'pile' in oryx.list_games() else 1)") == 0);
+    CHECK(run_python("import os, sys; os.chdir(r'" + elsewhere + "'); import oryx; oryx.init(); sys.exit(0 if oryx.list_games() == [] else 1)") == 0);
+    CHECK(run_python("import os, sys; os.chdir(r'" + elsewhere + "'); import oryx; oryx.init(r'" + settings + "'); sys.exit(0 if 'pile' in oryx.list_games() else 1)") == 0);
+    CHECK(run_python("import sys, oryx\ntry:\n    oryx.init('/no/such/oryx.yaml')\nexcept oryx.SettingsError:\n    sys.exit(0)\nsys.exit(1)") == 0);
+}
+
+TEST_CASE("research host: a scripted game and simulate() exit cleanly under the debug allocator")
+{
+    if (!can_run_python_extension())
+    {
+        return;
+    }
+    std::filesystem::path scripts_dir = repo_file("Oasis/scripts");
+    int status = run_python(
+        "import sys; sys.path.insert(0, r'" + scripts_dir.string() + "')\n"
+        "import oryx, nim\n"
+        "oryx.init()\n"
+        "result = oryx.simulate('nim', ['random', 'random'], games=20)\n"
+        "sys.exit(0 if result.matches == 20 else 1)",
+        "PYTHONMALLOC=debug ");
+    CHECK(status == 0);
 }
 
 TEST_CASE("research host: assertion hook raises instead of trapping")
@@ -105,15 +184,7 @@ TEST_CASE("research host: interruptible batch raises when the interpreter is int
     {
         return;
     }
-    // Oryx-only scoping (step 1) means the standalone host has no compiled-in game to simulate -
-    // Oryx core registers only strategies, and TicTacToe is Oasis-only. The only game reachable
-    // from a bare `import oryx` is a *scripted* one, so this uses the existing Nim example
-    // script instead of an all-C++ game. That makes the game itself scripted, which per D27
-    // wraps an interrupted callback's exception in oryx.errors.ScriptError rather than letting a
-    // raw KeyboardInterrupt propagate - still confirms the process doesn't hang forever on a
-    // huge batch, which is the property this test cares about (the merge()/run_interruptible()
-    // chunking math itself is covered against an all-C++ game in test_python_simulation.cpp,
-    // where TicTacToe is available inside the embedded Tests binary).
+    // Bare `import oryx` registers no C++ game, so this interrupts a scripted one: the interrupt must pass through its callback untouched.
     std::filesystem::path scripts_dir = repo_file("Oasis/scripts");
     std::string code =
         "import sys; sys.path.insert(0, r'" + scripts_dir.string() + "')\n"
@@ -123,7 +194,7 @@ TEST_CASE("research host: interruptible batch raises when the interpreter is int
         "threading.Timer(0.05, _thread.interrupt_main).start()\n"
         "try:\n"
         "    oryx.simulate('nim', ['random', 'random'], games=2_000_000)\n"
-        "except (KeyboardInterrupt, oryx.errors.ScriptError):\n"
+        "except KeyboardInterrupt:\n"
         "    sys.exit(0)\n"
         "sys.exit(1)";
     int status = run_python(code);

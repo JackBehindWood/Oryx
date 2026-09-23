@@ -2,12 +2,12 @@
 
 #include "Oryx/Core/Base.h"
 #include "Oryx/Containers/Pair.h"
+#include "Oryx/Memory/DefaultAllocator.h"
 
 namespace oryx
 {
 
-// Open-addressing (linear probing) map with N inline slots; grows to the heap past a 0.7 load factor. N must be a power of two.
-// Not thread-safe: insert_or_assign()'s rehash reallocates and moves every entry with no synchronization.
+// Linear-probing map, N inline slots (a power of two), grows into its allocator past load 0.7; not thread-safe, like SmallVector.
 template<typename Key, typename Value, size_t N>
 class FlatHashMap
 {
@@ -15,6 +15,11 @@ class FlatHashMap
 
 public:
     FlatHashMap() = default;
+
+    explicit FlatHashMap(IAllocator& allocator)
+        : m_allocator(&allocator)
+    {
+    }
 
     FlatHashMap(const FlatHashMap&) = delete;
     FlatHashMap& operator=(const FlatHashMap&) = delete;
@@ -122,9 +127,13 @@ private:
 
     void rehash(size_t new_capacity)
     {
-        Pair<Key, Value>* new_slots =
-            static_cast<Pair<Key, Value>*>(::operator new(new_capacity * sizeof(Pair<Key, Value>)));
-        bool* new_occupied = new bool[new_capacity]();
+        if (m_allocator == nullptr)
+        {
+            m_allocator = &default_allocator();
+        }
+        Pair<Key, Value>* new_slots = static_cast<Pair<Key, Value>*>(m_allocator->allocate(new_capacity * sizeof(Pair<Key, Value>), alignof(Pair<Key, Value>)));
+        bool* new_occupied = static_cast<bool*>(m_allocator->allocate(new_capacity * sizeof(bool), alignof(bool)));
+        std::fill_n(new_occupied, new_capacity, false);
 
         Pair<Key, Value>* old_slots = m_slots;
         bool* old_occupied = m_occupied;
@@ -148,8 +157,7 @@ private:
 
         if (old_was_heap)
         {
-            ::operator delete(old_slots);
-            delete[] old_occupied;
+            release(old_slots, old_occupied, old_capacity);
         }
     }
 
@@ -168,9 +176,14 @@ private:
     {
         if (m_is_heap)
         {
-            ::operator delete(m_slots);
-            delete[] m_occupied;
+            release(m_slots, m_occupied, m_capacity);
         }
+    }
+
+    void release(Pair<Key, Value>* slots, bool* occupied, size_t capacity)
+    {
+        m_allocator->deallocate(slots, capacity * sizeof(Pair<Key, Value>), alignof(Pair<Key, Value>));
+        m_allocator->deallocate(occupied, capacity * sizeof(bool), alignof(bool));
     }
 
     alignas(Pair<Key, Value>) unsigned char m_inline_slots[N * sizeof(Pair<Key, Value>)];
@@ -180,6 +193,7 @@ private:
     bool* m_occupied = m_inline_occupied;
     size_t m_capacity = N;
     size_t m_count = 0;
+    IAllocator* m_allocator = nullptr;
     bool m_is_heap = false;
 };
 

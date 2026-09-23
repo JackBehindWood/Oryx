@@ -3,7 +3,7 @@
 #include "Oryx/Benchmark/Timer.h"
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
-#include "Oryx/Debug/MemoryTracker.h"
+#include "Oryx/Memory/MemoryStats.h"
 #include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Simulation/BatchRunner.h"

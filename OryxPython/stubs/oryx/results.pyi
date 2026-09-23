@@ -38,7 +38,7 @@ class BatchResult:
     def mean_rewards(self) -> list[float]:
         ...
     @property
-    def metadata(self) -> typing.Any:
+    def metadata(self) -> dict[str, typing.Any] | None:
         """
         game, strategies, games, seed and oryx_version of a simulate() run; None for a BatchRunner.
         """

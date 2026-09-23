@@ -2,10 +2,13 @@
 Oryx's scripting API: games, strategies, matches, simulation and debugging.
 """
 from __future__ import annotations
+from oryx.errors import IllegalActionError
+from oryx.errors import NotInitialisedError
 from oryx.errors import OryxAssertionError
 from oryx.errors import OryxError
 from oryx.errors import ParamError
 from oryx.errors import ScriptError
+from oryx.errors import SettingsError
 from oryx.game import ActionFeatures
 from oryx.game import Context
 from oryx.game import Game
@@ -27,6 +30,7 @@ from oryx.results import BatchResult
 from oryx.simulation import BatchRunner
 from oryx.simulation import Match
 from oryx.simulation import simulate
+import typing
 from . import benchmark
 from . import debug
 from . import errors
@@ -36,12 +40,9 @@ from . import random
 from . import registry
 from . import results
 from . import simulation
-__all__: list[str] = ['ActionFeatures', 'BatchResult', 'BatchRunner', 'Context', 'Game', 'GameHandle', 'Match', 'OryxAssertionError', 'OryxError', 'ParamError', 'Random', 'ScriptError', 'State', 'StateHandle', 'Strategy', 'StrategyHandle', 'benchmark', 'debug', 'describe_game', 'describe_strategy', 'errors', 'game', 'init', 'is_embedded_host', 'list_games', 'list_strategies', 'make_game', 'make_strategy', 'math', 'random', 'register_game', 'register_strategy', 'registry', 'results', 'simulate', 'simulation']
-def init() -> None:
+__all__: list[str] = ['ActionFeatures', 'BatchResult', 'BatchRunner', 'Context', 'Game', 'GameHandle', 'IllegalActionError', 'Match', 'NotInitialisedError', 'OryxAssertionError', 'OryxError', 'ParamError', 'Random', 'ScriptError', 'SettingsError', 'State', 'StateHandle', 'Strategy', 'StrategyHandle', 'benchmark', 'debug', 'describe_game', 'describe_strategy', 'errors', 'game', 'init', 'list_games', 'list_strategies', 'make_game', 'make_strategy', 'math', 'random', 'register_game', 'register_strategy', 'registry', 'results', 'simulate', 'simulation']
+def init(settings: str | os.PathLike[str] | None = None) -> None:
     """
-    Initialises Oryx for a standalone Python process (idempotent) and installs the throwing assertion handler, so a C++ assert reached from Python raises OryxAssertionError instead of logging and trapping. Raises if called inside an embedding host such as Oasis.
+    Initialises Oryx for a standalone Python process and installs the throwing assertion handler, so a C++ assert reached from Python raises OryxAssertionError. Reads `settings` (else the nearest oryx.yaml above the working directory, if any) and imports the scripts under its `scripting.roots`; calling it again loads nothing new.
     """
-def is_embedded_host() -> bool:
-    """
-    True when running inside an embedding host such as Oasis; false for a standalone research-host process.
-    """
+__version__: str = '0.1.0'

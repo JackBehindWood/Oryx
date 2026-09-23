@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Base.h"
-#include "Oryx/Debug/MemoryTracker.h"
+#include "Oryx/Memory/MemoryStats.h"
 
 #include <chrono>
 #include <limits>

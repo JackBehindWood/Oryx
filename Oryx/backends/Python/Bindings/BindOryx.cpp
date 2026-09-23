@@ -1,10 +1,7 @@
 #include "oxpch.h"
 #include "Bindings/BindOryx.h"
 
-#include "Oryx/Core/Application.h"
-#include "Oryx/Core/Assert.h"
-#include "Oryx/Core/Error.h"
-#include "PythonHost.h"
+#include "PythonLanguage.h"
 
 namespace py = pybind11;
 
@@ -39,37 +36,25 @@ void bind_oryx(py::module_& module)
         binder(module);
     }
 
-    reexport(module, "errors", { "OryxError", "ParamError", "ScriptError", "OryxAssertionError" });
+    reexport(module, "errors", { "OryxError", "ParamError", "ScriptError", "OryxAssertionError", "SettingsError", "IllegalActionError", "NotInitialisedError" });
     reexport(module, "game", { "GameHandle", "StateHandle", "StrategyHandle", "Context", "ActionFeatures", "Game", "Strategy", "State" });
     reexport(module, "registry", { "make_game", "make_strategy", "list_games", "list_strategies", "describe_game", "describe_strategy", "register_game", "register_strategy" });
     reexport(module, "results", { "BatchResult" });
     reexport(module, "simulation", { "Match", "BatchRunner", "simulate" });
     reexport(module, "random", { "Random" });
 
-    module.def("init", []()
-    {
-#if OX_PYTHON_ENFORCE_HOST_GUARD
-        if (is_embedded_host())
-        {
-            throw Error("oryx.init() must not be called inside an embedding host (e.g. Oasis); "
-                        "it already initialised Oryx before the interpreter started.");
-        }
-#endif
-        init();
-        set_assertion_handler(&throw_on_assertion);
-    },
-    "Initialises Oryx for a standalone Python process (idempotent) and installs the throwing "
-    "assertion handler, so a C++ assert reached from Python raises OryxAssertionError instead of "
-    "logging and trapping. Raises if called inside an embedding host such as Oasis.");
+    module.attr("__version__") = version_string();
+}
 
-    module.def("is_embedded_host", &is_embedded_host,
-        "True when running inside an embedding host such as Oasis; false for a standalone "
-        "research-host process.");
+std::string version_string()
+{
+    return std::to_string(VERSION_MAJOR) + "." + std::to_string(VERSION_MINOR) + "." + std::to_string(VERSION_PATCH);
 }
 
 } // namespace oryx::python
 
-PYBIND11_MODULE(oryx, module)
+// Registered as "oryx" through the inittab; the PyInit_oryx symbol belongs to the research host's shared library.
+PYBIND11_MODULE(oryx_embedded, module)
 {
     oryx::python::bind_oryx(module);
 }
@@ -79,7 +64,7 @@ namespace oryx::python
 
 void register_oryx_module()
 {
-    if (PyImport_AppendInittab("oryx", &PyInit_oryx) == -1)
+    if (PyImport_AppendInittab(kModuleName, &PyInit_oryx_embedded) == -1)
     {
         throw std::runtime_error("could not register the oryx module");
     }

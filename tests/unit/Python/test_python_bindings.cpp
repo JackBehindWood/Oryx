@@ -97,7 +97,7 @@ TEST_CASE("oryx.debug raises OryxError before Oryx is initialised")
         "for call in (lambda: oryx.debug.info('x'), lambda: oryx.debug.check(True)):\n"
         "    try:\n"
         "        call()\n"
-        "    except oryx.OryxError as e:\n"
+        "    except oryx.NotInitialisedError as e:\n"
         "        mark(str(e) + '|' + repr(e.detail) + ';')\n");
 
     RunningPython python;
@@ -117,8 +117,12 @@ TEST_CASE("the Python exception types mirror the C++ error hierarchy")
     std::filesystem::path marker = dir.path() / "marker.txt";
     std::filesystem::path script = dir.write("hierarchy.py", marker_prelude(marker) +
         "import oryx\n"
-        "for kind in (oryx.ParamError, oryx.ScriptError, oryx.OryxAssertionError):\n"
+        "for kind in (oryx.ParamError, oryx.ScriptError, oryx.OryxAssertionError, oryx.SettingsError, oryx.NotInitialisedError):\n"
         "    assert issubclass(kind, oryx.OryxError)\n"
+        "assert issubclass(oryx.IllegalActionError, oryx.ScriptError)\n"
+        "for kind, builtin in ((oryx.ParamError, ValueError), (oryx.OryxAssertionError, AssertionError), (oryx.NotInitialisedError, RuntimeError), (oryx.IllegalActionError, ValueError)):\n"
+        "    assert issubclass(kind, builtin), kind\n"
+        "assert not issubclass(oryx.ScriptError, ValueError) and not issubclass(oryx.SettingsError, ValueError)\n"
         "assert issubclass(oryx.OryxError, Exception)\n"
         "assert oryx.errors.OryxError is oryx.OryxError\n"
         "assert oryx.simulation.Match is oryx.Match and oryx.registry.make_game is oryx.make_game and oryx.game.Game is oryx.Game and oryx.random.Random is oryx.Random\n"

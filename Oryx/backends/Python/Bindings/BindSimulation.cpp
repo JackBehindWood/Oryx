@@ -7,6 +7,7 @@
 #include "Support/PyHandles.h"
 #include "Oryx/Scripting/Support/ScriptUtil.h"
 #include "Support/PyResolve.h"
+#include "Support/PyTypeHints.h"
 #include "Support/PyUtil.h"
 #include "Oryx/Scripting/Support/InitGuard.h"
 #include "Oryx/Simulation/BatchRunner.h"
@@ -79,28 +80,32 @@ private:
     BatchRunner m_runner;
 };
 
-UniquePtr<PyMatch> make_match(const py::object& game, const py::sequence& strategies)
+SharedPtr<PyMatch> make_match(const hints::GameArg& game, const hints::StrategiesArg& strategies)
 {
-    return create_unique<PyMatch>(resolve_game(game), resolve_strategies(strategies));
+    SharedPtr<IGame> resolved = resolve_game(game);
+    return create_shared<PyMatch>(resolved, resolve_strategies(strategy_specs(strategies, resolved->num_players())));
 }
 
-UniquePtr<PyBatchRunner> make_batch_runner(const py::object& game, const py::sequence& strategies)
+SharedPtr<PyBatchRunner> make_batch_runner(const hints::GameArg& game, const hints::StrategiesArg& strategies)
 {
-    return create_unique<PyBatchRunner>(resolve_game(game), resolve_strategies(strategies));
+    SharedPtr<IGame> resolved = resolve_game(game);
+    return create_shared<PyBatchRunner>(resolved, resolve_strategies(strategy_specs(strategies, resolved->num_players())));
 }
 
-PyBatchResult simulate(const py::object& game, const py::sequence& strategies, int32_t games, const py::object& seed)
+PyBatchResult simulate(const hints::GameArg& game, const hints::StrategiesArg& strategies, int32_t games, const hints::Seed& seed)
 {
-    PyBatchRunner runner(resolve_game(game), resolve_seeded_strategies(strategies, seed));
+    SharedPtr<IGame> resolved = resolve_game(game);
+    py::list specs = strategy_specs(strategies, resolved->num_players());
+    PyBatchRunner runner(resolved, resolve_seeded_strategies(specs, seed));
     PyBatchResult result = runner.run(games);
     result.has_metadata = true;
-    result.metadata = make_metadata(runner.game(), strategies, games, seed);
+    result.metadata = make_metadata(runner.game(), specs, games, seed);
     return result;
 }
 
-py::object action_or_none(ActionId action)
+hints::OptionalAction action_or_none(ActionId action)
 {
-    return is_valid(action) ? py::cast(action) : py::none();
+    return hints::OptionalAction(is_valid(action) ? py::cast(action) : py::none());
 }
 
 std::vector<ActionId> history_of(PyMatch& match)
@@ -111,7 +116,7 @@ std::vector<ActionId> history_of(PyMatch& match)
 
 void bind_match(py::module_& module)
 {
-    py::class_<PyMatch>(module, "Match", "One game between strategies, stepped by hand or played to the end.")
+    py::class_<PyMatch, SharedPtr<PyMatch>>(module, "Match", "One game between strategies, stepped by hand or played to the end.")
         .def(py::init(OX_GUARDED_FUNC(make_match, "oryx.Match")), py::arg("game"), py::arg("strategies"))
         .def("state", [](PyMatch& match) { return create_shared<PyState>(match.match().state(), nullptr, StateAccess::ReadOnly); }, py::keep_alive<0, 1>())
         .def("is_terminal", [](PyMatch& match) { return match.match().is_terminal(); })
@@ -131,7 +136,7 @@ void bind_match(py::module_& module)
 
 void bind_batch(py::module_& module)
 {
-    py::class_<PyBatchRunner>(module, "BatchRunner", "Plays many matches of one game between the same strategies.")
+    py::class_<PyBatchRunner, SharedPtr<PyBatchRunner>>(module, "BatchRunner", "Plays many matches of one game between the same strategies.")
         .def(py::init(OX_GUARDED_FUNC(make_batch_runner, "oryx.BatchRunner")), py::arg("game"), py::arg("strategies"))
         .def("run", &PyBatchRunner::run, py::arg("matches"));
 

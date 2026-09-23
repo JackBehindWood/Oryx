@@ -3,9 +3,10 @@
 
 #include "Support/PyBatch.h"
 #include "Support/PyResolve.h"
+#include "Support/PyTypeHints.h"
 #include "Oryx/Benchmark/BenchmarkRunner.h"
 #include "Oryx/Benchmark/Timer.h"
-#include "Oryx/Debug/MemoryTracker.h"
+#include "Oryx/Memory/DefaultAllocator.h"
 #include "Oryx/Scripting/Support/InitGuard.h"
 
 namespace py = pybind11;
@@ -24,7 +25,7 @@ struct PyBenchmarkResult
     MemoryStats memory;
 };
 
-PyBenchmarkResult benchmark(const py::object& game, const py::sequence& strategies, int32_t games, const py::object& seed, bool memory)
+PyBenchmarkResult benchmark(const hints::GameArg& game, const hints::StrategiesArg& strategies, int32_t games, const hints::Seed& seed, bool memory)
 {
     if (games < 0)
     {
@@ -32,18 +33,16 @@ PyBenchmarkResult benchmark(const py::object& game, const py::sequence& strategi
     }
 
     SharedPtr<IGame> resolved = resolve_game(game);
-    Strategies participants = resolve_seeded_strategies(strategies, seed);
+    py::list specs = strategy_specs(strategies, resolved->num_players());
+    Strategies participants = resolve_seeded_strategies(specs, seed);
     std::vector<IStrategy*> raw = raw_pointers(participants);
     bool holds_gil = holds_gil_for(*resolved, raw);
 
-    // BenchmarkRunner::run()/MemoryBenchmarkRunner::run() time and (for memory) snapshot the
-    // whole batch as one monolithic call, which doesn't compose with chunked interruption (each
-    // chunk would reset the timer/instrumentation). Do that instrumentation here, once, around
-    // the whole interruptible loop instead, using the plain BatchRunner base directly.
+    // Measured here around the whole interruptible loop: MemoryBenchmarkRunner would reset its measurement per chunk.
     BatchRunner runner(*resolved, to_small_vector(raw));
 
     Instrumentation::reset();
-    MemoryStats memory_before = memory ? MemoryTracker::begin_measurement() : MemoryStats{};
+    MemoryStats memory_before = memory ? default_allocator().counters().begin_measurement() : MemoryStats{};
     Timer timer;
     timer.start();
     BatchResult outcome = run_interruptible(runner, games, holds_gil);
@@ -55,10 +54,10 @@ PyBenchmarkResult benchmark(const py::object& game, const py::sequence& strategi
     if (memory)
     {
         result.has_memory = true;
-        result.memory = memory_delta(memory_before, MemoryTracker::snapshot());
+        result.memory = memory_delta(memory_before, default_allocator_stats());
     }
     result.outcome.has_metadata = true;
-    result.outcome.metadata = make_metadata(*resolved, strategies, games, seed);
+    result.outcome.metadata = make_metadata(*resolved, specs, games, seed);
     return result;
 }
 
@@ -81,7 +80,7 @@ void bind_benchmark(py::module_& module)
         .def("__enter__", [](Timer& timer) -> Timer& { timer.start(); return timer; }, py::return_value_policy::reference_internal)
         .def("__exit__", [](Timer& timer, const py::args&) { timer.stop(); });
 
-    py::class_<MemoryStats>(benchmarking, "MemoryStats", "C++ heap allocations made by Oryx during a run; Python's own allocator is not counted.")
+    py::class_<MemoryStats>(benchmarking, "MemoryStats", "Oryx objects allocated during a run, counted exactly by Oryx's default allocator; Python's allocator and third-party C++ allocations are not counted.")
         .def_readonly("allocation_count", &MemoryStats::allocation_count)
         .def_readonly("deallocation_count", &MemoryStats::deallocation_count)
         .def_readonly("bytes_allocated", &MemoryStats::bytes_allocated)
@@ -98,7 +97,7 @@ void bind_benchmark(py::module_& module)
         .def_readonly("elapsed_seconds", &PyBenchmarkResult::elapsed_seconds)
         .def_property_readonly("matches_per_second", [](const PyBenchmarkResult& result) { return matches_per_second(as_results(result)); })
         .def_property_readonly("decisions_per_second", [](const PyBenchmarkResult& result) { return decisions_per_second(as_results(result)); })
-        .def_property_readonly("memory", [](const PyBenchmarkResult& result) { return result.has_memory ? py::cast(result.memory) : py::none(); }, "MemoryStats when benchmark(..., memory=True), else None.")
+        .def_property_readonly("memory", [](const PyBenchmarkResult& result) { return hints::typing::Optional<MemoryStats>(result.has_memory ? py::cast(result.memory) : py::none()); }, "MemoryStats when benchmark(..., memory=True), else None.")
         .def("__repr__", [](const PyBenchmarkResult& result)
             {
                 return "<oryx.benchmark.BenchmarkResult matches=" + std::to_string(result.outcome.counts.matches) + " elapsed_seconds=" + std::to_string(result.elapsed_seconds) + " matches_per_second=" + std::to_string(matches_per_second(as_results(result))) + ">";

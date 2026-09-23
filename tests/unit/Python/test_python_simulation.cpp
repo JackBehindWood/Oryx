@@ -103,13 +103,13 @@ TEST_CASE("oryx.Match rejects illegal actions and mismatched strategy counts wit
         "    try:\n"
         "        call()\n"
         "    except oryx.OryxError as e:\n"
-        "        mark(str(e) + ';')\n"
+        "        mark(type(e).__name__ + ':' + str(e) + ';')\n"
         "mark(str(match.history()))\n");
 
     CHECK(output ==
-          "action 4 is not legal in this state;"
-          "action 99 is not legal in this state;"
-          "TicTacToe has 2 players but 1 strategies were given;"
+          "IllegalActionError:action 4 is not legal in this state;"
+          "IllegalActionError:action 99 is not legal in this state;"
+          "OryxError:TicTacToe has 2 players but 1 strategies were given;"
           "[4]");
 }
 
@@ -198,11 +198,22 @@ TEST_CASE("oryx.simulate releases the GIL for an all-C++ batch")
     CHECK_FALSE(g_probe_saw_gil);
 }
 
+TEST_CASE("a C++ SettingsError reaches Python as oryx.SettingsError")
+{
+    ScopedStrategy unsettled("test/unsettled", [](const Params&) -> UniquePtr<IStrategy> { throw SettingsError("settings: bad value"); });
+
+    std::string output = run_script(
+        "try:\n"
+        "    oryx.make_strategy('test/unsettled')\n"
+        "except oryx.SettingsError as e:\n"
+        "    mark(type(e).__name__ + ':' + str(e))\n");
+
+    CHECK(output == "SettingsError:settings: bad value");
+}
+
 TEST_CASE("oryx.simulate is interruptible mid-batch for an all-C++ game")
 {
-    // Calibrated so a regression costs a couple of seconds, not a hang; the batch releases the
-    // GIL (previous test), so the only way the pending interrupt is ever observed is
-    // run_interruptible's own PyErr_CheckSignals() between chunks.
+    // The batch runs without the GIL, so only run_interruptible's check between chunks can see the interrupt.
     std::string output = run_script(
         "import signal, threading, _thread\n"
         "signal.signal(signal.SIGINT, signal.default_int_handler)\n"

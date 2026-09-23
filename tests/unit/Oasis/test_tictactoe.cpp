@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include "unit/MemoryTestSupport.h"
+
 #include "Oasis/Game/TicTacToeGame.h"
 #include "Oasis/Strategy/TicTacToeHeuristicStrategy.h"
 
@@ -168,13 +170,13 @@ TEST_CASE("ActionHistory's inline capacity holds the longest Tic-Tac-Toe game (9
     constexpr size_t kMaxPlies = 9;
     static_assert(kActionHistoryInlineCapacity >= kMaxPlies);
 
-    MemoryStats before = MemoryTracker::snapshot();
+    MemoryStats before = oryx::test::all_allocations();
     ActionHistory history;
     for (ActionId action = 0; action < kMaxPlies; ++action)
     {
         history.record(action);
     }
-    MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
+    MemoryStats delta = memory_delta(before, oryx::test::all_allocations());
 
     CHECK(history.size() == kMaxPlies);
     CHECK(delta.allocation_count == 0);

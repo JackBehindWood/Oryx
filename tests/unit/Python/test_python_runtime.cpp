@@ -90,6 +90,17 @@ TEST_CASE("PythonRuntime reports a missing script, a missing module and use befo
     runtime->stop();
 }
 
+TEST_CASE("a script that exits or is interrupted while loading is a ScriptError in the embedded host")
+{
+    TempDir dir;
+    UniquePtr<IScriptRuntime> runtime = python_runtime();
+    runtime->start();
+
+    CHECK_THROWS_AS(runtime->load(file_source(dir.write("exits.py", "raise SystemExit(3)\n"))), ScriptError);
+    CHECK_THROWS_AS(runtime->load(file_source(dir.write("interrupted.py", "raise KeyboardInterrupt\n"))), ScriptError);
+    runtime->stop();
+}
+
 TEST_CASE("a script that shares its name with a standard-library module is reported as shadowed")
 {
     TempDir dir;

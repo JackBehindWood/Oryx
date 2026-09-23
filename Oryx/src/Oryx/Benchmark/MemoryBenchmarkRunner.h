@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Benchmark/BenchmarkRunner.h"
-#include "Oryx/Debug/MemoryTracker.h"
+#include "Oryx/Memory/MemoryStats.h"
 
 namespace oryx
 {

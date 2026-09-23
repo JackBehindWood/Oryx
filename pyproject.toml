@@ -1,7 +1,7 @@
 [project]
-name = "oryx"
+name = "oryx-build"
 version = "0.1.0"
-description = "An open-source engine for games, strategies, simulation, and decision-making."
+description = "Build, test and docs tooling for the Oryx game strategy engine (the `build` command)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -27,6 +27,7 @@ dependencies = [
 
 [dependency-groups]
 research = [
+    "ipykernel>=6.29",
     "numpy>=2.1",
     "pandas>=2.2",
 ]
@@ -52,5 +53,5 @@ build-backend = "hatchling.build"
 packages = ["build_system"]
 
 [tool.pyright]
-stubPath = "Oryx/backends/Python/stubs"
+stubPath = "OryxPython/stubs"
 reportMissingModuleSource = "none"

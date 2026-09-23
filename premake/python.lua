@@ -1,7 +1,4 @@
--- Python is on by default and opt-out (`--no-python`). Only Oryx/backends/Python
--- needs pybind11 and <Python.h>; with it off nothing here adds a Python file,
--- include path, define or link. `uv run build` passes the interpreter's paths
--- (read from sysconfig) as the --python-* options.
+-- With --no-python nothing here adds a file, include path, define or link; `uv run build` passes the --python-* paths.
 
 newoption {
     trigger = "no-python",
@@ -57,8 +54,7 @@ function useOryxPythonHeaders()
     }
 end
 
--- The embedded interpreter's home and site-packages live in build/generated/PythonConfig.h (written by
--- `uv run build`), so any binary linking Oryx can start it with no env setup; only PythonRuntime.cpp includes it.
+-- build/generated/PythonConfig.h (written by `uv run build`) lets the embedded interpreter start with no environment setup.
 function useOryxPythonEmbedding()
     if not pythonEnabled() then
         return
@@ -67,8 +63,7 @@ function useOryxPythonEmbedding()
     includedirs { "%{wks.location}/generated" }
 end
 
--- Whole-archiving Oryx/yaml-cpp/spdlog into OryxPython needs -fPIC on Linux. Gated on Python
--- being enabled so a Python-off Linux build is untouched.
+-- Whole-archiving into the OryxPython shared library needs -fPIC on Linux.
 function useOryxPythonPIC()
     if pythonEnabled() then
         filter "system:linux"
@@ -77,12 +72,7 @@ function useOryxPythonPIC()
     end
 end
 
--- OryxPython is a plain Python extension module, not an embedding host like Oasis/Tests: it must
--- NOT link libpython directly. Doing so gives it its own separate, never-initialised copy of the
--- interpreter's runtime state (distinct from the one the importing process already set up), and
--- pybind11's PyGILState_Ensure() segfaults dereferencing that copy's uninitialised _PyRuntime.
--- Its Python C-API symbol references stay unresolved at link time and are satisfied by the host
--- process at import (dlopen) instead - the same as every other compiled Python extension.
+-- An extension must not link libpython: a second, uninitialised runtime copy crashes pybind11 (python-api.md, "Extension module").
 function linkPythonExtension()
     if not pythonEnabled() then
         return

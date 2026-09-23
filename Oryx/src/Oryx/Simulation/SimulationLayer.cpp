@@ -2,6 +2,7 @@
 
 #include "Oryx/Core/Application.h"
 #include "Oryx/Debug/Instrumentation.h"
+#include "Oryx/Memory/DefaultAllocator.h"
 #include "Oryx/Events/SimulationEvent.h"
 
 namespace oryx
@@ -54,7 +55,7 @@ bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
     if (m_benchmark)
     {
         Instrumentation::reset();
-        m_memory_before = MemoryTracker::begin_measurement();
+        m_memory_before = default_allocator().counters().begin_measurement();
         m_timer.start();
     }
 
@@ -82,7 +83,7 @@ void SimulationLayer::update()
             if (m_benchmark)
             {
                 results.elapsed_seconds = m_timer.elapsed_seconds();
-                results.memory = memory_delta(m_memory_before, MemoryTracker::snapshot());
+                results.memory = memory_delta(m_memory_before, default_allocator_stats());
             }
             SimulationCompleteEvent event(std::move(results), m_benchmark);
             Application::Get().post_event(event);

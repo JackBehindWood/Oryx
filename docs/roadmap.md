@@ -378,8 +378,14 @@ Supporting work, in build order:
 * Scripting inside `Oasis` first: debug (log and check) bindings with an init guard,
   the core bindings, script-backed types, the Nim milestone, then results as
   data and the math and benchmark modules
-* The research host last: `import oryx` from a REPL or notebook through an
-  `Oasis`-owned `_oryx` extension
+* The research host last: `import oryx` from a REPL or notebook through the
+  Oryx-only `oryx` extension module built by the `OryxPython` project;
+  `oryx.init()` loads the scripts of the nearest `oryx.yaml`, and
+  `Oasis/notebooks/research.ipynb` is the worked example
+* An audit of the whole layer and its fixes: overwrite chains that restore
+  the right entry, exceptions that map onto Python's (with interpreter-control
+  exceptions passed through), a research-host entry point with a clean
+  teardown, and Oryx's own allocator module ([Memory Allocator](design/memory-allocator.md))
 
 **Milestone:** Nim written in Python, running inside `Oasis`, plus one Python
 strategy that plays both Nim and TicTacToe.

@@ -57,8 +57,8 @@ def main(
     sanitize: bool = typer.Option(
         False,
         "--sanitize",
-        help="Build with AddressSanitizer + UndefinedBehaviorSanitizer, keeping the profile's own "
-        "optimize/symbols settings (a dev/CI diagnostic tool, not a build you'd ship).",
+        help="Build with AddressSanitizer + UndefinedBehaviorSanitizer, keeping the profile's optimize "
+        "level and forcing debug symbols on (a dev/CI diagnostic tool, not a build you'd ship).",
     ),
 ):
     """Global context setup executed before running commands."""

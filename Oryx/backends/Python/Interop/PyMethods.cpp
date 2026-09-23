@@ -1,6 +1,8 @@
 #include "oxpch.h"
 #include "Interop/PyMethods.h"
 
+#include "PythonContext.h"
+
 namespace oryx::python
 {
 
@@ -84,14 +86,12 @@ SharedPtr<const PyClassMethods> class_methods_for(PyObject* type, const void* se
             throw_python_error("could not look up " + name + "()");
         }
 
-        if (raw.get() == Py_None)
+        bool defined = raw.get() != Py_None && !PythonContext::current().is_placeholder(raw.get());
+        if (!defined && i < required)
         {
-            if (i < required)
-            {
-                throw ScriptError(std::string(owner) + " class '" + reinterpret_cast<PyTypeObject*>(type)->tp_name + "' must define " + name + "()");
-            }
+            throw ScriptError(std::string(owner) + " class '" + reinterpret_cast<PyTypeObject*>(type)->tp_name + "' must define " + name + "()");
         }
-        else
+        if (defined)
         {
             entry.function = plain_function_of(raw.get());
         }
