@@ -1,11 +1,18 @@
 #include "oxpch.h"
 #include "Oryx/Debug/MemoryTracker.h"
 
-#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdlib>
 #include <new>
+
+#if defined(__APPLE__)
+    #include <malloc/malloc.h>
+#elif defined(_WIN32)
+    #include <malloc.h>
+#else
+    #include <malloc.h>
+#endif
 
 namespace oryx
 {
@@ -21,11 +28,26 @@ std::atomic<uint64_t> g_bytes_freed{ 0 };
 std::atomic<int64_t> g_live_bytes{ 0 };
 std::atomic<int64_t> g_peak_live_bytes{ 0 };
 
-constexpr size_t kDefaultAlignment = alignof(std::max_align_t);
+// Must be __STDCPP_DEFAULT_NEW_ALIGNMENT__, not alignof(std::max_align_t): the plain (non-
+// align_val_t) new/delete overloads below are what the compiler holds to that alignment, and on
+// Apple Clang/AArch64 the two differ (16 vs 8).
+constexpr size_t kDefaultAlignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
 
-size_t header_size(size_t alignment)
+// The allocator's own usable-size bookkeeping, not a hand-rolled header: some libc++ containers
+// (e.g. std::string's growth path) are pre-instantiated out-of-line in the system's libc++ dylib,
+// so their internal `new` binds to the platform allocator directly rather than the overloads
+// below - a header we wrote at alloc time would not exist for such a pointer, and freeing through
+// it corrupted the heap (this is what actually made Release/Dist crash). Sizing and freeing every
+// pointer through the platform itself works no matter which path allocated it.
+size_t usable_size(void* pointer)
 {
-    return std::max(alignment, kDefaultAlignment);
+#if defined(__APPLE__)
+    return malloc_size(pointer);
+#elif defined(_WIN32)
+    return _msize(pointer);
+#else
+    return malloc_usable_size(pointer);
+#endif
 }
 
 void record_allocation(size_t size)
@@ -49,36 +71,27 @@ void record_deallocation(size_t size)
 
 void* tracked_allocate(size_t size, size_t alignment) noexcept
 {
-    size_t header = header_size(alignment);
-    if (size > SIZE_MAX - header - alignment)
+    void* pointer = alignment <= kDefaultAlignment
+        ? std::malloc(size)
+        : std::aligned_alloc(alignment, (size + alignment - 1) / alignment * alignment);
+    if (pointer == nullptr)
     {
         return nullptr;
     }
 
-    size_t total = size + header;
-    void* raw = alignment <= kDefaultAlignment
-        ? std::malloc(total)
-        : std::aligned_alloc(alignment, (total + alignment - 1) / alignment * alignment);
-    if (raw == nullptr)
-    {
-        return nullptr;
-    }
-
-    *static_cast<size_t*>(raw) = size;
-    record_allocation(size);
-    return static_cast<std::byte*>(raw) + header;
+    record_allocation(usable_size(pointer));
+    return pointer;
 }
 
-void tracked_free(void* pointer, size_t alignment) noexcept
+void tracked_free(void* pointer) noexcept
 {
     if (pointer == nullptr)
     {
         return;
     }
 
-    void* raw = static_cast<std::byte*>(pointer) - header_size(alignment);
-    record_deallocation(*static_cast<size_t*>(raw));
-    std::free(raw);
+    record_deallocation(usable_size(pointer));
+    std::free(pointer);
 }
 
 void* allocate_or_throw(size_t size, size_t alignment)
@@ -128,19 +141,19 @@ void* operator new[](size_t size, std::align_val_t alignment) { return oryx::all
 void* operator new(size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept { return oryx::tracked_allocate(size, static_cast<size_t>(alignment)); }
 void* operator new[](size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept { return oryx::tracked_allocate(size, static_cast<size_t>(alignment)); }
 
-void operator delete(void* pointer) noexcept { oryx::tracked_free(pointer, oryx::kDefaultAlignment); }
-void operator delete[](void* pointer) noexcept { oryx::tracked_free(pointer, oryx::kDefaultAlignment); }
-void operator delete(void* pointer, size_t) noexcept { oryx::tracked_free(pointer, oryx::kDefaultAlignment); }
-void operator delete[](void* pointer, size_t) noexcept { oryx::tracked_free(pointer, oryx::kDefaultAlignment); }
-void operator delete(void* pointer, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer, oryx::kDefaultAlignment); }
-void operator delete[](void* pointer, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer, oryx::kDefaultAlignment); }
+void operator delete(void* pointer) noexcept { oryx::tracked_free(pointer); }
+void operator delete[](void* pointer) noexcept { oryx::tracked_free(pointer); }
+void operator delete(void* pointer, size_t) noexcept { oryx::tracked_free(pointer); }
+void operator delete[](void* pointer, size_t) noexcept { oryx::tracked_free(pointer); }
+void operator delete(void* pointer, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer); }
+void operator delete[](void* pointer, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer); }
 
-void operator delete(void* pointer, std::align_val_t alignment) noexcept { oryx::tracked_free(pointer, static_cast<size_t>(alignment)); }
-void operator delete[](void* pointer, std::align_val_t alignment) noexcept { oryx::tracked_free(pointer, static_cast<size_t>(alignment)); }
-void operator delete(void* pointer, size_t, std::align_val_t alignment) noexcept { oryx::tracked_free(pointer, static_cast<size_t>(alignment)); }
-void operator delete[](void* pointer, size_t, std::align_val_t alignment) noexcept { oryx::tracked_free(pointer, static_cast<size_t>(alignment)); }
-void operator delete(void* pointer, std::align_val_t alignment, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer, static_cast<size_t>(alignment)); }
-void operator delete[](void* pointer, std::align_val_t alignment, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer, static_cast<size_t>(alignment)); }
+void operator delete(void* pointer, std::align_val_t) noexcept { oryx::tracked_free(pointer); }
+void operator delete[](void* pointer, std::align_val_t) noexcept { oryx::tracked_free(pointer); }
+void operator delete(void* pointer, size_t, std::align_val_t) noexcept { oryx::tracked_free(pointer); }
+void operator delete[](void* pointer, size_t, std::align_val_t) noexcept { oryx::tracked_free(pointer); }
+void operator delete(void* pointer, std::align_val_t, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer); }
+void operator delete[](void* pointer, std::align_val_t, const std::nothrow_t&) noexcept { oryx::tracked_free(pointer); }
 
 namespace oryx
 {

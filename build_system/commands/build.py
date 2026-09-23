@@ -33,15 +33,18 @@ def configure(ctx: typer.Context):
     cfg = run.config
 
     try:
-        python_options = premake_python_options(cfg)
+        premake_options = premake_python_options(cfg)
         python_info = python_build_info() if cfg.python_enabled else None
     except PythonEnvError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1)
 
+    if cfg.sanitize:
+        premake_options = [*premake_options, "--sanitize"]
+
     if run.dry_run:
         premake = get_premake_executable()
-        command_line = [str(premake), cfg.build_generator, *python_options]
+        command_line = [str(premake), cfg.build_generator, *premake_options]
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
@@ -52,7 +55,7 @@ def configure(ctx: typer.Context):
     if python_info is not None:
         write_python_config(python_info)
 
-    command_line = [str(premake), cfg.build_generator, *python_options]
+    command_line = [str(premake), cfg.build_generator, *premake_options]
 
     try:
         with console.status("[bold blue]⚙️ Configuring build...[/bold blue]"):
@@ -64,8 +67,8 @@ def configure(ctx: typer.Context):
         console.print(f"[bold red]✗ Failed to configure build:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
 
-    if clear_outputs_if_python_changed(python_options):
-        console.print("[yellow]⚠️ Python build options changed; cleared previous binaries and objects.[/yellow]\n")
+    if clear_outputs_if_python_changed(premake_options):
+        console.print("[yellow]⚠️ Build options changed (Python or --sanitize); cleared previous binaries and objects.[/yellow]\n")
 
     for project in clear_outputs_of_removed_sources():
         console.print(f"[yellow]⚠️ Cleared {project} binaries (a source file was removed).[/yellow]\n")

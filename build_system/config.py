@@ -61,6 +61,7 @@ class BuildConfig:
     test_suite: TestSuiteConfig = field(default_factory=lambda: TestSuiteConfig(name="Tests"))
     executables: dict[str, ExecutableConfig] = field(default_factory=lambda: dict(DEFAULT_EXECUTABLES))
     python_enabled: bool = True
+    sanitize: bool = False
 
     def __post_init__(self):
         """Validate configuration settings."""

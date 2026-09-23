@@ -8,6 +8,27 @@ function useOryxProjectDefaults()
 
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
     objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
+
+    useOryxSanitizers()
+end
+
+newoption {
+    trigger = "sanitize",
+    description = "Build with AddressSanitizer + UndefinedBehaviorSanitizer (opt-in dev/CI tool; keeps the profile's own optimize/symbols settings, so it still exercises Release/Dist codegen when built with --profile release|dist)",
+}
+
+-- Opt-in, keeps whatever optimize/symbols the active configuration already has - a Release/Dist
+-- build under --sanitize still runs through the optimizer, which is the point: some bugs only
+-- reproduce once the optimizer is on, and a sanitizer build is how you catch them at the actual
+-- faulting read/write instead of wherever the corruption happens to be noticed downstream.
+function useOryxSanitizers()
+    if _OPTIONS["sanitize"] == nil then
+        return
+    end
+
+    buildoptions { "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=undefined" }
+    linkoptions { "-fsanitize=address,undefined" }
+    symbols "On"
 end
 
 -- Games/strategies self-register via a static object with no other

@@ -54,6 +54,12 @@ def main(
         "--no-python",
         help="Build without the Python scripting backend (overrides [python] enabled in oryx.toml).",
     ),
+    sanitize: bool = typer.Option(
+        False,
+        "--sanitize",
+        help="Build with AddressSanitizer + UndefinedBehaviorSanitizer, keeping the profile's own "
+        "optimize/symbols settings (a dev/CI diagnostic tool, not a build you'd ship).",
+    ),
 ):
     """Global context setup executed before running commands."""
     try:
@@ -61,6 +67,8 @@ def main(
         cfg.profile = profile
         if no_python:
             cfg.python_enabled = False
+        if sanitize:
+            cfg.sanitize = True
         cfg.__post_init__()
         ctx.obj = RunContext(config=cfg, config_path=config_path, verbose=verbose, dry_run=dry_run)
     except Exception as err:

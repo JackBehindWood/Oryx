@@ -30,6 +30,29 @@ std::filesystem::path extension_path()
     return std::filesystem::path(OX_BUILD_OUTPUT_DIR) / "OryxPython";
 }
 
+// A --sanitize build's oryx.so requires the sanitizer runtime preloaded into whatever process
+// dlopen()s it; the plain `python` subprocess run_python() spawns has no way to get that, so it
+// always fails to import a sanitized extension - not a real regression, just untestable this way.
+bool can_run_python_extension()
+{
+    if (!std::filesystem::exists(extension_path()))
+    {
+        MESSAGE("skipping: research-host extension not built at ", extension_path().string());
+        return false;
+    }
+#if defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+    MESSAGE("skipping: --sanitize build - the sanitizer runtime isn't preloaded into the python subprocess");
+    return false;
+    #endif
+#endif
+#if defined(__SANITIZE_ADDRESS__)
+    MESSAGE("skipping: --sanitize build - the sanitizer runtime isn't preloaded into the python subprocess");
+    return false;
+#endif
+    return true;
+}
+
 } // namespace
 
 TEST_SUITE("integration")
@@ -37,9 +60,8 @@ TEST_SUITE("integration")
 
 TEST_CASE("research host: import oryx works standalone")
 {
-    if (!std::filesystem::exists(extension_path()))
+    if (!can_run_python_extension())
     {
-        MESSAGE("skipping: research-host extension not built at ", extension_path().string());
         return;
     }
     CHECK(run_python("import oryx; oryx.init()") == 0);
@@ -63,7 +85,7 @@ TEST_CASE("research host: init() refuses to run inside an embedding host")
 
 TEST_CASE("research host: assertion hook raises instead of trapping")
 {
-    if (!std::filesystem::exists(extension_path()))
+    if (!can_run_python_extension())
     {
         return;
     }
@@ -79,7 +101,7 @@ TEST_CASE("research host: assertion hook raises instead of trapping")
 
 TEST_CASE("research host: interruptible batch raises when the interpreter is interrupted mid-batch")
 {
-    if (!std::filesystem::exists(extension_path()))
+    if (!can_run_python_extension())
     {
         return;
     }
