@@ -99,7 +99,7 @@
       "{root}/Oryx/vendor/spdlog/include",
       "{root}/Oryx/src",
       "{root}/Oryx/backends/Python",
-      "{root}//py/include/python3.11"
+      "/py/include/python3.11"
      ]
     },
     {
@@ -120,7 +120,7 @@
       "{root}/Oryx/vendor/spdlog/include",
       "{root}/Oryx/src",
       "{root}/Oryx/backends/Python",
-      "{root}//py/include/python3.11"
+      "/py/include/python3.11"
      ]
     },
     {
@@ -141,7 +141,7 @@
       "{root}/Oryx/vendor/spdlog/include",
       "{root}/Oryx/src",
       "{root}/Oryx/backends/Python",
-      "{root}//py/include/python3.11"
+      "/py/include/python3.11"
      ]
     }
    ],

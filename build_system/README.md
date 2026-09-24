@@ -13,7 +13,7 @@ A Python-based CLI build automation system for the Oryx Engine. Built on top of 
 * **Cross-Platform Output Structuring**: Dynamically constructs target binary paths matching Premake conventions (`<Config>-<OS>-<Arch>`) based on host architecture and OS detection.
 * **Configurable CLI Profiles**: Switch between `debug`, `release`, and `dist` build configurations via global context flags.
 * **Integrated Workflow Execution**: Run complete sequential pipelines (configure, compile, and test) with single-command convenience.
-* **Optional IDE Integration**: `forge config init --ide vscode` generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, including a single-button build-and-debug flow with one Debug/Release/Dist configuration each, selectable from VS Code's Run & Debug dropdown. `forge config init --ide visual_studio` instead generates a Visual Studio solution via Premake's own `vs2022` action. Neither is required — the CLI itself never imports IDE-specific code unless you ask for it.
+* **Optional Editor Integration**: `forge editor vscode` generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json` from the Premake export (include dirs, defines, target binaries), with one debug configuration per `[targets]` entry and profile, selectable from VS Code's Run & Debug dropdown. `forge editor vs2022` instead generates a Visual Studio solution via Premake's own `vs2022` action. Neither is required — the CLI never imports editor code unless you ask for it.
 * **Declared dependencies**: third-party libraries are `[dependencies]` entries in `forge.toml` (a git submodule or a local folder); `forge deps` adds, fetches, updates and removes them, and Premake builds static ones from the same entries — see "Third-party dependencies" below.
 * **CLI Command Script**: Installs directly as the `build` executable via standard package entry points (`pyproject.toml`).
 
@@ -90,9 +90,16 @@ Manages build settings and local configurations.
 | Command | Description |
 | --- | --- |
 | `config init` | Generates a minimal `forge.toml` in the current directory when none exists. |
-| `config init --ide vscode [--debugger lldb\|cppdbg]` | Also generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, remembered in `forge.local.toml`. |
-| `config init --ide visual_studio` | Generates a Visual Studio 2022 solution via `premake5 vs2022` — independent of `forge build compile`, which still uses `forge.toml`'s `[premake] generator` (default `gmake`). |
-| `config init --no-remember` | One-shot `--ide`/`--debugger` override; doesn't touch `forge.local.toml`. |
+
+#### `editor`
+
+| Command | Description |
+| --- | --- |
+| `editor vscode [--debugger lldb\|cppdbg]` | Generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json` (configuring first when there is no Premake export yet), remembered in `forge.local.toml`. |
+| `editor vs2022` | Generates a Visual Studio 2022 solution via `premake5 vs2022` — independent of `forge build compile`, which still uses `forge.toml`'s `[premake] generator` (default `gmake`). |
+| `editor … --no-remember` | One-shot choice; doesn't touch `forge.local.toml`. |
+
+`config init --ide vscode|visual_studio` is a hidden alias that forwards to these.
 
 **`build`**
 
@@ -181,10 +188,8 @@ python = false
 An older `oryx.local.toml` (with `[ide]` instead of `[editor]`) is still read when no
 `forge.local.toml` exists; forge prints a rename hint and never modifies or deletes it.
 
-`forge config init --ide <kind> [--debugger <name>]` resolves against whatever
-is already saved here (so a bare `forge config init` re-run reuses your last
-choice instead of resetting to `none`), then saves the result back unless you
-pass `--no-remember`.
+`forge editor vscode` without `--debugger` uses the debugger saved here, then saves
+the choice back unless you pass `--no-remember`.
 
 ---
 
@@ -194,8 +199,8 @@ pass `--no-remember`.
 # Open the interactive menu
 uv run forge
 
-# Initialize build configuration file (and VS Code integration)
-uv run forge config init --ide vscode
+# Generate VS Code integration
+uv run forge editor vscode
 
 # Configure and compile in Release mode
 uv run forge --profile release build configure
@@ -273,25 +278,25 @@ a new builder function there, not editing `commands/build.py`.
 
 **VS Code integration details**
 
-Generated `.vscode/*` files live under `build_system/vscode/` as one module
+Generated `.vscode/*` files live under `build_system/editors/vscode/` as one module
 per file (`tasks.py`, `settings.py`, `c_cpp_properties.py`, `launch.py`),
 sharing a small JSON-merge-by-key helper in `build_system/utils/json_files.py`
-so re-running `config init --ide vscode` replaces only the entries this CLI
-owns and leaves anything else in those files untouched. `write_all()` in
-`build_system/vscode/__init__.py` is the entry point `commands/config.py`
-calls; the `vscode` package itself is never imported unless `--ide vscode`
-is actually requested.
+so re-running `forge editor vscode` replaces only the entries this CLI
+owns (task and launch labels start with `<[project] name>: `) and leaves anything
+else in those files untouched. `write_all()` in `build_system/editors/vscode/__init__.py`
+is the entry point `commands/editor.py` calls; the package is never imported
+unless `forge editor vscode` runs.
 
-`tasks.py` generates one `Compile (<Profile>)` task per build profile
-(Debug/Release/Dist); `launch.py` generates a matching debug configuration
-per profile, each with that task as its `preLaunchTask` — so VS Code's
-native Run & Debug dropdown gives you a single button that builds the right
-profile and starts debugging, the closest match to Visual Studio's
-configuration dropdown without needing a custom extension. The default
-debugger is `lldb` (the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb)
+`tasks.py` generates one `Compile (<Profile>)` task per build profile and one
+`Run <target>` task per `[targets]` entry, invoking `uv run forge` when the project
+has a `uv.lock` and `forge` otherwise. `launch.py` generates a debug configuration
+per target and profile, each with its profile's compile task as `preLaunchTask` —
+so VS Code's Run & Debug dropdown gives you a single button that builds the right
+profile and starts debugging. The default debugger is `lldb` (the
+[CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb)
 extension); pass `--debugger cppdbg` for [Microsoft C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
-instead — the only place this branches is the small `DEBUGGER_TYPES` /
-`DEBUGGER_EXTRA_KEYS` dict pair at the top of `vscode/launch.py`.
+instead — the only place this branches is the `DEBUGGER_TYPES` /
+`DEBUGGER_EXTRA_KEYS` dict pair at the top of `editors/vscode/launch.py`.
 
 `c_cpp_properties.py` points VS Code's `compileCommands` at
 `build/compile_commands.json`, which `build_system/compile_commands.py`
@@ -299,8 +304,9 @@ regenerates on every `forge build configure` by dry-running (`make -n -B`)
 each Premake-generated `build/*.make` file and capturing the real, fully-resolved
 per-file compiler invocations — so IntelliSense stays accurate per project
 (and covers new projects automatically) without any hand-maintained include
-list. The `includePath`/`defines` still baked into `c_cpp_properties.py`
-are only a fallback for before `configure` has ever run.
+list. `includePath`/`defines` are the union of every project's include dirs and
+defines for the active profile, read from the Premake export, for files
+`compile_commands.json` doesn't list.
 
 ---
 

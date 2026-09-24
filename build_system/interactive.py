@@ -1,3 +1,4 @@
+import enum
 import inspect
 import sys
 import types
@@ -70,7 +71,7 @@ def _prompt_for_extra_params(func) -> dict | None:
     """Prompt for every parameter beyond `ctx`, inferring a widget from its
     type/default:
       - bool                              -> questionary.confirm
-      - Literal[...] (or `Literal[...] | None`) -> questionary.select
+      - Literal[...] or an Enum (or either `| None`) -> questionary.select
       - anything else                     -> questionary.text
 
     Uses the typer.Option's own `help=` text as the prompt (falls back to
@@ -97,6 +98,11 @@ def _prompt_for_extra_params(func) -> dict | None:
             answer = None if answer is None else answer.split()
         elif annotation is bool:
             answer = questionary.confirm(help_text, default=bool(typer_default)).ask()
+        elif isinstance(annotation, type) and issubclass(annotation, enum.Enum):
+            choices = [str(member.value) for member in annotation]
+            default_choice = str(typer_default.value) if isinstance(typer_default, enum.Enum) else None
+            answer = questionary.select(help_text, choices=choices, default=default_choice).ask()
+            answer = None if answer is None else annotation(answer)
         elif _is_literal(annotation):
             choices = [str(choice) for choice in typing.get_args(annotation)]
             default_choice = typer_default if typer_default in choices else None

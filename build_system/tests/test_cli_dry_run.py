@@ -1,5 +1,7 @@
 import pytest
 
+from build_system.tests.conftest import workspace_json
+
 PYTHON_OPTIONS = "--python-include=/py/include/python3.11 --python-libdir=/py/lib --python-lib=python3.11"
 
 
@@ -209,7 +211,7 @@ def test_setup_premake_ignores_dry_run(dry, premake):
 
 def test_config_init_ignores_dry_run_and_keeps_existing_file(dry, tmp_project):
     before = (tmp_project / "forge.toml").read_text(encoding="utf-8")
-    assert dry("config", "init", "--no-remember")[1] == f"⚠️ Configuration file already exists at: {tmp_project / 'forge.toml'}"
+    assert dry("config", "init", "--no-remember")[0] == f"⚠️ Configuration file already exists at: {tmp_project / 'forge.toml'}"
     assert (tmp_project / "forge.toml").read_text(encoding="utf-8") == before
     assert not (tmp_project / "forge.local.toml").exists()
 
@@ -250,7 +252,7 @@ def test_config_init_vscode_writes_four_files(forge, tmp_project):
 def test_bare_forge_prints_help_outside_a_tty(forge):
     result = forge()
     assert result.exit_code == 0
-    for group in ("build", "config", "deps", "docs", "python", "setup", "test"):
+    for group in ("build", "config", "deps", "docs", "editor", "python", "setup", "test"):
         assert group in result.output
     assert "vendor" not in result.output
 
@@ -299,3 +301,19 @@ def test_hidden_aliases_stay_out_of_help(forge):
     output = forge("--help").output
     assert "--with" in output and "--without" in output
     assert "--no-python" not in output and "--sanitize" not in output
+
+
+def test_editor_vscode_configures_first_without_an_export(forge, tmp_project, monkeypatch):
+    from build_system.commands import build
+
+    (tmp_project / "build" / "forge" / "workspace.json").unlink()
+    calls = []
+    monkeypatch.setattr(build, "configure", lambda ctx: calls.append("configure") or (tmp_project / "build" / "forge" / "workspace.json").write_text(workspace_json(tmp_project), encoding="utf-8"))
+    result = forge("editor", "vscode", "--no-remember")
+    assert result.exit_code == 0, result.output
+    assert calls == ["configure"]
+    assert (tmp_project / ".vscode" / "launch.json").is_file()
+
+
+def test_editor_vs2022_dry_run(dry, premake):
+    assert dry("editor", "vs2022") == [f" would run: {premake} vs2022 {PYTHON_OPTIONS}"]

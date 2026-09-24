@@ -2,7 +2,7 @@ import typer
 
 from build_system import registry
 
-GROUPS = ["Build", "Config", "Deps", "Docs", "Python", "Setup", "Test"]
+GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Python", "Setup", "Test"]
 MODULES = [*GROUPS, "Vendor"]
 
 
@@ -29,6 +29,7 @@ def test_entries_for_group():
         "Config": ["init"],
         "Deps": ["add", "sync", "update", "status", "remove"],
         "Docs": ["build_docs", "serve_docs", "clean_docs"],
+        "Editor": ["vscode", "vs2022"],
         "Python": ["generate_stubs"],
         "Setup": ["premake"],
         "Test": ["run_tests", "run_benchmarks"],

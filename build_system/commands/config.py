@@ -3,9 +3,8 @@ from typing import Literal, Optional
 import typer
 from rich.console import Console
 
-from build_system import registry
-from build_system import tomledit
-from build_system.config import LOCAL_CONFIG_NAME, RunContext, save_local
+from build_system import registry, tomledit
+from build_system.config import RunContext
 
 console = Console()
 app = typer.Typer()
@@ -16,73 +15,28 @@ command = registry.make_group(app, group="Config")
 @command(name="init", label="Init — create a default forge.toml")
 def init(
     ctx: typer.Context,
-    ide: Optional[Literal["vscode", "visual_studio", "none"]] = typer.Option(
-        None,
-        "--ide",
-        help="Generate IDE integration files (vscode | visual_studio | none) and remember the "
-        "choice in forge.local.toml (gitignored, per-developer). Defaults to the existing "
-        "[editor] kind, or 'none'.",
-    ),
-    debugger: Optional[Literal["lldb", "cppdbg"]] = typer.Option(
-        None,
-        "--debugger",
-        help="VS Code debugger adapter used by --ide vscode (lldb = CodeLLDB, cppdbg = Microsoft "
-        "C/C++). Defaults to the existing [editor] debugger, or 'lldb'.",
-    ),
-    remember: bool = typer.Option(
-        True,
-        "--remember/--no-remember",
-        help="Save the resolved --ide/--debugger choice to forge.local.toml for future commands.",
-    ),
+    ide: Optional[Literal["vscode", "visual_studio", "none"]] = typer.Option(None, "--ide", hidden=True),
+    debugger: Optional[Literal["lldb", "cppdbg"]] = typer.Option(None, "--debugger", hidden=True),
+    remember: bool = typer.Option(True, "--remember/--no-remember", hidden=True),
 ):
-    """Initialize a default build configuration file, and optionally IDE integration."""
+    """Create a minimal forge.toml in the current directory. Editor files: `forge editor vscode|vs2022`."""
     run: RunContext = ctx.obj
-    root = run.project.root
     config_file = run.project.config_file
-    console.print("[bold blue]⚙️ Initializing build configuration...[/bold blue]")
     if config_file.exists():
         console.print(f"⚠️ Configuration file already exists at: {config_file}")
     else:
-        config_file.write_text(tomledit.dumps({"project": {"name": root.name}}), encoding="utf-8")
+        config_file.write_text(tomledit.dumps({"project": {"name": run.project.root.name}}), encoding="utf-8")
         console.print(f"✓ Created default build configuration at: {config_file}")
 
-    resolved_ide = ide or run.local.editor.kind
-    resolved_debugger = debugger or run.local.editor.debugger
+    from build_system.commands import editor
 
-    if remember:
-        save_local(root, "editor", {"kind": str(resolved_ide), "debugger": str(resolved_debugger)})
-        console.print(f"[green]✓ Saved IDE preference to {LOCAL_CONFIG_NAME} (not committed).[/green]")
+    if ide is None or ide == "none":
+        if remember and (ide or debugger):
+            editor.save_preference(run, ide or run.local.editor.kind, debugger or str(run.local.editor.debugger))
+        return
 
-    if resolved_ide == "vscode":
-        from build_system import vscode  # deferred: only imported when actually generating .vscode files
-
-        try:
-            for path in vscode.write_all(run, debugger=resolved_debugger):
-                console.print(f"[bold green]✓ Wrote {path.relative_to(root)}[/bold green]")
-        except Exception as error:
-            console.print(f"[bold red]✗ Failed to write .vscode files:[/bold red] {error}")
-            raise typer.Exit(code=1)
-
-    elif resolved_ide == "visual_studio":
-        from build_system.setup.premake import ensure_premake
-        from build_system.utils import run_command
-
-        from build_system.commands.build import premake_args
-        from build_system.commands.deps import ensure_or_exit
-        from build_system.deps.resolve import write_premake_config
-
-        ensure_or_exit(run)
-        premake = ensure_premake(run.project.premake_bin_dir, run.config.premake.version)
-        if not premake:
-            raise typer.Exit(code=1)
-        write_premake_config(run)
-        try:
-            run_command([str(premake), "vs2022", *premake_args(run)], cwd=root)
-            console.print("[bold green]✓ Generated Visual Studio 2022 project files (premake5 vs2022).[/bold green]")
-            console.print(
-                "  [dim]This is independent of `forge build compile`, which still uses the "
-                "[premake] generator in forge.toml (default gmake).[/dim]"
-            )
-        except Exception as error:
-            console.print(f"[bold red]✗ Failed to generate Visual Studio project files:[/bold red] {error}")
-            raise typer.Exit(code=1)
+    console.print(f"[dim]`config init --ide` is now `forge editor {'vscode' if ide == 'vscode' else 'vs2022'}`; forwarding.[/dim]")
+    if ide == "vscode":
+        editor.write_vscode(ctx, debugger or str(run.local.editor.debugger), remember)
+    else:
+        editor.write_vs2022(ctx, remember)

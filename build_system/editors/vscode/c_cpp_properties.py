@@ -3,76 +3,32 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from build_system import workspace
 from build_system.compile_commands import COMPILE_COMMANDS_NAME
 from build_system.config import RunContext
-from build_system.setup.python_env import PythonEnvError, python_build_info
 from build_system.utils import get_macos_sdk_path, load_json, merge_by_key, write_json
-from build_system.deps.resolve import required
 
 COMPILE_COMMANDS_TOKEN = f"${{workspaceFolder}}/build/{COMPILE_COMMANDS_NAME}"
 
-# Mirrors the `filter "configurations:<Profile>" defines { ... }` blocks in
-# premake5.lua. Used only as a fallback (see FALLBACK_INCLUDE_PATHS below).
-PROFILE_DEFINES = {
-    "debug": ["OX_DEBUG", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING"],
-    "release": ["OX_RELEASE", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING"],
-    "dist": ["OX_DIST"],
-}
 
-# Mirrors the always-on defines in the projects' premake5.lua files.
-BASE_DEFINES = ["SPDLOG_COMPILED_LIB"]
-
-# Fallback only, for before `forge build configure` has ever run (or if
-# compile_commands.json is otherwise missing). Real per-project accuracy comes
-# from compile_commands.json — generated straight from Premake's own resolved
-# build output — via the "compileCommands" field below, which VS Code prefers
-# over these lists whenever it's present. This union just keeps IntelliSense
-# from being completely broken on a fresh checkout.
-FALLBACK_INCLUDE_PATHS = [
-    "${workspaceFolder}/Oryx/src",
-    "${workspaceFolder}/Oasis/src",
-    "${workspaceFolder}/tests",
-]
-
-# Private Python backend (Oryx/backends/Python), compiled into Oryx only when Python is on.
-PYTHON_BACKEND_INCLUDE_PATH = "${workspaceFolder}/Oryx/backends/Python"
+def _workspace_path(root: Path, path: Path) -> str:
+    return f"${{workspaceFolder}}/{path.relative_to(root).as_posix()}" if path.is_relative_to(root) else path.as_posix()
 
 
-def _python_enabled(run: RunContext) -> bool:
-    return run.options.get("python", False)
+def _unique(items) -> list:
+    return list(dict.fromkeys(items))
 
 
-def _python_build_info(run: RunContext):
-    # None when Python is off, or when no usable interpreter is found: the IDE fallback simply omits the CPython bits.
-    if not _python_enabled(run):
-        return None
-    try:
-        return python_build_info()
-    except PythonEnvError:
-        return None
-
-
-def _fallback_include_paths(run: RunContext) -> list[str]:
-    # Appends every <project>/vendor/<lib>/ header dir discovered on disk (see
-    # build_system/vendor.py) instead of hardcoding each library's path here.
+def _include_paths(run: RunContext) -> list[str]:
+    """Union of every exported project's include dirs for the active profile."""
+    ws = workspace.require(run.project)
     root = run.project.root
-    paths = FALLBACK_INCLUDE_PATHS + [
-        f"${{workspaceFolder}}/{dep.include.relative_to(root).as_posix()}" for dep in required(run) if dep.include.is_relative_to(root)
-    ]
-    if _python_enabled(run):
-        paths.append(PYTHON_BACKEND_INCLUDE_PATH)
-        paths.append("${workspaceFolder}/build/generated")
-        info = _python_build_info(run)
-        if info is not None:
-            paths.append(info.include_dir.as_posix())
-    return paths
+    return _unique(_workspace_path(root, path) for name in ws.projects for path in ws.config(name, run.profile).includedirs)
 
 
 def _defines(run: RunContext) -> list[str]:
-    defines = BASE_DEFINES + PROFILE_DEFINES.get(run.profile, [f"OX_{run.profile.upper()}"])
-    if _python_enabled(run):
-        defines.append("OX_ENABLE_PYTHON")
-    return defines
+    ws = workspace.require(run.project)
+    return _unique(define for name in ws.projects for define in ws.config(name, run.profile).defines)
 
 
 def _macos_compiler_path() -> str:
@@ -93,7 +49,7 @@ def _homebrew_include_path(intellisense_mode: str) -> str:
 def _macos_configuration(name: str, intellisense_mode: str, run: RunContext) -> dict:
     sdk = get_macos_sdk_path()
     sdk_includes = [f"{sdk}/usr/include/c++/v1", f"{sdk}/usr/include"] if sdk else []
-    include_paths = _fallback_include_paths(run)
+    include_paths = _include_paths(run)
 
     return {
         "name": name,
@@ -114,7 +70,7 @@ def _macos_configuration(name: str, intellisense_mode: str, run: RunContext) -> 
 
 def _linux_configuration(run: RunContext) -> dict:
     compiler_path = shutil.which("g++") or shutil.which("clang++") or "/usr/bin/g++"
-    include_paths = _fallback_include_paths(run)
+    include_paths = _include_paths(run)
 
     return {
         "name": "Linux",
@@ -133,7 +89,7 @@ def _linux_configuration(run: RunContext) -> dict:
 
 
 def _windows_configuration(run: RunContext) -> dict:
-    include_paths = _fallback_include_paths(run)
+    include_paths = _include_paths(run)
 
     return {
         "name": "Windows",
@@ -170,15 +126,10 @@ def _generate_configurations(run: RunContext) -> list[dict]:
 
 
 def write_c_cpp_properties(run: RunContext) -> Path:
-    """Generate or merge .vscode/c_cpp_properties.json for the host platform.
+    """Generate or merge .vscode/c_cpp_properties.json for the host platform, replacing configurations by name.
 
-    Configurations are matched and replaced by name; any other user-defined
-    configuration in the file is left untouched. Each configuration points
-    "compileCommands" at compile_commands.json (generated by `forge build
-    configure` from Premake's own resolved output — see
-    build_system/compile_commands.py), which VS Code prefers over
-    includePath/defines whenever it exists. Those lists remain only as a
-    fallback for before compile_commands.json exists.
+    VS Code prefers "compileCommands" (per-file flags) whenever that file exists; the includePath/defines
+    unions from the Premake export cover files it doesn't list.
     """
     path = run.project.root / ".vscode" / "c_cpp_properties.json"
     generated = _generate_configurations(run)
