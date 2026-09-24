@@ -67,6 +67,24 @@ jobs:
         echo "$output"
         echo "$output" | grep -q "Benchmark report"
 
+  tooling:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Test build_system
+      run: uv run --no-default-groups --group test pytest -q --cov=build_system --cov-report=term
+
   docs:
     runs-on: ubuntu-latest
 
