@@ -1,5 +1,7 @@
 #pragma once
 
+#include "doctest.h"
+
 #include "unit/Scripting/ScriptingTestSupport.h"
 
 #ifdef OX_ENABLE_PYTHON
@@ -14,6 +16,39 @@ namespace oryx::python
 
 namespace oryx::test
 {
+
+inline std::filesystem::path extension_path()
+{
+    return std::filesystem::path(OX_BUILD_OUTPUT_DIR) / "OryxPython";
+}
+
+// A sanitized oryx.so needs the ASan runtime preloaded, which a plain `python` subprocess never has.
+inline bool can_run_python_extension()
+{
+    if (!std::filesystem::exists(extension_path()))
+    {
+        MESSAGE("skipping: research-host extension not built at ", extension_path().string());
+        return false;
+    }
+#if defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+    MESSAGE("skipping: --sanitize build - the sanitizer runtime isn't preloaded into the python subprocess");
+    return false;
+    #endif
+#endif
+#if defined(__SANITIZE_ADDRESS__)
+    MESSAGE("skipping: --sanitize build - the sanitizer runtime isn't preloaded into the python subprocess");
+    return false;
+#endif
+    return true;
+}
+
+// `python` from PATH: under `uv run` (or forge's own PATH prepend) that is the venv interpreter the research-host .pth lives in.
+inline int run_python(const std::string& code, const std::string& environment = "")
+{
+    std::string command = environment + "python -c \"" + code + "\"";
+    return std::system(command.c_str());
+}
 
 inline ScriptSource file_source(const std::filesystem::path& file)
 {

@@ -134,6 +134,23 @@ TEST_CASE("the Python exception types mirror the C++ error hierarchy")
     CHECK(read_file(marker) == "oryx.errors");
 }
 
+TEST_CASE("the embedded host's module surface equals the research host's, minus init() and __file__")
+{
+    std::string embedded_dir = run_oryx_script("mark(repr(sorted(dir(oryx))))\n");
+
+    if (!can_run_python_extension())
+    {
+        return;
+    }
+    // A real `import` adds __file__, which the embedded host's manually-constructed
+    // module never gets — that's an import-machinery artifact, not part of oryx's own API surface.
+    std::string code =
+        "import oryx, sys\n"
+        "surface = sorted(set(dir(oryx)) - {'init', '__file__'})\n"
+        "sys.exit(0 if surface == " + embedded_dir + " else 1)";
+    CHECK(run_python(code) == 0);
+}
+
 TEST_CASE("the embedded module survives an interpreter restart")
 {
     TempDir dir;
