@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from build_system.tests.conftest import workspace_json
@@ -191,15 +193,42 @@ def test_benchmark(dry, tests_binary):
 
 def test_docs(dry, tmp_project):
     mkdocs = tmp_project / "mkdocs.yml"
-    assert dry("docs", "build") == [f" would run: uv run --group docs mkdocs build --strict -f {mkdocs}"]
+    assert dry("docs", "build") == [f" would run: {sys.executable} -m mkdocs build --strict --site-dir {tmp_project / 'site'} -f {mkdocs}"]
     assert dry("docs", "serve", "--port", "9000") == [
-        f" would run: uv run --group docs mkdocs serve --dev-addr localhost:9000 -f {mkdocs}"
+        f" would run: {sys.executable} -m mkdocs serve --dev-addr localhost:9000 -f {mkdocs}"
     ]
     assert dry("docs", "clean") == [f" would remove: {tmp_project / 'site'}"]
 
 
 def test_python_stubs(dry):
-    assert dry("python", "stubs") == [" would run: uv run --group stubs python -m pybind11_stubgen oryx -o OryxPython/stubs"]
+    assert dry("python", "stubs") == [f" would run: {sys.executable} -m pybind11_stubgen oryx -o OryxPython/stubs"]
+
+
+def test_docs_follow_the_docs_table(dry, tmp_project):
+    from build_system import tomledit
+
+    tomledit.edit_file(tmp_project / "forge.toml", lambda text: tomledit.set_value(tomledit.set_value(text, ["docs", "config"], "site.yml"), ["docs", "site"], "public"))
+    assert dry("docs", "build") == [f" would run: {sys.executable} -m mkdocs build --strict --site-dir {tmp_project / 'public'} -f {tmp_project / 'site.yml'}"]
+    assert dry("docs", "clean") == [f" would remove: {tmp_project / 'public'}"]
+
+
+def test_missing_mkdocs_names_uv_and_pip(forge, monkeypatch):
+    import importlib.util
+
+    real_find_spec = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *args: None if name == "mkdocs" else real_find_spec(name, *args))
+    result = forge("docs", "build")
+    assert result.exit_code == 1
+    output = " ".join(result.output.split())
+    assert "uv sync --group docs" in output and "-m pip install mkdocs mkdocs-material" in output
+
+
+def test_python_stubs_needs_a_stubs_dir(forge, tmp_project):
+    config = tmp_project / "forge.toml"
+    config.write_text(config.read_text(encoding="utf-8").replace('stubs-dir = "OryxPython/stubs"\n', ""), encoding="utf-8")
+    result = forge("--dry-run", "python", "stubs")
+    assert result.exit_code == 1
+    assert "stubs-dir" in result.output
 
 
 def test_setup_premake_ignores_dry_run(dry, premake):

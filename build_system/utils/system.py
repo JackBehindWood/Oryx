@@ -41,3 +41,16 @@ def run_command(command, cwd=None, capture_output=True, env=None):
         text=True,
         check=True,
     )
+
+
+def missing_module_hint(module: str, uv_group: str, pip_packages: list[str]) -> str | None:
+    """None when `module` is importable by this Python, else how to install it with uv or pip."""
+    import importlib.util
+    import sys
+
+    if importlib.util.find_spec(module) is not None:
+        return None
+    return (
+        f"{module} is not installed for {sys.executable}. Install it with `uv sync --group {uv_group}` "
+        f"(or run forge via `uv run --group {uv_group} forge …`), or `{sys.executable} -m pip install {' '.join(pip_packages)}`."
+    )

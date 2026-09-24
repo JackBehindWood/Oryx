@@ -68,7 +68,7 @@ def _compile_entries(make_file: Path, config_token: str) -> list[dict]:
 
 def generate_compile_commands(config_token: str, build_dir: Path) -> Path | None:
     """Generate compile_commands.json from the .make files Premake already wrote,
-    covering every discovered project (Oryx.make, Oasis.make, Tests.make, and any
+    covering every discovered project (one <project>.make per Premake project, and any
     future project) with its own real per-file includes/defines. Returns None (and
     prints a note) if `make` or the generated .make files aren't available yet —
     the caller should treat that as non-fatal."""

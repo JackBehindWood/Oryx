@@ -50,14 +50,18 @@ pip install -e .
 
 ```
 
+forge never shells out to `uv`: `docs` and `python stubs` run their tools as
+`python -m mkdocs` / `python -m pybind11_stubgen` with the interpreter forge itself
+runs on, and name both the uv group and the pip packages when one is missing.
+
 ---
 
 **CLI Overview**
 
-Once installed, invoke the CLI using the `build` command (or via `python -m build_system.main`):
+Once installed, invoke the CLI using the `forge` command (or via `python -m build_system.main`):
 
 ```bash
-build [GLOBAL OPTIONS] COMMAND [ARGS]...
+forge [GLOBAL OPTIONS] COMMAND [ARGS]...
 
 ```
 

@@ -1,4 +1,4 @@
-"""Locate the Python that Oryx's embedded scripting backend builds against.
+"""Locate the Python that the embedded scripting backend builds against.
 
 Read from the interpreter running build_system (the uv venv), so the headers, libpython and
 standard library the C++ side links are the ones `uv run` uses. The values reach Premake as
