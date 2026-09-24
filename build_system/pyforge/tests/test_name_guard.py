@@ -8,11 +8,12 @@ ALLOWED: dict[str, int] = {}
 
 def _counts() -> dict[str, int]:
     counts = {}
-    for path in sorted(PACKAGE.rglob("*.py")):
-        relative = path.relative_to(PACKAGE).as_posix()
-        found = len(PROJECT_NAMES.findall(path.read_text(encoding="utf-8")))
-        if found:
-            counts[relative] = found
+    for pattern in ("*.py", "*.lua"):
+        for path in sorted(PACKAGE.rglob(pattern)):
+            relative = path.relative_to(PACKAGE).as_posix()
+            found = len(PROJECT_NAMES.findall(path.read_text(encoding="utf-8")))
+            if found:
+                counts[relative] = found
     return counts
 
 

@@ -3,6 +3,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from pyforge import __version__, options, plugins, registry
 from pyforge.config import LOCAL_CONFIG_NAME, ForgeConfig, LocalConfig, Profile, ProjectTable, RunContext, SchemaError, load_config, load_local, validate_local
@@ -147,7 +148,7 @@ def main(
             pm=pm,
         )
     except (ProjectNotFound, SchemaError, PluginError) as err:
-        console.print(f"[bold red]Configuration Error:[/bold red] {err}")
+        console.print(f"[bold red]Configuration Error:[/bold red] {escape(str(err))}")
         raise typer.Exit(code=1)
 
     if legacy_local is not None:

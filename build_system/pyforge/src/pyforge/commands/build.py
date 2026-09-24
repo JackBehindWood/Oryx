@@ -31,7 +31,7 @@ def require_workspace(run: RunContext) -> Workspace:
     try:
         return workspace.require(run.project)
     except WorkspaceError as error:
-        console.print(f"[bold red]✗ {error}[/bold red]")
+        console.print(f"[bold red]✗ {escape(str(error))}[/bold red]")
         raise typer.Exit(code=1)
 
 
@@ -49,7 +49,7 @@ def premake_args(run: RunContext) -> list[str]:
     try:
         plugin_args = [arg for result in run.pm.hook.forge_premake_args(ctx=run) if result for arg in result]
     except RuntimeError as error:
-        console.print(f"[bold red]✗ {error}[/bold red]")
+        console.print(f"[bold red]✗ {escape(str(error))}[/bold red]")
         raise typer.Exit(code=1)
     return options.premake_flags(run.config.options, run.options, run.defines) + plugin_args
 
@@ -119,7 +119,7 @@ def configure(ctx: typer.Context):
         if generate_compile_commands(ws.token(run.profile), project.build_dir):
             console.print("[bold green]✓ compile_commands.json generated.[/bold green]\n")
     except Exception as error:
-        console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {error}[/yellow]\n")
+        console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {escape(str(error))}[/yellow]\n")
 
 
 @command(name="compile", label="Compile — build engine binaries", requires_dependencies=True, rich_help_panel="Build")
@@ -138,7 +138,7 @@ def compile_project(ctx: typer.Context):
     try:
         command_line = build_compile_command(cfg.premake.generator, token, run.project.build_dir, run.jobs)
     except ValueError as error:
-        console.print(f"[bold red]✗ {error}[/bold red]")
+        console.print(f"[bold red]✗ {escape(str(error))}[/bold red]")
         raise typer.Exit(code=1)
 
     if run.dry_run:

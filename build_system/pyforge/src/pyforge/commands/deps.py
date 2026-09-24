@@ -30,11 +30,13 @@ def _fail(message: str) -> typer.Exit:
 
 
 def _confirm_fetch(deps: list[ResolvedDependency]) -> bool:
-    from pyforge.interactive import is_interactive
+    from pyforge.interactive import is_interactive, questionary_or_none
 
     if not is_interactive():
         return False
-    import questionary
+    questionary = questionary_or_none()
+    if questionary is None:
+        return False
 
     return bool(questionary.confirm(f"Fetch missing dependencies ({', '.join(dep.name for dep in deps)})?", default=True).ask())
 

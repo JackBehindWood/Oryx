@@ -17,6 +17,22 @@ def is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
+def questionary_or_none():
+    """questionary is the `pyforge[menu]` extra, not a core dependency: a caller that needs it
+    for an interactive prompt gets None (with an install hint printed) instead of a raw
+    ModuleNotFoundError, and degrades to its non-interactive behaviour."""
+    try:
+        import questionary
+
+        return questionary
+    except ImportError:
+        from rich.console import Console
+        from rich.markup import escape
+
+        Console(stderr=True).print(escape('The interactive menu needs the "menu" extra: pip install "pyforge[menu]" (or uv sync).'), style="yellow")
+        return None
+
+
 def run_menu(ctx: typer.Context) -> None:
     """Present the arrow-key command menu, dispatching actions until the user quits.
 
@@ -25,7 +41,10 @@ def run_menu(ctx: typer.Context) -> None:
     session. A failing action still exits immediately, since the underlying
     command raises typer.Exit(code=1), which unwinds out of this loop.
     """
-    import questionary
+    questionary = questionary_or_none()
+    if questionary is None:
+        print(ctx.get_help())
+        return
 
     while True:
         group_choices = registry.groups_in_order() + [QUIT]

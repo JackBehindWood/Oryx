@@ -1,13 +1,9 @@
-import hashlib
-import json
 import platform
 import subprocess
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 from rich.console import Console
-from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
+from rich.markup import escape
 
 from ..cache import premake_dir
 from ..project import Project
@@ -89,6 +85,8 @@ def check_local_premake(bin_dir: Path) -> bool:
 
 
 def _download_with_progress(url: str, destination, description: str):
+    from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
+
     with Progress(
         "[progress.description]{task.description}",
         BarColumn(),
@@ -107,6 +105,8 @@ def _download_with_progress(url: str, destination, description: str):
 
 
 def _sha256(path: Path) -> str:
+    import hashlib
+
     digest = hashlib.sha256()
     with open(path, "rb") as file:
         for chunk in iter(lambda: file.read(1 << 20), b""):
@@ -115,6 +115,10 @@ def _sha256(path: Path) -> str:
 
 
 def _fetch_json(url: str):
+    import json
+    import urllib.error
+    import urllib.request
+
     try:
         with urllib.request.urlopen(url, timeout=10) as response:
             return json.load(response)
@@ -196,7 +200,7 @@ def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
             download_file(PREMAKE_LICENSE_URL.format(version=version), license_path)
             console.print(f"[green]✓ Saved licence to {license_path}[/green]\n")
         except Exception as error:
-            console.print(f"[yellow]⚠️ Could not download licence: {error}[/yellow]\n")
+            console.print(f"[yellow]⚠️ Could not download licence: {escape(str(error))}[/yellow]\n")
 
         executable = get_premake_executable(bin_dir)
         if system in {"Linux", "Darwin"} and executable.exists():
@@ -215,11 +219,11 @@ def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
         return True
 
     except ChecksumError as error:
-        console.print(f"[bold red]✗ Checksum mismatch, refusing to install:[/bold red] {error}")
+        console.print(f"[bold red]✗ Checksum mismatch, refusing to install:[/bold red] {escape(str(error))}")
         remove_file(archive_path)
         return False
     except Exception as error:
-        console.print(f"[bold red]✗ Failed to download/extract Premake5:[/bold red] {error}")
+        console.print(f"[bold red]✗ Failed to download/extract Premake5:[/bold red] {escape(str(error))}")
         remove_file(archive_path)
         return False
 

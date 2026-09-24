@@ -49,11 +49,13 @@ def _fail(message: str) -> typer.Exit:
 
 def _project_name(run: RunContext, yes: bool) -> str:
     default = run.project.root.name
-    from pyforge.interactive import is_interactive
+    from pyforge.interactive import is_interactive, questionary_or_none
 
     if yes or not is_interactive():
         return default
-    import questionary
+    questionary = questionary_or_none()
+    if questionary is None:
+        return default
 
     return questionary.text("Project name", default=default).ask() or default
 

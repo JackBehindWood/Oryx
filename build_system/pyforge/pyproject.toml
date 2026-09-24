@@ -42,6 +42,7 @@ packages = ["src/pyforge"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = ["slow: a real end-to-end test (network + an actual compiler); not deselected by default, see test_e2e_hello.py"]
 
 [tool.coverage.run]
 omit = ["tests/*"]

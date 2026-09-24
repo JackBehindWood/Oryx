@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
 
-import pluggy
+from dataclasses import dataclass, field
+from typing import Any
 
 from ..plugins import get_plugin_manager
 from ..project import Project
@@ -82,7 +83,7 @@ class RunContext:
     verbose: bool = False
     dry_run: bool = False
     interactive: bool = False
-    pm: pluggy.PluginManager = field(default_factory=get_plugin_manager)
+    pm: Any = field(default_factory=get_plugin_manager)  # pluggy.PluginManager, or _NullPluginManager without the [plugins] extra
 
     @property
     def jobs(self) -> int:

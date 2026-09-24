@@ -1,6 +1,5 @@
 import os
 import tarfile
-import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -15,6 +14,8 @@ def download_file(url, destination, reporthook=None):
         reporthook: Optional urlretrieve-style progress callback
             (block_num, block_size, total_size).
     """
+    import urllib.request
+
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
 

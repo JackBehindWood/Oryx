@@ -2,6 +2,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from pyforge import registry, workspace
 from pyforge.config import LOCAL_CONFIG_NAME, Debugger, RunContext, save_local
@@ -42,7 +43,7 @@ def write_vscode(ctx: typer.Context, debugger: str, remember: bool) -> None:
         for path in vscode.write_all(run, debugger=debugger):
             console.print(f"[bold green]✓ Wrote {path.relative_to(run.project.root)}[/bold green]")
     except (OSError, ValueError, workspace.WorkspaceError) as error:
-        console.print(f"[bold red]✗ Failed to write .vscode files:[/bold red] {error}")
+        console.print(f"[bold red]✗ Failed to write .vscode files:[/bold red] {escape(str(error))}")
         raise typer.Exit(code=1)
 
 

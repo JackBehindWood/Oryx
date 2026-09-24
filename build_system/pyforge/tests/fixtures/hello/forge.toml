@@ -1,0 +1,6 @@
+[project]
+name = "hello"
+default-target = "hello"
+
+[targets.hello]
+project = "hello"
