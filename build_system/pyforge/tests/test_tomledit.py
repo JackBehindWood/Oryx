@@ -207,8 +207,8 @@ def test_dumps_writes_dict_values_inside_arrays_as_inline_tables():
     assert tomllib.loads(dumps({"t": {"x": [{"a": 1}]}})) == {"t": {"x": [{"a": 1}]}}
 
 
-def test_config_init_keeps_comments_in_forge_local_toml(forge, tmp_project):
+def test_editor_vscode_keeps_comments_in_forge_local_toml(forge, tmp_project):
     local = tmp_project / "forge.local.toml"
     local.write_text('# mine\n[editor]\nkind = "none"  # default\n\n[build]\njobs = 2\n', encoding="utf-8")
-    assert forge("config", "init", "--debugger", "cppdbg").exit_code == 0
-    assert local.read_text(encoding="utf-8") == '# mine\n[editor]\nkind = "none"  # default\ndebugger = "cppdbg"\n\n[build]\njobs = 2\n'
+    assert forge("editor", "vscode", "--debugger", "cppdbg").exit_code == 0
+    assert local.read_text(encoding="utf-8") == '# mine\n[editor]\nkind = "vscode"  # default\ndebugger = "cppdbg"\n\n[build]\njobs = 2\n'

@@ -54,17 +54,22 @@ except (ProjectNotFound, SchemaError, PluginError):
     _boot_pm = plugins.get_plugin_manager()
 _boot_pm.hook.forge_commands(app=app)
 
+# `config` and `init` are the only commands that make sense before a forge.toml exists
+# (config show/get/set/unset needs somewhere to point at; init is what creates the file).
+_COMMANDS_WITHOUT_A_PROJECT = ("config", "init")
+
+
 def _discover(ctx: typer.Context) -> Project:
     try:
         return Project.discover()
     except ProjectNotFound:
-        if ctx.invoked_subcommand != "config":
+        if ctx.invoked_subcommand not in _COMMANDS_WITHOUT_A_PROJECT:
             raise
         return Project.from_config(Path.cwd() / "forge.toml")
 
 
 def _load(ctx: typer.Context, project: Project) -> ForgeConfig:
-    if not project.config_file.is_file() and ctx.invoked_subcommand == "config":
+    if not project.config_file.is_file() and ctx.invoked_subcommand in _COMMANDS_WITHOUT_A_PROJECT:
         return ForgeConfig(project=ProjectTable(name=project.root.name))
     return load_config(project.config_file, __version__)
 

@@ -198,11 +198,17 @@ def parse_enum(enum: type[Enum], value, where: str, source: str = "forge.toml"):
     return enum(value)
 
 
+def _unwrap_optional(annotation):
+    origin = typing.get_origin(annotation)
+    if origin is types.UnionType or origin is typing.Union:
+        return next(arg for arg in typing.get_args(annotation) if arg is not type(None))
+    return annotation
+
+
 def _convert(annotation, value, where: str, source: str):
     origin = typing.get_origin(annotation)
     if origin is types.UnionType or origin is typing.Union:
-        inner = next(arg for arg in typing.get_args(annotation) if arg is not type(None))
-        return _convert(inner, value, where, source)
+        return _convert(_unwrap_optional(annotation), value, where, source)
     if isinstance(annotation, type) and issubclass(annotation, Enum):
         return parse_enum(annotation, value, where, source)
     if dataclasses.is_dataclass(annotation):
@@ -222,6 +228,51 @@ def _convert(annotation, value, where: str, source: str):
     if annotation is int and isinstance(value, bool) or not isinstance(value, annotation):
         raise SchemaError(f"{source}: '{where}' must be {_type_name(annotation)}, not {type(value).__name__}")
     return value
+
+
+def leaf_type(cls, path: list[str], where: str = ""):
+    """Walk a dotted `path` (e.g. ["build", "jobs"] or ["targets", "oasis", "project"]) through `cls`'s
+    dataclass/dict field annotations, for `forge config set`'s type-directed CLI-string conversion."""
+    if not path:
+        return cls
+    hints = typing.get_type_hints(cls)
+    fields = {toml_key(f.name): f for f in dataclasses.fields(cls)}
+    key, *rest = path
+    if key not in fields:
+        raise SchemaError(f"unknown key '{_join(where, key)}'{suggestion(key, fields)}")
+    annotation = _unwrap_optional(hints[fields[key].name])
+    here = _join(where, key)
+    if not rest:
+        return annotation
+    origin = typing.get_origin(annotation)
+    if origin is dict:
+        _, value_type = typing.get_args(annotation)
+        entry_key, *deeper = rest
+        if not deeper:
+            raise SchemaError(f"'{_join(here, entry_key)}' is a table; set one of its keys instead")
+        return leaf_type(value_type, deeper, _join(here, entry_key))
+    if dataclasses.is_dataclass(annotation):
+        return leaf_type(annotation, rest, here)
+    raise SchemaError(f"'{here}' is not a table; '{_join(here, rest[0])}' does not exist")
+
+
+def parse_scalar(annotation, text: str, where: str, source: str = "forge.toml"):
+    """The CLI string `text`, converted to the type `leaf_type` found at `where`."""
+    annotation = _unwrap_optional(annotation)
+    if isinstance(annotation, type) and issubclass(annotation, Enum):
+        return parse_enum(annotation, text, where, source)
+    if annotation is bool:
+        if text not in ("true", "false"):
+            raise SchemaError(f"{source}: '{where}' must be true or false, not {text!r}")
+        return text == "true"
+    if annotation is int:
+        try:
+            return int(text)
+        except ValueError:
+            raise SchemaError(f"{source}: '{where}' must be an integer, not {text!r}") from None
+    if annotation is str:
+        return text
+    raise SchemaError(f"{source}: '{where}' is {_type_name(annotation)}; not settable with a single value — edit {source} by hand")
 
 
 def from_dict(cls, data: dict, where: str = "", source: str = "forge.toml"):

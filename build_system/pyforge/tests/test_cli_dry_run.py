@@ -1,6 +1,7 @@
 import sys
 
 import pytest
+import typer
 
 from conftest import workspace_json
 from pyforge.setup.premake import lua_scripts_dir
@@ -264,37 +265,86 @@ def test_setup_premake_ignores_dry_run(dry, premake):
     ]
 
 
-def test_config_init_ignores_dry_run_and_keeps_existing_file(dry, tmp_project):
+def test_init_ignores_dry_run_and_keeps_existing_file(dry, tmp_project):
     before = (tmp_project / "forge.toml").read_text(encoding="utf-8")
-    assert dry("config", "init", "--no-remember")[0] == f"⚠️ Configuration file already exists at: {tmp_project / 'forge.toml'}"
+    assert dry("init")[0] == f"⚠️ Configuration file already exists at: {tmp_project / 'forge.toml'}"
     assert (tmp_project / "forge.toml").read_text(encoding="utf-8") == before
     assert not (tmp_project / "forge.local.toml").exists()
 
 
-def test_config_init_creates_missing_file(forge, tmp_project):
+def test_init_dry_run_creates_nothing_in_a_fresh_project(forge, tmp_project):
     (tmp_project / "forge.toml").unlink()
-    result = forge("config", "init", "--no-remember")
+    result = forge("--dry-run", "init", "--yes")
+    assert result.exit_code == 0, result.output
+    assert f"would create: {tmp_project / 'forge.toml'}" in result.output
+    assert not (tmp_project / "forge.toml").exists()
+
+
+def test_init_creates_missing_file(forge, tmp_project):
+    (tmp_project / "forge.toml").unlink()
+    result = forge("init", "--yes")
     assert result.exit_code == 0, result.output
     assert (tmp_project / "forge.toml").read_text(encoding="utf-8") == f'[project]\nname = "{tmp_project.name}"\n'
+    assert "No premake5.lua found" in result.output
 
 
-def test_config_init_remembers_ide_choice(forge, tmp_project):
-    assert forge("config", "init", "--debugger", "cppdbg").exit_code == 0
-    assert (tmp_project / "forge.local.toml").read_text(encoding="utf-8") == '[editor]\nkind = "none"\ndebugger = "cppdbg"\n'
+def test_init_scaffolds_an_app_template(forge, tmp_project, monkeypatch):
+    from pyforge.commands import build
+
+    def no_premake(ctx):
+        raise typer.Exit(code=1)
+
+    (tmp_project / "forge.toml").unlink()
+    monkeypatch.setattr(build, "configure", no_premake)
+    result = forge("init", "--yes", "--template", "app")
+    assert result.exit_code == 0, result.output
+    assert (tmp_project / "premake5.lua").is_file()
+    assert (tmp_project / "src" / "main.cpp").is_file()
+    assert "couldn't run Premake" in result.output
 
 
-def test_config_init_copies_the_legacy_local_file_and_leaves_it(forge, tmp_project):
+def test_init_derives_targets_from_an_existing_premake_export(forge, tmp_project, monkeypatch):
+    from pyforge.commands import build
+
+    (tmp_project / "forge.toml").unlink()
+    (tmp_project / "premake5.lua").write_text("-- pretend project\n", encoding="utf-8")
+    monkeypatch.setattr(
+        build,
+        "configure",
+        lambda ctx: (tmp_project / "build" / "forge" / "workspace.json").write_text(workspace_json(tmp_project), encoding="utf-8"),
+    )
+    result = forge("init", "--yes")
+    assert result.exit_code == 0, result.output
+    config = tmp_project / "forge.toml"
+    assert '[targets.oasis]\nproject = "Oasis"' in config.read_text(encoding="utf-8")
+    assert '[targets.tests]\nproject = "Tests"' in config.read_text(encoding="utf-8")
+    assert 'default-target = "oasis"' in config.read_text(encoding="utf-8")
+
+
+def test_init_rejects_an_unknown_template(forge, tmp_project):
+    (tmp_project / "forge.toml").unlink()
+    result = forge("init", "--yes", "--template", "bogus")
+    assert result.exit_code == 1
+    assert "Unknown --template 'bogus'" in result.output
+
+
+def test_editor_vscode_remembers_the_debugger_choice(forge, tmp_project):
+    assert forge("editor", "vscode", "--debugger", "cppdbg").exit_code == 0
+    assert (tmp_project / "forge.local.toml").read_text(encoding="utf-8") == '[editor]\nkind = "vscode"\ndebugger = "cppdbg"\n'
+
+
+def test_editor_vscode_copies_the_legacy_local_file_and_leaves_it(forge, tmp_project):
     legacy = tmp_project / "oryx.local.toml"
     legacy.write_text('[ide]\nkind = "vscode"\ndebugger = "lldb"\n', encoding="utf-8")
-    result = forge("config", "init", "--debugger", "cppdbg")
+    result = forge("editor", "vscode", "--debugger", "cppdbg")
     assert result.exit_code == 0, result.output
     assert "rename it to forge.local.toml" in result.output
     assert (tmp_project / "forge.local.toml").read_text(encoding="utf-8") == '[editor]\nkind = "vscode"\ndebugger = "cppdbg"\n'
     assert legacy.read_text(encoding="utf-8") == '[ide]\nkind = "vscode"\ndebugger = "lldb"\n'
 
 
-def test_config_init_vscode_writes_four_files(forge, tmp_project):
-    result = forge("config", "init", "--ide", "vscode", "--no-remember")
+def test_editor_vscode_writes_four_files(forge, tmp_project):
+    result = forge("editor", "vscode", "--no-remember")
     assert result.exit_code == 0, result.output
     assert sorted(p.name for p in (tmp_project / ".vscode").iterdir()) == [
         "c_cpp_properties.json",

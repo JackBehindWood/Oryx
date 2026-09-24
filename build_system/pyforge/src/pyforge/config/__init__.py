@@ -29,6 +29,8 @@ from .schema import (
     Suite,
     Target,
     TestsTable,
+    leaf_type,
+    parse_scalar,
 )
 
 __all__ = [
@@ -57,10 +59,12 @@ __all__ = [
     "Suite",
     "Target",
     "TestsTable",
+    "leaf_type",
     "load_config",
     "load_local",
     "local_config_file",
     "parse_config",
+    "parse_scalar",
     "save_local",
     "validate_local",
 ]
