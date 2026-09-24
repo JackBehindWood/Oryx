@@ -20,6 +20,7 @@ SOURCES: dict[str, Source] = {}
 
 
 def register(name: str, source: Source) -> None:
+    # forge_dependency_sources() (wired in 4.2+) feeds plugin sources into this same register().
     SOURCES[name] = source
     DEPENDENCY_SOURCES.register(name)
 

@@ -5,6 +5,7 @@ from rich.console import Console
 
 from build_system import registry, workspace
 from build_system.config import LOCAL_CONFIG_NAME, Debugger, RunContext, save_local
+from build_system.editors import registry as editor_registry
 
 console = Console()
 app = typer.Typer(no_args_is_help=True)
@@ -84,7 +85,7 @@ def vscode(
 ):
     """Generate or merge .vscode/{tasks,settings,c_cpp_properties,launch}.json, configuring first if needed."""
     run: RunContext = ctx.obj
-    write_vscode(ctx, str(debugger or run.local.editor.debugger), remember)
+    editor_registry.editor_command("vscode")(ctx, str(debugger or run.local.editor.debugger), remember)
 
 
 @command(name="vs2022", label="Visual Studio 2022 — generate a solution with premake5 vs2022")
@@ -93,4 +94,12 @@ def vs2022(
     remember: bool = typer.Option(True, "--remember/--no-remember", help=REMEMBER_HELP),
 ):
     """Generate a Visual Studio 2022 solution with the same options and dependencies as the build."""
-    write_vs2022(ctx, remember)
+    editor_registry.editor_command("visual_studio")(ctx, remember)
+
+
+def _register_builtins() -> None:
+    editor_registry.register("vscode", write_vscode)
+    editor_registry.register("visual_studio", write_vs2022)
+
+
+_register_builtins()

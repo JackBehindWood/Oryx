@@ -10,8 +10,6 @@ from build_system import registry, runners
 from build_system.config import RunContext, Suite
 from build_system.config.schema import suggestion
 from build_system.deps.resolve import requirements_met
-from build_system.runners import doctest as doctest_runner
-from build_system.runners import pytest as pytest_runner
 from build_system.utils import child_env, missing_module_hint, run_command, stream_command
 
 console = Console()
@@ -76,12 +74,12 @@ def _dirs_by_kind(suites: dict[str, Suite], kinds: dict[str, runners.RunnerKind]
 
 
 def _build_command(run: RunContext, kind: runners.RunnerKind, dirs: list[str], extra: list[str], *, list_only: bool) -> list[str]:
-    if kind == "doctest":
-        return doctest_runner.command(_test_binary(run), dirs, extra, list_only=list_only)
-    hint = missing_module_hint("pytest", "test", ["pytest"])
-    if hint:
-        raise _fail(hint)
-    return pytest_runner.command(dirs, extra, list_only=list_only)
+    binary = _test_binary(run) if kind == "doctest" else None
+    if kind == "pytest":
+        hint = missing_module_hint("pytest", "test", ["pytest"])
+        if hint:
+            raise _fail(hint)
+    return runners.runner_for(kind).command(binary, dirs, extra, list_only=list_only)
 
 
 def run_suites(
