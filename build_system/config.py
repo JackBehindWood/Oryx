@@ -4,6 +4,8 @@ import platform
 import re
 import tomllib
 
+from . import tomledit
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = PROJECT_ROOT / "build"
 BIN_DIR = BUILD_DIR / "bin"
@@ -188,29 +190,14 @@ class BuildConfig:
 
     def save(self, path: Path = DEFAULT_CONFIG_FILE):
         """Save configuration to a TOML file."""
-        lines = [
-            "[project]",
-            f'name = "{self.project_name}"',
-            "",
-            "[build]",
-            f'generator = "{self.build_generator}"',
-            f'profile = "{self.profile}"',
-            "",
-            "[test-suite]",
-            f'name = "{self.test_suite.name}"',
-        ]
-        for key, entry in self.executables.items():
-            lines.append("")
-            lines.append(f"[executables.{key}]")
-            lines.append(f'name = "{entry.name}"')
-        lines += [
-            "",
-            "[python]",
-            f"enabled = {str(self.python_enabled).lower()}",
-            "",
-        ]
-
-        path.write_text("\n".join(lines), encoding="utf-8")
+        data = {
+            "project": {"name": self.project_name},
+            "build": {"generator": self.build_generator, "profile": self.profile},
+            "test-suite": {"name": self.test_suite.name},
+            "executables": {key: {"name": entry.name} for key, entry in self.executables.items()},
+            "python": {"enabled": self.python_enabled},
+        }
+        path.write_text(tomledit.dumps(data), encoding="utf-8")
 
 
 @dataclass
@@ -265,10 +252,5 @@ class LocalConfig:
 
     def save(self, path: Path = DEFAULT_LOCAL_CONFIG_FILE) -> None:
         """Save per-developer preferences to oryx.local.toml."""
-        lines = [
-            "[ide]",
-            f'kind = "{self.ide_kind}"',
-            f'debugger = "{self.debugger}"',
-        ]
-        lines.append("")
-        path.write_text("\n".join(lines), encoding="utf-8")
+        data = {"ide": {"kind": self.ide_kind, "debugger": self.debugger}}
+        path.write_text(tomledit.dumps(data), encoding="utf-8")

@@ -38,6 +38,9 @@ docs = [
 stubs = [
     "pybind11-stubgen>=2.5",
 ]
+test = [
+    "pytest>=8",
+]
 
 [tool.uv]
 default-groups = ["research", "docs"]
