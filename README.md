@@ -166,11 +166,9 @@ direct subcommands for scripts and CI:
 ```text
 uv run forge                          # interactive menu
 uv run forge editor vscode           # forge.local.toml + .vscode/{tasks,launch,...}.json
-uv run forge build all                # configure, compile, test
-uv run forge build run                # run the Oasis sandbox (`oasis:bench` = benchmark preset)
+uv run forge all                      # configure, compile, test
+uv run forge run                      # run the Oasis sandbox (`oasis:bench` = benchmark preset)
 uv run forge docs serve               # live-preview the documentation site
-build experiment
-build explain
 ```
 
 The exact command structure will evolve as the project develops.

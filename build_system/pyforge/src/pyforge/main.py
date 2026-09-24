@@ -34,6 +34,12 @@ for _module in registry.discover_command_modules():
         # `name [ARGS] [-- extra]` (see commands/test.py) mounts as a plain leaf command instead
         # of the usual add_typer() sub-group.
         app.command(name=_name, help=getattr(_module, "GROUP_HELP", ""), context_settings=getattr(_module, "ROOT_COMMAND_CONTEXT_SETTINGS", {}))(_root_command)
+    elif getattr(_module, "FLAT", False):
+        # Decision 6 (CLI shape): a handful of common verbs (configure/compile/all/clean/run)
+        # mount directly on the root app instead of nesting under their module's own group name,
+        # so `forge compile` stays a flat verb rather than `forge build compile`. The interactive
+        # menu is unaffected — it groups by registry.CommandEntry.group, not by Typer mounting.
+        app.registered_commands.extend(_module.app.registered_commands)
     else:
         app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""), hidden=getattr(_module, "GROUP_HIDDEN", False))
 
@@ -113,8 +119,6 @@ def main(
         metavar="KEY[=VALUE]",
         help="Pass --KEY[=VALUE] straight to Premake (repeatable).",
     ),
-    no_python: bool = typer.Option(False, "--no-python", hidden=True, help="Alias of --without python."),
-    sanitize: bool = typer.Option(False, "--sanitize", hidden=True, help="Alias of --with sanitize."),
 ):
     """Global context setup executed before running commands."""
     try:
@@ -122,8 +126,6 @@ def main(
         cfg = _load(ctx, project)
         local, legacy_local = load_local(project.root)
         validate_local(local, cfg)
-        with_ = [*with_, *(["sanitize"] if sanitize else [])]
-        without = [*without, *(["python"] if no_python else [])]
         values = options.resolve(cfg, local, with_, without)
         for define in defines:
             options.define_flag(define)

@@ -23,16 +23,16 @@ def generated_tasks(run: RunContext) -> list[dict]:
     """Tasks this CLI owns; Cmd+Shift+B runs the one with "isDefault" (Compile (Debug))."""
     forge = forge_command(run.project.root)
     return [
-        _task("Configure", f"{forge} build configure", "build", []),
+        _task("Configure", f"{forge} configure", "build", []),
         *(
-            _task(f"Compile ({profile.capitalize()})", f"{forge} --profile {profile} build compile", {"kind": "build", "isDefault": profile == "debug"}, ["$gcc"])
+            _task(f"Compile ({profile.capitalize()})", f"{forge} --profile {profile} compile", {"kind": "build", "isDefault": profile == "debug"}, ["$gcc"])
             for profile in PROFILES
         ),
-        _task("Compile (choose profile)", f"{forge} --profile ${{input:{PROFILE_INPUT}}} build compile", "build", ["$gcc"]),
-        _task("Test", f"{forge} test run", {"kind": "test", "isDefault": True}, []),
-        *(_task(f"Run {name}", f"{forge} build run {name}", "build", []) for name in run.config.targets),
-        _task("All", f"{forge} build all", "build", ["$gcc"]),
-        _task("Clean", f"{forge} build clean", "build", []),
+        _task("Compile (choose profile)", f"{forge} --profile ${{input:{PROFILE_INPUT}}} compile", "build", ["$gcc"]),
+        _task("Test", f"{forge} test", {"kind": "test", "isDefault": True}, []),
+        *(_task(f"Run {name}", f"{forge} run {name}", "build", []) for name in run.config.targets),
+        _task("All", f"{forge} all", "build", ["$gcc"]),
+        _task("Clean", f"{forge} clean", "build", []),
     ]
 
 

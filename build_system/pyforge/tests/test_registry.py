@@ -3,7 +3,7 @@ import typer
 from pyforge import registry
 
 STATIC_GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Setup", "Test"]
-MODULES = [*STATIC_GROUPS, "Vendor"]
+MODULES = STATIC_GROUPS
 # "Python" (from build_system/oryx/, the Oryx plugin — see pyforge/main.py's plugin
 # loading) mounts after every statically-discovered group, since it isn't one of the files
 # pkgutil finds under pyforge/commands/.
@@ -75,13 +75,13 @@ def test_hidden_only_group_is_not_listed(monkeypatch):
 
 
 def test_dependency_check_skipped_under_dry_run(forge):
-    assert forge("--dry-run", "build", "compile").exit_code == 0
+    assert forge("--dry-run", "compile").exit_code == 0
 
 
 def test_dependency_check_blocks_compile_before_its_body(forge, tmp_project):
     (tmp_project / "forge.toml").write_text(
         (tmp_project / "forge.toml").read_text(encoding="utf-8").replace('fetch = "never"', 'fetch = "never"'), encoding="utf-8"
     )
-    result = forge("build", "compile")
+    result = forge("compile")
     assert result.exit_code == 1
     assert "Missing dependencies: spdlog (Oryx/vendor/spdlog), yaml-cpp (Oryx/vendor/yaml-cpp), pybind11 (Oryx/vendor/pybind11)" in result.output

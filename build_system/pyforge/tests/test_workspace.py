@@ -17,7 +17,7 @@ def ws(project):
 def test_load_before_configure_is_none(project):
     workspace.workspace_file(project).unlink()
     assert workspace.load(project) is None
-    with pytest.raises(WorkspaceError, match="run `forge build configure` first"):
+    with pytest.raises(WorkspaceError, match="run `forge configure` first"):
         workspace.require(project)
 
 

@@ -27,7 +27,7 @@ class PythonBuildInfo:
     site_packages: tuple[Path, ...]
 
 
-_NO_LIBPYTHON_HINT = "Use `forge --no-python ...`, or a Python built with a shared libpython."
+_NO_LIBPYTHON_HINT = "Use `forge --without python ...`, or a Python built with a shared libpython."
 
 
 def _windows_library(lib_dir: Path) -> tuple[Path, str]:

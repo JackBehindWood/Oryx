@@ -44,11 +44,11 @@ def test_tasks_fresh(tmp_project, run):
     assert data["tasks"][1] == {
         "label": "Oryx: Compile (Debug)",
         "type": "shell",
-        "command": "uv run forge --profile debug build compile",
+        "command": "uv run forge --profile debug compile",
         "group": {"kind": "build", "isDefault": True},
         "problemMatcher": ["$gcc"],
     }
-    assert data["tasks"][4]["command"] == "uv run forge --profile ${input:forgeProfile} build compile"
+    assert data["tasks"][4]["command"] == "uv run forge --profile ${input:forgeProfile} compile"
     assert data["inputs"] == [{"id": "forgeProfile", "type": "pickString", "description": "Oryx build profile", "options": ["debug", "release", "dist"], "default": "debug"}]
 
 
@@ -56,7 +56,7 @@ def test_tasks_use_plain_forge_without_uv_lock_and_prefix_from_project_name(proj
     run = make_run(project)
     run.config = dataclasses.replace(run.config, project=dataclasses.replace(run.config.project, name="Demo"))
     data = _read(tasks.write_tasks(run))
-    assert data["tasks"][0] == {"label": "Demo: Configure", "type": "shell", "command": "forge build configure", "group": "build", "problemMatcher": []}
+    assert data["tasks"][0] == {"label": "Demo: Configure", "type": "shell", "command": "forge configure", "group": "build", "problemMatcher": []}
 
 
 def test_tasks_keep_user_entries(tmp_project, run):
@@ -68,7 +68,7 @@ def test_tasks_keep_user_entries(tmp_project, run):
     assert data["custom"] == 1
     assert data["tasks"][0] == user_task
     assert [task["label"] for task in data["tasks"][1:]] == ORYX_TASKS
-    assert data["tasks"][1]["command"] == "uv run forge build configure"
+    assert data["tasks"][1]["command"] == "uv run forge configure"
 
 
 def test_launch_entries_per_profile(tmp_project, run):
@@ -157,7 +157,7 @@ def test_c_cpp_properties_defines_follow_the_profile(project, profile):
 
 def test_editor_files_need_an_export(project):
     (project.forge_dir / "workspace.json").unlink()
-    with pytest.raises(WorkspaceError, match="forge build configure"):
+    with pytest.raises(WorkspaceError, match="forge configure"):
         c_cpp_properties.write_c_cpp_properties(make_run(project))
 
 

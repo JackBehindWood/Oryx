@@ -106,7 +106,7 @@ local function config()
         local file = path.join(_MAIN_SCRIPT_DIR, "build", "forge", "config.json")
         local text = io.readfile(file)
         if not text then
-            error("forge: " .. file .. " is missing; generate the build through `forge build configure`")
+            error("forge: " .. file .. " is missing; generate the build through `forge configure`")
         end
         config_cache = json.decode(text)
     end

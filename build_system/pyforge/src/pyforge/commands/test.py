@@ -122,7 +122,7 @@ def run_suites(
         binary = _test_binary(run)
         if not binary.exists():
             console.print(f"[bold red]✗ Test binary missing at:[/bold red] {binary}")
-            console.print("  [dim]Run 'forge build compile' first.[/dim]")
+            console.print("  [dim]Run 'forge compile' first.[/dim]")
             raise typer.Exit(code=1)
 
     plugin_env: dict[str, str] = {}

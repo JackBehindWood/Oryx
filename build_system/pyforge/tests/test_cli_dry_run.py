@@ -30,23 +30,20 @@ def tests_binary(tmp_project):
 
 
 def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
-    assert dry("build", "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export"]
+    assert dry("configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export"]
 
 
 @pytest.mark.parametrize(
     ("flags", "options"),
     [
         ([], PYTHON_OPTIONS),
-        (["--no-python"], "--no-python"),
-        (["--sanitize"], f"--sanitize {PYTHON_OPTIONS}"),
-        (["--no-python", "--sanitize"], "--no-python --sanitize"),
         (["--without", "python"], "--no-python"),
         (["--with", "sanitize", "--without", "python"], "--no-python --sanitize"),
         (["--without", "python", "-D", "cc=clang", "-D", "verbose"], "--no-python --cc=clang --verbose"),
     ],
 )
 def test_configure(dry, premake, flags, options):
-    assert dry(*flags, "build", "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {options} --forge-export"]
+    assert dry(*flags, "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {options} --forge-export"]
 
 
 @pytest.mark.parametrize(
@@ -55,21 +52,20 @@ def test_configure(dry, premake, flags, options):
         ([], "debug_x64"),
         (["--profile", "release"], "release_x64"),
         (["--profile", "DIST"], "dist_x64"),
-        (["--no-python"], "debug_x64"),
-        (["--sanitize"], "debug_x64"),
-        (["--no-python", "--sanitize"], "debug_x64"),
+        (["--without", "python"], "debug_x64"),
+        (["--with", "sanitize"], "debug_x64"),
     ],
 )
 def test_compile(dry, tmp_project, flags, token):
-    assert dry(*flags, "build", "compile") == [f" would run: make -C {tmp_project / 'build'} -j8 {'config=' + token}"]
+    assert dry(*flags, "compile") == [f" would run: make -C {tmp_project / 'build'} -j8 {'config=' + token}"]
 
 
 def test_clean(dry, tmp_project):
-    assert dry("build", "clean") == [f" would remove: {tmp_project / 'build'}"]
+    assert dry("clean") == [f" would remove: {tmp_project / 'build'}"]
 
 
 def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tests_binary):
-    assert dry("build", "all") == [
+    assert dry("all") == [
         f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export",
         f" would run: make -C {tmp_project / 'build'} -j8 config=debug_x64",
         f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
@@ -93,7 +89,7 @@ def test_run(dry, tmp_project, args, passed):
     global_flags = args[:2] if "--profile" in args else []
     command_args = args[2:] if global_flags else args
     oasis = tmp_project / "build" / "bin" / f"{profile}-linux-x86_64" / "Oasis" / "Oasis"
-    assert dry(*global_flags, "build", "run", *command_args) == [f" would run: {oasis}{passed}"]
+    assert dry(*global_flags, "run", *command_args) == [f" would run: {oasis}{passed}"]
 
 
 @pytest.mark.parametrize(
@@ -107,7 +103,7 @@ def test_run(dry, tmp_project, args, passed):
 def test_run_errors(forge, tmp_project, args, message):
     config = tmp_project / "forge.toml"
     config.write_text(config.read_text(encoding="utf-8") + '\n[targets.core]\nproject = "Oryx"\n', encoding="utf-8")
-    result = forge("--dry-run", "build", "run", *args)
+    result = forge("--dry-run", "run", *args)
     assert result.exit_code == 1
     assert message in result.output
 
@@ -128,7 +124,7 @@ def test_run_from_the_menu_keeps_the_menu_process(tmp_project, run, monkeypatch)
 def test_run_without_a_default_target(forge, tmp_project):
     config = tmp_project / "forge.toml"
     config.write_text(config.read_text(encoding="utf-8").replace('default-target = "oasis"\n', ""), encoding="utf-8")
-    result = forge("--dry-run", "build", "run")
+    result = forge("--dry-run", "run")
     assert result.exit_code == 1
     assert "no [project] default-target" in result.output
 
@@ -149,7 +145,7 @@ def test_run_replaces_the_process_from_the_project_root(forge, tmp_project, monk
     monkeypatch.setattr(build.os, "execv", lambda path, argv: calls.append((path, argv, build.os.getcwd())))
     (tmp_project / "sub").mkdir()
     monkeypatch.chdir(tmp_project / "sub")
-    result = forge("build", "run", "oasis:bench")
+    result = forge("run", "oasis:bench")
     assert result.exit_code == 0, result.output
     assert calls == [(str(binary), [str(binary), "--simulate=random,first-legal,100", "--benchmark"], str(tmp_project))]
 
@@ -161,27 +157,27 @@ def test_run_uses_a_subprocess_on_windows(forge, tmp_project, monkeypatch):
     calls = []
     monkeypatch.setattr(build, "_can_replace_process", lambda: False)
     monkeypatch.setattr(build.subprocess, "run", lambda argv, cwd: calls.append((argv, cwd)) or build.subprocess.CompletedProcess(argv, 3))
-    result = forge("build", "run", "--", "--game=x")
+    result = forge("run", "--", "--game=x")
     assert result.exit_code == 3
     assert calls == [([str(binary), "--game=x"], tmp_project)]
 
 
 def test_run_missing_binary(forge):
-    result = forge("build", "run")
+    result = forge("run")
     assert result.exit_code == 1
     assert "Executable missing at:" in result.output
 
 
 def test_run_before_configure_asks_for_it(forge, tmp_project):
     (tmp_project / "build" / "forge" / "workspace.json").unlink()
-    result = forge("--dry-run", "build", "run")
+    result = forge("--dry-run", "run")
     assert result.exit_code == 1
-    assert "run `forge build configure` first" in result.output
+    assert "run `forge configure` first" in result.output
 
 
 def test_compile_before_configure_uses_a_placeholder_token(dry, tmp_project):
     (tmp_project / "build" / "forge" / "workspace.json").unlink()
-    assert dry("build", "compile") == [f" would run: make -C {tmp_project / 'build'} -j8 config=<from export>"]
+    assert dry("compile") == [f" would run: make -C {tmp_project / 'build'} -j8 config=<from export>"]
 
 
 def test_tests(dry, tests_binary):
@@ -264,7 +260,7 @@ def test_python_stubs_needs_a_stubs_dir(forge, tmp_project):
 def test_setup_premake_ignores_dry_run(dry, premake):
     assert dry("setup", "premake") == [
         f"✗ premake5: not installed locally (expected {premake}).",
-        "  Run 'forge build configure' or 'forge setup premake --update' to install it.",
+        "  Run 'forge configure' or 'forge setup premake --update' to install it.",
     ]
 
 
@@ -311,20 +307,20 @@ def test_config_init_vscode_writes_four_files(forge, tmp_project):
 def test_bare_forge_prints_help_outside_a_tty(forge):
     result = forge()
     assert result.exit_code == 0
-    for group in ("build", "config", "deps", "docs", "editor", "python", "setup", "test"):
-        assert group in result.output
+    for name in ("configure", "compile", "all", "clean", "run", "config", "deps", "docs", "editor", "python", "setup", "test"):
+        assert name in result.output
     assert "vendor" not in result.output
 
 
 def test_invalid_profile_is_a_configuration_error(forge):
-    result = forge("--profile", "bogus", "build", "compile")
+    result = forge("--profile", "bogus", "compile")
     assert result.exit_code == 1
     assert result.output.startswith("Configuration Error: command line: '--profile' is 'bogus'; expected one of 'debug', 'release', 'dist'")
 
 
 def test_schema_error_is_a_configuration_error(forge, tmp_project):
     (tmp_project / "forge.toml").write_text('[project]\nname = "x"\n[build]\njob = 2\n', encoding="utf-8")
-    result = forge("build", "compile")
+    result = forge("compile")
     assert result.exit_code == 1
     assert "unknown key 'build.job' — did you mean 'jobs'?" in result.output
 
@@ -332,7 +328,7 @@ def test_schema_error_is_a_configuration_error(forge, tmp_project):
 def test_runs_from_a_subdirectory(forge, tmp_project, monkeypatch):
     (tmp_project / "Oasis" / "src").mkdir(parents=True)
     monkeypatch.chdir(tmp_project / "Oasis" / "src")
-    result = forge("--dry-run", "build", "clean")
+    result = forge("--dry-run", "clean")
     assert result.output.strip() == f"would remove: {tmp_project / 'build'}"
 
 
@@ -345,21 +341,23 @@ def test_runs_from_a_subdirectory(forge, tmp_project, monkeypatch):
     ],
 )
 def test_bad_option_flags_are_configuration_errors(forge, flags, message):
-    result = forge(*flags, "build", "configure")
+    result = forge(*flags, "configure")
     assert result.exit_code == 1
     assert message in result.output
 
 
 def test_local_options_override_the_defaults(dry, premake, tmp_project):
     (tmp_project / "forge.local.toml").write_text("[options]\npython = false\n", encoding="utf-8")
-    assert dry("build", "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} --no-python --forge-export"]
-    assert dry("--with", "python", "build", "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export"]
+    assert dry("configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} --no-python --forge-export"]
+    assert dry("--with", "python", "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export"]
 
 
-def test_hidden_aliases_stay_out_of_help(forge):
+def test_no_python_and_sanitize_aliases_are_gone(forge):
     output = forge("--help").output
     assert "--with" in output and "--without" in output
     assert "--no-python" not in output and "--sanitize" not in output
+    result = forge("--no-python", "configure")
+    assert result.exit_code != 0
 
 
 def test_editor_vscode_configures_first_without_an_export(forge, tmp_project, monkeypatch):

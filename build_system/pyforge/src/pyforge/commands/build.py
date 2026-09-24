@@ -23,6 +23,7 @@ from pyforge.workspace import Workspace, WorkspaceError
 console = Console()
 app = typer.Typer(no_args_is_help=True)
 GROUP_HELP = "Configure, build, and clean the engine binaries"
+FLAT = True  # mount configure/compile/all/clean/run as root-level verbs (Decision 6), not `forge build <x>`
 command = registry.make_group(app, group="Build")
 
 
@@ -59,7 +60,7 @@ def scripts_flag() -> str:
     return f"--scripts={lua_scripts_dir()}"
 
 
-@command(name="configure", label="Configure — generate Premake build files")
+@command(name="configure", label="Configure — generate Premake build files", rich_help_panel="Build")
 def configure(ctx: typer.Context):
     """Generate build files using Premake5."""
     run: RunContext = ctx.obj
@@ -120,7 +121,7 @@ def configure(ctx: typer.Context):
         console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {error}[/yellow]\n")
 
 
-@command(name="compile", label="Compile — build engine binaries", requires_dependencies=True)
+@command(name="compile", label="Compile — build engine binaries", requires_dependencies=True, rich_help_panel="Build")
 def compile_project(ctx: typer.Context):
     """Compile the engine binaries for the targeted configuration."""
     run: RunContext = ctx.obj
@@ -156,7 +157,7 @@ def compile_project(ctx: typer.Context):
     run.pm.hook.forge_post_compile(ctx=run)
 
 
-@command(name="clean", label="Clean — remove build artifacts")
+@command(name="clean", label="Clean — remove build artifacts", rich_help_panel="Build")
 def clean(ctx: typer.Context):
     """Remove generated build artifacts and binaries."""
     run: RunContext = ctx.obj
@@ -173,7 +174,7 @@ def clean(ctx: typer.Context):
     run.pm.hook.forge_post_clean(ctx=run)
 
 
-@command(name="all", label="All — configure, compile, and test")
+@command(name="all", label="All — configure, compile, and test", rich_help_panel="Build")
 def run_all(ctx: typer.Context):
     """Configure, compile, and execute tests sequentially."""
     ctx.invoke(configure, ctx)
@@ -227,6 +228,7 @@ def _exec(argv: list[str], cwd: Path, replace_process: bool) -> None:
     name="run",
     label="Run — launch a [targets] executable",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    rich_help_panel="Build",
 )
 def run_project(
     ctx: typer.Context,
@@ -255,7 +257,7 @@ def run_project(
 
     if not config.target.exists():
         console.print(f"[bold red]✗ Executable missing at:[/bold red] {config.target}")
-        console.print("  [dim]Run 'forge build compile' first.[/dim]")
+        console.print("  [dim]Run 'forge compile' first.[/dim]")
         raise typer.Exit(code=1)
 
     console.print(f"[bold blue]🚀 Running {name} ({run.profile})...[/bold blue]")

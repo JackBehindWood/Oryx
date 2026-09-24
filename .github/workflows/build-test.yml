@@ -56,17 +56,17 @@ jobs:
       run: uv sync
 
     - name: Configure and compile
-      run: uv run forge $BUILD_FLAGS build compile
+      run: uv run forge $BUILD_FLAGS compile
 
     - name: Test (unit, integration, python when enabled)
       run: uv run forge $BUILD_FLAGS test
 
     - name: Run Oasis sandbox
-      run: uv run forge $BUILD_FLAGS build run
+      run: uv run forge $BUILD_FLAGS run
 
     - name: Benchmark smoke run
       run: |
-        output=$(uv run forge $BUILD_FLAGS build run oasis:bench)
+        output=$(uv run forge $BUILD_FLAGS run oasis:bench)
         echo "$output"
         echo "$output" | grep -q "Benchmark report"
 
@@ -118,7 +118,7 @@ jobs:
     - name: Build and test (no uv involved)
       run: |
         source .venv/bin/activate
-        forge build all
+        forge all
 
   docs:
     runs-on: ubuntu-latest

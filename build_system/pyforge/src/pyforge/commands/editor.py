@@ -72,7 +72,7 @@ def write_vs2022(ctx: typer.Context, remember: bool) -> None:
         console.print(f"[bold red]✗ Failed to generate Visual Studio project files:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
     console.print("[bold green]✓ Generated Visual Studio 2022 project files (premake5 vs2022).[/bold green]")
-    console.print(f"  [dim]`forge build compile` still uses the [premake] generator ({run.config.premake.generator}).[/dim]")
+    console.print(f"  [dim]`forge compile` still uses the [premake] generator ({run.config.premake.generator}).[/dim]")
 
 
 @command(name="vscode", label="VS Code — write .vscode tasks, launch, IntelliSense, settings")

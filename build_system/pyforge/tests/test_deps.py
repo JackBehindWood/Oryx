@@ -191,13 +191,6 @@ def test_add_errors(forge, tmp_project, args, message):
     assert (tmp_project / "forge.toml").read_text(encoding="utf-8") == before
 
 
-def test_vendor_add_is_a_hidden_alias(forge, tmp_project, git_calls):
-    result = forge("vendor", "add", "Oryx", "glfw", "--url", "https://example.com/glfw.git", "--kind", "static-lib", "--include-subdir", "include", "--source-subdir", "src")
-    assert result.exit_code == 0, result.output
-    assert "`forge vendor add` is now `forge deps add`" in result.output
-    assert _config(tmp_project)["dependencies"]["glfw"] == {"kind": "static", "include": "include", "sources": "src"}
-
-
 def test_sync_fetches_missing_required(forge, tmp_project, git_calls):
     _populate(tmp_project, "Oryx/vendor/spdlog", "Oryx/vendor/yaml-cpp", "tests/vendor/doctest")
     result = forge("--without", "python", "deps", "sync")

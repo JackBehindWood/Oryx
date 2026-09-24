@@ -131,7 +131,7 @@ def _project(name: str, data: dict) -> WsProject:
 
 def parse(data: dict) -> Workspace:
     if data.get("format") != SUPPORTED_FORMAT:
-        raise WorkspaceError(f"Unsupported workspace.json format {data.get('format')!r}; run `forge build configure` again.")
+        raise WorkspaceError(f"Unsupported workspace.json format {data.get('format')!r}; run `forge configure` again.")
     return Workspace(
         location=Path(data["location"]),
         action=data.get("action", ""),
@@ -145,7 +145,7 @@ def workspace_file(project: Project) -> Path:
 
 
 def load(project: Project) -> Workspace | None:
-    """The last export, or None before the first `forge build configure`."""
+    """The last export, or None before the first `forge configure`."""
     path = workspace_file(project)
     if not path.is_file():
         return None
@@ -155,5 +155,5 @@ def load(project: Project) -> Workspace | None:
 def require(project: Project) -> Workspace:
     workspace = load(project)
     if workspace is None:
-        raise WorkspaceError("No Premake export yet; run `forge build configure` first.")
+        raise WorkspaceError("No Premake export yet; run `forge configure` first.")
     return workspace
