@@ -116,22 +116,32 @@ def test_setup_premake_ignores_dry_run(dry, premake):
 
 
 def test_config_init_ignores_dry_run_and_keeps_existing_file(dry, tmp_project):
-    before = (tmp_project / "oryx.toml").read_text(encoding="utf-8")
-    assert dry("config", "init", "--no-remember")[1] == f"⚠️ Configuration file already exists at: {tmp_project / 'oryx.toml'}"
-    assert (tmp_project / "oryx.toml").read_text(encoding="utf-8") == before
-    assert not (tmp_project / "oryx.local.toml").exists()
+    before = (tmp_project / "forge.toml").read_text(encoding="utf-8")
+    assert dry("config", "init", "--no-remember")[1] == f"⚠️ Configuration file already exists at: {tmp_project / 'forge.toml'}"
+    assert (tmp_project / "forge.toml").read_text(encoding="utf-8") == before
+    assert not (tmp_project / "forge.local.toml").exists()
 
 
 def test_config_init_creates_missing_file(forge, tmp_project):
-    (tmp_project / "oryx.toml").unlink()
+    (tmp_project / "forge.toml").unlink()
     result = forge("config", "init", "--no-remember")
-    assert result.exit_code == 0
-    assert (tmp_project / "forge.toml").is_file()
+    assert result.exit_code == 0, result.output
+    assert (tmp_project / "forge.toml").read_text(encoding="utf-8") == f'[project]\nname = "{tmp_project.name}"\n'
 
 
 def test_config_init_remembers_ide_choice(forge, tmp_project):
     assert forge("config", "init", "--debugger", "cppdbg").exit_code == 0
-    assert (tmp_project / "oryx.local.toml").read_text(encoding="utf-8") == '[ide]\nkind = "none"\ndebugger = "cppdbg"\n'
+    assert (tmp_project / "forge.local.toml").read_text(encoding="utf-8") == '[editor]\nkind = "none"\ndebugger = "cppdbg"\n'
+
+
+def test_config_init_copies_the_legacy_local_file_and_leaves_it(forge, tmp_project):
+    legacy = tmp_project / "oryx.local.toml"
+    legacy.write_text('[ide]\nkind = "vscode"\ndebugger = "lldb"\n', encoding="utf-8")
+    result = forge("config", "init", "--debugger", "cppdbg")
+    assert result.exit_code == 0, result.output
+    assert "rename it to forge.local.toml" in result.output
+    assert (tmp_project / "forge.local.toml").read_text(encoding="utf-8") == '[editor]\nkind = "vscode"\ndebugger = "cppdbg"\n'
+    assert legacy.read_text(encoding="utf-8") == '[ide]\nkind = "vscode"\ndebugger = "lldb"\n'
 
 
 def test_config_init_vscode_writes_four_files(forge, tmp_project):
@@ -155,4 +165,18 @@ def test_bare_forge_prints_help_outside_a_tty(forge):
 def test_invalid_profile_is_a_configuration_error(forge):
     result = forge("--profile", "bogus", "build", "compile")
     assert result.exit_code == 1
-    assert result.output.startswith("Configuration Error: Invalid profile 'bogus'. Must be one of: ")
+    assert result.output.startswith("Configuration Error: command line: '--profile' is 'bogus'; expected one of 'debug', 'release', 'dist'")
+
+
+def test_schema_error_is_a_configuration_error(forge, tmp_project):
+    (tmp_project / "forge.toml").write_text('[project]\nname = "x"\n[build]\njob = 2\n', encoding="utf-8")
+    result = forge("build", "compile")
+    assert result.exit_code == 1
+    assert "unknown key 'build.job' — did you mean 'jobs'?" in result.output
+
+
+def test_runs_from_a_subdirectory(forge, tmp_project, monkeypatch):
+    (tmp_project / "Oasis" / "src").mkdir(parents=True)
+    monkeypatch.chdir(tmp_project / "Oasis" / "src")
+    result = forge("--dry-run", "build", "clean")
+    assert result.output.strip() == f"would remove: {tmp_project / 'build'}"

@@ -1,0 +1,33 @@
+[project]
+name = "Oryx"
+description = "Game strategy engine"
+license = "Apache-2.0"
+repository = "https://github.com/JackBehindWood/oryx"
+default-target = "oasis"
+forge-version = ">=0.2"
+
+[premake]
+version = "5.0.0-beta8"
+generator = "gmake"
+
+[build]
+default-profile = "debug"
+jobs = 0
+dependencies-dir = "Oryx/vendor"
+fetch = "auto"
+
+[options]
+python = { default = true, off = "--no-python", help = "Embedded Python backend" }
+sanitize = { default = false, on = "--sanitize", help = "ASan+UBSan diagnostic build" }
+
+[targets.oasis]
+project = "Oasis"
+
+[tests]
+project = "Tests"
+
+[docs]
+tool = "mkdocs"
+
+[tool.oryx]
+stubs-dir = "OryxPython/stubs"

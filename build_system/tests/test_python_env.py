@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from build_system.config import BuildConfig
 from build_system.setup import python_env
 
 
@@ -31,11 +30,11 @@ def test_windows_library():
 
 
 def test_premake_options_without_python():
-    assert python_env.premake_python_options(BuildConfig(python_enabled=False)) == ["--no-python"]
+    assert python_env.premake_python_options(False) == ["--no-python"]
 
 
 def test_premake_options_with_python(fake_python):
-    assert python_env.premake_python_options(BuildConfig()) == [
+    assert python_env.premake_python_options(True) == [
         "--python-include=/py/include/python3.11",
         "--python-libdir=/py/lib",
         "--python-lib=python3.11",

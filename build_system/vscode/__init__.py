@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from build_system.config import BuildConfig
+from build_system.config import RunContext
 
 from .c_cpp_properties import write_c_cpp_properties
 from .launch import write_launch
@@ -10,11 +10,11 @@ from .tasks import write_tasks
 __all__ = ["write_all", "write_tasks", "write_settings", "write_c_cpp_properties", "write_launch"]
 
 
-def write_all(cfg: BuildConfig, root: Path, debugger: str = "lldb") -> list[Path]:
+def write_all(run: RunContext, debugger: str = "lldb") -> list[Path]:
     """Generate/merge every .vscode file this CLI knows how to produce."""
     return [
-        write_tasks(root),
-        write_settings(root),
-        write_c_cpp_properties(cfg, root),
-        write_launch(cfg, root, debugger=debugger),
+        write_tasks(run.project.root),
+        write_settings(run.project.root),
+        write_c_cpp_properties(run),
+        write_launch(run, debugger=debugger),
     ]

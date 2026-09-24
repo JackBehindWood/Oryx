@@ -2,8 +2,6 @@ import tomllib
 
 import pytest
 
-from build_system.config import BuildConfig, LocalConfig
-from build_system.tests.conftest import REAL_ROOT
 from build_system.tomledit import dumps
 
 
@@ -43,25 +41,3 @@ def test_parent_table_without_scalars_has_no_header():
 def test_unsupported_value_raises():
     with pytest.raises(TypeError):
         dumps({"value": object()})
-
-
-def test_build_config_save_matches_committed_file(tmp_path):
-    path = tmp_path / "oryx.toml"
-    BuildConfig().save(path)
-    assert path.read_text(encoding="utf-8") == (REAL_ROOT / "oryx.toml").read_text(encoding="utf-8")
-
-
-def test_build_config_round_trip_escapes(tmp_path):
-    path = tmp_path / "oryx.toml"
-    config = BuildConfig(project_name='My "Game"\\Engine', python_enabled=False)
-    config.save(path)
-    loaded = BuildConfig.load(path)
-    assert loaded.project_name == config.project_name
-    assert loaded.python_enabled is False
-    assert loaded.executables == config.executables
-
-
-def test_local_config_round_trip(tmp_path):
-    path = tmp_path / "oryx.local.toml"
-    LocalConfig(ide_kind="vscode", debugger="cppdbg").save(path)
-    assert LocalConfig.load(path) == LocalConfig(ide_kind="vscode", debugger="cppdbg")

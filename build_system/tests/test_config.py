@@ -1,124 +1,160 @@
-import platform
-from pathlib import Path
+import tomllib
 
 import pytest
 
-from build_system import config
-from build_system.config import BuildConfig, ExecutableConfig, LocalConfig
+from build_system.config import (
+    DEPENDENCY_SOURCES,
+    Dependency,
+    FetchMode,
+    ForgeConfig,
+    LocalConfig,
+    Profile,
+    SchemaError,
+    load_config,
+    load_local,
+    parse_config,
+    validate_local,
+)
+from build_system.config.load import check_forge_version
+from build_system.config.schema import Choices, EditorTable, LocalBuildTable
+from build_system.tests.conftest import REAL_ROOT
 
 
-def test_defaults():
-    cfg = BuildConfig()
-    assert cfg.project_name == "Oryx"
-    assert cfg.build_generator == "gmake"
-    assert cfg.profile == "debug"
-    assert cfg.test_suite == config.TestSuiteConfig(name="Tests")
-    assert cfg.executables == {"oasis": ExecutableConfig(name="Oasis")}
-    assert cfg.python_enabled is True
-    assert cfg.sanitize is False
+def parse(text: str) -> ForgeConfig:
+    return parse_config(tomllib.loads(text))
 
 
-def test_profile_is_lowercased():
-    assert BuildConfig(profile="Release").profile == "release"
+def test_minimal_config_takes_every_default():
+    cfg = parse('[project]\nname = "Demo"\n')
+    assert cfg.project.name == "Demo"
+    assert (cfg.premake.version, cfg.premake.generator) == ("5.0.0-beta8", "gmake")
+    assert (cfg.build.default_profile, cfg.build.jobs, cfg.build.fetch) == (Profile.DEBUG, 0, FetchMode.AUTO)
+    assert (cfg.options, cfg.targets, cfg.dependencies, cfg.tests, cfg.docs) == ({}, {}, {}, None, None)
 
 
-def test_invalid_profile_raises():
-    with pytest.raises(ValueError, match="^Invalid profile 'fast'. Must be one of: "):
-        BuildConfig(profile="fast")
+def test_committed_forge_toml_parses():
+    cfg = load_config(REAL_ROOT / "forge.toml", "0.2.0")
+    assert cfg.project.default_target in cfg.targets
+    assert cfg.options["python"].default is True
+    assert cfg.tool["oryx"]["stubs-dir"] == "OryxPython/stubs"
 
 
-def test_load_missing_file_returns_defaults(tmp_path):
-    assert BuildConfig.load(tmp_path / "absent.toml") == BuildConfig()
+def test_enum_values_compare_as_strings():
+    cfg = parse('[project]\nname = "x"\n[build]\ndefault-profile = "release"\nfetch = "never"\n')
+    assert cfg.build.default_profile == "release"
+    assert f"{cfg.build.fetch}" == "never"
 
 
-def test_load_partial_and_extended_file(tmp_path):
-    path = tmp_path / "oryx.toml"
-    path.write_text(
-        '[build]\nprofile = "dist"\n\n[executables.bench]\nname = "Bench"\n\n[executables.oasis]\n\n[python]\nenabled = false\n',
-        encoding="utf-8",
+def test_dependency_table():
+    cfg = parse(
+        '[project]\nname = "x"\n[options]\npython = { default = true }\n'
+        '[dependencies]\nspdlog = { kind = "static", include = "include", sources = "src", defines = ["A"] }\n'
+        'pybind11 = { include = "include", requires = ["python"] }\n'
     )
-    cfg = BuildConfig.load(path)
-    assert cfg.profile == "dist"
-    assert cfg.project_name == "Oryx"
-    assert cfg.executables == {"oasis": ExecutableConfig(name="Oasis"), "bench": ExecutableConfig(name="Bench")}
-    assert cfg.python_enabled is False
-    assert cfg.sanitize is False
-
-
-def test_load_executable_without_name_uses_its_key(tmp_path):
-    path = tmp_path / "oryx.toml"
-    path.write_text("[executables.demo]\n", encoding="utf-8")
-    assert BuildConfig.load(path).executables["demo"] == ExecutableConfig(name="demo")
-
-
-def test_load_ignores_unknown_tables(tmp_path):
-    path = tmp_path / "oryx.toml"
-    path.write_text('[whatever]\nkey = 1\n\n[test-suite]\nname = "Checks"\n', encoding="utf-8")
-    assert BuildConfig.load(path).test_suite == config.TestSuiteConfig(name="Checks")
+    assert cfg.dependencies["spdlog"] == Dependency(kind="static", include="include", sources="src", defines=["A"])
+    assert cfg.dependencies["pybind11"].source == "submodule"
 
 
 @pytest.mark.parametrize(
-    ("machine", "profile", "token"),
-    [("arm64", "debug", "debug_arm64"), ("aarch64", "release", "release_arm64"), ("x86_64", "dist", "dist_x64"), ("AMD64", "debug", "debug_x64")],
+    ("text", "message"),
+    [
+        ("[build]\njob = 1", "unknown key 'build.job' — did you mean 'jobs'?"),
+        ("[projct]\nname = 'y'", "unknown key 'projct' — did you mean 'project'?"),
+        ("[build]\nfetch = 'atuo'", "'build.fetch' is 'atuo'; expected one of 'auto', 'ask', 'never' — did you mean 'auto'?"),
+        ("[premake]\ngenerator = 'gmak'", "'premake.generator' is 'gmak'; expected one of 'gmake' — did you mean 'gmake'?"),
+        ("[build]\njobs = true", "'build.jobs' must be an integer, not bool"),
+        ("[build]\ndefault-profile = 3", "'build.default-profile' is 3; expected one of"),
+        ("[targets.app]\nprojekt = 'App'", "unknown key 'targets.app.projekt' — did you mean 'project'?"),
+        ("[targets.app]\nproject = 'App'\npresets = { a = 'x' }", "'targets.app.presets.a' must be an array"),
+        ("[dependencies]\nx = { requires = ['pyhton'] }", "names unknown option 'pyhton'"),
+        ("[project]\ndefault-target = 'oasys'", "'project.default-target' is 'oasys', which is not in [targets]"),
+    ],
 )
-def test_make_config_token(monkeypatch, machine, profile, token):
-    monkeypatch.setattr(platform, "machine", lambda: machine)
-    assert BuildConfig(profile=profile).make_config_token == token
+def test_schema_errors(text, message):
+    base = '[project]\nname = "x"\n'
+    text = text.replace("[project]\n", base) if text.startswith("[project]\n") else base + text
+    with pytest.raises(SchemaError) as error:
+        parse(text)
+    assert str(error.value).startswith("forge.toml: ")
+    assert message in str(error.value)
 
 
-def test_outputdir_read_from_generated_make_file(tmp_project):
-    assert BuildConfig()._outputdir_from_make() == "Debug-linux-x86_64"
-    assert BuildConfig(profile="release").outputdir == "Release-linux-x86_64"
+def test_missing_project_name():
+    with pytest.raises(SchemaError, match="missing required key 'project.name'"):
+        parse("[project]\n")
 
 
-def test_outputdir_from_make_uses_project_name(tmp_project):
-    assert BuildConfig(project_name="Missing")._outputdir_from_make() is None
+def test_open_choices_accept_registered_names(monkeypatch):
+    monkeypatch.setattr(DEPENDENCY_SOURCES, "_names", list(DEPENDENCY_SOURCES))
+    with pytest.raises(SchemaError, match="did you mean 'local'"):
+        parse('[project]\nname = "x"\n[dependencies]\nglad = { source = "locl" }\n')
+    DEPENDENCY_SOURCES.register("conan")
+    assert parse('[project]\nname = "x"\n[dependencies]\nfmt = { source = "conan" }\n').dependencies["fmt"].source == "conan"
 
 
-def test_outputdir_from_make_without_matching_block(tmp_project):
-    assert BuildConfig(profile="dist")._outputdir_from_make() is None
-    assert BuildConfig(profile="dist").outputdir == "Dist-linux-x64"
+def test_choices_register_is_idempotent():
+    choices = Choices("a")
+    choices.register("b")
+    choices.register("b")
+    assert list(choices) == ["a", "b"]
 
 
-@pytest.mark.parametrize(("system", "expected"), [("Darwin", "macosx"), ("Linux", "linux"), ("Windows", "windows"), ("FreeBSD", "freebsd")])
-def test_outputdir_fallback(tmp_project, monkeypatch, system, expected):
-    (tmp_project / "build" / "Oryx.make").unlink()
-    monkeypatch.setattr(platform, "system", lambda: system)
-    assert BuildConfig().outputdir == f"Debug-{expected}-x64"
+@pytest.mark.parametrize(("requirement", "installed", "ok"), [("", "0.1.0", True), (">=0.2", "0.2.0", True), (">= 0.2", "0.10.1", True), (">=0.3", "0.2.9", False)])
+def test_forge_version(requirement, installed, ok):
+    if ok:
+        check_forge_version(requirement, installed)
+    else:
+        with pytest.raises(SchemaError, match="needs forge >=0.3 but 0.2.9 is installed"):
+            check_forge_version(requirement, installed)
 
 
-def test_target_paths_are_nested(tmp_project):
-    cfg = BuildConfig(root=tmp_project)
-    bin_dir = tmp_project / "build" / "bin" / "Debug-linux-x86_64"
-    assert cfg.binary_path == bin_dir
-    assert cfg.executable_path("oasis") == bin_dir / "Oasis" / "Oasis"
-    assert cfg.test_suite_path() == bin_dir / "Tests" / "Tests"
+def test_forge_version_must_be_a_minimum():
+    with pytest.raises(SchemaError, match="must look like"):
+        check_forge_version("~=0.2", "0.2.0")
 
 
-def test_unknown_executable_lists_available(tmp_project):
-    with pytest.raises(KeyError, match="No executable named 'nope' configured. Available: oasis"):
-        BuildConfig(root=tmp_project).executable_path("nope")
+def test_local_defaults(tmp_path):
+    assert load_local(tmp_path) == (LocalConfig(), None)
 
 
-def test_local_config_defaults(tmp_path):
-    assert LocalConfig.load(tmp_path / "absent.toml") == LocalConfig(ide_kind="none", debugger="lldb")
+def test_local_file(tmp_path):
+    (tmp_path / "forge.local.toml").write_text('[editor]\nkind = "vscode"\n[build]\njobs = 4\n[options]\npython = false\n', encoding="utf-8")
+    local, legacy = load_local(tmp_path)
+    assert legacy is None
+    assert local.editor == EditorTable(kind="vscode")
+    assert local.build == LocalBuildTable(jobs=4)
+    assert local.options == {"python": False}
 
 
-@pytest.mark.parametrize(("kwargs", "message"), [({"ide_kind": "emacs"}, "Invalid \\[ide\\] kind 'emacs'"), ({"debugger": "gdb"}, "Invalid \\[ide\\] debugger 'gdb'")])
-def test_local_config_validation(kwargs, message):
-    with pytest.raises(ValueError, match=message):
-        LocalConfig(**kwargs)
+def test_legacy_local_file_is_read_and_left_alone(tmp_path):
+    legacy = tmp_path / "oryx.local.toml"
+    legacy.write_text('[ide]\nkind = "vscode"\ndebugger = "cppdbg"\n', encoding="utf-8")
+    local, source = load_local(tmp_path)
+    assert source == legacy
+    assert local.editor == EditorTable(kind="vscode", debugger="cppdbg")
+    assert legacy.read_text(encoding="utf-8") == '[ide]\nkind = "vscode"\ndebugger = "cppdbg"\n'
+    assert not (tmp_path / "forge.local.toml").exists()
 
 
-def test_local_config_init_creates_then_loads(tmp_path):
-    path = tmp_path / "oryx.local.toml"
-    assert LocalConfig.init(path) == LocalConfig()
-    path.write_text('[ide]\nkind = "vscode"\n', encoding="utf-8")
-    assert LocalConfig.init(path) == LocalConfig(ide_kind="vscode")
+def test_forge_local_wins_over_legacy(tmp_path):
+    (tmp_path / "oryx.local.toml").write_text('[ide]\nkind = "vscode"\n', encoding="utf-8")
+    (tmp_path / "forge.local.toml").write_text('[editor]\nkind = "none"\n', encoding="utf-8")
+    assert load_local(tmp_path) == (LocalConfig(), None)
 
 
-def test_build_config_init_does_not_overwrite(tmp_path):
-    path = tmp_path / "oryx.toml"
-    path.write_text('[project]\nname = "Custom"\n', encoding="utf-8")
-    assert BuildConfig.init(Path(path)).project_name == "Custom"
-    assert path.read_text(encoding="utf-8") == '[project]\nname = "Custom"\n'
+def test_local_errors_name_their_file(tmp_path):
+    (tmp_path / "forge.local.toml").write_text("[editor]\ndebuger = 'lldb'\n", encoding="utf-8")
+    with pytest.raises(SchemaError, match="^forge.local.toml: unknown key 'editor.debuger' — did you mean 'debugger'"):
+        load_local(tmp_path)
+
+
+def test_local_options_must_exist():
+    cfg = parse('[project]\nname = "x"\n[options]\npython = {}\n')
+    with pytest.raises(SchemaError, match="unknown option 'pyton' in \\[options\\] — did you mean 'python'"):
+        validate_local(LocalConfig(options={"pyton": False}), cfg)
+
+
+def test_invalid_toml_names_the_file(tmp_path):
+    (tmp_path / "forge.local.toml").write_text("[editor\n", encoding="utf-8")
+    with pytest.raises(SchemaError, match="^forge.local.toml: "):
+        load_local(tmp_path)

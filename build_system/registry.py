@@ -84,7 +84,7 @@ def _with_vendor_check(func: Callable) -> Callable:
 
         run = ctx.obj
         if not run.dry_run:
-            ensure_vendor_dirs(run.project.root, run.config)
+            ensure_vendor_dirs(run.project.root, run.options.get("python", False))
         return func(ctx, *args, **kwargs)
 
     return guarded

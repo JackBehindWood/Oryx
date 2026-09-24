@@ -1,11 +1,10 @@
 import subprocess
 from pathlib import Path
 
-from ..config import BuildConfig
 from ..utils import remove_directory, run_command
 
 
-def prune_stale_object_dirs(cfg: BuildConfig, build_dir: Path) -> list[str]:
+def prune_stale_object_dirs(config_token: str, outputdir: str, build_dir: Path) -> list[str]:
     """Clear out any project's object/dependency cache left stale by a
     source file move/rename/delete since the last build.
 
@@ -29,13 +28,13 @@ def prune_stale_object_dirs(cfg: BuildConfig, build_dir: Path) -> list[str]:
     for make_file in sorted(build_dir.glob("*.make")):
         project = make_file.stem
         try:
-            run_command(["make", "-n", "-f", make_file.name, f"config={cfg.make_config_token}"], cwd=build_dir)
+            run_command(["make", "-n", "-f", make_file.name, f"config={config_token}"], cwd=build_dir)
         except (subprocess.CalledProcessError, FileNotFoundError) as error:
             stderr = getattr(error, "stderr", None) or ""
             if "No rule to make target" not in stderr:
                 continue
 
-            object_dir = build_dir / "bin-int" / cfg.outputdir / project
+            object_dir = build_dir / "bin-int" / outputdir / project
             remove_directory(object_dir)
             cleaned.append(project)
 

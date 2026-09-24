@@ -3,7 +3,7 @@ from rich.console import Console
 
 from build_system import registry
 from build_system.config import RunContext
-from build_system.setup.premake import DEFAULT_PREMAKE_VERSION, get_premake_executable, installed_version, update_premake
+from build_system.setup.premake import get_premake_executable, installed_version, update_premake
 
 console = Console()
 app = typer.Typer(no_args_is_help=True)
@@ -23,8 +23,9 @@ def premake(
     """Show, or update, the locally-vendored Premake5 install."""
     run: RunContext = ctx.obj
     bin_dir = run.project.premake_bin_dir
+    pinned = run.config.premake.version
     if update:
-        if not update_premake(bin_dir):
+        if not update_premake(bin_dir, pinned):
             raise typer.Exit(code=1)
         return
 
@@ -32,8 +33,8 @@ def premake(
     version = installed_version(executable)
     if version:
         console.print(f"[green]✓ premake5:[/green] {version} at {executable}")
-        if DEFAULT_PREMAKE_VERSION not in version:
-            console.print(f"[yellow]  Pinned version is v{DEFAULT_PREMAKE_VERSION}. Run with --update to refresh.[/yellow]")
+        if pinned not in version:
+            console.print(f"[yellow]  Pinned version is v{pinned}. Run with --update to refresh.[/yellow]")
     else:
         console.print(f"[yellow]✗ premake5: not installed locally (expected {executable}).[/yellow]")
         console.print("  [dim]Run 'forge build configure' or 'forge setup premake --update' to install it.[/dim]")

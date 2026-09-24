@@ -4,7 +4,8 @@ import typer
 from rich.console import Console
 
 from build_system import registry
-from build_system.config import BuildConfig, LocalConfig, RunContext
+from build_system import tomledit
+from build_system.config import LOCAL_CONFIG_NAME, RunContext, local_config_file, local_data_for_save
 
 console = Console()
 app = typer.Typer()
@@ -12,52 +13,53 @@ GROUP_HELP = "Manage local build configuration settings"
 command = registry.make_group(app, group="Config")
 
 
-@command(name="init", label="Init — create the default oryx.toml")
+@command(name="init", label="Init — create a default forge.toml")
 def init(
     ctx: typer.Context,
     ide: Optional[Literal["vscode", "visual_studio", "none"]] = typer.Option(
         None,
         "--ide",
         help="Generate IDE integration files (vscode | visual_studio | none) and remember the "
-        "choice in oryx.local.toml (gitignored, per-developer). Defaults to the existing "
-        "oryx.local.toml value, or 'none'.",
+        "choice in forge.local.toml (gitignored, per-developer). Defaults to the existing "
+        "[editor] kind, or 'none'.",
     ),
     debugger: Optional[Literal["lldb", "cppdbg"]] = typer.Option(
         None,
         "--debugger",
         help="VS Code debugger adapter used by --ide vscode (lldb = CodeLLDB, cppdbg = Microsoft "
-        "C/C++). Defaults to the existing oryx.local.toml value, or 'lldb'.",
+        "C/C++). Defaults to the existing [editor] debugger, or 'lldb'.",
     ),
     remember: bool = typer.Option(
         True,
         "--remember/--no-remember",
-        help="Save the resolved --ide/--debugger choice to oryx.local.toml for future commands.",
+        help="Save the resolved --ide/--debugger choice to forge.local.toml for future commands.",
     ),
 ):
     """Initialize a default build configuration file, and optionally IDE integration."""
     run: RunContext = ctx.obj
     root = run.project.root
-    local_file = root / "oryx.local.toml"
+    config_file = run.project.config_file
     console.print("[bold blue]⚙️ Initializing build configuration...[/bold blue]")
-    try:
-        BuildConfig.init(run.project.config_file)
-    except Exception as error:
-        console.print(f"[bold red]✗ Failed to initialize configuration:[/bold red] {error}")
-        raise typer.Exit(code=1)
+    if config_file.exists():
+        console.print(f"⚠️ Configuration file already exists at: {config_file}")
+    else:
+        config_file.write_text(tomledit.dumps({"project": {"name": root.name}}), encoding="utf-8")
+        console.print(f"✓ Created default build configuration at: {config_file}")
 
-    existing = LocalConfig.load(local_file)
-    resolved_ide = ide or existing.ide_kind
-    resolved_debugger = debugger or existing.debugger
+    resolved_ide = ide or run.local.editor.kind
+    resolved_debugger = debugger or run.local.editor.debugger
 
     if remember:
-        LocalConfig(ide_kind=resolved_ide, debugger=resolved_debugger).save(local_file)
-        console.print("[green]✓ Saved IDE preference to oryx.local.toml (not committed).[/green]")
+        data = local_data_for_save(root)
+        data["editor"] = {**data.get("editor", {}), "kind": str(resolved_ide), "debugger": str(resolved_debugger)}
+        local_config_file(root).write_text(tomledit.dumps(data), encoding="utf-8")
+        console.print(f"[green]✓ Saved IDE preference to {LOCAL_CONFIG_NAME} (not committed).[/green]")
 
     if resolved_ide == "vscode":
         from build_system import vscode  # deferred: only imported when actually generating .vscode files
 
         try:
-            for path in vscode.write_all(run.config, root, debugger=resolved_debugger):
+            for path in vscode.write_all(run, debugger=resolved_debugger):
                 console.print(f"[bold green]✓ Wrote {path.relative_to(root)}[/bold green]")
         except Exception as error:
             console.print(f"[bold red]✗ Failed to write .vscode files:[/bold red] {error}")
@@ -67,7 +69,7 @@ def init(
         from build_system.setup.premake import ensure_premake
         from build_system.utils import run_command
 
-        premake = ensure_premake(run.project.premake_bin_dir)
+        premake = ensure_premake(run.project.premake_bin_dir, run.config.premake.version)
         if not premake:
             raise typer.Exit(code=1)
         try:
@@ -75,7 +77,7 @@ def init(
             console.print("[bold green]✓ Generated Visual Studio 2022 project files (premake5 vs2022).[/bold green]")
             console.print(
                 "  [dim]This is independent of `forge build compile`, which still uses the "
-                "[build] generator in oryx.toml (default gmake).[/dim]"
+                "[premake] generator in forge.toml (default gmake).[/dim]"
             )
         except Exception as error:
             console.print(f"[bold red]✗ Failed to generate Visual Studio project files:[/bold red] {error}")

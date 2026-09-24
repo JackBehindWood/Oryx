@@ -2,7 +2,6 @@ import subprocess
 
 import pytest
 
-from build_system.config import BuildConfig
 from build_system.setup import stale_objects
 
 
@@ -138,7 +137,7 @@ def test_prune_clears_only_projects_with_missing_prerequisites(tmp_project, monk
     for name in ("Oryx", "Tests"):
         (object_root / name).mkdir(parents=True)
 
-    assert stale_objects.prune_stale_object_dirs(BuildConfig(root=tmp_project), tmp_project / "build") == ["Tests"]
+    assert stale_objects.prune_stale_object_dirs("debug_x64", "Debug-linux-x86_64", tmp_project / "build") == ["Tests"]
     assert calls == [
         (["make", "-n", "-f", "Oryx.make", "config=debug_x64"], tmp_project / "build"),
         (["make", "-n", "-f", "Tests.make", "config=debug_x64"], tmp_project / "build"),
@@ -152,4 +151,4 @@ def test_prune_without_make_is_a_no_op(tmp_project, monkeypatch):
         raise FileNotFoundError("make")
 
     monkeypatch.setattr(stale_objects, "run_command", missing_make)
-    assert stale_objects.prune_stale_object_dirs(BuildConfig(root=tmp_project), tmp_project / "build") == []
+    assert stale_objects.prune_stale_object_dirs("debug_x64", "Debug-linux-x86_64", tmp_project / "build") == []

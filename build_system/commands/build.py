@@ -6,6 +6,7 @@ from rich.console import Console
 
 from build_system import registry
 from build_system.compile_commands import generate_compile_commands
+from build_system import legacy_outputs
 from build_system.config import RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
@@ -26,6 +27,10 @@ GROUP_HELP = "Configure, build, and clean the engine binaries"
 command = registry.make_group(app, group="Build")
 
 
+def _outputdir(run: RunContext) -> str:
+    return legacy_outputs.outputdir(run.project.build_dir, run.profile, run.config.project.name)
+
+
 @command(name="configure", label="Configure — generate Premake build files")
 def configure(ctx: typer.Context):
     """Generate build files using Premake5."""
@@ -33,30 +38,32 @@ def configure(ctx: typer.Context):
     cfg = run.config
     project = run.project
 
+    python_enabled = run.options.get("python", False)
+    generator = cfg.premake.generator
     try:
-        premake_options = premake_python_options(cfg)
-        python_info = python_build_info() if cfg.python_enabled else None
+        premake_options = premake_python_options(python_enabled)
+        python_info = python_build_info() if python_enabled else None
     except PythonEnvError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1)
 
-    if cfg.sanitize:
+    if run.options.get("sanitize", False):
         premake_options = [*premake_options, "--sanitize"]
 
     if run.dry_run:
         premake = get_premake_executable(project.premake_bin_dir)
-        command_line = [str(premake), cfg.build_generator, *premake_options]
+        command_line = [str(premake), generator, *premake_options]
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
-    premake = ensure_premake(project.premake_bin_dir)
+    premake = ensure_premake(project.premake_bin_dir, cfg.premake.version)
     if not premake:
         raise typer.Exit(code=1)
 
     if python_info is not None:
         write_python_config(python_info, project.build_dir)
 
-    command_line = [str(premake), cfg.build_generator, *premake_options]
+    command_line = [str(premake), generator, *premake_options]
 
     try:
         with console.status("[bold blue]⚙️ Configuring build...[/bold blue]"):
@@ -75,14 +82,14 @@ def configure(ctx: typer.Context):
         console.print(f"[yellow]⚠️ Cleared {name} binaries (a source file was removed).[/yellow]\n")
     record_source_manifest(project.root)
 
-    for name in prune_stale_object_dirs(cfg, project.build_dir):
+    for name in prune_stale_object_dirs(legacy_outputs.make_config_token(run.profile), _outputdir(run), project.build_dir):
         console.print(
             f"[yellow]⚠️ Cleared stale object cache for {name} "
             "(moved/renamed/deleted source detected).[/yellow]\n"
         )
 
     try:
-        if generate_compile_commands(cfg, project.build_dir):
+        if generate_compile_commands(legacy_outputs.make_config_token(run.profile), project.build_dir):
             console.print("[bold green]✓ compile_commands.json generated.[/bold green]\n")
     except Exception as error:
         console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {error}[/yellow]\n")
@@ -99,7 +106,7 @@ def compile_project(ctx: typer.Context):
         ctx.invoke(configure, ctx)
 
     try:
-        command_line = build_compile_command(cfg, run.project.build_dir)
+        command_line = build_compile_command(cfg.premake.generator, legacy_outputs.make_config_token(run.profile), run.project.build_dir, run.jobs)
     except ValueError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1)
@@ -109,20 +116,21 @@ def compile_project(ctx: typer.Context):
         return
 
     try:
-        with console.status(f"[bold blue]🔨 Building project ({cfg.profile})...[/bold blue]"):
+        with console.status(f"[bold blue]🔨 Building project ({run.profile})...[/bold blue]"):
             result = run_command(command_line)
         if run.verbose and result.stdout:
             console.print(result.stdout)
-        console.print(f"[bold green]✓ Build successful ({cfg.profile})[/bold green]\n")
+        console.print(f"[bold green]✓ Build successful ({run.profile})[/bold green]\n")
     except subprocess.CalledProcessError as error:
         console.print(f"[bold red]✗ Build failed:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
 
-    if cfg.python_enabled and not cfg.sanitize:
-        install_extension_pth(cfg.binary_path / "OryxPython")
+    python_enabled = run.options.get("python", False)
+    if python_enabled and not run.options.get("sanitize", False):
+        install_extension_pth(run.project.bin_dir / _outputdir(run) / "OryxPython")
     elif remove_extension_pth():
         # A sanitized oryx.so needs the ASan runtime preloaded, which a plain `python` never has.
-        reason = "a --sanitize extension can't be imported by plain python" if cfg.python_enabled else "this build has no Python extension"
+        reason = "a --sanitize extension can't be imported by plain python" if python_enabled else "this build has no Python extension"
         console.print(f"[dim]Removed the venv's `import oryx` path: {reason}; a normal build restores it.[/dim]\n")
 
 
@@ -181,7 +189,8 @@ def run_project(
     run: RunContext = ctx.obj
     cfg = run.config
 
-    exe_path = cfg.executable_path("oasis")
+    target = cfg.targets[cfg.project.default_target]
+    exe_path = legacy_outputs.target_path(run.project.build_dir, run.profile, cfg.project.name, target.project)
 
     args = [str(exe_path)]
     if game:
@@ -197,7 +206,7 @@ def run_project(
         console.print(f"[dim][dry-run] would run: {' '.join(args)}[/dim]")
         return
 
-    console.print(f"[bold blue]🚀 Running Oasis ({cfg.profile})...[/bold blue]")
+    console.print(f"[bold blue]🚀 Running {target.project} ({run.profile})...[/bold blue]")
 
     if not exe_path.exists():
         console.print(f"[bold red]✗ Executable missing at:[/bold red] {exe_path}")
@@ -206,7 +215,7 @@ def run_project(
 
     try:
         run_command(args, cwd=run.project.root, capture_output=False)
-        console.print("\n[bold green]✓ Oasis exited successfully[/bold green]\n")
+        console.print(f"\n[bold green]✓ {target.project} exited successfully[/bold green]\n")
     except subprocess.CalledProcessError:
-        console.print("[bold red]✗ Oasis exited with an error.[/bold red]")
+        console.print(f"[bold red]✗ {target.project} exited with an error.[/bold red]")
         raise typer.Exit(code=1)

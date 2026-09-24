@@ -4,15 +4,16 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from build_system import registry
-from build_system.config import BuildConfig, RunContext
+from build_system import __version__, registry
+from build_system.config import LOCAL_CONFIG_NAME, ForgeConfig, LocalConfig, Profile, ProjectTable, RunContext, SchemaError, load_config, load_local, validate_local
+from build_system.config.schema import parse_enum
 from build_system.project import Project, ProjectNotFound
 
 console = Console()
 
 app = typer.Typer(
     name="forge",
-    help="Oryx Engine Build & Tooling CLI",
+    help="Forge build & tooling CLI",
     invoke_without_command=True,
     rich_markup_mode="markdown",
 )
@@ -34,6 +35,25 @@ def _discover(ctx: typer.Context) -> Project:
         return Project.from_config(Path.cwd() / "forge.toml")
 
 
+def _load(ctx: typer.Context, project: Project) -> ForgeConfig:
+    if not project.config_file.is_file() and ctx.invoked_subcommand == "config":
+        return ForgeConfig(project=ProjectTable(name=project.root.name))
+    return load_config(project.config_file, __version__)
+
+
+def _resolve_profile(requested: str | None, cfg: ForgeConfig, local: LocalConfig) -> Profile:
+    if requested is None:
+        return local.build.default_profile or cfg.build.default_profile
+    return parse_enum(Profile, requested.lower(), "--profile", "command line")
+
+
+def _resolve_options(cfg: ForgeConfig, local: LocalConfig, overrides: dict[str, bool]) -> dict[str, bool]:
+    values = {name: spec.default for name, spec in cfg.options.items()}
+    values.update(local.options)
+    values.update({name: value for name, value in overrides.items() if name in values})
+    return values
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -43,11 +63,11 @@ def main(
         "-c",
         help="Path to the project's config file (default: the nearest forge.toml at or above the current directory).",
     ),
-    profile: str = typer.Option(
-        "debug",
+    profile: Optional[str] = typer.Option(
+        None,
         "--profile",
         "-p",
-        help="Build configuration profile: [debug | release | dist]",
+        help="Build configuration profile: [debug | release | dist] (default: [build] default-profile).",
     ),
     verbose: bool = typer.Option(
         False,
@@ -63,7 +83,7 @@ def main(
     no_python: bool = typer.Option(
         False,
         "--no-python",
-        help="Build without the Python scripting backend (overrides [python] enabled in oryx.toml).",
+        help="Build without the Python scripting backend (overrides [options] python in forge.toml).",
     ),
     sanitize: bool = typer.Option(
         False,
@@ -75,17 +95,27 @@ def main(
     """Global context setup executed before running commands."""
     try:
         project = Project.from_config(config_path) if config_path else _discover(ctx)
-        cfg = BuildConfig.load(project.config_file)
-        cfg.profile = profile
-        if no_python:
-            cfg.python_enabled = False
-        if sanitize:
-            cfg.sanitize = True
-        cfg.__post_init__()
-        ctx.obj = RunContext(config=cfg, project=project, verbose=verbose, dry_run=dry_run)
-    except Exception as err:
+        cfg = _load(ctx, project)
+        local, legacy_local = load_local(project.root)
+        validate_local(local, cfg)
+        overrides = {**({"python": False} if no_python else {}), **({"sanitize": True} if sanitize else {})}
+        ctx.obj = RunContext(
+            project=project,
+            config=cfg,
+            local=local,
+            profile=_resolve_profile(profile, cfg, local),
+            options=_resolve_options(cfg, local, overrides),
+            verbose=verbose,
+            dry_run=dry_run,
+        )
+    except (ProjectNotFound, SchemaError) as err:
         console.print(f"[bold red]Configuration Error:[/bold red] {err}")
         raise typer.Exit(code=1)
+
+    if legacy_local is not None:
+        Console(stderr=True).print(
+            f"[yellow]Note: reading {legacy_local.name}; rename it to {LOCAL_CONFIG_NAME} (forge never modifies the old file).[/yellow]"
+        )
 
     if ctx.invoked_subcommand is None:
         from build_system import interactive

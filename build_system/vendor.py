@@ -13,7 +13,6 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from build_system.config import BuildConfig
 
 console = Console()
 
@@ -42,21 +41,21 @@ def vendor_dirs(root: Path) -> list[Path]:
     return dirs
 
 
-def missing_vendor_dirs(root: Path, cfg: BuildConfig | None = None) -> list[Path]:
+def missing_vendor_dirs(root: Path, python_enabled: bool = True) -> list[Path]:
     """Vendored library directories that exist but are empty — i.e. the git
     submodule hasn't been checked out yet. Python-only libs are skipped when
     cfg says Python is off."""
-    skipped = PYTHON_VENDOR_LIBS if cfg is not None and not cfg.python_enabled else set()
+    skipped = set() if python_enabled else PYTHON_VENDOR_LIBS
     return [d for d in vendor_dirs(root) if d.name not in skipped and not any(d.iterdir())]
 
 
-def vendor_include_paths(root: Path, cfg: BuildConfig | None = None) -> list[str]:
+def vendor_include_paths(root: Path, python_enabled: bool = True) -> list[str]:
     """Best-effort IntelliSense include paths for every vendored lib, mirroring
     the IncludeDir entries in premake/dependencies.lua: `<lib>/include` when it
     exists (spdlog, pybind11), otherwise — like useVendorHeader's `headerSubdir`
     — the vendor dir plus a same-named subdirectory one level in (doctest).
     Python-only libs are skipped when cfg says Python is off."""
-    skipped = PYTHON_VENDOR_LIBS if cfg is not None and not cfg.python_enabled else set()
+    skipped = set() if python_enabled else PYTHON_VENDOR_LIBS
     paths = []
     for d in vendor_dirs(root):
         if d.name in skipped:
@@ -68,12 +67,12 @@ def vendor_include_paths(root: Path, cfg: BuildConfig | None = None) -> list[str
     return paths
 
 
-def ensure_vendor_dirs(root: Path, cfg: BuildConfig | None = None) -> None:
+def ensure_vendor_dirs(root: Path, python_enabled: bool = True) -> None:
     """Verify every vendored git submodule (doctest today, and any future
     ones under <project>/vendor/<lib>/) is populated; abort with guidance if
     not. Used as the `requires_vendor=True` precondition on
     @registry.command(...) — see build_system/registry.py."""
-    missing = missing_vendor_dirs(root, cfg)
+    missing = missing_vendor_dirs(root, python_enabled)
     if not missing:
         return
     for d in missing:

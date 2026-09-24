@@ -90,6 +90,7 @@ site/
 .env.local
 config.local.json
 oryx.local.toml
+forge.local.toml
 
 # OS files
 Thumbs.db

@@ -1,6 +1,6 @@
 [project]
 name = "oryx-build"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Build, test and docs tooling for the Oryx game strategy engine (the `forge` command)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -52,6 +52,9 @@ pyforge = "build_system.main:app"
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "build_system/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["build_system"]

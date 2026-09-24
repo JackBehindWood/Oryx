@@ -5,13 +5,14 @@ import pkgutil
 import platform
 import sys
 import sysconfig
+import tomllib
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 import build_system
-from build_system.config import BuildConfig
+from build_system.config import RunContext, parse_config
 from build_system.project import Project
 
 REAL_ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +30,31 @@ GITMODULES = """\
 [submodule "Oryx/vendor/yaml-cpp"]
 \tpath = Oryx/vendor/yaml-cpp
 \turl = https://github.com/jbeder/yaml-cpp.git
+"""
+
+FORGE_TOML = """\
+[project]
+name = "Oryx"
+default-target = "oasis"
+
+[build]
+dependencies-dir = "Oryx/vendor"
+
+[options]
+python = { default = true, off = "--no-python" }
+sanitize = { default = false, on = "--sanitize" }
+
+[targets.oasis]
+project = "Oasis"
+
+[tests]
+project = "Tests"
+
+[docs]
+tool = "mkdocs"
+
+[tool.oryx]
+stubs-dir = "OryxPython/stubs"
 """
 
 VENDOR_DIRS = ["Oryx/vendor/spdlog", "Oryx/vendor/pybind11", "Oryx/vendor/yaml-cpp", "tests/vendor/doctest"]
@@ -115,7 +141,7 @@ def tmp_project(tmp_path, monkeypatch, linux_host) -> Path:
     (tmp_path / ".gitmodules").write_text(GITMODULES, encoding="utf-8")
     for vendor_dir in VENDOR_DIRS:
         (tmp_path / vendor_dir).mkdir(parents=True)
-    BuildConfig().save(tmp_path / "oryx.toml")
+    (tmp_path / "forge.toml").write_text(FORGE_TOML, encoding="utf-8")
     build_dir = tmp_path / "build"
     build_dir.mkdir()
     for project in ("Oryx", "Tests"):
@@ -138,3 +164,14 @@ def forge(tmp_project, fake_python):
 @pytest.fixture
 def project(tmp_project) -> Project:
     return Project.discover(tmp_project)
+
+
+def make_run(project: Project, profile: str = "debug", **options: bool) -> RunContext:
+    cfg = parse_config(tomllib.loads(project.config_file.read_text(encoding="utf-8")))
+    values = {name: spec.default for name, spec in cfg.options.items()} | options
+    return RunContext(project=project, config=cfg, profile=profile, options=values)
+
+
+@pytest.fixture
+def run(project) -> RunContext:
+    return make_run(project)

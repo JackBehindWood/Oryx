@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 
 from build_system import registry
+from build_system import legacy_outputs
 from build_system.config import RunContext
 from build_system.utils import run_command
 
@@ -11,6 +12,13 @@ console = Console()
 app = typer.Typer(invoke_without_command=True)
 GROUP_HELP = "Execute test binaries"
 command = registry.make_group(app, group="Test")
+
+
+def _test_binary(run: RunContext):
+    if run.config.tests is None:
+        console.print("[bold red]✗ No [tests] table in forge.toml.[/bold red]")
+        raise typer.Exit(code=1)
+    return legacy_outputs.target_path(run.project.build_dir, run.profile, run.config.project.name, run.config.tests.project)
 
 
 @app.callback()
@@ -25,15 +33,13 @@ def test_callback(ctx: typer.Context):
 def run_tests(ctx: typer.Context):
     """Execute the project test suite."""
     run: RunContext = ctx.obj
-    cfg = run.config
-
-    test_path = cfg.test_suite_path()
+    test_path = _test_binary(run)
 
     if run.dry_run:
         console.print(f"[dim][dry-run] would run: {test_path}[/dim]")
         return
 
-    console.print(f"[bold blue]🧪 Running tests ({cfg.profile})...[/bold blue]")
+    console.print(f"[bold blue]🧪 Running tests ({run.profile})...[/bold blue]")
 
     if not test_path.exists():
         console.print(f"[bold red]✗ Test binary missing at:[/bold red] {test_path}")
@@ -57,15 +63,13 @@ def run_tests(ctx: typer.Context):
 def run_benchmarks(ctx: typer.Context):
     """Run the performance micro-benchmark suite (excluded from `test run`)."""
     run: RunContext = ctx.obj
-    cfg = run.config
-
-    test_path = cfg.test_suite_path()
+    test_path = _test_binary(run)
 
     if run.dry_run:
         console.print(f"[dim][dry-run] would run: {test_path} --test-suite=benchmark[/dim]")
         return
 
-    console.print(f"[bold blue]📊 Running benchmarks ({cfg.profile})...[/bold blue]")
+    console.print(f"[bold blue]📊 Running benchmarks ({run.profile})...[/bold blue]")
 
     if not test_path.exists():
         console.print(f"[bold red]✗ Test binary missing at:[/bold red] {test_path}")

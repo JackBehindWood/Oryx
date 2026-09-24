@@ -6,7 +6,6 @@ from pathlib import Path
 
 from rich.console import Console
 
-from .config import BuildConfig
 from .utils import get_macos_sdk_path, run_command, write_json
 
 console = Console()
@@ -67,7 +66,7 @@ def _compile_entries(make_file: Path, config_token: str) -> list[dict]:
     return entries
 
 
-def generate_compile_commands(cfg: BuildConfig, build_dir: Path) -> Path | None:
+def generate_compile_commands(config_token: str, build_dir: Path) -> Path | None:
     """Generate compile_commands.json from the .make files Premake already wrote,
     covering every discovered project (Oryx.make, Oasis.make, Tests.make, and any
     future project) with its own real per-file includes/defines. Returns None (and
@@ -84,6 +83,6 @@ def generate_compile_commands(cfg: BuildConfig, build_dir: Path) -> Path | None:
 
     entries = []
     for make_file in make_files:
-        entries.extend(_compile_entries(make_file, cfg.make_config_token))
+        entries.extend(_compile_entries(make_file, config_token))
 
     return write_json(build_dir / COMPILE_COMMANDS_NAME, entries)

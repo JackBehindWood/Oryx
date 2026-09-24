@@ -8,7 +8,7 @@ A Python-based CLI build automation system for the Oryx Engine. Built on top of 
 
 * **Interactive Menu**: Run `uv run forge` with no arguments in a terminal for an arrow-key command menu — no need to memorize subcommand names.
 * **Auto-Registering Commands**: Command groups under `build_system/commands/` are discovered automatically; adding one requires no edits to `main.py` or `interactive.py`. See "Extending the CLI" below.
-* **TOML Configuration**: Shared settings live in `oryx.toml` (git-committed); per-developer preferences (IDE choice, debugger) live in `oryx.local.toml` (gitignored) — see "Personal preferences" below.
+* **TOML Configuration**: Shared settings live in `forge.toml` (git-committed, found by walking up from the current directory, so `forge` works from any subdirectory); per-developer preferences live in `forge.local.toml` (gitignored) — see "Personal preferences" below.
 * **Isolated Dependency Management**: Automatically downloads and extracts the required Premake5 release locally using `urllib`, `tarfile`, and `zipfile` utilities, automatically setting system execution permissions.
 * **Cross-Platform Output Structuring**: Dynamically constructs target binary paths matching Premake conventions (`<Config>-<OS>-<Arch>`) based on host architecture and OS detection.
 * **Configurable CLI Profiles**: Switch between `debug`, `release`, and `dist` build configurations via global context flags.
@@ -67,11 +67,11 @@ Running `build` with **no command** opens an interactive arrow-key menu (in a re
 
 | Option | Short | Description |
 | --- | --- | --- |
-| `--config PATH` | `-c` | Path to the `oryx.toml` configuration file (default: project-root `oryx.toml`). |
-| `--profile [debug\|release\|dist]` | `-p` | Active build configuration profile (default: `debug`). |
+| `--config PATH` | `-c` | Path to the project's `forge.toml` (default: the nearest one at or above the current directory). |
+| `--profile [debug\|release\|dist]` | `-p` | Active build configuration profile (default: `[build] default-profile`). |
 | `--verbose` | `-v` | Show full subprocess output and the underlying commands being run. |
 | `--dry-run` | | Print the command that would run without executing it. |
-| `--no-python` | | Build without the Python scripting backend (overrides `[python] enabled` in `oryx.toml`). Python is on by default; `configure` reads the interpreter's paths from `sysconfig` and passes them to Premake, and changing them clears previous binaries. |
+| `--no-python` | | Build without the Python scripting backend (overrides `[options] python` in `forge.toml`). Python is on by default; `configure` reads the interpreter's paths from `sysconfig` and passes them to Premake, and changing them clears previous binaries. |
 
 ---
 
@@ -83,10 +83,10 @@ Manages build settings and local configurations.
 
 | Command | Description |
 | --- | --- |
-| `config init` | Generates a default `oryx.toml` in the project root. |
-| `config init --ide vscode [--debugger lldb\|cppdbg]` | Also generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, remembered in `oryx.local.toml`. |
-| `config init --ide visual_studio` | Generates a Visual Studio 2022 solution via `premake5 vs2022` — independent of `forge build compile`, which still uses `oryx.toml`'s `[build] generator` (default `gmake`). |
-| `config init --no-remember` | One-shot `--ide`/`--debugger` override; doesn't touch `oryx.local.toml`. |
+| `config init` | Generates a minimal `forge.toml` in the current directory when none exists. |
+| `config init --ide vscode [--debugger lldb\|cppdbg]` | Also generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, remembered in `forge.local.toml`. |
+| `config init --ide visual_studio` | Generates a Visual Studio 2022 solution via `premake5 vs2022` — independent of `forge build compile`, which still uses `forge.toml`'s `[premake] generator` (default `gmake`). |
+| `config init --no-remember` | One-shot `--ide`/`--debugger` override; doesn't touch `forge.local.toml`. |
 
 **`build`**
 
@@ -110,57 +110,74 @@ Manages test execution suites.
 
 ---
 
-**Configuration (`oryx.toml`)**
+**Configuration (`forge.toml`)**
 
-Running `forge config init` generates a default TOML configuration file in your project root:
+Only `[project] name` is required; every other table is optional with the defaults shown.
+The schema is strict: an unknown key or a wrong type fails with the file and key named,
+plus a "did you mean" suggestion.
 
 ```toml
 [project]
 name = "Oryx"
+default-target = "oasis"          # `forge build run` with no argument
+forge-version = ">=0.2"           # checked at load
+
+[premake]
+version = "5.0.0-beta8"
+generator = "gmake"
 
 [build]
-generator = "gmake"
-profile = "debug"
+default-profile = "debug"         # debug | release | dist
+jobs = 0                          # 0 = all cores
+dependencies-dir = "vendor"
+fetch = "auto"                    # auto | ask | never
 
-[test-suite]
-name = "Tests"
+[options]                         # build switches → Premake flags
+python = { default = true, off = "--no-python", help = "Embedded Python backend" }
 
-[executables.oasis]
-name = "Oasis"
+[targets.oasis]
+project = "Oasis"                 # a Premake project name
+
+[tests]
+project = "Tests"
+
+[docs]
+tool = "mkdocs"                   # config/site default to mkdocs.yml / site
+
+[tool.oryx]                       # project-owned tables, not validated by forge
+stubs-dir = "OryxPython/stubs"
 ```
 
-`[test-suite]` is its own top-level block, separate from `[executables.*]` —
-the test suite is a first-class concept with its own `test` command, not just
-another app. Every other compiled target is an `[executables.<key>]` block; a
-command locates and runs one via `cfg.executable_path("<key>")`, while the test
-suite goes through `cfg.test_suite_path()`. Both are optional — omitting a
-block keeps its default (`test-suite` → `Tests`, `oasis` → `Oasis`). To add a
-new target (a benchmark harness, another demo app, etc.), add a new
-`[executables.<key>]` block with a `name` — no code changes to `BuildConfig`
-are required. Each block's shape also leaves room for more than just `name`
-(args, working directory, etc. for executables; framework, filters, etc. for
-the test suite) to be added later without another schema migration.
+Closed value sets (profile, fetch mode, dependency kind, debugger) are `StrEnum`s in
+`build_system/config/schema.py`. Open sets that plugins will extend (generators,
+dependency sources, editors, doc tools) are `Choices` registries with `register()`.
 
 ---
 
-**Personal preferences (`oryx.local.toml`)**
+**Personal preferences (`forge.local.toml`)**
 
-`oryx.toml` is shared and git-committed — it shouldn't hold anything specific
-to one contributor's editor. IDE choice and debugger preference instead live
-in a separate, **gitignored** `oryx.local.toml` at the project root, managed
-by `LocalConfig` in `build_system/config.py`:
+`forge.toml` is shared and git-committed; editor choice, debugger and personal build
+overrides live in the **gitignored** `forge.local.toml` next to it:
 
 ```toml
-[ide]
+[editor]
 kind = "vscode"     # "vscode" | "visual_studio" | "none"
 debugger = "lldb"   # "lldb" | "cppdbg"
+
+[build]             # optional overrides of the shared [build]
+jobs = 6
+
+[options]           # optional overrides of the shared [options] defaults
+python = false
 ```
+
+An older `oryx.local.toml` (with `[ide]` instead of `[editor]`) is still read when no
+`forge.local.toml` exists; forge prints a rename hint and never modifies or deletes it.
 
 `forge config init --ide <kind> [--debugger <name>]` resolves against whatever
 is already saved here (so a bare `forge config init` re-run reuses your last
 choice instead of resetting to `none`), then saves the result back unless you
-pass `--no-remember`. Each contributor on a shared repo gets their own file —
-it never collides with, or gets overwritten by, anyone else's.
+pass `--no-remember`.
 
 ---
 

@@ -13,8 +13,6 @@ import platform
 import sys
 import sysconfig
 
-from build_system.config import BuildConfig
-
 
 class PythonEnvError(RuntimeError):
     pass
@@ -29,7 +27,7 @@ class PythonBuildInfo:
     site_packages: tuple[Path, ...]
 
 
-_NO_LIBPYTHON_HINT = "Use `uv run forge --no-python ...`, or a Python built with a shared libpython."
+_NO_LIBPYTHON_HINT = "Use `forge --no-python ...`, or a Python built with a shared libpython."
 
 
 def _windows_library(lib_dir: Path) -> tuple[Path, str]:
@@ -70,8 +68,8 @@ def python_build_info() -> PythonBuildInfo:
     return PythonBuildInfo(include_dir=include_dir, lib_dir=lib_dir, lib_name=lib_name, home=home, site_packages=_site_packages())
 
 
-def premake_python_options(cfg: BuildConfig) -> list[str]:
-    if not cfg.python_enabled:
+def premake_python_options(python_enabled: bool) -> list[str]:
+    if not python_enabled:
         return ["--no-python"]
 
     info = python_build_info()

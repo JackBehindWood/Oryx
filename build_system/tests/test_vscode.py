@@ -3,7 +3,7 @@ import shutil
 
 import pytest
 
-from build_system.config import BuildConfig
+from build_system.tests.conftest import make_run
 from build_system.utils import merge_by_key
 from build_system.vscode import c_cpp_properties, launch, settings, tasks
 
@@ -59,10 +59,10 @@ def test_tasks_keep_user_entries(tmp_path):
     assert data["tasks"][1]["command"] == "uv run forge build configure"
 
 
-def test_launch_entries_per_profile(tmp_project):
+def test_launch_entries_per_profile(tmp_project, run):
     path = tmp_project / ".vscode" / "launch.json"
     _write(path, {"configurations": [{"name": "Attach", "type": "lldb", "request": "attach"}]})
-    data = _read(launch.write_launch(BuildConfig(root=tmp_project), tmp_project, debugger="lldb"))
+    data = _read(launch.write_launch(run, debugger="lldb"))
     bin_dir = tmp_project / "build" / "bin"
     assert data["version"] == "0.2.0"
     assert data["configurations"][0]["name"] == "Attach"
@@ -82,10 +82,10 @@ def test_launch_entries_per_profile(tmp_project):
 
 
 @pytest.mark.parametrize(("system", "mode", "tool"), [("Linux", "gdb", "gdb"), ("Darwin", "lldb", "lldb-mi")])
-def test_launch_cppdbg_keys(tmp_project, monkeypatch, system, mode, tool):
+def test_launch_cppdbg_keys(run, monkeypatch, system, mode, tool):
     monkeypatch.setattr(launch.platform, "system", lambda: system)
     monkeypatch.setattr(shutil, "which", lambda name: f"/bin/{name}")
-    data = _read(launch.write_launch(BuildConfig(root=tmp_project), tmp_project, debugger="cppdbg"))
+    data = _read(launch.write_launch(run, debugger="cppdbg"))
     entry = data["configurations"][0]
     assert (entry["type"], entry["console"], entry["MIMode"], entry["miDebuggerPath"]) == ("cppdbg", "integratedTerminal", mode, f"/bin/{tool}")
 
@@ -112,11 +112,11 @@ def test_settings_merge_keeps_user_keys(tmp_project):
     assert data["files.exclude"] == {"*.pyc": True, ".DS_Store": True}
 
 
-def test_c_cpp_properties_linux(tmp_project, fake_python, monkeypatch):
+def test_c_cpp_properties_linux(tmp_project, run, fake_python, monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
     path = tmp_project / ".vscode" / "c_cpp_properties.json"
     _write(path, {"configurations": [{"name": "Custom"}, {"name": "Linux", "stale": True}]})
-    data = _read(c_cpp_properties.write_c_cpp_properties(BuildConfig(), tmp_project))
+    data = _read(c_cpp_properties.write_c_cpp_properties(run))
     assert data["version"] == 4
     assert [c["name"] for c in data["configurations"]] == ["Custom", "Linux"]
     linux = data["configurations"][1]
@@ -140,18 +140,18 @@ def test_c_cpp_properties_linux(tmp_project, fake_python, monkeypatch):
 
 
 @pytest.mark.parametrize(("profile", "defines"), [("release", ["OX_RELEASE", "OX_ENABLE_PROFILING", "OX_ENABLE_MEMORY_TRACKING"]), ("dist", ["OX_DIST"])])
-def test_c_cpp_properties_defines_without_python(tmp_project, profile, defines):
-    data = _read(c_cpp_properties.write_c_cpp_properties(BuildConfig(profile=profile, python_enabled=False), tmp_project))
+def test_c_cpp_properties_defines_without_python(project, profile, defines):
+    data = _read(c_cpp_properties.write_c_cpp_properties(make_run(project, profile, python=False)))
     config = data["configurations"][0]
     assert config["defines"] == ["SPDLOG_COMPILED_LIB", *defines]
     assert "${workspaceFolder}/Oryx/vendor/pybind11" not in config["includePath"]
 
 
-def test_c_cpp_properties_macos_has_two_configurations(tmp_project, monkeypatch):
+def test_c_cpp_properties_macos_has_two_configurations(project, monkeypatch):
     monkeypatch.setattr(c_cpp_properties.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(c_cpp_properties, "get_macos_sdk_path", lambda: "/SDK")
     monkeypatch.setattr(c_cpp_properties, "_macos_compiler_path", lambda: "/usr/bin/clang++")
-    data = _read(c_cpp_properties.write_c_cpp_properties(BuildConfig(python_enabled=False), tmp_project))
+    data = _read(c_cpp_properties.write_c_cpp_properties(make_run(project, python=False)))
     assert [(c["name"], c["intelliSenseMode"], c["includePath"][-1]) for c in data["configurations"]] == [
         ("Mac ARM64", "macos-clang-arm64", "/opt/homebrew/include"),
         ("Mac x64", "macos-clang-x64", "/usr/local/include"),
