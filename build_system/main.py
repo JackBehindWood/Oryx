@@ -4,7 +4,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from build_system import __version__, registry
+from build_system import __version__, options, registry
 from build_system.config import LOCAL_CONFIG_NAME, ForgeConfig, LocalConfig, Profile, ProjectTable, RunContext, SchemaError, load_config, load_local, validate_local
 from build_system.config.schema import parse_enum
 from build_system.project import Project, ProjectNotFound
@@ -47,13 +47,6 @@ def _resolve_profile(requested: str | None, cfg: ForgeConfig, local: LocalConfig
     return parse_enum(Profile, requested.lower(), "--profile", "command line")
 
 
-def _resolve_options(cfg: ForgeConfig, local: LocalConfig, overrides: dict[str, bool]) -> dict[str, bool]:
-    values = {name: spec.default for name, spec in cfg.options.items()}
-    values.update(local.options)
-    values.update({name: value for name, value in overrides.items() if name in values})
-    return values
-
-
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -80,17 +73,26 @@ def main(
         "--dry-run",
         help="Print the commands that would run without executing them.",
     ),
-    no_python: bool = typer.Option(
-        False,
-        "--no-python",
-        help="Build without the Python scripting backend (overrides [options] python in forge.toml).",
+    with_: list[str] = typer.Option(
+        [],
+        "--with",
+        metavar="OPTION",
+        help="Turn a forge.toml [options] switch on for this run (repeatable).",
     ),
-    sanitize: bool = typer.Option(
-        False,
-        "--sanitize",
-        help="Build with AddressSanitizer + UndefinedBehaviorSanitizer, keeping the profile's optimize "
-        "level and forcing debug symbols on (a dev/CI diagnostic tool, not a build you'd ship).",
+    without: list[str] = typer.Option(
+        [],
+        "--without",
+        metavar="OPTION",
+        help="Turn a forge.toml [options] switch off for this run (repeatable).",
     ),
+    defines: list[str] = typer.Option(
+        [],
+        "-D",
+        metavar="KEY[=VALUE]",
+        help="Pass --KEY[=VALUE] straight to Premake (repeatable).",
+    ),
+    no_python: bool = typer.Option(False, "--no-python", hidden=True, help="Alias of --without python."),
+    sanitize: bool = typer.Option(False, "--sanitize", hidden=True, help="Alias of --with sanitize."),
 ):
     """Global context setup executed before running commands."""
     try:
@@ -98,13 +100,18 @@ def main(
         cfg = _load(ctx, project)
         local, legacy_local = load_local(project.root)
         validate_local(local, cfg)
-        overrides = {**({"python": False} if no_python else {}), **({"sanitize": True} if sanitize else {})}
+        with_ = [*with_, *(["sanitize"] if sanitize else [])]
+        without = [*without, *(["python"] if no_python else [])]
+        values = options.resolve(cfg, local, with_, without)
+        for define in defines:
+            options.define_flag(define)
         ctx.obj = RunContext(
             project=project,
             config=cfg,
             local=local,
             profile=_resolve_profile(profile, cfg, local),
-            options=_resolve_options(cfg, local, overrides),
+            options=values,
+            defines=list(defines),
             verbose=verbose,
             dry_run=dry_run,
         )

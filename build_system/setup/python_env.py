@@ -70,7 +70,7 @@ def python_build_info() -> PythonBuildInfo:
 
 def premake_python_options(python_enabled: bool) -> list[str]:
     if not python_enabled:
-        return ["--no-python"]
+        return []
 
     info = python_build_info()
     return [

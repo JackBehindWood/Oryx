@@ -32,8 +32,11 @@ def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
     [
         ([], PYTHON_OPTIONS),
         (["--no-python"], "--no-python"),
-        (["--sanitize"], f"{PYTHON_OPTIONS} --sanitize"),
+        (["--sanitize"], f"--sanitize {PYTHON_OPTIONS}"),
         (["--no-python", "--sanitize"], "--no-python --sanitize"),
+        (["--without", "python"], "--no-python"),
+        (["--with", "sanitize", "--without", "python"], "--no-python --sanitize"),
+        (["--without", "python", "-D", "cc=clang", "-D", "verbose"], "--no-python --cc=clang --verbose"),
     ],
 )
 def test_configure(dry, premake, flags, options):
@@ -186,3 +189,29 @@ def test_runs_from_a_subdirectory(forge, tmp_project, monkeypatch):
     monkeypatch.chdir(tmp_project / "Oasis" / "src")
     result = forge("--dry-run", "build", "clean")
     assert result.output.strip() == f"would remove: {tmp_project / 'build'}"
+
+
+@pytest.mark.parametrize(
+    ("flags", "message"),
+    [
+        (["--with", "sanitise"], "--with sanitise: unknown option — did you mean 'sanitize'? (available: python, sanitize)"),
+        (["--without", "gui"], "--without gui: unknown option (available: python, sanitize)"),
+        (["-D", "=x"], "-D '=x': expected KEY or KEY=VALUE"),
+    ],
+)
+def test_bad_option_flags_are_configuration_errors(forge, flags, message):
+    result = forge(*flags, "build", "configure")
+    assert result.exit_code == 1
+    assert message in result.output
+
+
+def test_local_options_override_the_defaults(dry, premake, tmp_project):
+    (tmp_project / "forge.local.toml").write_text("[options]\npython = false\n", encoding="utf-8")
+    assert dry("build", "configure") == [f" would run: {premake} gmake --no-python --forge-export"]
+    assert dry("--with", "python", "build", "configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export"]
+
+
+def test_hidden_aliases_stay_out_of_help(forge):
+    output = forge("--help").output
+    assert "--with" in output and "--without" in output
+    assert "--no-python" not in output and "--sanitize" not in output

@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 
@@ -34,8 +35,7 @@ def prune_stale_object_dirs(workspace: Workspace, profile: str, build_dir: Path)
         try:
             run_command(["make", "-n", "-f", make_file.name, f"config={config_token}"], cwd=build_dir)
         except (subprocess.CalledProcessError, FileNotFoundError) as error:
-            stderr = getattr(error, "stderr", None) or ""
-            if "No rule to make target" not in stderr:
+            if not _names_a_stale_source(getattr(error, "stderr", None) or "", build_dir):
                 continue
 
             remove_directory(workspace.config(project, profile).objdir)
@@ -44,22 +44,28 @@ def prune_stale_object_dirs(workspace: Workspace, profile: str, build_dir: Path)
     return cleaned
 
 
-def clear_outputs_if_python_changed(premake_options: list[str], build_dir: Path) -> bool:
-    """Wipe build/bin and build/bin-int when the Python/--sanitize options differ from the last configure.
+_MISSING_TARGET = re.compile(r"No rule to make target [`'\"]?([^'`\"]+)['`\"]?")
+
+
+def _names_a_stale_source(stderr: str, build_dir: Path) -> bool:
+    # A missing library another project builds (e.g. after its target was cleared) is not a stale .d entry.
+    match = _MISSING_TARGET.search(stderr)
+    return bool(match) and not (build_dir / match.group(1)).resolve().is_relative_to((build_dir / "bin").resolve())
+
+
+def wipe_outputs_if_options_changed(build_dir: Path, previous_hash: str | None, current_hash: str) -> bool:
+    """Wipe build/bin and build/bin-int when the Premake flags differ from the last configure.
 
     Premake's Makefiles don't rebuild an object when only its defines or buildoptions change, and
     `ar` keeps archive members from a previous build (also, --sanitize's own PCH is incompatible
-    with a non-sanitized one, or vice versa), so toggling --no-python, --sanitize, or moving to
-    another interpreter would otherwise leave stale objects and outputs from the old options.
+    with a non-sanitized one, or vice versa), so toggling an option or moving to another
+    interpreter would otherwise leave stale objects and outputs from the old flags. With no
+    record of the previous flags, existing outputs are wiped too. Returns whether it wiped.
     """
-    options_file = build_dir / ".python-options"
-    current = "\n".join(premake_options)
-    previous = options_file.read_text(encoding="utf-8") if options_file.is_file() else None
-
-    changed = previous is not None and previous != current
-    if changed or (previous is None and (build_dir / "bin").exists()):
-        remove_directory(build_dir / "bin")
-        remove_directory(build_dir / "bin-int")
-
-    options_file.write_text(current, encoding="utf-8")
-    return changed
+    (build_dir / ".python-options").unlink(missing_ok=True)
+    changed = bool(previous_hash) and previous_hash != current_hash
+    if not (changed or (not previous_hash and (build_dir / "bin").exists())):
+        return False
+    remove_directory(build_dir / "bin")
+    remove_directory(build_dir / "bin-int")
+    return True

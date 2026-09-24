@@ -30,7 +30,7 @@ def test_windows_library():
 
 
 def test_premake_options_without_python():
-    assert python_env.premake_python_options(False) == ["--no-python"]
+    assert python_env.premake_python_options(False) == []
 
 
 def test_premake_options_with_python(fake_python):

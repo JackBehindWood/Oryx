@@ -67,6 +67,7 @@ class RunContext:
     profile: Profile
     options: dict[str, bool]
     local: LocalConfig = field(default_factory=LocalConfig)
+    defines: list[str] = field(default_factory=list)
     verbose: bool = False
     dry_run: bool = False
 
