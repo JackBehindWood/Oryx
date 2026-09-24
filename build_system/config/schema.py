@@ -123,6 +123,11 @@ class Dependency:
 
 
 @dataclass(frozen=True)
+class PluginsTable:
+    paths: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class DocsTable:
     tool: str = _open(DOCS_TOOLS, "mkdocs")
     config: str = "mkdocs.yml"
@@ -139,6 +144,7 @@ class ForgeConfig:
     tests: TestsTable | None = None
     dependencies: dict[str, Dependency] = field(default_factory=dict)
     docs: DocsTable | None = None
+    plugins: PluginsTable = field(default_factory=PluginsTable)
     tool: dict[str, dict] = field(default_factory=dict)
 
 

@@ -64,6 +64,9 @@ doctest = { include = "doctest", path = "tests/vendor/doctest" }
 [docs]
 tool = "mkdocs"
 
+[plugins]
+paths = ["build_system/oryx"]
+
 [tool.oryx]
 stubs-dir = "OryxPython/stubs"
 """
@@ -136,6 +139,14 @@ def real_dev_files_untouched():
     assert _snapshot() == before, "a test touched real developer files (local config, .vscode or the venv .pth)"
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _load_forge_app():
+    """Import build_system.main once, from the real repo root, before any test's tmp_project
+    chdir runs — this is what mounts the oryx plugin's commands (see build_system/main.py),
+    and it must happen against the real forge.toml so it's independent of test order."""
+    import build_system.main  # noqa: F401
+
+
 def _build_system_modules() -> list:
     for info in pkgutil.walk_packages(build_system.__path__, prefix="build_system."):
         if not info.name.startswith("build_system.tests"):
@@ -158,7 +169,7 @@ def linux_host(monkeypatch):
 
 @pytest.fixture
 def fake_python(monkeypatch):
-    from build_system.setup.python_env import PythonBuildInfo
+    from build_system.oryx.python_env import PythonBuildInfo
 
     info = PythonBuildInfo(
         include_dir=Path("/py/include/python3.11"),

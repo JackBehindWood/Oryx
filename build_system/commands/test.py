@@ -125,8 +125,12 @@ def run_suites(
             console.print("  [dim]Run 'forge build compile' first.[/dim]")
             raise typer.Exit(code=1)
 
-    python_on = run.options.get("python", False)
-    env = child_env(Path(sys.executable).parent, {"ORYX_REQUIRE_EXTENSION": "1"} if python_on else None)
+    plugin_env: dict[str, str] = {}
+    for suite in selected.values():
+        for result in run.pm.hook.forge_test_env(ctx=run, suite=suite):
+            if result:
+                plugin_env.update(result)
+    env = child_env(Path(sys.executable).parent, plugin_env or None)
 
     if list_:
         for kind, dirs in dirs_by_kind.items():

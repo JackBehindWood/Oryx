@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from build_system.setup import python_env
+from build_system.oryx import python_env
 
 
 @pytest.mark.parametrize(

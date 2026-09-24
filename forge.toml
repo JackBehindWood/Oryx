@@ -40,5 +40,8 @@ doctest = { include = "doctest", path = "tests/vendor/doctest" }
 [docs]
 tool = "mkdocs"
 
+[plugins]
+paths = ["build_system/oryx"]
+
 [tool.oryx]
 stubs-dir = "OryxPython/stubs"

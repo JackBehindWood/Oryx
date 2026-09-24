@@ -4,9 +4,10 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from build_system import __version__, options, registry
+from build_system import __version__, options, plugins, registry
 from build_system.config import LOCAL_CONFIG_NAME, ForgeConfig, LocalConfig, Profile, ProjectTable, RunContext, SchemaError, load_config, load_local, validate_local
 from build_system.config.schema import parse_enum
+from build_system.plugins import PluginError
 from build_system.project import Project, ProjectNotFound
 
 console = Console()
@@ -35,6 +36,17 @@ for _module in registry.discover_command_modules():
         app.command(name=_name, help=getattr(_module, "GROUP_HELP", ""), context_settings=getattr(_module, "ROOT_COMMAND_CONTEXT_SETTINGS", {}))(_root_command)
     else:
         app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""), hidden=getattr(_module, "GROUP_HIDDEN", False))
+
+# Plugin commands (e.g. `forge python stubs`, from build_system/oryx/) must be mounted onto `app`
+# here, before Click parses the command line — a project's own config decides which plugins load
+# (see main()'s per-invocation reload below), so this is a best-effort pass using whatever project
+# is discoverable from the current directory; outside any project, plugin commands are simply absent.
+try:
+    _boot_project = Project.discover()
+    _boot_pm = plugins.load_plugins(_boot_project.root, load_config(_boot_project.config_file, __version__).plugins.paths)
+except (ProjectNotFound, SchemaError, PluginError):
+    _boot_pm = plugins.get_plugin_manager()
+_boot_pm.hook.forge_commands(app=app)
 
 def _discover(ctx: typer.Context) -> Project:
     try:
@@ -115,6 +127,7 @@ def main(
         values = options.resolve(cfg, local, with_, without)
         for define in defines:
             options.define_flag(define)
+        pm = plugins.load_plugins(project.root, cfg.plugins.paths)
         ctx.obj = RunContext(
             project=project,
             config=cfg,
@@ -124,8 +137,9 @@ def main(
             defines=list(defines),
             verbose=verbose,
             dry_run=dry_run,
+            pm=pm,
         )
-    except (ProjectNotFound, SchemaError) as err:
+    except (ProjectNotFound, SchemaError, PluginError) as err:
         console.print(f"[bold red]Configuration Error:[/bold red] {err}")
         raise typer.Exit(code=1)
 

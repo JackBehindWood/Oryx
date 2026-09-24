@@ -2,8 +2,12 @@ import typer
 
 from build_system import registry
 
-GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Python", "Setup", "Test"]
-MODULES = [*GROUPS, "Vendor"]
+STATIC_GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Setup", "Test"]
+MODULES = [*STATIC_GROUPS, "Vendor"]
+# "Python" (from build_system/oryx/, the Oryx plugin — see build_system/main.py's plugin
+# loading) mounts after every statically-discovered group, since it isn't one of the files
+# pkgutil finds under build_system/commands/.
+GROUPS = [*STATIC_GROUPS, "Python"]
 
 
 def test_discovery_order():

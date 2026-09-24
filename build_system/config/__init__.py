@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
 
+import pluggy
+
+from ..plugins import get_plugin_manager
 from ..project import Project
 from .load import LOCAL_CONFIG_NAME, load_config, load_local, local_config_file, parse_config, save_local, validate_local
 from .schema import (
@@ -18,6 +21,7 @@ from .schema import (
     ForgeConfig,
     LocalConfig,
     OptionSpec,
+    PluginsTable,
     PremakeTable,
     Profile,
     ProjectTable,
@@ -44,6 +48,7 @@ __all__ = [
     "ForgeConfig",
     "LocalConfig",
     "OptionSpec",
+    "PluginsTable",
     "PremakeTable",
     "Profile",
     "ProjectTable",
@@ -73,6 +78,7 @@ class RunContext:
     verbose: bool = False
     dry_run: bool = False
     interactive: bool = False
+    pm: pluggy.PluginManager = field(default_factory=get_plugin_manager)
 
     @property
     def jobs(self) -> int:

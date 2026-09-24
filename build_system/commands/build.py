@@ -16,8 +16,6 @@ from build_system.config import ForgeConfig, RunContext, Target
 from build_system.config.schema import suggestion
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
-from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
-from build_system.setup.python_extension import install_extension_pth, remove_extension_pth
 from build_system.setup.stale_objects import prune_stale_object_dirs, wipe_outputs_if_options_changed
 from build_system.utils import remove_directory, run_command
 from build_system.workspace import Workspace, WorkspaceError
@@ -48,11 +46,11 @@ def _clear_targets_that_lost_sources(previous: freshness.Stamp | None, ws: Works
 def premake_args(run: RunContext) -> list[str]:
     """Every Premake flag this run's options produce, in a stable order (their hash decides an output wipe)."""
     try:
-        python_args = premake_python_options(run.options.get("python", False))
-    except PythonEnvError as error:
+        plugin_args = [arg for result in run.pm.hook.forge_premake_args(ctx=run) if result for arg in result]
+    except RuntimeError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1)
-    return options.premake_flags(run.config.options, run.options, run.defines) + python_args
+    return options.premake_flags(run.config.options, run.options, run.defines) + plugin_args
 
 
 @command(name="configure", label="Configure — generate Premake build files")
@@ -77,9 +75,7 @@ def configure(ctx: typer.Context):
         raise typer.Exit(code=1)
 
     write_premake_config(run)
-
-    if run.options.get("python", False):
-        write_python_config(python_build_info(), project.build_dir)
+    run.pm.hook.forge_pre_configure(ctx=run)
 
     command_line = [str(premake), generator, *premake_options, "--forge-export"]
     previous = freshness.load_stamp(project)
@@ -151,13 +147,7 @@ def compile_project(ctx: typer.Context):
         console.print(f"[bold red]✗ Build failed:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
 
-    python_enabled = run.options.get("python", False)
-    if python_enabled and not run.options.get("sanitize", False):
-        install_extension_pth(ws.target_path("OryxPython", run.profile).parent)
-    elif remove_extension_pth():
-        # A sanitized oryx.so needs the ASan runtime preloaded, which a plain `python` never has.
-        reason = "a --sanitize extension can't be imported by plain python" if python_enabled else "this build has no Python extension"
-        console.print(f"[dim]Removed the venv's `import oryx` path: {reason}; a normal build restores it.[/dim]\n")
+    run.pm.hook.forge_post_compile(ctx=run)
 
 
 @command(name="clean", label="Clean — remove build artifacts")
@@ -174,8 +164,7 @@ def clean(ctx: typer.Context):
     if build_dir.exists():
         remove_directory(build_dir)
         console.print(f"[green]✓ Removed directory:[/green] {build_dir}")
-    if remove_extension_pth():
-        console.print("[green]✓ Removed the venv's `import oryx` path[/green]")
+    run.pm.hook.forge_post_clean(ctx=run)
 
 
 @command(name="all", label="All — configure, compile, and test")

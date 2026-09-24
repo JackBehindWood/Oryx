@@ -3,19 +3,14 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[1]
 PROJECT_NAMES = re.compile(r"Oryx|Oasis")
-ALLOWED = {
-    "commands/build.py": 1,
-    "commands/python.py": 0,
-    "setup/python_env.py": 0,
-    "setup/python_extension.py": 0,
-}
+ALLOWED: dict[str, int] = {}
 
 
 def _counts() -> dict[str, int]:
     counts = {}
     for path in sorted(PACKAGE.rglob("*.py")):
         relative = path.relative_to(PACKAGE).as_posix()
-        if relative.startswith("tests/"):
+        if relative.startswith("tests/") or relative.startswith("oryx/"):
             continue
         found = len(PROJECT_NAMES.findall(path.read_text(encoding="utf-8")))
         if found:
