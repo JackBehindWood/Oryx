@@ -41,7 +41,7 @@ def test_premake_options_with_python(fake_python):
     ]
 
 
-def test_write_python_config_only_when_changed(tmp_project):
+def test_write_python_config_only_when_changed(tmp_path):
     info = python_env.PythonBuildInfo(
         include_dir=Path("/py/include"),
         lib_dir=Path("/py/lib"),
@@ -49,8 +49,8 @@ def test_write_python_config_only_when_changed(tmp_project):
         home=Path('/odd "home"\\dir'),
         site_packages=(Path("/a/site-packages"), Path("/b/site-packages")),
     )
-    header = tmp_project / "build" / "generated" / "PythonConfig.h"
-    assert python_env.write_python_config(info, tmp_project / "build") is True
+    header = tmp_path / "build" / "generated" / "PythonConfig.h"
+    assert python_env.write_python_config(info, tmp_path / "build") is True
     home = Path('/odd "home"\\dir').as_posix().replace("\\", "\\\\").replace('"', '\\"')
     assert header.read_text(encoding="utf-8") == (
         "#pragma once\n\n"
@@ -58,7 +58,7 @@ def test_write_python_config_only_when_changed(tmp_project):
         f'#define OX_PYTHON_HOME "{home}"\n'
         f'#define OX_PYTHON_SITE_PACKAGES "/a/site-packages{os.pathsep}/b/site-packages"\n'
     )
-    assert python_env.write_python_config(info, tmp_project / "build") is False
+    assert python_env.write_python_config(info, tmp_path / "build") is False
 
 
 def test_python_build_info_rejects_static_libpython(tmp_path, monkeypatch, linux_host):

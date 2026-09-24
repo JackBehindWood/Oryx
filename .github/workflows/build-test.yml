@@ -91,6 +91,9 @@ jobs:
       with:
         enable-cache: true
 
+    - name: Test the Oryx plugin
+      run: uv run --group test python -m pytest build_system/oryx/tests -q
+
     - name: Test pyforge
       working-directory: build_system/pyforge
       run: uv run --no-default-groups --group test pytest -q --cov=pyforge --cov-report=term
