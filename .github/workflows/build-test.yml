@@ -55,8 +55,11 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    - name: Configure, compile, and test
-      run: uv run forge $BUILD_FLAGS build all
+    - name: Configure and compile
+      run: uv run forge $BUILD_FLAGS build compile
+
+    - name: Test (unit, integration, python when enabled)
+      run: uv run forge $BUILD_FLAGS test
 
     - name: Run Oasis sandbox
       run: uv run forge $BUILD_FLAGS build run

@@ -23,6 +23,14 @@ For:
 * Engine workflows
 * Python bindings
 
+Python bindings are split by what they need. `tests/unit/Python/` and `tests/integration/`
+(doctest, in the `Tests` binary) cover the embedded runtime's lifecycle, the GIL, C++-computed
+expectations, and anything that needs a C++-native game (Oasis isn't linked into the standalone
+research-host extension, so only `tests/integration/test_research_host.cpp` and a same-named
+scripted game can stand in for one there). `tests/python/` (pytest, `forge test python`) covers
+pure Python-visible behaviour of `import oryx` against the research host, using Oasis's own
+scripted `nim`/`monte-carlo` example as its test game and strategy.
+
 ### Regression tests
 
 For:
