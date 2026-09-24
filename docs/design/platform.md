@@ -76,7 +76,7 @@ build_system CLI
 
 The Python CLI should orchestrate rather than duplicate the responsibilities of Premake.
 
-Documentation follows the same rule: `build docs` wraps MkDocs (configured in `mkdocs.yml`) rather than reimplementing any of it.
+Documentation follows the same rule: `forge docs` wraps MkDocs (configured in `mkdocs.yml`) rather than reimplementing any of it.
 
 Premake itself defines three sibling projects: `Oryx` (the engine, a static
 library), `tests` (the engine's own test suite), and `Oasis` (a console

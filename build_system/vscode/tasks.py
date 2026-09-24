@@ -13,7 +13,7 @@ def _profile_compile_tasks() -> list[dict]:
     return [
         {
             "label": f"Compile ({profile.capitalize()})",
-            "command": f"uv run build --profile {profile} build compile",
+            "command": f"uv run forge --profile {profile} build compile",
             "group": {"kind": "build", "isDefault": profile == "debug"},
             "problemMatcher": ["$gcc"],
         }
@@ -44,38 +44,38 @@ GENERATED_INPUTS = [
 GENERATED_TASKS = [
     {
         "label": "Configure",
-        "command": "uv run build build configure",
+        "command": "uv run forge build configure",
         "group": "build",
         "problemMatcher": [],
     },
     *_profile_compile_tasks(),
     {
         "label": "Compile (choose profile)",
-        "command": "uv run build --profile ${input:oryxProfile} build compile",
+        "command": "uv run forge --profile ${input:oryxProfile} build compile",
         "group": "build",
         "problemMatcher": ["$gcc"],
     },
     {
         "label": "Test",
-        "command": "uv run build test run",
+        "command": "uv run forge test run",
         "group": {"kind": "test", "isDefault": True},
         "problemMatcher": [],
     },
     {
         "label": "Run Oasis",
-        "command": "uv run build build run",
+        "command": "uv run forge build run",
         "group": "build",
         "problemMatcher": [],
     },
     {
         "label": "All",
-        "command": "uv run build build all",
+        "command": "uv run forge build all",
         "group": "build",
         "problemMatcher": ["$gcc"],
     },
     {
         "label": "Clean",
-        "command": "uv run build build clean",
+        "command": "uv run forge build clean",
         "group": "build",
         "problemMatcher": [],
     },

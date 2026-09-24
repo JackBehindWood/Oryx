@@ -33,4 +33,4 @@ def premake(
             console.print(f"[yellow]  Pinned version is v{PREMAKE_VERSION}. Run with --update to refresh.[/yellow]")
     else:
         console.print(f"[yellow]✗ premake5: not installed locally (expected {executable}).[/yellow]")
-        console.print("  [dim]Run 'build build configure' or 'build setup premake --update' to install it.[/dim]")
+        console.print("  [dim]Run 'forge build configure' or 'forge setup premake --update' to install it.[/dim]")

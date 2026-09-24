@@ -199,7 +199,7 @@ def run_project(
 
     if not exe_path.exists():
         console.print(f"[bold red]✗ Executable missing at:[/bold red] {exe_path}")
-        console.print("  [dim]Run 'build build compile' first.[/dim]")
+        console.print("  [dim]Run 'forge build compile' first.[/dim]")
         raise typer.Exit(code=1)
 
     try:

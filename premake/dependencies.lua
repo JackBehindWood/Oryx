@@ -5,7 +5,7 @@
 -- Dependencies.lua). Compiled vendor libs additionally get their own
 -- project under the root workspace's "Dependencies" group — see
 -- <project>/vendor/premake/<lib>.lua — wired up alongside an entry here by
--- `uv run build vendor add ... --kind static-lib`.
+-- `uv run forge vendor add ... --kind static-lib`.
 
 IncludeDir = {}
 IncludeDir["yaml-cpp"] = "%{_MAIN_SCRIPT_DIR}/Oryx/vendor/yaml-cpp/include"

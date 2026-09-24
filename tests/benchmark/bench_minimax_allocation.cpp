@@ -28,7 +28,7 @@ double milliseconds_since(Clock::time_point start)
 
 } // namespace
 
-// Not in the default `build test` run (wall-clock, noisy in CI); run with `build test benchmark`.
+// Not in the default `forge test` run (wall-clock, noisy in CI); run with `forge test benchmark`.
 TEST_SUITE("benchmark")
 {
 

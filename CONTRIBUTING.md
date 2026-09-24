@@ -44,5 +44,5 @@ To suggest a feature or improvement:
    git submodule update --init --recursive
    ```
    (`tests/vendor/doctest`, the test framework, is a git submodule — without
-   this step `uv run build build compile` will fail with a clear message
+   this step `uv run forge build compile` will fail with a clear message
    telling you to run it.)

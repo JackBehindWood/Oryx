@@ -37,7 +37,7 @@ def run_tests(ctx: typer.Context):
 
     if not test_path.exists():
         console.print(f"[bold red]✗ Test binary missing at:[/bold red] {test_path}")
-        console.print("  [dim]Run 'build build compile' first.[/dim]")
+        console.print("  [dim]Run 'forge build compile' first.[/dim]")
         raise typer.Exit(code=1)
 
     try:
@@ -69,7 +69,7 @@ def run_benchmarks(ctx: typer.Context):
 
     if not test_path.exists():
         console.print(f"[bold red]✗ Test binary missing at:[/bold red] {test_path}")
-        console.print("  [dim]Run 'build build compile' first.[/dim]")
+        console.print("  [dim]Run 'forge build compile' first.[/dim]")
         raise typer.Exit(code=1)
 
     try:

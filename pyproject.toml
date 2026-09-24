@@ -1,7 +1,7 @@
 [project]
 name = "oryx-build"
 version = "0.1.0"
-description = "Build, test and docs tooling for the Oryx game strategy engine (the `build` command)."
+description = "Build, test and docs tooling for the Oryx game strategy engine (the `forge` command)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -43,7 +43,8 @@ stubs = [
 default-groups = ["research", "docs"]
 
 [project.scripts]
-build = "build_system.main:app"
+forge = "build_system.main:app"
+pyforge = "build_system.main:app"
 
 [build-system]
 requires = ["hatchling>=1.27"]

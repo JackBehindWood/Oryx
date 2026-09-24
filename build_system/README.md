@@ -6,14 +6,14 @@ A Python-based CLI build automation system for the Oryx Engine. Built on top of 
 
 **Features**
 
-* **Interactive Menu**: Run `uv run build` with no arguments in a terminal for an arrow-key command menu — no need to memorize subcommand names.
+* **Interactive Menu**: Run `uv run forge` with no arguments in a terminal for an arrow-key command menu — no need to memorize subcommand names.
 * **Auto-Registering Commands**: Command groups under `build_system/commands/` are discovered automatically; adding one requires no edits to `main.py` or `interactive.py`. See "Extending the CLI" below.
 * **TOML Configuration**: Shared settings live in `oryx.toml` (git-committed); per-developer preferences (IDE choice, debugger) live in `oryx.local.toml` (gitignored) — see "Personal preferences" below.
 * **Isolated Dependency Management**: Automatically downloads and extracts the required Premake5 release locally using `urllib`, `tarfile`, and `zipfile` utilities, automatically setting system execution permissions.
 * **Cross-Platform Output Structuring**: Dynamically constructs target binary paths matching Premake conventions (`<Config>-<OS>-<Arch>`) based on host architecture and OS detection.
 * **Configurable CLI Profiles**: Switch between `debug`, `release`, and `dist` build configurations via global context flags.
 * **Integrated Workflow Execution**: Run complete sequential pipelines (configure, compile, and test) with single-command convenience.
-* **Optional IDE Integration**: `build config init --ide vscode` generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, including a single-button build-and-debug flow with one Debug/Release/Dist configuration each, selectable from VS Code's Run & Debug dropdown. `build config init --ide visual_studio` instead generates a Visual Studio solution via Premake's own `vs2022` action. Neither is required — the CLI itself never imports IDE-specific code unless you ask for it.
+* **Optional IDE Integration**: `forge config init --ide vscode` generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, including a single-button build-and-debug flow with one Debug/Release/Dist configuration each, selectable from VS Code's Run & Debug dropdown. `forge config init --ide visual_studio` instead generates a Visual Studio solution via Premake's own `vs2022` action. Neither is required — the CLI itself never imports IDE-specific code unless you ask for it.
 * **Generic Vendoring Convention**: Header-only third-party libraries (git submodules) live under `<project>/vendor/<lib>/`, wired up with one `useVendorHeader(...)` call in Premake and auto-discovered on the Python side — see "Vendoring third-party libraries" below.
 * **CLI Command Script**: Installs directly as the `build` executable via standard package entry points (`pyproject.toml`).
 
@@ -32,7 +32,7 @@ A Python-based CLI build automation system for the Oryx Engine. Built on top of 
 Run the CLI instantly without explicit installation:
 
 ```bash
-uv run build [COMMAND]
+uv run forge [COMMAND]
 
 ```
 
@@ -85,7 +85,7 @@ Manages build settings and local configurations.
 | --- | --- |
 | `config init` | Generates a default `oryx.toml` in the project root. |
 | `config init --ide vscode [--debugger lldb\|cppdbg]` | Also generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, remembered in `oryx.local.toml`. |
-| `config init --ide visual_studio` | Generates a Visual Studio 2022 solution via `premake5 vs2022` — independent of `build build compile`, which still uses `oryx.toml`'s `[build] generator` (default `gmake`). |
+| `config init --ide visual_studio` | Generates a Visual Studio 2022 solution via `premake5 vs2022` — independent of `forge build compile`, which still uses `oryx.toml`'s `[build] generator` (default `gmake`). |
 | `config init --no-remember` | One-shot `--ide`/`--debugger` override; doesn't touch `oryx.local.toml`. |
 
 **`build`**
@@ -112,7 +112,7 @@ Manages test execution suites.
 
 **Configuration (`oryx.toml`)**
 
-Running `build config init` generates a default TOML configuration file in your project root:
+Running `forge config init` generates a default TOML configuration file in your project root:
 
 ```toml
 [project]
@@ -156,8 +156,8 @@ kind = "vscode"     # "vscode" | "visual_studio" | "none"
 debugger = "lldb"   # "lldb" | "cppdbg"
 ```
 
-`build config init --ide <kind> [--debugger <name>]` resolves against whatever
-is already saved here (so a bare `build config init` re-run reuses your last
+`forge config init --ide <kind> [--debugger <name>]` resolves against whatever
+is already saved here (so a bare `forge config init` re-run reuses your last
 choice instead of resetting to `none`), then saves the result back unless you
 pass `--no-remember`. Each contributor on a shared repo gets their own file —
 it never collides with, or gets overwritten by, anyone else's.
@@ -168,26 +168,26 @@ it never collides with, or gets overwritten by, anyone else's.
 
 ```bash
 # Open the interactive menu
-uv run build
+uv run forge
 
 # Initialize build configuration file (and VS Code integration)
-uv run build config init --ide vscode
+uv run forge config init --ide vscode
 
 # Configure and compile in Release mode
-uv run build --profile release build configure
-uv run build --profile release build compile
+uv run forge --profile release build configure
+uv run forge --profile release build compile
 
 # Run the complete pipeline (configure, build, and test) in Debug mode
-uv run build build all
+uv run forge build all
 
 # Run the Oasis sandbox executable
-uv run build build run
+uv run forge build run
 
 # Preview what a command would do without running it
-uv run build --dry-run build compile
+uv run forge --dry-run build compile
 
 # Clean build artifacts
-uv run build build clean
+uv run forge build clean
 
 ```
 
@@ -272,7 +272,7 @@ instead — the only place this branches is the small `DEBUGGER_TYPES` /
 
 `c_cpp_properties.py` points VS Code's `compileCommands` at
 `build/compile_commands.json`, which `build_system/compile_commands.py`
-regenerates on every `build build configure` by dry-running (`make -n -B`)
+regenerates on every `forge build configure` by dry-running (`make -n -B`)
 each Premake-generated `build/*.make` file and capturing the real, fully-resolved
 per-file compiler invocations — so IntelliSense stays accurate per project
 (and covers new projects automatically) without any hand-maintained include

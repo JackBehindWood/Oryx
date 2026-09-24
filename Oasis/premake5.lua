@@ -7,7 +7,7 @@ project "Oasis"
     pchsource "src/ospch.cpp"
 
     -- Run with the repo root as cwd (matches .vscode/launch.json and the
-    -- `uv run build` CLI) so relative paths behave the same everywhere.
+    -- `uv run forge` CLI) so relative paths behave the same everywhere.
     debugdir "%{wks.location}/.."
 
     files {

@@ -72,7 +72,7 @@ def init(
             run_command([str(premake), "vs2022"], cwd=PROJECT_ROOT)
             console.print("[bold green]✓ Generated Visual Studio 2022 project files (premake5 vs2022).[/bold green]")
             console.print(
-                "  [dim]This is independent of `build build compile`, which still uses the "
+                "  [dim]This is independent of `forge build compile`, which still uses the "
                 "[build] generator in oryx.toml (default gmake).[/dim]"
             )
         except Exception as error:

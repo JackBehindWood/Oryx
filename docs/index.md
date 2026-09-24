@@ -16,6 +16,6 @@ Getting started, building and contributing live in the repository's [README](htt
 ## Working on these docs
 
 ```bash
-uv run build docs serve   # live preview
-uv run build docs build   # strict build into site/ (fails on broken links)
+uv run forge docs serve   # live preview
+uv run forge docs build   # strict build into site/ (fails on broken links)
 ```

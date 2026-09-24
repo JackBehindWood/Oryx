@@ -21,7 +21,7 @@ def run_menu(ctx: typer.Context) -> None:
     """Present the arrow-key command menu, dispatching actions until the user quits.
 
     Each completed action returns to the top-level menu rather than exiting,
-    so e.g. Build > Compile followed by Test > Run works in one `uv run build`
+    so e.g. Build > Compile followed by Test > Run works in one `uv run forge`
     session. A failing action still exits immediately, since the underlying
     command raises typer.Exit(code=1), which unwinds out of this loop.
     """

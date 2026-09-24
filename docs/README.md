@@ -17,12 +17,12 @@ Check `design/decision-log.md` and the open-questions list in `architecture.md` 
 ## Working on the docs
 
 ```bash
-uv run build docs serve   # live preview at http://localhost:8000
-uv run build docs build   # strict build into site/; fails on broken links and anchors
-uv run build docs clean   # remove site/
+uv run forge docs serve   # live preview at http://localhost:8000
+uv run forge docs build   # strict build into site/; fails on broken links and anchors
+uv run forge docs clean   # remove site/
 ```
 
-The docs toolchain is the optional `docs` dependency group in `pyproject.toml`; `uv run build docs ...` installs it on demand. CI runs the strict build on every pull request. Pushes to `main` also publish the site to GitHub Pages (`.github/workflows/docs.yml`); this needs Settings → Pages → Source set to "GitHub Actions" once.
+The docs toolchain is the optional `docs` dependency group in `pyproject.toml`; `uv run forge docs ...` installs it on demand. CI runs the strict build on every pull request. Pushes to `main` also publish the site to GitHub Pages (`.github/workflows/docs.yml`); this needs Settings → Pages → Source set to "GitHub Actions" once.
 
 ## Conventions
 

@@ -160,15 +160,15 @@ Oryx uses **Premake5** for C++ project generation and build configuration.
 The project also includes a small Python development CLI.  See [`build_system`](build_system/README.md) for contribution guidelines.
 
 The CLI is intended to simplify common workflows without replacing Premake5.
-Run `uv run build` with no arguments for an interactive arrow-key menu, or use
+Run `uv run forge` with no arguments for an interactive arrow-key menu, or use
 direct subcommands for scripts and CI:
 
 ```text
-uv run build                          # interactive menu
-uv run build config init --ide vscode # oryx.toml + .vscode/{tasks,launch,...}.json
-uv run build build all                # configure, compile, test
-uv run build build run                # run the Oasis sandbox executable
-uv run build docs serve               # live-preview the documentation site
+uv run forge                          # interactive menu
+uv run forge config init --ide vscode # oryx.toml + .vscode/{tasks,launch,...}.json
+uv run forge build all                # configure, compile, test
+uv run forge build run                # run the Oasis sandbox executable
+uv run forge docs serve               # live-preview the documentation site
 build experiment
 build explain
 ```
@@ -264,7 +264,7 @@ The project favours **incremental design over speculative implementation**.
 | `docs/roadmap.md`      | Development direction and planned milestones               |
 | `CONTRIBUTING.md`      | Contribution guidelines                                    |
 
-The `docs/` folder is a MkDocs site: run `uv run build docs serve` to preview it locally.
+The `docs/` folder is a MkDocs site: run `uv run forge docs serve` to preview it locally.
 
 ----------------- | ---------------------------------------------------------- |
 | `README.md`       | Project overview and getting started                       |

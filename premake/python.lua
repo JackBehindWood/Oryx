@@ -1,4 +1,4 @@
--- With --no-python nothing here adds a file, include path, define or link; `uv run build` passes the --python-* paths.
+-- With --no-python nothing here adds a file, include path, define or link; `uv run forge` passes the --python-* paths.
 
 newoption {
     trigger = "no-python",
@@ -30,7 +30,7 @@ end
 local function requirePythonOption(name)
     local value = _OPTIONS[name]
     if not value then
-        error("Python is enabled but --" .. name .. " was not given; run through `uv run build` or pass --no-python")
+        error("Python is enabled but --" .. name .. " was not given; run through `uv run forge` or pass --no-python")
     end
     return value
 end
@@ -54,7 +54,7 @@ function useOryxPythonHeaders()
     }
 end
 
--- build/generated/PythonConfig.h (written by `uv run build`) lets the embedded interpreter start with no environment setup.
+-- build/generated/PythonConfig.h (written by `uv run forge`) lets the embedded interpreter start with no environment setup.
 function useOryxPythonEmbedding()
     if not pythonEnabled() then
         return

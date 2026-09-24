@@ -56,14 +56,14 @@ jobs:
       run: uv sync
 
     - name: Configure, compile, and test
-      run: uv run build $BUILD_FLAGS build all
+      run: uv run forge $BUILD_FLAGS build all
 
     - name: Run Oasis sandbox
-      run: uv run build $BUILD_FLAGS build run
+      run: uv run forge $BUILD_FLAGS build run
 
     - name: Benchmark smoke run
       run: |
-        output=$(uv run build $BUILD_FLAGS build run --simulate=random,first-legal,100 --benchmark)
+        output=$(uv run forge $BUILD_FLAGS build run --simulate=random,first-legal,100 --benchmark)
         echo "$output"
         echo "$output" | grep -q "Benchmark report"
 
@@ -79,4 +79,4 @@ jobs:
         enable-cache: true
 
     - name: Build docs (strict)
-      run: uv run build docs build
+      run: uv run forge docs build

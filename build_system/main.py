@@ -9,7 +9,7 @@ from build_system.config import BuildConfig, DEFAULT_CONFIG_FILE, RunContext
 console = Console()
 
 app = typer.Typer(
-    name="oryx-build",
+    name="forge",
     help="Oryx Engine Build & Tooling CLI",
     invoke_without_command=True,
     rich_markup_mode="markdown",
