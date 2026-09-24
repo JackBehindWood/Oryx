@@ -1,6 +1,5 @@
 import hashlib
 import importlib
-import inspect
 import os
 import pkgutil
 import platform
@@ -9,13 +8,13 @@ import sysconfig
 from pathlib import Path
 
 import pytest
-import typer
 from typer.testing import CliRunner
 
 import build_system
-from build_system.config import PROJECT_ROOT, BuildConfig
+from build_system.config import BuildConfig
+from build_system.project import Project
 
-REAL_ROOT = PROJECT_ROOT
+REAL_ROOT = Path(__file__).resolve().parents[2]
 
 GITMODULES = """\
 [submodule "tests/vendor/doctest"]
@@ -82,41 +81,6 @@ def _build_system_modules() -> list:
     return [module for name, module in sys.modules.items() if name.split(".")[0] == "build_system" and ".tests" not in name]
 
 
-def _rebased(value, root: Path):
-    if isinstance(value, Path) and value.is_relative_to(REAL_ROOT):
-        return root / value.relative_to(REAL_ROOT)
-    return value
-
-
-def _rebase_defaults(monkeypatch, func, root: Path) -> None:
-    func = inspect.unwrap(getattr(func, "__func__", func))
-    if not inspect.isfunction(func):
-        return
-    if func.__defaults__:
-        for default in func.__defaults__:
-            if isinstance(default, typer.models.OptionInfo):
-                monkeypatch.setattr(default, "default", _rebased(default.default, root))
-        monkeypatch.setattr(func, "__defaults__", tuple(_rebased(d, root) for d in func.__defaults__))
-    if func.__kwdefaults__:
-        monkeypatch.setattr(func, "__kwdefaults__", {k: _rebased(v, root) for k, v in func.__kwdefaults__.items()})
-
-
-def rebase_paths(monkeypatch, root: Path) -> None:
-    """Point every repo path build_system captured at import time (constants, defaults, Typer options) into root."""
-    for module in _build_system_modules():
-        for name, value in list(vars(module).items()):
-            if isinstance(value, Path):
-                monkeypatch.setattr(module, name, _rebased(value, root))
-            elif inspect.isfunction(value) and value.__module__ == module.__name__:
-                _rebase_defaults(monkeypatch, value, root)
-            elif inspect.isclass(value) and value.__module__ == module.__name__:
-                for attr, member in list(vars(value).items()):
-                    if isinstance(member, Path):
-                        monkeypatch.setattr(value, attr, _rebased(member, root))
-                    else:
-                        _rebase_defaults(monkeypatch, member, root)
-
-
 def patch_everywhere(monkeypatch, name: str, value) -> None:
     for module in _build_system_modules():
         if name in vars(module):
@@ -147,7 +111,7 @@ def fake_python(monkeypatch):
 
 @pytest.fixture
 def tmp_project(tmp_path, monkeypatch, linux_host) -> Path:
-    rebase_paths(monkeypatch, tmp_path)
+    monkeypatch.chdir(tmp_path)
     (tmp_path / ".gitmodules").write_text(GITMODULES, encoding="utf-8")
     for vendor_dir in VENDOR_DIRS:
         (tmp_path / vendor_dir).mkdir(parents=True)
@@ -169,3 +133,8 @@ def forge(tmp_project, fake_python):
         return runner.invoke(app, list(args), env={"COLUMNS": "10000"})
 
     return invoke
+
+
+@pytest.fixture
+def project(tmp_project) -> Project:
+    return Project.discover(tmp_project)

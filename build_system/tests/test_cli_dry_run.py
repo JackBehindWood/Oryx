@@ -126,7 +126,7 @@ def test_config_init_creates_missing_file(forge, tmp_project):
     (tmp_project / "oryx.toml").unlink()
     result = forge("config", "init", "--no-remember")
     assert result.exit_code == 0
-    assert (tmp_project / "oryx.toml").is_file()
+    assert (tmp_project / "forge.toml").is_file()
 
 
 def test_config_init_remembers_ide_choice(forge, tmp_project):

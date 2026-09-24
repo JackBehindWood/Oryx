@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 
 from build_system import registry
-from build_system.config import BuildConfig, LocalConfig, PROJECT_ROOT, RunContext
+from build_system.config import BuildConfig, LocalConfig, RunContext
 
 console = Console()
 app = typer.Typer()
@@ -36,27 +36,29 @@ def init(
 ):
     """Initialize a default build configuration file, and optionally IDE integration."""
     run: RunContext = ctx.obj
+    root = run.project.root
+    local_file = root / "oryx.local.toml"
     console.print("[bold blue]⚙️ Initializing build configuration...[/bold blue]")
     try:
-        BuildConfig.init(run.config_path)
+        BuildConfig.init(run.project.config_file)
     except Exception as error:
         console.print(f"[bold red]✗ Failed to initialize configuration:[/bold red] {error}")
         raise typer.Exit(code=1)
 
-    existing = LocalConfig.load()
+    existing = LocalConfig.load(local_file)
     resolved_ide = ide or existing.ide_kind
     resolved_debugger = debugger or existing.debugger
 
     if remember:
-        LocalConfig(ide_kind=resolved_ide, debugger=resolved_debugger).save()
+        LocalConfig(ide_kind=resolved_ide, debugger=resolved_debugger).save(local_file)
         console.print("[green]✓ Saved IDE preference to oryx.local.toml (not committed).[/green]")
 
     if resolved_ide == "vscode":
         from build_system import vscode  # deferred: only imported when actually generating .vscode files
 
         try:
-            for path in vscode.write_all(run.config, debugger=resolved_debugger):
-                console.print(f"[bold green]✓ Wrote {path.relative_to(PROJECT_ROOT)}[/bold green]")
+            for path in vscode.write_all(run.config, root, debugger=resolved_debugger):
+                console.print(f"[bold green]✓ Wrote {path.relative_to(root)}[/bold green]")
         except Exception as error:
             console.print(f"[bold red]✗ Failed to write .vscode files:[/bold red] {error}")
             raise typer.Exit(code=1)
@@ -65,11 +67,11 @@ def init(
         from build_system.setup.premake import ensure_premake
         from build_system.utils import run_command
 
-        premake = ensure_premake()
+        premake = ensure_premake(run.project.premake_bin_dir)
         if not premake:
             raise typer.Exit(code=1)
         try:
-            run_command([str(premake), "vs2022"], cwd=PROJECT_ROOT)
+            run_command([str(premake), "vs2022"], cwd=root)
             console.print("[bold green]✓ Generated Visual Studio 2022 project files (premake5 vs2022).[/bold green]")
             console.print(
                 "  [dim]This is independent of `forge build compile`, which still uses the "

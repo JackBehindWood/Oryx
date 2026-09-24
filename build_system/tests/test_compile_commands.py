@@ -84,19 +84,19 @@ def test_failed_dry_run_without_compile_lines_is_skipped(tmp_project, monkeypatc
 
 def test_generate_without_make(tmp_project, monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: None)
-    assert compile_commands.generate_compile_commands(BuildConfig()) is None
+    assert compile_commands.generate_compile_commands(BuildConfig(root=tmp_project), tmp_project / "build") is None
 
 
 def test_generate_without_make_files(tmp_project, monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/make")
     for make_file in (tmp_project / "build").glob("*.make"):
         make_file.unlink()
-    assert compile_commands.generate_compile_commands(BuildConfig()) is None
+    assert compile_commands.generate_compile_commands(BuildConfig(root=tmp_project), tmp_project / "build") is None
 
 
 def test_generate_writes_every_project(tmp_project, make_calls, monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/make")
-    path = compile_commands.generate_compile_commands(BuildConfig(profile="release"))
+    path = compile_commands.generate_compile_commands(BuildConfig(profile="release", root=tmp_project), tmp_project / "build")
     assert path == tmp_project / "build" / "compile_commands.json"
     assert [call[0][5:] for call in make_calls] == [["Oryx.make", "config=release_x64"], ["Tests.make", "config=release_x64"]]
     assert json.loads(path.read_text(encoding="utf-8")) == _expected(tmp_project, []) * 2

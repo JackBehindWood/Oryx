@@ -1,10 +1,10 @@
 import platform
 import subprocess
+from pathlib import Path
 
 from rich.console import Console
 from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
 
-from ..config import PROJECT_ROOT
 from ..utils import remove_directory
 from .utils import (
     download_file,
@@ -15,34 +15,12 @@ from .utils import (
 
 console = Console()
 
-# ---------------------------------------------------------------------------
-# Premake configuration
-# ---------------------------------------------------------------------------
+DEFAULT_PREMAKE_VERSION = "5.0.0-beta8"
 
-# Only the downloaded binary + LICENSE.txt live under premake/bin/ (gitignored).
-# premake/ itself also holds tracked, hand-written Lua helpers (common.lua,
-# vendor.lua, included from the root premake5.lua) that are NOT touched here.
-PREMAKE_DIR = PROJECT_ROOT / "premake" / "bin"
-
-
-PREMAKE_VERSION = "5.0.0-beta8"
-
-PREMAKE_URLS = {
-    "Linux": (
-        "https://github.com/premake/premake-core/releases/"
-        "download/v5.0.0-beta8/"
-        "premake-5.0.0-beta8-linux.tar.gz"
-    ),
-    "Darwin": (
-        "https://github.com/premake/premake-core/releases/"
-        "download/v5.0.0-beta8/"
-        "premake-5.0.0-beta8-macosx.tar.gz"
-    ),
-    "Windows": (
-        "https://github.com/premake/premake-core/releases/"
-        "download/v5.0.0-beta8/"
-        "premake-5.0.0-beta8-windows.zip"
-    ),
+PREMAKE_ASSETS = {
+    "Linux": "linux.tar.gz",
+    "Darwin": "macosx.tar.gz",
+    "Windows": "windows.zip",
 }
 
 PREMAKE_LICENSE_URL = (
@@ -51,32 +29,22 @@ PREMAKE_LICENSE_URL = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
+def premake_url(version: str, system: str) -> str:
+    return (
+        "https://github.com/premake/premake-core/releases/"
+        f"download/v{version}/premake-{version}-{PREMAKE_ASSETS[system]}"
+    )
 
-def get_premake_executable():
+
+def get_premake_executable(bin_dir: Path) -> Path:
     """Return the expected local Premake5 executable path."""
-    if platform.system() == "Windows":
-        return PREMAKE_DIR / "premake5.exe"
-
-    return PREMAKE_DIR / "premake5"
+    return bin_dir / ("premake5.exe" if platform.system() == "Windows" else "premake5")
 
 
-# ---------------------------------------------------------------------------
-# Detection
-# ---------------------------------------------------------------------------
-
-def check_local_premake():
+def check_local_premake(bin_dir: Path) -> bool:
     """Check whether the required local Premake5 executable exists."""
-    executable = get_premake_executable()
+    return get_premake_executable(bin_dir).is_file()
 
-    return executable.is_file()
-
-
-# ---------------------------------------------------------------------------
-# Installation
-# ---------------------------------------------------------------------------
 
 def _download_with_progress(url: str, destination, description: str):
     with Progress(
@@ -96,21 +64,21 @@ def _download_with_progress(url: str, destination, description: str):
         download_file(url, destination, reporthook=reporthook)
 
 
-def install_premake():
+def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     """Download and install the required Premake5 version locally."""
     system = platform.system()
 
-    if system not in PREMAKE_URLS:
+    if system not in PREMAKE_ASSETS:
         console.print(f"[bold red]✗ Unsupported operating system:[/bold red] {system}")
         return False
 
-    url = PREMAKE_URLS[system]
+    url = premake_url(version, system)
     filename = url.split("/")[-1]
-    archive_path = PREMAKE_DIR / filename
+    archive_path = bin_dir / filename
 
-    console.print(f"[bold blue]📥 Downloading Premake5 v{PREMAKE_VERSION}...[/bold blue]")
+    console.print(f"[bold blue]📥 Downloading Premake5 v{version}...[/bold blue]")
 
-    PREMAKE_DIR.mkdir(parents=True, exist_ok=True)
+    bin_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         # Download Premake
@@ -119,7 +87,7 @@ def install_premake():
 
         # Extract Premake
         console.print(f"[bold blue]📦 Extracting {filename}...[/bold blue]")
-        extract_archive(archive_path, PREMAKE_DIR)
+        extract_archive(archive_path, bin_dir)
         console.print("[green]✓ Extracted successfully[/green]\n")
 
         # Remove downloaded archive
@@ -127,7 +95,7 @@ def install_premake():
 
         # Download Premake licence
         console.print("[bold blue]📄 Downloading Premake5 licence...[/bold blue]")
-        license_path = PREMAKE_DIR / "LICENSE.txt"
+        license_path = bin_dir / "LICENSE.txt"
 
         try:
             download_file(PREMAKE_LICENSE_URL, license_path)
@@ -136,7 +104,7 @@ def install_premake():
             console.print(f"[yellow]⚠️ Could not download licence: {error}[/yellow]\n")
 
         # Make executable on Unix-like systems
-        executable = get_premake_executable()
+        executable = get_premake_executable(bin_dir)
         if system in {"Linux", "Darwin"} and executable.exists():
             make_executable(executable)
             console.print(f"[green]✓ Made executable:[/green] {executable}\n")
@@ -146,7 +114,7 @@ def install_premake():
         # -------------------------------------------------------------------
         allowed_files = {executable.name.lower(), "license.txt"}
 
-        for item in PREMAKE_DIR.iterdir():
+        for item in bin_dir.iterdir():
             if item.is_file() and item.name.lower() not in allowed_files:
                 remove_file(item)
             elif item.is_dir():
@@ -161,40 +129,39 @@ def install_premake():
         return False
 
 
-def installed_version(executable=None) -> str | None:
+def installed_version(executable: Path) -> str | None:
     """Report the version string the local Premake5 binary identifies itself as."""
-    executable = executable or get_premake_executable()
     if not executable.is_file():
         return None
     try:
         # Outside the repo root, or premake loads premake5.lua and fails on missing --python-* args.
-        result = subprocess.run([str(executable), "--version"], cwd=PREMAKE_DIR, capture_output=True, text=True, check=True)
+        result = subprocess.run([str(executable), "--version"], cwd=executable.parent, capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
 
 
-def update_premake():
+def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     """Force a re-download of the pinned Premake5 version, overwriting whatever
     is currently installed — unlike ensure_premake(), which leaves an existing
-    install alone even if it doesn't match PREMAKE_VERSION."""
-    previous = installed_version()
+    install alone even if it doesn't match the pinned version."""
+    executable = get_premake_executable(bin_dir)
+    previous = installed_version(executable)
     if previous:
         console.print(f"[dim]Currently installed: {previous}[/dim]")
 
-    console.print(f"[bold blue]📦 Updating Premake5 to v{PREMAKE_VERSION}...[/bold blue]\n")
+    console.print(f"[bold blue]📦 Updating Premake5 to v{version}...[/bold blue]\n")
 
-    if not install_premake():
+    if not install_premake(bin_dir, version):
         console.print("[bold red]✗ Could not update Premake5.[/bold red]")
         return None
 
-    executable = get_premake_executable()
-    if not check_local_premake():
+    if not check_local_premake(bin_dir):
         console.print("[bold red]✗ Update reported success but the executable is missing.[/bold red]")
         return None
 
     new_version = installed_version(executable)
-    console.print(f"[green]✓ premake5: now {new_version or f'v{PREMAKE_VERSION}'} at {executable}[/green]\n")
+    console.print(f"[green]✓ premake5: now {new_version or f'v{version}'} at {executable}[/green]\n")
     return executable
 
 
@@ -202,7 +169,7 @@ def update_premake():
 # Public setup function
 # ---------------------------------------------------------------------------
 
-def ensure_premake():
+def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     """
     Ensure the required local Premake5 installation exists.
 
@@ -213,9 +180,9 @@ def ensure_premake():
         Path to the local Premake5 executable.
         None if Premake could not be installed.
     """
-    executable = get_premake_executable()
+    executable = get_premake_executable(bin_dir)
 
-    if check_local_premake():
+    if check_local_premake(bin_dir):
         console.print(f"[green]✓ premake5:[/green] found locally at {executable}\n")
         return executable
 
@@ -224,10 +191,8 @@ def ensure_premake():
 
     console.print("[bold blue]📦 Installing Premake5 locally...[/bold blue]\n")
 
-    if install_premake():
-        executable = get_premake_executable()
-
-        if check_local_premake():
+    if install_premake(bin_dir, version):
+        if check_local_premake(bin_dir):
             console.print(f"[green]✓ premake5: installed locally at {executable}[/green]\n")
             return executable
 

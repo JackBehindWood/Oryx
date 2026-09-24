@@ -42,7 +42,7 @@ def run_tests(ctx: typer.Context):
 
     try:
         with console.status("[bold blue]Running tests...[/bold blue]"):
-            result = run_command([str(test_path), "--test-suite-exclude=benchmark"])
+            result = run_command([str(test_path), "--test-suite-exclude=benchmark"], cwd=run.project.root)
         if run.verbose and result.stdout:
             console.print(result.stdout)
         console.print("[bold green]✓ Tests passed[/bold green]\n")
@@ -73,7 +73,7 @@ def run_benchmarks(ctx: typer.Context):
         raise typer.Exit(code=1)
 
     try:
-        result = run_command([str(test_path), "--test-suite=benchmark"])
+        result = run_command([str(test_path), "--test-suite=benchmark"], cwd=run.project.root)
         console.print(result.stdout)
         console.print("[bold green]✓ Benchmarks complete[/bold green]\n")
     except subprocess.CalledProcessError as error:

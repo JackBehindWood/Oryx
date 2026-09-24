@@ -1,9 +1,7 @@
 from pathlib import Path
 
-from build_system.config import PROJECT_ROOT
 from build_system.utils import load_json, merge_by_key, write_json
 
-TASKS_FILE = PROJECT_ROOT / ".vscode" / "tasks.json"
 LABEL_PREFIX = "Oryx: "
 
 PROFILES = ["debug", "release", "dist"]
@@ -92,12 +90,13 @@ def _build_task(entry: dict) -> dict:
     }
 
 
-def write_tasks(path: Path = TASKS_FILE) -> Path:
+def write_tasks(root: Path) -> Path:
     """Generate or merge .vscode/tasks.json with this CLI's tasks.
 
     Tasks whose label starts with "Oryx: " are replaced; any other
     user-defined tasks in the file are left untouched.
     """
+    path = root / ".vscode" / "tasks.json"
     generated = [_build_task(entry) for entry in GENERATED_TASKS]
 
     existing = load_json(path, default={"version": "2.0.0", "tasks": []})

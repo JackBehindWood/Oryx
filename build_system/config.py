@@ -5,14 +5,7 @@ import re
 import tomllib
 
 from . import tomledit
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-BUILD_DIR = PROJECT_ROOT / "build"
-BIN_DIR = BUILD_DIR / "bin"
-SITE_DIR = PROJECT_ROOT / "site"
-MKDOCS_CONFIG = PROJECT_ROOT / "mkdocs.yml"
-DEFAULT_CONFIG_FILE = PROJECT_ROOT / "oryx.toml"
-DEFAULT_LOCAL_CONFIG_FILE = PROJECT_ROOT / "oryx.local.toml"
+from .project import Project
 
 VALID_PROFILES = {"debug", "release", "dist"}
 VALID_IDE_KINDS = {"vscode", "visual_studio", "none"}
@@ -64,6 +57,7 @@ class BuildConfig:
     executables: dict[str, ExecutableConfig] = field(default_factory=lambda: dict(DEFAULT_EXECUTABLES))
     python_enabled: bool = True
     sanitize: bool = False
+    root: Path = field(default=Path("."), compare=False, repr=False)
 
     def __post_init__(self):
         """Validate configuration settings."""
@@ -96,7 +90,7 @@ class BuildConfig:
         return f"{cfg_name}-{system}-{_detect_arch()}"
 
     def _outputdir_from_make(self) -> str | None:
-        make_file = BUILD_DIR / f"{self.project_name}.make"
+        make_file = self.root / "build" / f"{self.project_name}.make"
         if not make_file.is_file():
             return None
 
@@ -116,7 +110,7 @@ class BuildConfig:
     @property
     def binary_path(self) -> Path:
         """Get the full output directory path for built binaries."""
-        return BIN_DIR / self.outputdir
+        return self.root / "build" / "bin" / self.outputdir
 
     def _resolve_target_path(self, target: str) -> Path:
         # useOryxProjectDefaults() (premake/common.lua) always sets targetdir
@@ -141,7 +135,7 @@ class BuildConfig:
         return self._resolve_target_path(self.test_suite.name)
 
     @classmethod
-    def init(cls, path: Path = DEFAULT_CONFIG_FILE) -> "BuildConfig":
+    def init(cls, path: Path) -> "BuildConfig":
         """Initialize and create a default oryx.toml if it does not exist."""
         if path.exists():
             print(f"⚠️ Configuration file already exists at: {path}")
@@ -153,10 +147,10 @@ class BuildConfig:
         return default_config
 
     @classmethod
-    def load(cls, path: Path = DEFAULT_CONFIG_FILE) -> "BuildConfig":
+    def load(cls, path: Path) -> "BuildConfig":
         """Load configuration from a TOML file, or return defaults."""
         if not path.exists():
-            return cls()
+            return cls(root=path.parent)
 
         with path.open("rb") as file:
             data = tomllib.load(file)
@@ -186,9 +180,10 @@ class BuildConfig:
             test_suite=test_suite,
             executables=executables,
             python_enabled=python.get("enabled", True),
+            root=path.parent,
         )
 
-    def save(self, path: Path = DEFAULT_CONFIG_FILE):
+    def save(self, path: Path):
         """Save configuration to a TOML file."""
         data = {
             "project": {"name": self.project_name},
@@ -204,7 +199,7 @@ class BuildConfig:
 class RunContext:
     """Global CLI runtime state, shared as the Typer context object."""
     config: BuildConfig
-    config_path: Path = DEFAULT_CONFIG_FILE
+    project: Project
     verbose: bool = False
     dry_run: bool = False
 
@@ -226,7 +221,7 @@ class LocalConfig:
             raise ValueError(f"Invalid [ide] debugger '{self.debugger}'. Must be one of: {', '.join(VALID_DEBUGGERS)}")
 
     @classmethod
-    def init(cls, path: Path = DEFAULT_LOCAL_CONFIG_FILE) -> "LocalConfig":
+    def init(cls, path: Path) -> "LocalConfig":
         """Initialize and create a default oryx.local.toml if it does not exist."""
         if path.exists():
             return cls.load(path)
@@ -236,7 +231,7 @@ class LocalConfig:
         return default_config
 
     @classmethod
-    def load(cls, path: Path = DEFAULT_LOCAL_CONFIG_FILE) -> "LocalConfig":
+    def load(cls, path: Path) -> "LocalConfig":
         """Load per-developer preferences, or defaults if never saved."""
         if not path.exists():
             return cls()
@@ -250,7 +245,7 @@ class LocalConfig:
             debugger=ide.get("debugger", cls.debugger),
         )
 
-    def save(self, path: Path = DEFAULT_LOCAL_CONFIG_FILE) -> None:
+    def save(self, path: Path) -> None:
         """Save per-developer preferences to oryx.local.toml."""
         data = {"ide": {"kind": self.ide_kind, "debugger": self.debugger}}
         path.write_text(tomledit.dumps(data), encoding="utf-8")

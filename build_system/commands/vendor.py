@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 
 from build_system import registry
-from build_system.config import PROJECT_ROOT
+from build_system.config import RunContext
 from build_system.setup import vendor_scaffold
 from build_system.vendor import PROJECT_DIRS, vendor_dirs
 
@@ -59,17 +59,19 @@ def add(
     ),
 ):
     """Vendor a new third-party library as a git submodule and wire it into Premake."""
+    run: RunContext = ctx.obj
+    root = run.project.root
     if project not in PROJECT_DIRS:
         console.print(f"[bold red]✗ Unknown project '{project}'. Must be one of: {', '.join(PROJECT_DIRS)}[/bold red]")
         raise typer.Exit(code=1)
 
-    path = vendor_scaffold.vendor_path(project, name)
+    path = vendor_scaffold.vendor_path(root, project, name)
 
     if path.exists():
-        console.print(f"[dim]{path.relative_to(PROJECT_ROOT)} already exists, skipping submodule add.[/dim]")
+        console.print(f"[dim]{path.relative_to(root)} already exists, skipping submodule add.[/dim]")
     elif url:
         try:
-            vendor_scaffold.add_git_submodule(url, project, name)
+            vendor_scaffold.add_git_submodule(root, url, project, name)
             console.print(f"[bold green]✓ Added submodule {project}/vendor/{name}[/bold green]")
         except Exception as error:
             console.print(f"[bold red]✗ git submodule add failed:[/bold red] {error}")
@@ -79,7 +81,7 @@ def add(
         raise typer.Exit(code=1)
 
     if kind == "header-only":
-        edited, call = vendor_scaffold.insert_header_only_usage(project, name, header_subdir)
+        edited, call = vendor_scaffold.insert_header_only_usage(root, project, name, header_subdir)
         if edited:
             console.print(f"[bold green]✓ {project}/premake5.lua now calls {call}[/bold green]")
         else:
@@ -87,12 +89,12 @@ def add(
             console.print(f"  [dim]{call}[/dim]")
     else:
         script_path = vendor_scaffold.write_static_lib_script(
-            project, name, include_subdir=include_subdir, source_subdir=source_subdir, defines=define
+            root, project, name, include_subdir=include_subdir, source_subdir=source_subdir, defines=define
         )
-        console.print(f"[bold green]✓ Wrote {script_path.relative_to(PROJECT_ROOT)}[/bold green]")
+        console.print(f"[bold green]✓ Wrote {script_path.relative_to(root)}[/bold green]")
 
         edited, snippets = vendor_scaffold.insert_static_lib_wiring(
-            project, name, include_subdir=include_subdir, defines=define
+            root, project, name, include_subdir=include_subdir, defines=define
         )
         if edited:
             console.print(f"[bold green]✓ Wired into {project}/premake5.lua (include, includedirs, links)[/bold green]")
@@ -101,4 +103,4 @@ def add(
             for snippet in snippets:
                 console.print(f"  [dim]{snippet}[/dim]")
 
-    console.print(f"\n[bold blue]{len(vendor_dirs())} vendored librar{'y' if len(vendor_dirs()) == 1 else 'ies'} tracked.[/bold blue]")
+    console.print(f"\n[bold blue]{len(vendor_dirs(root))} vendored librar{'y' if len(vendor_dirs(root)) == 1 else 'ies'} tracked.[/bold blue]")

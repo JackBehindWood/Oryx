@@ -82,9 +82,9 @@ def _with_vendor_check(func: Callable) -> Callable:
     def guarded(ctx, *args, **kwargs):
         from build_system.vendor import ensure_vendor_dirs
 
-        run = getattr(ctx, "obj", None)
-        if not (run is not None and getattr(run, "dry_run", False)):
-            ensure_vendor_dirs(getattr(run, "config", None))
+        run = ctx.obj
+        if not run.dry_run:
+            ensure_vendor_dirs(run.project.root, run.config)
         return func(ctx, *args, **kwargs)
 
     return guarded

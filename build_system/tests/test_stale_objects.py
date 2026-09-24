@@ -28,7 +28,7 @@ def test_manifest_lists_compiled_sources_only(tmp_project):
         "tests/python/test_api.py",
         "Other/src/Ignored.cpp",
     )
-    assert stale_objects.source_manifest() == [
+    assert stale_objects.source_manifest(tmp_project) == [
         "Oasis/src/Oasis/Game/TicTacToe.cpp",
         "Oryx/backends/MacOS/Window.mm",
         "Oryx/backends/Python/Glue.c",
@@ -40,15 +40,15 @@ def test_manifest_lists_compiled_sources_only(tmp_project):
 
 def test_sources_changed(tmp_project):
     _touch(tmp_project, "Oryx/src/A.cpp")
-    assert stale_objects.sources_changed() is True
-    stale_objects.record_source_manifest()
-    assert stale_objects.sources_changed() is False
+    assert stale_objects.sources_changed(tmp_project) is True
+    stale_objects.record_source_manifest(tmp_project)
+    assert stale_objects.sources_changed(tmp_project) is False
     _touch(tmp_project, "Oryx/src/B.cpp")
-    assert stale_objects.sources_changed() is True
+    assert stale_objects.sources_changed(tmp_project) is True
 
 
 def test_no_manifest_clears_nothing(tmp_project):
-    assert stale_objects.clear_outputs_of_removed_sources() == []
+    assert stale_objects.clear_outputs_of_removed_sources(tmp_project) == []
 
 
 @pytest.mark.parametrize(
@@ -63,14 +63,14 @@ def test_no_manifest_clears_nothing(tmp_project):
 )
 def test_removed_source_clears_its_project_binaries(tmp_project, source, project):
     _touch(tmp_project, source, "Oryx/src/Keep.cpp")
-    stale_objects.record_source_manifest()
+    stale_objects.record_source_manifest(tmp_project)
     bin_dir = tmp_project / "build" / "bin"
     for profile in ("Debug-linux-x86_64", "Release-linux-x86_64"):
         for name in ("Oryx", "OryxPython", "Oasis", "Tests"):
             (bin_dir / profile / name).mkdir(parents=True, exist_ok=True)
     (tmp_project / source).unlink()
 
-    assert stale_objects.clear_outputs_of_removed_sources() == [project]
+    assert stale_objects.clear_outputs_of_removed_sources(tmp_project) == [project]
     assert sorted(p.name for p in (bin_dir / "Debug-linux-x86_64").iterdir()) == sorted(
         {"Oryx", "OryxPython", "Oasis", "Tests"} - {project}
     )
@@ -79,12 +79,12 @@ def test_removed_source_clears_its_project_binaries(tmp_project, source, project
 
 def test_removed_oasis_game_source_clears_only_oasis(tmp_project):
     _touch(tmp_project, "Oasis/src/Oasis/Game/TicTacToeGame.cpp")
-    stale_objects.record_source_manifest()
+    stale_objects.record_source_manifest(tmp_project)
     tests_bin = tmp_project / "build" / "bin" / "Debug-linux-x86_64" / "Tests"
     tests_bin.mkdir(parents=True)
     (tmp_project / "Oasis/src/Oasis/Game/TicTacToeGame.cpp").unlink()
 
-    assert stale_objects.clear_outputs_of_removed_sources() == ["Oasis"]
+    assert stale_objects.clear_outputs_of_removed_sources(tmp_project) == ["Oasis"]
     assert tests_bin.exists()
 
 
@@ -99,27 +99,27 @@ def _make_outputs(tmp_project):
 
 
 def test_first_configure_without_outputs_records_options(tmp_project):
-    assert stale_objects.clear_outputs_if_python_changed(["--no-python"]) is False
+    assert stale_objects.clear_outputs_if_python_changed(["--no-python"], tmp_project / "build") is False
     assert (tmp_project / "build" / ".python-options").read_text(encoding="utf-8") == "--no-python"
 
 
 def test_first_configure_with_outputs_wipes_them_silently(tmp_project):
     _make_outputs(tmp_project)
-    assert stale_objects.clear_outputs_if_python_changed(["--no-python"]) is False
+    assert stale_objects.clear_outputs_if_python_changed(["--no-python"], tmp_project / "build") is False
     assert _outputs(tmp_project) == (False, False)
 
 
 def test_unchanged_options_keep_outputs(tmp_project):
-    stale_objects.clear_outputs_if_python_changed(["--no-python", "--sanitize"])
+    stale_objects.clear_outputs_if_python_changed(["--no-python", "--sanitize"], tmp_project / "build")
     _make_outputs(tmp_project)
-    assert stale_objects.clear_outputs_if_python_changed(["--no-python", "--sanitize"]) is False
+    assert stale_objects.clear_outputs_if_python_changed(["--no-python", "--sanitize"], tmp_project / "build") is False
     assert _outputs(tmp_project) == (True, True)
 
 
 def test_changed_options_wipe_outputs(tmp_project):
-    stale_objects.clear_outputs_if_python_changed(["--no-python"])
+    stale_objects.clear_outputs_if_python_changed(["--no-python"], tmp_project / "build")
     _make_outputs(tmp_project)
-    assert stale_objects.clear_outputs_if_python_changed(["--no-python", "--sanitize"]) is True
+    assert stale_objects.clear_outputs_if_python_changed(["--no-python", "--sanitize"], tmp_project / "build") is True
     assert _outputs(tmp_project) == (False, False)
     assert (tmp_project / "build" / ".python-options").read_text(encoding="utf-8") == "--no-python\n--sanitize"
 
@@ -138,7 +138,7 @@ def test_prune_clears_only_projects_with_missing_prerequisites(tmp_project, monk
     for name in ("Oryx", "Tests"):
         (object_root / name).mkdir(parents=True)
 
-    assert stale_objects.prune_stale_object_dirs(BuildConfig()) == ["Tests"]
+    assert stale_objects.prune_stale_object_dirs(BuildConfig(root=tmp_project), tmp_project / "build") == ["Tests"]
     assert calls == [
         (["make", "-n", "-f", "Oryx.make", "config=debug_x64"], tmp_project / "build"),
         (["make", "-n", "-f", "Tests.make", "config=debug_x64"], tmp_project / "build"),
@@ -152,4 +152,4 @@ def test_prune_without_make_is_a_no_op(tmp_project, monkeypatch):
         raise FileNotFoundError("make")
 
     monkeypatch.setattr(stale_objects, "run_command", missing_make)
-    assert stale_objects.prune_stale_object_dirs(BuildConfig()) == []
+    assert stale_objects.prune_stale_object_dirs(BuildConfig(root=tmp_project), tmp_project / "build") == []

@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from build_system.config import BuildConfig, PROJECT_ROOT
+from build_system.config import BuildConfig
 
 console = Console()
 
@@ -30,11 +30,11 @@ PREMAKE_SUBDIR_NAME = "premake"
 PYTHON_VENDOR_LIBS = {"pybind11"}
 
 
-def vendor_dirs() -> list[Path]:
+def vendor_dirs(root: Path) -> list[Path]:
     """Every <project>/vendor/<lib>/ directory that currently exists."""
     dirs = []
     for project in PROJECT_DIRS:
-        vendor_root = PROJECT_ROOT / project / "vendor"
+        vendor_root = root / project / "vendor"
         if vendor_root.is_dir():
             dirs.extend(
                 sorted(p for p in vendor_root.iterdir() if p.is_dir() and p.name != PREMAKE_SUBDIR_NAME)
@@ -42,15 +42,15 @@ def vendor_dirs() -> list[Path]:
     return dirs
 
 
-def missing_vendor_dirs(cfg: BuildConfig | None = None) -> list[Path]:
+def missing_vendor_dirs(root: Path, cfg: BuildConfig | None = None) -> list[Path]:
     """Vendored library directories that exist but are empty — i.e. the git
     submodule hasn't been checked out yet. Python-only libs are skipped when
     cfg says Python is off."""
     skipped = PYTHON_VENDOR_LIBS if cfg is not None and not cfg.python_enabled else set()
-    return [d for d in vendor_dirs() if d.name not in skipped and not any(d.iterdir())]
+    return [d for d in vendor_dirs(root) if d.name not in skipped and not any(d.iterdir())]
 
 
-def vendor_include_paths(cfg: BuildConfig | None = None) -> list[str]:
+def vendor_include_paths(root: Path, cfg: BuildConfig | None = None) -> list[str]:
     """Best-effort IntelliSense include paths for every vendored lib, mirroring
     the IncludeDir entries in premake/dependencies.lua: `<lib>/include` when it
     exists (spdlog, pybind11), otherwise — like useVendorHeader's `headerSubdir`
@@ -58,25 +58,25 @@ def vendor_include_paths(cfg: BuildConfig | None = None) -> list[str]:
     Python-only libs are skipped when cfg says Python is off."""
     skipped = PYTHON_VENDOR_LIBS if cfg is not None and not cfg.python_enabled else set()
     paths = []
-    for d in vendor_dirs():
+    for d in vendor_dirs(root):
         if d.name in skipped:
             continue
         include = d / "include"
         nested = d / d.name
         headers = [include] if include.is_dir() else [d] + ([nested] if nested.is_dir() else [])
-        paths.extend(f"${{workspaceFolder}}/{h.relative_to(PROJECT_ROOT).as_posix()}" for h in headers)
+        paths.extend(f"${{workspaceFolder}}/{h.relative_to(root).as_posix()}" for h in headers)
     return paths
 
 
-def ensure_vendor_dirs(cfg: BuildConfig | None = None) -> None:
+def ensure_vendor_dirs(root: Path, cfg: BuildConfig | None = None) -> None:
     """Verify every vendored git submodule (doctest today, and any future
     ones under <project>/vendor/<lib>/) is populated; abort with guidance if
     not. Used as the `requires_vendor=True` precondition on
     @registry.command(...) — see build_system/registry.py."""
-    missing = missing_vendor_dirs(cfg)
+    missing = missing_vendor_dirs(root, cfg)
     if not missing:
         return
     for d in missing:
-        console.print(f"[bold red]✗ Missing vendored submodule: {d.relative_to(PROJECT_ROOT)} is empty.[/bold red]")
+        console.print(f"[bold red]✗ Missing vendored submodule: {d.relative_to(root)} is empty.[/bold red]")
     console.print("  [dim]Run: git submodule update --init --recursive[/dim]")
     raise typer.Exit(code=1)

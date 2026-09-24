@@ -24,7 +24,6 @@ itself from being treated as a vendored lib.)
 import re
 from pathlib import Path
 
-from build_system.config import PROJECT_ROOT
 from build_system.utils import run_command
 
 STATIC_LIB_TEMPLATE = """\
@@ -53,19 +52,19 @@ project "{name}"
 """
 
 
-def vendor_path(project: str, name: str) -> Path:
-    return PROJECT_ROOT / project / "vendor" / name
+def vendor_path(root: Path, project: str, name: str) -> Path:
+    return root / project / "vendor" / name
 
 
-def premake_script_path(project: str, name: str) -> Path:
-    return PROJECT_ROOT / project / "vendor" / "premake" / f"{name}.lua"
+def premake_script_path(root: Path, project: str, name: str) -> Path:
+    return root / project / "vendor" / "premake" / f"{name}.lua"
 
 
-def add_git_submodule(url: str, project: str, name: str) -> None:
+def add_git_submodule(root: Path, url: str, project: str, name: str) -> None:
     """Run `git submodule add`. A no-op error if the path is already a
     submodule (e.g. re-running after a partial failure)."""
-    path = vendor_path(project, name)
-    run_command(["git", "submodule", "add", url, str(path.relative_to(PROJECT_ROOT))], cwd=PROJECT_ROOT)
+    path = vendor_path(root, project, name)
+    run_command(["git", "submodule", "add", url, str(path.relative_to(root))], cwd=root)
 
 
 def _vendor_subpath(name: str, subdir: str | None) -> str:
@@ -83,6 +82,7 @@ def _defines_block(defines: list[str] | None) -> str:
 
 
 def write_static_lib_script(
+    root: Path,
     project: str,
     name: str,
     include_subdir: str | None = None,
@@ -96,7 +96,7 @@ def write_static_lib_script(
     glob its example/tests/bench sources). `defines` are written as a
     `defines {}` block, for libraries whose compiled-lib mode needs a
     preprocessor define (e.g. spdlog's SPDLOG_COMPILED_LIB)."""
-    path = premake_script_path(project, name)
+    path = premake_script_path(root, project, name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         STATIC_LIB_TEMPLATE.format(
@@ -111,7 +111,7 @@ def write_static_lib_script(
     return path
 
 
-def insert_header_only_usage(project: str, name: str, header_subdir: str | None) -> tuple[bool, str]:
+def insert_header_only_usage(root: Path, project: str, name: str, header_subdir: str | None) -> tuple[bool, str]:
     """Insert a useVendorHeader(...) call into <project>/premake5.lua, right
     after useOryxProjectDefaults(). Returns (edited, snippet): edited is
     False when the expected anchor line isn't found (e.g. the file was
@@ -119,7 +119,7 @@ def insert_header_only_usage(project: str, name: str, header_subdir: str | None)
     `snippet` for the user to paste manually instead."""
     call = f'useVendorHeader("{name}")' if not header_subdir else f'useVendorHeader("{name}", "{header_subdir}")'
 
-    path = PROJECT_ROOT / project / "premake5.lua"
+    path = root / project / "premake5.lua"
     text = path.read_text(encoding="utf-8")
 
     if call in text:
@@ -158,17 +158,14 @@ def _insert_or_append_block(text: str, block_name: str, entries: list[str]) -> s
     return updated
 
 
-ROOT_PREMAKE_PATH = PROJECT_ROOT / "premake5.lua"
-DEPENDENCIES_LUA_PATH = PROJECT_ROOT / "premake" / "dependencies.lua"
-
-
-def _add_include_dir_entry(name: str, path_expr: str) -> bool:
+def _add_include_dir_entry(root: Path, name: str, path_expr: str) -> bool:
     """Insert `IncludeDir["<name>"] = "<path_expr>"` into
     premake/dependencies.lua, right after `IncludeDir = {}`. Returns False
     if that file/anchor isn't found (e.g. hand-edited since last written)."""
-    if not DEPENDENCIES_LUA_PATH.exists():
+    dependencies_lua = root / "premake" / "dependencies.lua"
+    if not dependencies_lua.exists():
         return False
-    text = DEPENDENCIES_LUA_PATH.read_text(encoding="utf-8")
+    text = dependencies_lua.read_text(encoding="utf-8")
     entry = f'IncludeDir["{name}"] = "{path_expr}"'
     if entry in text:
         return True
@@ -176,16 +173,17 @@ def _add_include_dir_entry(name: str, path_expr: str) -> bool:
     if anchor not in text:
         return False
     text = text.replace(anchor, f"{anchor}\n{entry}", 1)
-    DEPENDENCIES_LUA_PATH.write_text(text, encoding="utf-8")
+    dependencies_lua.write_text(text, encoding="utf-8")
     return True
 
 
-def _add_dependency_group_include(include_path: str) -> bool:
+def _add_dependency_group_include(root: Path, include_path: str) -> bool:
     """Insert `include "<include_path>"` into the root premake5.lua's
     `group "Dependencies"` block, creating that group (right before
     `group "Core"`) if it doesn't exist yet. Returns False if neither anchor
     is found."""
-    text = ROOT_PREMAKE_PATH.read_text(encoding="utf-8")
+    root_premake = root / "premake5.lua"
+    text = root_premake.read_text(encoding="utf-8")
     include_line = f'include "{include_path}"'
     if include_line in text:
         return True
@@ -193,7 +191,7 @@ def _add_dependency_group_include(include_path: str) -> bool:
     group_anchor = 'group "Dependencies"\n'
     if group_anchor in text:
         text = text.replace(group_anchor, f"{group_anchor}    {include_line}\n", 1)
-        ROOT_PREMAKE_PATH.write_text(text, encoding="utf-8")
+        root_premake.write_text(text, encoding="utf-8")
         return True
 
     core_anchor = 'group "Core"'
@@ -201,11 +199,12 @@ def _add_dependency_group_include(include_path: str) -> bool:
         return False
     new_group = f'group "Dependencies"\n    {include_line}\ngroup ""\n\n'
     text = text.replace(core_anchor, f"{new_group}{core_anchor}", 1)
-    ROOT_PREMAKE_PATH.write_text(text, encoding="utf-8")
+    root_premake.write_text(text, encoding="utf-8")
     return True
 
 
 def insert_static_lib_wiring(
+    root: Path,
     project: str,
     name: str,
     include_subdir: str | None = None,
@@ -237,12 +236,12 @@ def insert_static_lib_wiring(
         for d in defines or []
     ]
 
-    root_ok = _add_dependency_group_include(include_path)
-    includedir_ok = _add_include_dir_entry(name, includedir_expr)
+    root_ok = _add_dependency_group_include(root, include_path)
+    includedir_ok = _add_include_dir_entry(root, name, includedir_expr)
     if not (root_ok and includedir_ok):
         return False, snippets
 
-    path = PROJECT_ROOT / project / "premake5.lua"
+    path = root / project / "premake5.lua"
     text = path.read_text(encoding="utf-8")
 
     with_includedirs = _insert_into_brace_list(text, "includedirs", f"%{{IncludeDir['{name}']}}")

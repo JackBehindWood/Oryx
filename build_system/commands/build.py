@@ -6,7 +6,7 @@ from rich.console import Console
 
 from build_system import registry
 from build_system.compile_commands import generate_compile_commands
-from build_system.config import BUILD_DIR, PROJECT_ROOT, RunContext
+from build_system.config import RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
 from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
@@ -31,6 +31,7 @@ def configure(ctx: typer.Context):
     """Generate build files using Premake5."""
     run: RunContext = ctx.obj
     cfg = run.config
+    project = run.project
 
     try:
         premake_options = premake_python_options(cfg)
@@ -43,23 +44,23 @@ def configure(ctx: typer.Context):
         premake_options = [*premake_options, "--sanitize"]
 
     if run.dry_run:
-        premake = get_premake_executable()
+        premake = get_premake_executable(project.premake_bin_dir)
         command_line = [str(premake), cfg.build_generator, *premake_options]
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
-    premake = ensure_premake()
+    premake = ensure_premake(project.premake_bin_dir)
     if not premake:
         raise typer.Exit(code=1)
 
     if python_info is not None:
-        write_python_config(python_info)
+        write_python_config(python_info, project.build_dir)
 
     command_line = [str(premake), cfg.build_generator, *premake_options]
 
     try:
         with console.status("[bold blue]⚙️ Configuring build...[/bold blue]"):
-            result = run_command(command_line, cwd=PROJECT_ROOT)
+            result = run_command(command_line, cwd=project.root)
         if run.verbose and result.stdout:
             console.print(result.stdout)
         console.print("[bold green]✓ Build files generated successfully.[/bold green]\n")
@@ -67,21 +68,21 @@ def configure(ctx: typer.Context):
         console.print(f"[bold red]✗ Failed to configure build:[/bold red]\n{error.stderr}")
         raise typer.Exit(code=1)
 
-    if clear_outputs_if_python_changed(premake_options):
+    if clear_outputs_if_python_changed(premake_options, project.build_dir):
         console.print("[yellow]⚠️ Build options changed (Python or --sanitize); cleared previous binaries and objects.[/yellow]\n")
 
-    for project in clear_outputs_of_removed_sources():
-        console.print(f"[yellow]⚠️ Cleared {project} binaries (a source file was removed).[/yellow]\n")
-    record_source_manifest()
+    for name in clear_outputs_of_removed_sources(project.root):
+        console.print(f"[yellow]⚠️ Cleared {name} binaries (a source file was removed).[/yellow]\n")
+    record_source_manifest(project.root)
 
-    for project in prune_stale_object_dirs(cfg):
+    for name in prune_stale_object_dirs(cfg, project.build_dir):
         console.print(
-            f"[yellow]⚠️ Cleared stale object cache for {project} "
+            f"[yellow]⚠️ Cleared stale object cache for {name} "
             "(moved/renamed/deleted source detected).[/yellow]\n"
         )
 
     try:
-        if generate_compile_commands(cfg):
+        if generate_compile_commands(cfg, project.build_dir):
             console.print("[bold green]✓ compile_commands.json generated.[/bold green]\n")
     except Exception as error:
         console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {error}[/yellow]\n")
@@ -93,12 +94,12 @@ def compile_project(ctx: typer.Context):
     run: RunContext = ctx.obj
     cfg = run.config
 
-    if not run.dry_run and sources_changed():
+    if not run.dry_run and sources_changed(run.project.root):
         console.print("[yellow]⚠️ Source files were added or removed; regenerating build files first.[/yellow]\n")
         ctx.invoke(configure, ctx)
 
     try:
-        command_line = build_compile_command(cfg, BUILD_DIR)
+        command_line = build_compile_command(cfg, run.project.build_dir)
     except ValueError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1)
@@ -129,15 +130,16 @@ def compile_project(ctx: typer.Context):
 def clean(ctx: typer.Context):
     """Remove generated build artifacts and binaries."""
     run: RunContext = ctx.obj
+    build_dir = run.project.build_dir
 
     if run.dry_run:
-        console.print(f"[dim][dry-run] would remove: {BUILD_DIR}[/dim]")
+        console.print(f"[dim][dry-run] would remove: {build_dir}[/dim]")
         return
 
     console.print("[bold yellow]🧹 Cleaning build artifacts...[/bold yellow]")
-    if BUILD_DIR.exists():
-        remove_directory(BUILD_DIR)
-        console.print(f"[green]✓ Removed directory:[/green] {BUILD_DIR}")
+    if build_dir.exists():
+        remove_directory(build_dir)
+        console.print(f"[green]✓ Removed directory:[/green] {build_dir}")
     if remove_extension_pth():
         console.print("[green]✓ Removed the venv's `import oryx` path[/green]")
 
@@ -203,7 +205,7 @@ def run_project(
         raise typer.Exit(code=1)
 
     try:
-        run_command(args, capture_output=False)
+        run_command(args, cwd=run.project.root, capture_output=False)
         console.print("\n[bold green]✓ Oasis exited successfully[/bold green]\n")
     except subprocess.CalledProcessError:
         console.print("[bold red]✗ Oasis exited with an error.[/bold red]")

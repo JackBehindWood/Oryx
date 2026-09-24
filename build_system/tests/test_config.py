@@ -88,7 +88,7 @@ def test_outputdir_fallback(tmp_project, monkeypatch, system, expected):
 
 
 def test_target_paths_are_nested(tmp_project):
-    cfg = BuildConfig()
+    cfg = BuildConfig(root=tmp_project)
     bin_dir = tmp_project / "build" / "bin" / "Debug-linux-x86_64"
     assert cfg.binary_path == bin_dir
     assert cfg.executable_path("oasis") == bin_dir / "Oasis" / "Oasis"
@@ -97,7 +97,7 @@ def test_target_paths_are_nested(tmp_project):
 
 def test_unknown_executable_lists_available(tmp_project):
     with pytest.raises(KeyError, match="No executable named 'nope' configured. Available: oasis"):
-        BuildConfig().executable_path("nope")
+        BuildConfig(root=tmp_project).executable_path("nope")
 
 
 def test_local_config_defaults(tmp_path):

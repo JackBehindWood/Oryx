@@ -3,15 +3,13 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from build_system.compile_commands import COMPILE_COMMANDS_FILE
-from build_system.config import BuildConfig, PROJECT_ROOT
-from build_system.setup.python_env import PYTHON_CONFIG_HEADER, PythonEnvError, python_build_info
+from build_system.compile_commands import COMPILE_COMMANDS_NAME
+from build_system.config import BuildConfig
+from build_system.setup.python_env import PythonEnvError, python_build_info
 from build_system.utils import get_macos_sdk_path, load_json, merge_by_key, write_json
 from build_system.vendor import vendor_include_paths
 
-C_CPP_PROPERTIES_FILE = PROJECT_ROOT / ".vscode" / "c_cpp_properties.json"
-
-COMPILE_COMMANDS_TOKEN = f"${{workspaceFolder}}/{COMPILE_COMMANDS_FILE.relative_to(PROJECT_ROOT).as_posix()}"
+COMPILE_COMMANDS_TOKEN = f"${{workspaceFolder}}/build/{COMPILE_COMMANDS_NAME}"
 
 # Mirrors the `filter "configurations:<Profile>" defines { ... }` blocks in
 # premake5.lua. Used only as a fallback (see FALLBACK_INCLUDE_PATHS below).
@@ -50,13 +48,13 @@ def _python_build_info(cfg: BuildConfig):
         return None
 
 
-def _fallback_include_paths(cfg: BuildConfig) -> list[str]:
+def _fallback_include_paths(cfg: BuildConfig, root: Path) -> list[str]:
     # Appends every <project>/vendor/<lib>/ header dir discovered on disk (see
     # build_system/vendor.py) instead of hardcoding each library's path here.
-    paths = FALLBACK_INCLUDE_PATHS + vendor_include_paths(cfg)
+    paths = FALLBACK_INCLUDE_PATHS + vendor_include_paths(root, cfg)
     if cfg.python_enabled:
         paths.append(PYTHON_BACKEND_INCLUDE_PATH)
-        paths.append(PYTHON_CONFIG_HEADER.parent.as_posix())
+        paths.append("${workspaceFolder}/build/generated")
         info = _python_build_info(cfg)
         if info is not None:
             paths.append(info.include_dir.as_posix())
@@ -85,10 +83,10 @@ def _homebrew_include_path(intellisense_mode: str) -> str:
     return "/opt/homebrew/include" if "arm64" in intellisense_mode else "/usr/local/include"
 
 
-def _macos_configuration(name: str, intellisense_mode: str, cfg: BuildConfig) -> dict:
+def _macos_configuration(name: str, intellisense_mode: str, cfg: BuildConfig, root: Path) -> dict:
     sdk = get_macos_sdk_path()
     sdk_includes = [f"{sdk}/usr/include/c++/v1", f"{sdk}/usr/include"] if sdk else []
-    include_paths = _fallback_include_paths(cfg)
+    include_paths = _fallback_include_paths(cfg, root)
 
     return {
         "name": name,
@@ -107,9 +105,9 @@ def _macos_configuration(name: str, intellisense_mode: str, cfg: BuildConfig) ->
     }
 
 
-def _linux_configuration(cfg: BuildConfig) -> dict:
+def _linux_configuration(cfg: BuildConfig, root: Path) -> dict:
     compiler_path = shutil.which("g++") or shutil.which("clang++") or "/usr/bin/g++"
-    include_paths = _fallback_include_paths(cfg)
+    include_paths = _fallback_include_paths(cfg, root)
 
     return {
         "name": "Linux",
@@ -127,8 +125,8 @@ def _linux_configuration(cfg: BuildConfig) -> dict:
     }
 
 
-def _windows_configuration(cfg: BuildConfig) -> dict:
-    include_paths = _fallback_include_paths(cfg)
+def _windows_configuration(cfg: BuildConfig, root: Path) -> dict:
+    include_paths = _fallback_include_paths(cfg, root)
 
     return {
         "name": "Windows",
@@ -148,23 +146,23 @@ def _windows_configuration(cfg: BuildConfig) -> dict:
     }
 
 
-def _generate_configurations(cfg: BuildConfig) -> list[dict]:
+def _generate_configurations(cfg: BuildConfig, root: Path) -> list[dict]:
     """Generate IntelliSense configurations for the host platform only —
     we don't guess SDK/compiler paths for platforms we're not running on."""
     system = platform.system()
     if system == "Darwin":
         return [
-            _macos_configuration("Mac ARM64", "macos-clang-arm64", cfg),
-            _macos_configuration("Mac x64", "macos-clang-x64", cfg),
+            _macos_configuration("Mac ARM64", "macos-clang-arm64", cfg, root),
+            _macos_configuration("Mac x64", "macos-clang-x64", cfg, root),
         ]
     if system == "Linux":
-        return [_linux_configuration(cfg)]
+        return [_linux_configuration(cfg, root)]
     if system == "Windows":
-        return [_windows_configuration(cfg)]
+        return [_windows_configuration(cfg, root)]
     return []
 
 
-def write_c_cpp_properties(cfg: BuildConfig, path: Path = C_CPP_PROPERTIES_FILE) -> Path:
+def write_c_cpp_properties(cfg: BuildConfig, root: Path) -> Path:
     """Generate or merge .vscode/c_cpp_properties.json for the host platform.
 
     Configurations are matched and replaced by name; any other user-defined
@@ -175,7 +173,8 @@ def write_c_cpp_properties(cfg: BuildConfig, path: Path = C_CPP_PROPERTIES_FILE)
     includePath/defines whenever it exists. Those lists remain only as a
     fallback for before compile_commands.json exists.
     """
-    generated = _generate_configurations(cfg)
+    path = root / ".vscode" / "c_cpp_properties.json"
+    generated = _generate_configurations(cfg, root)
 
     existing = load_json(path, default={"version": 4, "configurations": []})
     existing.setdefault("version", 4)

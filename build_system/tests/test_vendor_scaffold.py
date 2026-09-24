@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from build_system.setup import vendor_scaffold
@@ -21,12 +23,12 @@ def lua(tmp_project):
 
 
 def test_paths(tmp_project):
-    assert vendor_scaffold.vendor_path("Oryx", "glfw") == tmp_project / "Oryx" / "vendor" / "glfw"
-    assert vendor_scaffold.premake_script_path("Oryx", "glfw") == tmp_project / "Oryx" / "vendor" / "premake" / "glfw.lua"
+    assert vendor_scaffold.vendor_path(Path.cwd(), "Oryx", "glfw") == tmp_project / "Oryx" / "vendor" / "glfw"
+    assert vendor_scaffold.premake_script_path(Path.cwd(), "Oryx", "glfw") == tmp_project / "Oryx" / "vendor" / "premake" / "glfw.lua"
 
 
 def test_static_lib_script(tmp_project):
-    path = vendor_scaffold.write_static_lib_script("Oryx", "glfw", include_subdir="include", source_subdir="src", defines=["_GLFW_COCOA", "GLFW_X"])
+    path = vendor_scaffold.write_static_lib_script(Path.cwd(), "Oryx", "glfw", include_subdir="include", source_subdir="src", defines=["_GLFW_COCOA", "GLFW_X"])
     assert path == tmp_project / "Oryx" / "vendor" / "premake" / "glfw.lua"
     assert path.read_text(encoding="utf-8") == """\
 -- Vendored static library: glfw
@@ -60,7 +62,7 @@ project "glfw"
 
 
 def test_static_lib_script_without_subdirs_or_defines(tmp_project):
-    text = vendor_scaffold.write_static_lib_script("Oryx", "stb").read_text(encoding="utf-8")
+    text = vendor_scaffold.write_static_lib_script(Path.cwd(), "Oryx", "stb").read_text(encoding="utf-8")
     assert '"../stb/**.cpp",' in text
     assert text.endswith('    includedirs {\n        "../stb"\n    }\n')
 
@@ -68,16 +70,16 @@ def test_static_lib_script_without_subdirs_or_defines(tmp_project):
 @pytest.mark.parametrize(("subdir", "call"), [(None, 'useVendorHeader("stb")'), ("doctest", 'useVendorHeader("doctest", "doctest")')])
 def test_header_only_usage_is_idempotent(lua, subdir, call):
     name = "doctest" if subdir else "stb"
-    assert vendor_scaffold.insert_header_only_usage("Oasis", name, subdir) == (True, call)
+    assert vendor_scaffold.insert_header_only_usage(Path.cwd(), "Oasis", name, subdir) == (True, call)
     once = lua("Oasis/premake5.lua")
     assert once == CONSUMER_PREMAKE.replace("useOryxProjectDefaults()", f"useOryxProjectDefaults()\n\n    {call}")
-    assert vendor_scaffold.insert_header_only_usage("Oasis", name, subdir) == (True, call)
+    assert vendor_scaffold.insert_header_only_usage(Path.cwd(), "Oasis", name, subdir) == (True, call)
     assert lua("Oasis/premake5.lua") == once
 
 
 def test_header_only_usage_without_anchor_leaves_file(lua, tmp_project):
     (tmp_project / "Oasis/premake5.lua").write_text('project "Oasis"\n', encoding="utf-8")
-    assert vendor_scaffold.insert_header_only_usage("Oasis", "stb", None) == (False, 'useVendorHeader("stb")')
+    assert vendor_scaffold.insert_header_only_usage(Path.cwd(), "Oasis", "stb", None) == (False, 'useVendorHeader("stb")')
     assert lua("Oasis/premake5.lua") == 'project "Oasis"\n'
 
 
@@ -96,7 +98,7 @@ DEPENDENCIES_WIRED = DEPENDENCIES_LUA.replace("IncludeDir = {}\n", 'IncludeDir =
 
 
 def test_static_lib_wiring(lua):
-    edited, snippets = vendor_scaffold.insert_static_lib_wiring("Oasis", "glfw", include_subdir="include", defines=["GLFW_X"])
+    edited, snippets = vendor_scaffold.insert_static_lib_wiring(Path.cwd(), "Oasis", "glfw", include_subdir="include", defines=["GLFW_X"])
     assert edited is True
     assert snippets == [
         'include "Oasis/vendor/premake/glfw.lua"  # in the root premake5.lua\'s group "Dependencies"',
@@ -116,8 +118,8 @@ def test_static_lib_wiring(lua):
 
 
 def test_static_lib_wiring_repeats_consumer_entries_on_rerun(lua):
-    vendor_scaffold.insert_static_lib_wiring("Oasis", "glfw", include_subdir="include")
-    vendor_scaffold.insert_static_lib_wiring("Oasis", "glfw", include_subdir="include")
+    vendor_scaffold.insert_static_lib_wiring(Path.cwd(), "Oasis", "glfw", include_subdir="include")
+    vendor_scaffold.insert_static_lib_wiring(Path.cwd(), "Oasis", "glfw", include_subdir="include")
     assert lua("premake5.lua") == ROOT_WIRED
     assert lua("premake/dependencies.lua") == DEPENDENCIES_WIRED
     consumer = lua("Oasis/premake5.lua")
@@ -127,7 +129,7 @@ def test_static_lib_wiring_repeats_consumer_entries_on_rerun(lua):
 
 def test_static_lib_wiring_reuses_existing_dependencies_group(lua, tmp_project):
     (tmp_project / "premake5.lua").write_text('group "Dependencies"\n    include "x.lua"\ngroup ""\n', encoding="utf-8")
-    vendor_scaffold.insert_static_lib_wiring("Oasis", "glfw")
+    vendor_scaffold.insert_static_lib_wiring(Path.cwd(), "Oasis", "glfw")
     assert lua("premake5.lua") == 'group "Dependencies"\n    include "Oasis/vendor/premake/glfw.lua"\n    include "x.lua"\ngroup ""\n'
 
 
@@ -137,7 +139,7 @@ def test_static_lib_wiring_reuses_existing_dependencies_group(lua, tmp_project):
 )
 def test_static_lib_wiring_without_anchor_is_not_edited(lua, tmp_project, name, text):
     (tmp_project / name).write_text(text, encoding="utf-8")
-    edited, snippets = vendor_scaffold.insert_static_lib_wiring("Oasis", "glfw")
+    edited, snippets = vendor_scaffold.insert_static_lib_wiring(Path.cwd(), "Oasis", "glfw")
     assert edited is False
     assert len(snippets) == 4
     assert lua("Oasis/premake5.lua") in (CONSUMER_PREMAKE, 'project "Oasis"\n')
@@ -146,8 +148,8 @@ def test_static_lib_wiring_without_anchor_is_not_edited(lua, tmp_project, name, 
 def test_add_git_submodule(tmp_project, monkeypatch):
     calls = []
     monkeypatch.setattr(vendor_scaffold, "run_command", lambda command, cwd=None: calls.append((command, cwd)))
-    vendor_scaffold.add_git_submodule("https://github.com/glfw/glfw.git", "Oryx", "glfw")
-    assert calls == [(["git", "submodule", "add", "https://github.com/glfw/glfw.git", str(vendor_scaffold.vendor_path("Oryx", "glfw").relative_to(tmp_project))], tmp_project)]
+    vendor_scaffold.add_git_submodule(Path.cwd(), "https://github.com/glfw/glfw.git", "Oryx", "glfw")
+    assert calls == [(["git", "submodule", "add", "https://github.com/glfw/glfw.git", str(vendor_scaffold.vendor_path(Path.cwd(), "Oryx", "glfw").relative_to(tmp_project))], tmp_project)]
 
 
 def test_cli_rejects_unknown_project(forge):

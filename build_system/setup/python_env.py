@@ -13,7 +13,7 @@ import platform
 import sys
 import sysconfig
 
-from build_system.config import BUILD_DIR, BuildConfig
+from build_system.config import BuildConfig
 
 
 class PythonEnvError(RuntimeError):
@@ -82,14 +82,15 @@ def premake_python_options(cfg: BuildConfig) -> list[str]:
     ]
 
 
-PYTHON_CONFIG_HEADER = BUILD_DIR / "generated" / "PythonConfig.h"
+def python_config_header(build_dir: Path) -> Path:
+    return build_dir / "generated" / "PythonConfig.h"
 
 
 def _c_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def write_python_config(info: PythonBuildInfo) -> bool:
+def write_python_config(info: PythonBuildInfo, build_dir: Path) -> bool:
     """Write the header PythonRuntime.cpp includes; leaves the file alone when nothing changed,
     so an unchanged interpreter never rebuilds it. Returns whether it was written."""
     text = (
@@ -98,9 +99,10 @@ def write_python_config(info: PythonBuildInfo) -> bool:
         f"#define OX_PYTHON_HOME {_c_string(info.home.as_posix())}\n"
         f"#define OX_PYTHON_SITE_PACKAGES {_c_string(os.pathsep.join(path.as_posix() for path in info.site_packages))}\n"
     )
-    if PYTHON_CONFIG_HEADER.is_file() and PYTHON_CONFIG_HEADER.read_text(encoding="utf-8") == text:
+    header = python_config_header(build_dir)
+    if header.is_file() and header.read_text(encoding="utf-8") == text:
         return False
 
-    PYTHON_CONFIG_HEADER.parent.mkdir(parents=True, exist_ok=True)
-    PYTHON_CONFIG_HEADER.write_text(text, encoding="utf-8")
+    header.parent.mkdir(parents=True, exist_ok=True)
+    header.write_text(text, encoding="utf-8")
     return True

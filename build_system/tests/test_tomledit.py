@@ -2,7 +2,8 @@ import tomllib
 
 import pytest
 
-from build_system.config import DEFAULT_CONFIG_FILE, BuildConfig, LocalConfig
+from build_system.config import BuildConfig, LocalConfig
+from build_system.tests.conftest import REAL_ROOT
 from build_system.tomledit import dumps
 
 
@@ -47,7 +48,7 @@ def test_unsupported_value_raises():
 def test_build_config_save_matches_committed_file(tmp_path):
     path = tmp_path / "oryx.toml"
     BuildConfig().save(path)
-    assert path.read_text(encoding="utf-8") == DEFAULT_CONFIG_FILE.read_text(encoding="utf-8")
+    assert path.read_text(encoding="utf-8") == (REAL_ROOT / "oryx.toml").read_text(encoding="utf-8")
 
 
 def test_build_config_round_trip_escapes(tmp_path):

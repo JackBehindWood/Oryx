@@ -1,10 +1,12 @@
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
 
 from build_system import registry
-from build_system.config import BuildConfig, DEFAULT_CONFIG_FILE, RunContext
+from build_system.config import BuildConfig, RunContext
+from build_system.project import Project, ProjectNotFound
 
 console = Console()
 
@@ -23,14 +25,23 @@ for _module in registry.discover_command_modules():
     _name = _module.__name__.rsplit(".", 1)[-1]
     app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""))
 
+def _discover(ctx: typer.Context) -> Project:
+    try:
+        return Project.discover()
+    except ProjectNotFound:
+        if ctx.invoked_subcommand != "config":
+            raise
+        return Project.from_config(Path.cwd() / "forge.toml")
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
-    config_path: Path = typer.Option(
-        DEFAULT_CONFIG_FILE,
+    config_path: Optional[Path] = typer.Option(
+        None,
         "--config",
         "-c",
-        help="Path to the oryx.toml configuration file.",
+        help="Path to the project's config file (default: the nearest forge.toml at or above the current directory).",
     ),
     profile: str = typer.Option(
         "debug",
@@ -63,14 +74,15 @@ def main(
 ):
     """Global context setup executed before running commands."""
     try:
-        cfg = BuildConfig.load(config_path)
+        project = Project.from_config(config_path) if config_path else _discover(ctx)
+        cfg = BuildConfig.load(project.config_file)
         cfg.profile = profile
         if no_python:
             cfg.python_enabled = False
         if sanitize:
             cfg.sanitize = True
         cfg.__post_init__()
-        ctx.obj = RunContext(config=cfg, config_path=config_path, verbose=verbose, dry_run=dry_run)
+        ctx.obj = RunContext(config=cfg, project=project, verbose=verbose, dry_run=dry_run)
     except Exception as err:
         console.print(f"[bold red]Configuration Error:[/bold red] {err}")
         raise typer.Exit(code=1)

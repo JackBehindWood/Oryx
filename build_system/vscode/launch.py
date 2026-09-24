@@ -3,11 +3,9 @@ import platform
 import shutil
 from pathlib import Path
 
-from build_system.config import BuildConfig, PROJECT_ROOT
+from build_system.config import BuildConfig
 from build_system.utils import load_json, merge_by_key, write_json
 from build_system.vscode.tasks import LABEL_PREFIX, PROFILES
-
-LAUNCH_FILE = PROJECT_ROOT / ".vscode" / "launch.json"
 
 # The one-line switch for a different debugger: add/replace an entry here.
 # "type" is VS Code's own launch.json debug-adapter type.
@@ -53,7 +51,7 @@ def _configuration(profile: str, cfg: BuildConfig, debugger: str) -> dict:
     return entry
 
 
-def write_launch(cfg: BuildConfig, debugger: str = "lldb", path: Path = LAUNCH_FILE) -> Path:
+def write_launch(cfg: BuildConfig, root: Path, debugger: str = "lldb") -> Path:
     """Generate/merge .vscode/launch.json with one debug configuration per
     build profile (Debug/Release/Dist), each wired to its matching
     "Compile (<Profile>)" task (see vscode/tasks.py) as its preLaunchTask —
@@ -61,6 +59,7 @@ def write_launch(cfg: BuildConfig, debugger: str = "lldb", path: Path = LAUNCH_F
     "build then debug" flow per profile, the closest match to Visual
     Studio's configuration dropdown without needing a custom extension.
     """
+    path = root / ".vscode" / "launch.json"
     generated = [_configuration(profile, cfg, debugger) for profile in PROFILES]
 
     existing = load_json(path, default={"version": "0.2.0", "configurations": []})

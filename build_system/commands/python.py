@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 
 from build_system import registry
-from build_system.config import PROJECT_ROOT, RunContext
+from build_system.config import RunContext
 from build_system.utils import run_command
 
 console = Console()
@@ -25,7 +25,7 @@ def generate_stubs(ctx: typer.Context):
 
     try:
         with console.status("[bold blue]🐍 Regenerating stubs...[/bold blue]"):
-            result = run_command(command_line, cwd=PROJECT_ROOT)
+            result = run_command(command_line, cwd=run.project.root)
         if run.verbose and result.stdout:
             console.print(result.stdout)
         console.print("[bold green]✓ Stubs regenerated.[/bold green]\n")
