@@ -37,9 +37,9 @@ def test_requirements():
     from build_system.config import Dependency
 
     spec = Dependency(requires=["python", "!sanitize"])
-    assert requirements_met(spec, {"python": True, "sanitize": False})
-    assert not requirements_met(spec, {"python": False, "sanitize": False})
-    assert not requirements_met(spec, {"python": True, "sanitize": True})
+    assert requirements_met(spec.requires, {"python": True, "sanitize": False})
+    assert not requirements_met(spec.requires, {"python": False, "sanitize": False})
+    assert not requirements_met(spec.requires, {"python": True, "sanitize": True})
 
 
 def test_required_skips_pybind11_without_python(project):

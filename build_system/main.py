@@ -24,7 +24,17 @@ app = typer.Typer(
 # requires no edits to this file. See build_system/registry.py.
 for _module in registry.discover_command_modules():
     _name = _module.__name__.rsplit(".", 1)[-1]
-    app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""), hidden=getattr(_module, "GROUP_HIDDEN", False))
+    _root_command = getattr(_module, "ROOT_COMMAND", None)
+    if _root_command is not None:
+        # A Click Group always resolves its first leftover positional token as a subcommand name
+        # (even with invoke_without_command=True), so a variadic argument on the group's own
+        # callback can never coexist with real subcommands, and forcing allow_interspersed_args
+        # still can't recover a `--`-delimited passthrough tail. A module that needs
+        # `name [ARGS] [-- extra]` (see commands/test.py) mounts as a plain leaf command instead
+        # of the usual add_typer() sub-group.
+        app.command(name=_name, help=getattr(_module, "GROUP_HELP", ""), context_settings=getattr(_module, "ROOT_COMMAND_CONTEXT_SETTINGS", {}))(_root_command)
+    else:
+        app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""), hidden=getattr(_module, "GROUP_HIDDEN", False))
 
 def _discover(ctx: typer.Context) -> Project:
     try:

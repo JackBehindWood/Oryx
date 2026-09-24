@@ -119,11 +119,14 @@ Handles build lifecycle, Premake configuration, and binary compilation.
 
 **`test`**
 
-Manages test execution suites.
+Runs the suites declared under `forge.toml`'s `[tests.suites]` (default: every suite with `default = true`). Each suite's directory decides its runner: a `conftest.py`/`test_*.py` present means pytest, otherwise the compiled doctest binary filtered to that directory via `--source-file`.
 
 | Command | Description |
 | --- | --- |
-| `test` / `test run` | Executes the compiled test binary for the active build profile (bare `test` runs it directly). |
+| `test [SUITE[,SUITE...]]` | Runs the named suites (comma-separated), or every default suite when none are given. `test run` is a deprecated alias for the latter. |
+| `test [SUITE...] -- ARGS` | Passes `ARGS` straight to the runner; only valid when every selected suite shares one (doctest or pytest, not both). |
+| `test --list` | Lists the selected suites' test cases/items instead of running them. |
+| `test benchmark` | A suite name like any other (`default = false`, so it's opt-in). |
 
 ---
 

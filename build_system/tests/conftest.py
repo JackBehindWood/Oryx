@@ -51,6 +51,9 @@ presets.bench = ["--simulate=random,first-legal,100", "--benchmark"]
 
 [tests]
 project = "Tests"
+suites.unit = "tests/unit"
+suites.integration = "tests/integration"
+suites.benchmark = { dir = "tests/benchmark", default = false }
 
 [dependencies]
 spdlog = { kind = "static", include = "include", sources = "src", defines = ["SPDLOG_COMPILED_LIB"] }

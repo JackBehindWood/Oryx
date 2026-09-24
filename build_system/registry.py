@@ -75,6 +75,19 @@ def make_group(app: typer.Typer, group: str):
     return command
 
 
+def register_entry(*, group: str, label: str, func: Callable, hidden: bool = False) -> None:
+    """Add `func` to the interactive menu under `group` without also registering it as a Click subcommand.
+
+    For a module whose CLI behaviour lives entirely on its Typer app's own
+    `@app.callback(...)` (e.g. `forge test [SUITE...]`, where a variadic
+    Argument on a Group callback makes any further `@command(...)`
+    subcommand unreachable — Click's parser consumes every remaining
+    positional token into that Argument before it ever looks for a
+    subcommand name) rather than on a `@command(...)` subcommand.
+    """
+    _REGISTRY.append(CommandEntry(group=group, label=label, func=func, order=next(_counter), hidden=hidden))
+
+
 def _with_dependency_check(func: Callable) -> Callable:
     @functools.wraps(func)
     def guarded(ctx, *args, **kwargs):

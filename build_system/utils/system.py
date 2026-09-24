@@ -1,5 +1,7 @@
+import os
 import platform
 import subprocess
+from pathlib import Path
 
 
 def get_os():
@@ -41,6 +43,19 @@ def run_command(command, cwd=None, capture_output=True, env=None):
         text=True,
         check=True,
     )
+
+
+def child_env(extra_path: Path | None = None, extra: dict[str, str] | None = None) -> dict:
+    """A copy of the current environment with `extra_path` prepended to PATH and `extra` applied.
+
+    Used to give a child process (e.g. the Tests binary) the same Python
+    interpreter this forge invocation runs under, without requiring `uv run`.
+    """
+    env = dict(os.environ)
+    if extra_path is not None:
+        env["PATH"] = f"{extra_path}{os.pathsep}{env.get('PATH', '')}"
+    env.update(extra or {})
+    return env
 
 
 def missing_module_hint(module: str, uv_group: str, pip_packages: list[str]) -> str | None:

@@ -34,14 +34,21 @@ def _requirement_name(requirement: str) -> str:
     return requirement.removeprefix("!")
 
 
+def _check_requires(where: str, requires: list[str], options) -> None:
+    for requirement in requires:
+        option = _requirement_name(requirement)
+        if option not in options:
+            raise SchemaError(f"forge.toml: '{where}.requires' names unknown option '{option}'{suggestion(option, options)}")
+
+
 def validate(cfg: ForgeConfig) -> ForgeConfig:
     """Cross-table checks that a single table's schema can't express."""
     options = cfg.options.keys()
     for name, dependency in cfg.dependencies.items():
-        for requirement in dependency.requires:
-            option = _requirement_name(requirement)
-            if option not in options:
-                raise SchemaError(f"forge.toml: 'dependencies.{name}.requires' names unknown option '{option}'{suggestion(option, options)}")
+        _check_requires(f"dependencies.{name}", dependency.requires, options)
+    if cfg.tests:
+        for name, suite in cfg.tests.suites.items():
+            _check_requires(f"tests.suites.{name}", suite.requires, options)
     default_target = cfg.project.default_target
     if default_target and default_target not in cfg.targets:
         raise SchemaError(
@@ -50,8 +57,17 @@ def validate(cfg: ForgeConfig) -> ForgeConfig:
     return cfg
 
 
+def _normalize_tests(data: dict) -> dict:
+    """A suite may be a bare string ('tests/unit') shorthand for {dir = "tests/unit"}."""
+    tests = data.get("tests")
+    if not isinstance(tests, dict) or not isinstance(tests.get("suites"), dict):
+        return data
+    suites = {name: ({"dir": suite} if isinstance(suite, str) else suite) for name, suite in tests["suites"].items()}
+    return {**data, "tests": {**tests, "suites": suites}}
+
+
 def parse_config(data: dict) -> ForgeConfig:
-    return validate(from_dict(ForgeConfig, data))
+    return validate(from_dict(ForgeConfig, _normalize_tests(data)))
 
 
 def load_config(path: Path, installed_version: str) -> ForgeConfig:

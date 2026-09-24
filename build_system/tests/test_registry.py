@@ -32,7 +32,7 @@ def test_entries_for_group():
         "Editor": ["vscode", "vs2022"],
         "Python": ["generate_stubs"],
         "Setup": ["premake"],
-        "Test": ["run_tests", "run_benchmarks"],
+        "Test": ["run_suites"],
     }
 
 

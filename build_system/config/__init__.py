@@ -22,6 +22,7 @@ from .schema import (
     Profile,
     ProjectTable,
     SchemaError,
+    Suite,
     Target,
     TestsTable,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "ProjectTable",
     "RunContext",
     "SchemaError",
+    "Suite",
     "Target",
     "TestsTable",
     "load_config",

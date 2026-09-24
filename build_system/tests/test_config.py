@@ -10,6 +10,7 @@ from build_system.config import (
     LocalConfig,
     Profile,
     SchemaError,
+    Suite,
     load_config,
     load_local,
     parse_config,
@@ -55,6 +56,16 @@ def test_dependency_table():
     assert cfg.dependencies["pybind11"].source == "submodule"
 
 
+def test_tests_table_suites_accept_a_bare_string_or_a_table():
+    cfg = parse(
+        '[project]\nname = "x"\n[options]\npython = { default = true }\n[tests]\nproject = "Tests"\n'
+        'suites.unit = "tests/unit"\n'
+        'suites.benchmark = { dir = "tests/benchmark", default = false, requires = ["python"] }\n'
+    )
+    assert cfg.tests.suites["unit"] == Suite(dir="tests/unit")
+    assert cfg.tests.suites["benchmark"] == Suite(dir="tests/benchmark", default=False, requires=["python"])
+
+
 @pytest.mark.parametrize(
     ("text", "message"),
     [
@@ -67,6 +78,7 @@ def test_dependency_table():
         ("[targets.app]\nprojekt = 'App'", "unknown key 'targets.app.projekt' — did you mean 'project'?"),
         ("[targets.app]\nproject = 'App'\npresets = { a = 'x' }", "'targets.app.presets.a' must be an array"),
         ("[dependencies]\nx = { requires = ['pyhton'] }", "names unknown option 'pyhton'"),
+        ("[tests]\nproject = 'Tests'\nsuites.x = { dir = 'd', requires = ['pyhton'] }", "'tests.suites.x.requires' names unknown option 'pyhton'"),
         ("[project]\ndefault-target = 'oasys'", "'project.default-target' is 'oasys', which is not in [targets]"),
     ],
 )

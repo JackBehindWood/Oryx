@@ -183,8 +183,8 @@ def run_all(ctx: typer.Context):
     """Configure, compile, and execute tests sequentially."""
     ctx.invoke(configure, ctx)
     ctx.invoke(compile_project, ctx)
-    from build_system.commands.test import run_tests
-    ctx.invoke(run_tests, ctx)
+    from build_system.commands.test import run_suites
+    ctx.invoke(run_suites, ctx, suites=None, list_=False)
 
 
 EXECUTABLE_KINDS = ("ConsoleApp", "WindowedApp")

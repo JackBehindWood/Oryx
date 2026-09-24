@@ -70,7 +70,7 @@ def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tes
     assert dry("build", "all") == [
         f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export",
         f" would run: make -C {tmp_project / 'build'} -j8 config=debug_x64",
-        f" would run: {tests_binary}",
+        f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
     ]
 
 
@@ -182,13 +182,41 @@ def test_compile_before_configure_uses_a_placeholder_token(dry, tmp_project):
     assert dry("build", "compile") == [f" would run: make -C {tmp_project / 'build'} -j8 config=<from export>"]
 
 
-@pytest.mark.parametrize("args", [["test"], ["test", "run"]])
-def test_tests(dry, tests_binary, args):
-    assert dry(*args) == [f" would run: {tests_binary}"]
+def test_tests(dry, tests_binary):
+    assert dry("test") == [f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*"]
+
+
+def test_tests_run_alias_is_deprecated(dry, tests_binary):
+    assert dry("test", "run") == [
+        "Note: 'test run' is deprecated; use 'forge test'.",
+        f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
+    ]
 
 
 def test_benchmark(dry, tests_binary):
-    assert dry("test", "benchmark") == [f" would run: {tests_binary} --test-suite=benchmark"]
+    assert dry("test", "benchmark") == [f" would run: {tests_binary} --source-file=*tests/benchmark/*"]
+
+
+def test_tests_unknown_suite(forge):
+    result = forge("--dry-run", "test", "unti")
+    assert result.exit_code == 1
+    assert "Unknown test suite 'unti' — did you mean 'unit'?" in result.output
+
+
+def test_tests_passthrough_rejected_across_runners(forge, tmp_project):
+    (tmp_project / "tests" / "python").mkdir(parents=True)
+    (tmp_project / "tests" / "python" / "conftest.py").touch()
+    config = tmp_project / "forge.toml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            'suites.benchmark = { dir = "tests/benchmark", default = false }',
+            'suites.benchmark = { dir = "tests/benchmark", default = false }\nsuites.python = { dir = "tests/python" }',
+        ),
+        encoding="utf-8",
+    )
+    result = forge("--dry-run", "test", "unit,python", "--", "-k", "foo")
+    assert result.exit_code == 1
+    assert "-- arguments need every selected suite to share one runner" in result.output
 
 
 def test_docs(dry, tmp_project):

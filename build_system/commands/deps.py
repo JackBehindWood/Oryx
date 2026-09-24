@@ -143,7 +143,7 @@ def add(
 def sync(ctx: typer.Context):
     """Fetch every dependency this build needs that is missing, whatever [build] fetch says."""
     run: RunContext = ctx.obj
-    absent = [dep for dep in resolve_all(run.project, run.config) if requirements_met(dep.spec, run.options) and not dep.present]
+    absent = [dep for dep in resolve_all(run.project, run.config) if requirements_met(dep.spec.requires, run.options) and not dep.present]
     if run.dry_run:
         for dep in absent:
             console.print(f"[dim][dry-run] would fetch {dep.name} into {shown(run, dep.dir)}[/dim]")
@@ -197,7 +197,7 @@ def status(ctx: typer.Context):
     deps = resolve_all(run.project, run.config)
     table = Table("name", "source", "kind", "path", "pin", "state", "requires")
     for dep in deps:
-        needed = requirements_met(dep.spec, run.options)
+        needed = requirements_met(dep.spec.requires, run.options)
         state = ("[green]present[/green]" if dep.present else "[red]missing[/red]") if needed else "[dim]not needed[/dim]"
         table.add_row(dep.name, dep.spec.source, str(dep.spec.kind), shown(run, dep.dir), source_for(dep).pin(run.project.root, dep), state, ", ".join(dep.spec.requires))
     console.print(table)

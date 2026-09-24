@@ -99,8 +99,16 @@ class Target:
 
 
 @dataclass(frozen=True)
+class Suite:
+    dir: str
+    default: bool = True
+    requires: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class TestsTable:
     project: str
+    suites: dict[str, Suite] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

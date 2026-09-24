@@ -39,9 +39,9 @@ def dependency_dir(project: Project, cfg: ForgeConfig, name: str, spec: Dependen
     return project.path(spec.path) if spec.path else project.path(cfg.build.dependencies_dir) / name
 
 
-def requirements_met(spec: Dependency, options: dict[str, bool]) -> bool:
+def requirements_met(requires: list[str], options: dict[str, bool]) -> bool:
     """`requires = ["python", "!sanitize"]`: every named option on, every `!`-prefixed one off."""
-    for requirement in spec.requires:
+    for requirement in requires:
         wanted = not requirement.startswith("!")
         if options.get(requirement.removeprefix("!"), False) != wanted:
             return False
@@ -54,7 +54,7 @@ def resolve_all(project: Project, cfg: ForgeConfig) -> list[ResolvedDependency]:
 
 def required(run: RunContext) -> list[ResolvedDependency]:
     """The dependencies this run's options need; the others are never checked, fetched or given to Premake."""
-    return [dep for dep in resolve_all(run.project, run.config) if requirements_met(dep.spec, run.options)]
+    return [dep for dep in resolve_all(run.project, run.config) if requirements_met(dep.spec.requires, run.options)]
 
 
 def missing(run: RunContext) -> list[ResolvedDependency]:
