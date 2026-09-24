@@ -24,7 +24,7 @@ def tests_binary(tmp_project):
 
 
 def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
-    assert dry("build", "configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS}"]
+    assert dry("build", "configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export"]
 
 
 @pytest.mark.parametrize(
@@ -37,7 +37,7 @@ def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
     ],
 )
 def test_configure(dry, premake, flags, options):
-    assert dry(*flags, "build", "configure") == [f" would run: {premake} gmake {options}"]
+    assert dry(*flags, "build", "configure") == [f" would run: {premake} gmake {options} --forge-export"]
 
 
 @pytest.mark.parametrize(
@@ -61,7 +61,7 @@ def test_clean(dry, tmp_project):
 
 def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tests_binary):
     assert dry("build", "all") == [
-        f" would run: {premake} gmake {PYTHON_OPTIONS}",
+        f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export",
         f" would run: make -C {tmp_project / 'build'} -j8 config=debug_x64",
         f" would run: {tests_binary}",
     ]
@@ -80,10 +80,16 @@ def test_run(dry, tmp_project, args, passed):
     assert dry("build", "run", *args) == [f" would run: {oasis}{passed}"]
 
 
-def test_run_uses_the_fallback_outputdir_without_a_generated_make_file(dry, tmp_project):
-    (tmp_project / "build" / "Oryx.make").unlink()
-    oasis = tmp_project / "build" / "bin" / "Debug-linux-x64" / "Oasis" / "Oasis"
-    assert dry("build", "run") == [f" would run: {oasis}"]
+def test_run_before_configure_asks_for_it(forge, tmp_project):
+    (tmp_project / "build" / "forge" / "workspace.json").unlink()
+    result = forge("--dry-run", "build", "run")
+    assert result.exit_code == 1
+    assert "run `forge build configure` first" in result.output
+
+
+def test_compile_before_configure_uses_a_placeholder_token(dry, tmp_project):
+    (tmp_project / "build" / "forge" / "workspace.json").unlink()
+    assert dry("build", "compile") == [f" would run: make -C {tmp_project / 'build'} -j8 config=<from export>"]
 
 
 @pytest.mark.parametrize("args", [["test"], ["test", "run"]])

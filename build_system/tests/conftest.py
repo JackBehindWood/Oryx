@@ -160,6 +160,7 @@ def tmp_project(tmp_path, monkeypatch, linux_host) -> Path:
     build_dir.mkdir()
     for project in ("Oryx", "Tests"):
         (build_dir / f"{project}.make").write_text(make_file(project), encoding="utf-8")
+    write_workspace(tmp_path)
     return tmp_path
 
 

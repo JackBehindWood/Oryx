@@ -4,7 +4,6 @@ import typer
 from rich.console import Console
 
 from build_system import registry
-from build_system import legacy_outputs
 from build_system.config import RunContext
 from build_system.utils import run_command
 
@@ -18,7 +17,9 @@ def _test_binary(run: RunContext):
     if run.config.tests is None:
         console.print("[bold red]✗ No [tests] table in forge.toml.[/bold red]")
         raise typer.Exit(code=1)
-    return legacy_outputs.target_path(run.project.build_dir, run.profile, run.config.project.name, run.config.tests.project)
+    from build_system.commands.build import require_workspace
+
+    return require_workspace(run).target_path(run.config.tests.project, run.profile)
 
 
 @app.callback()

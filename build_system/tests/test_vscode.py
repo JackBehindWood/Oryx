@@ -77,7 +77,7 @@ def test_launch_entries_per_profile(tmp_project, run):
             "preLaunchTask": f"Oryx: Compile ({label})",
             "console": "internalConsole",
         }
-        for label, outputdir in [("Debug", "Debug-linux-x86_64"), ("Release", "Release-linux-x86_64"), ("Dist", "Dist-linux-x64")]
+        for label, outputdir in [("Debug", "Debug-linux-x86_64"), ("Release", "Release-linux-x86_64"), ("Dist", "Dist-linux-x86_64")]
     ]
 
 

@@ -2,7 +2,7 @@ import platform
 import shutil
 from pathlib import Path
 
-from build_system import legacy_outputs
+from build_system import workspace
 from build_system.config import RunContext
 from build_system.utils import load_json, merge_by_key, write_json
 from build_system.vscode.tasks import LABEL_PREFIX, PROFILES
@@ -31,7 +31,7 @@ DEBUGGER_EXTRA_KEYS = {"lldb": _lldb_extra_keys, "cppdbg": _cppdbg_extra_keys}
 
 def _configuration(profile: str, run: RunContext, debugger: str) -> dict:
     target = run.config.targets[run.config.project.default_target]
-    program = legacy_outputs.target_path(run.project.build_dir, profile, run.config.project.name, target.project)
+    program = workspace.require(run.project).target_path(target.project, profile)
     label = profile.capitalize()
 
     entry = {

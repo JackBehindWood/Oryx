@@ -5,17 +5,17 @@ from pathlib import Path
 import pytest
 
 from build_system import workspace
-from build_system.tests.conftest import workspace_json, write_workspace
+from build_system.tests.conftest import workspace_json
 from build_system.workspace import WorkspaceError, WsConfig, select_config
 
 
 @pytest.fixture
-def ws(tmp_project, project):
-    write_workspace(tmp_project)
+def ws(project):
     return workspace.require(project)
 
 
 def test_load_before_configure_is_none(project):
+    workspace.workspace_file(project).unlink()
     assert workspace.load(project) is None
     with pytest.raises(WorkspaceError, match="run `forge build configure` first"):
         workspace.require(project)

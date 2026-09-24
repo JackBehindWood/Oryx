@@ -2,9 +2,10 @@ import subprocess
 from pathlib import Path
 
 from ..utils import remove_directory, run_command
+from ..workspace import Workspace
 
 
-def prune_stale_object_dirs(config_token: str, outputdir: str, build_dir: Path) -> list[str]:
+def prune_stale_object_dirs(workspace: Workspace, profile: str, build_dir: Path) -> list[str]:
     """Clear out any project's object/dependency cache left stale by a
     source file move/rename/delete since the last build.
 
@@ -24,9 +25,12 @@ def prune_stale_object_dirs(config_token: str, outputdir: str, build_dir: Path) 
     the next real build regenerates it cleanly.
     """
     cleaned = []
+    config_token = workspace.token(profile)
 
-    for make_file in sorted(build_dir.glob("*.make")):
-        project = make_file.stem
+    for project in sorted(workspace.projects):
+        make_file = build_dir / f"{project}.make"
+        if not make_file.is_file():
+            continue
         try:
             run_command(["make", "-n", "-f", make_file.name, f"config={config_token}"], cwd=build_dir)
         except (subprocess.CalledProcessError, FileNotFoundError) as error:
@@ -34,8 +38,7 @@ def prune_stale_object_dirs(config_token: str, outputdir: str, build_dir: Path) 
             if "No rule to make target" not in stderr:
                 continue
 
-            object_dir = build_dir / "bin-int" / outputdir / project
-            remove_directory(object_dir)
+            remove_directory(workspace.config(project, profile).objdir)
             cleaned.append(project)
 
     return cleaned
@@ -60,62 +63,3 @@ def clear_outputs_if_python_changed(premake_options: list[str], build_dir: Path)
 
     options_file.write_text(current, encoding="utf-8")
     return changed
-
-
-SOURCE_ROOTS = {"Oryx/src": "Oryx", "Oryx/backends": "Oryx", "OryxPython": "OryxPython", "Oasis": "Oasis", "tests": "Tests"}
-SOURCE_SUFFIXES = {".cpp", ".c", ".mm"}
-SKIPPED_DIRS = {"vendor", "build", "bin", "bin-int", ".git", "__pycache__"}
-
-
-def _manifest_file(root: Path) -> Path:
-    return root / "build" / ".sources"
-
-
-def source_manifest(root: Path) -> list[str]:
-    """Every compiled source file Premake globs into a project, as sorted repo-relative paths."""
-    sources = []
-    for source_root in SOURCE_ROOTS:
-        base = root / source_root
-        for path in base.rglob("*") if base.is_dir() else []:
-            relative = path.relative_to(base)
-            if path.suffix in SOURCE_SUFFIXES and not SKIPPED_DIRS.intersection(relative.parts[:-1]):
-                sources.append(path.relative_to(root).as_posix())
-    return sorted(sources)
-
-
-def _recorded_sources(root: Path) -> list[str] | None:
-    manifest = _manifest_file(root)
-    if not manifest.is_file():
-        return None
-    return manifest.read_text(encoding="utf-8").splitlines()
-
-
-def sources_changed(root: Path) -> bool:
-    """True when a source file was added or removed since the last configure, so the generated Makefiles are stale."""
-    return _recorded_sources(root) != source_manifest(root)
-
-
-def clear_outputs_of_removed_sources(root: Path) -> list[str]:
-    """Delete the binaries of every project that lost a source file since the last configure.
-
-    Premake regenerates the object list, but `ar` keeps the archive member of a removed source
-    (the link then fails on symbols that no longer exist) and an executable is not relinked just
-    because it lost an object (a deleted test would keep running from the old binary). Removing
-    the project's binaries makes Make archive or link them again from the current objects.
-    """
-    previous = _recorded_sources(root)
-    if previous is None:
-        return []
-
-    removed = set(previous) - set(source_manifest(root))
-    projects = sorted({project for source_root, project in SOURCE_ROOTS.items() for path in removed if path.startswith(source_root + "/")})
-    for project in projects:
-        for output_dir in (root / "build" / "bin").glob(f"*/{project}"):
-            remove_directory(output_dir)
-    return projects
-
-
-def record_source_manifest(root: Path) -> None:
-    manifest = _manifest_file(root)
-    manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text("\n".join(source_manifest(root)), encoding="utf-8")

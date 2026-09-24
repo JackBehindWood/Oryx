@@ -4,22 +4,16 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from build_system import registry
+from build_system import freshness, registry, workspace
 from build_system.compile_commands import generate_compile_commands
-from build_system import legacy_outputs
 from build_system.config import RunContext
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
 from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
 from build_system.setup.python_extension import install_extension_pth, remove_extension_pth
-from build_system.setup.stale_objects import (
-    clear_outputs_if_python_changed,
-    clear_outputs_of_removed_sources,
-    prune_stale_object_dirs,
-    record_source_manifest,
-    sources_changed,
-)
+from build_system.setup.stale_objects import clear_outputs_if_python_changed, prune_stale_object_dirs
 from build_system.utils import remove_directory, run_command
+from build_system.workspace import Workspace, WorkspaceError
 
 console = Console()
 app = typer.Typer(no_args_is_help=True)
@@ -27,8 +21,21 @@ GROUP_HELP = "Configure, build, and clean the engine binaries"
 command = registry.make_group(app, group="Build")
 
 
-def _outputdir(run: RunContext) -> str:
-    return legacy_outputs.outputdir(run.project.build_dir, run.profile, run.config.project.name)
+def require_workspace(run: RunContext) -> Workspace:
+    try:
+        return workspace.require(run.project)
+    except WorkspaceError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1)
+
+
+def _clear_targets_that_lost_sources(previous: freshness.Stamp | None, ws: Workspace) -> None:
+    # `ar` keeps a removed source's archive member and Make won't relink an executable that only lost an object.
+    for name in freshness.projects_that_lost_sources(previous, ws):
+        ws_project = ws.projects.get(name)
+        for cfg in ws_project.configs if ws_project else ():
+            cfg.target.unlink(missing_ok=True)
+        console.print(f"[yellow]⚠️ Cleared {name} binaries (a source file was removed).[/yellow]\n")
 
 
 @command(name="configure", label="Configure — generate Premake build files")
@@ -52,7 +59,7 @@ def configure(ctx: typer.Context):
 
     if run.dry_run:
         premake = get_premake_executable(project.premake_bin_dir)
-        command_line = [str(premake), generator, *premake_options]
+        command_line = [str(premake), generator, *premake_options, "--forge-export"]
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
@@ -63,7 +70,8 @@ def configure(ctx: typer.Context):
     if python_info is not None:
         write_python_config(python_info, project.build_dir)
 
-    command_line = [str(premake), generator, *premake_options]
+    command_line = [str(premake), generator, *premake_options, "--forge-export"]
+    previous = freshness.load_stamp(project)
 
     try:
         with console.status("[bold blue]⚙️ Configuring build...[/bold blue]"):
@@ -78,18 +86,19 @@ def configure(ctx: typer.Context):
     if clear_outputs_if_python_changed(premake_options, project.build_dir):
         console.print("[yellow]⚠️ Build options changed (Python or --sanitize); cleared previous binaries and objects.[/yellow]\n")
 
-    for name in clear_outputs_of_removed_sources(project.root):
-        console.print(f"[yellow]⚠️ Cleared {name} binaries (a source file was removed).[/yellow]\n")
-    record_source_manifest(project.root)
+    ws = require_workspace(run)
+    (project.build_dir / ".sources").unlink(missing_ok=True)
+    _clear_targets_that_lost_sources(previous, ws)
+    freshness.record(project, ws)
 
-    for name in prune_stale_object_dirs(legacy_outputs.make_config_token(run.profile), _outputdir(run), project.build_dir):
+    for name in prune_stale_object_dirs(ws, run.profile, project.build_dir):
         console.print(
             f"[yellow]⚠️ Cleared stale object cache for {name} "
             "(moved/renamed/deleted source detected).[/yellow]\n"
         )
 
     try:
-        if generate_compile_commands(legacy_outputs.make_config_token(run.profile), project.build_dir):
+        if generate_compile_commands(ws.token(run.profile), project.build_dir):
             console.print("[bold green]✓ compile_commands.json generated.[/bold green]\n")
     except Exception as error:
         console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {error}[/yellow]\n")
@@ -101,12 +110,15 @@ def compile_project(ctx: typer.Context):
     run: RunContext = ctx.obj
     cfg = run.config
 
-    if not run.dry_run and sources_changed(run.project.root):
-        console.print("[yellow]⚠️ Source files were added or removed; regenerating build files first.[/yellow]\n")
+    reason = None if run.dry_run else freshness.stale(run.project)
+    if reason:
+        console.print(f"[yellow]⚠️ Regenerating build files first ({reason}).[/yellow]\n")
         ctx.invoke(configure, ctx)
 
+    ws = workspace.load(run.project)
+    token = ws.token(run.profile) if ws else "<from export>"
     try:
-        command_line = build_compile_command(cfg.premake.generator, legacy_outputs.make_config_token(run.profile), run.project.build_dir, run.jobs)
+        command_line = build_compile_command(cfg.premake.generator, token, run.project.build_dir, run.jobs)
     except ValueError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1)
@@ -127,7 +139,7 @@ def compile_project(ctx: typer.Context):
 
     python_enabled = run.options.get("python", False)
     if python_enabled and not run.options.get("sanitize", False):
-        install_extension_pth(run.project.bin_dir / _outputdir(run) / "OryxPython")
+        install_extension_pth(ws.target_path("OryxPython", run.profile).parent)
     elif remove_extension_pth():
         # A sanitized oryx.so needs the ASan runtime preloaded, which a plain `python` never has.
         reason = "a --sanitize extension can't be imported by plain python" if python_enabled else "this build has no Python extension"
@@ -190,7 +202,7 @@ def run_project(
     cfg = run.config
 
     target = cfg.targets[cfg.project.default_target]
-    exe_path = legacy_outputs.target_path(run.project.build_dir, run.profile, cfg.project.name, target.project)
+    exe_path = require_workspace(run).target_path(target.project, run.profile)
 
     args = [str(exe_path)]
     if game:
