@@ -46,3 +46,29 @@ To suggest a feature or improvement:
    (`tests/vendor/doctest`, the test framework, is a git submodule — without
    this step `uv run forge compile` will fail with a clear message
    telling you to run it.)
+
+#### Build & test
+
+The build/tooling CLI is `pyforge` (`forge` on the command line), documented in
+[`build_system/pyforge/README.md`](build_system/pyforge/README.md) and
+[`docs/tooling.md`](docs/tooling.md). Two ways to get it:
+
+**uv (recommended)** — a single command installs pyforge, its `menu`/`plugins` extras and
+Oryx's own dev dependencies (research, docs, test) into one workspace:
+```bash
+uv sync
+uv run forge all          # configure, compile, test
+uv run forge run          # run the Oasis sandbox
+```
+
+**Plain pip** — no uv required; installs pyforge as a standalone package:
+```bash
+python -m venv .venv && source .venv/bin/activate    # .venv\Scripts\activate on Windows
+pip install -e "build_system/pyforge[menu,plugins]"
+pip install --group research pytest
+forge all
+```
+
+Both call the same `forge.toml`-driven CLI; `uv sync`'s workspace is only a convenience for
+working on Oryx and pyforge together. If you're changing pyforge itself, its own test suite
+(`cd build_system/pyforge && pytest`) is faster to iterate against than a full Oryx build.

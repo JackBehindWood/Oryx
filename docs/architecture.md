@@ -696,7 +696,7 @@ is a self-registering factory: a game or strategy registers a name and a
 factory function via a static object in its own `.cpp` file, so adding a
 new one never requires editing shared engine code.
 
-This mirrors `build_system/registry.py`'s decorator-based command
+This mirrors pyforge's `registry.py`'s decorator-based command
 auto-discovery already used in this project's Python tooling — a single
 `Registry<T>::create("name")`-style lookup gives the same ergonomics as
 Gymnasium's `gym.make("name")`, without Gymnasium's `__init__.py`
