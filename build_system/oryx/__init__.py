@@ -1,13 +1,13 @@
-"""The Oryx pyforge plugin: everything specific to this engine, kept out of the generic build_system.
+"""The Oryx pyforge plugin: everything specific to this engine, kept out of the generic pyforge.
 
-Behind pyforge's hookspecs (build_system/plugins.py): the embedded Python backend's Premake args,
+Behind pyforge's hookspecs (pyforge/plugins.py): the embedded Python backend's Premake args,
 PythonConfig.h, the `import oryx` .pth file, `forge python stubs`, and the [tool.oryx] schema.
 Loaded via forge.toml's `[plugins] paths = ["build_system/oryx"]`.
 """
 
 from rich.console import Console
 
-from build_system.api import hookimpl
+from pyforge.api import hookimpl
 
 from . import commands
 from .python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
@@ -36,7 +36,7 @@ def forge_pre_configure(ctx):
 
 @hookimpl
 def forge_post_compile(ctx):
-    from build_system import workspace
+    from pyforge import workspace
 
     python_enabled = ctx.options.get("python", False)
     if python_enabled and not ctx.options.get("sanitize", False):

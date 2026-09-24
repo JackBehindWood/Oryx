@@ -1,6 +1,6 @@
 """Locate the Python that the embedded scripting backend builds against.
 
-Read from the interpreter running build_system (the uv venv), so the headers, libpython and
+Read from the interpreter running pyforge (the uv venv), so the headers, libpython and
 standard library the C++ side links are the ones `uv run` uses. The values reach Premake as
 the --python-* options declared in premake/python.lua, except the interpreter's home and
 site-packages, which go into a generated header only PythonRuntime.cpp includes.

@@ -5,9 +5,9 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from build_system import registry
-from build_system.config import RunContext
-from build_system.utils import missing_module_hint, run_command
+from pyforge import registry
+from pyforge.config import RunContext
+from pyforge.utils import missing_module_hint, run_command
 
 console = Console()
 app = typer.Typer(no_args_is_help=True)

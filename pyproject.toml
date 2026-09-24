@@ -1,31 +1,15 @@
-[project]
-name = "oryx-build"
-dynamic = ["version"]
-description = "Build, test and docs tooling for the Oryx game strategy engine (the `forge` command)."
-readme = "README.md"
-requires-python = ">=3.11"
-license = "Apache-2.0"
-license-files = ["LICENSE"]
-authors = [
-    { name = "JackBehindWood" }
-]
-keywords = ["game-engine", "simulation", "strategy", "decision-making"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-]
-dependencies = [
-    "typer>=0.9.0",
-    "rich>=13.0.0",
-    "questionary>=2.0.0",
-    "pluggy>=1.5",
-]
+[tool.uv.workspace]
+members = ["build_system/pyforge"]
+
+[tool.uv]
+package = false
+default-groups = ["dev", "research", "docs"]
+
+[tool.uv.sources]
+pyforge = { workspace = true }
 
 [dependency-groups]
+dev = ["pyforge[menu,plugins]"]
 research = [
     "ipykernel>=6.29",
     "numpy>=2.1",
@@ -42,31 +26,6 @@ test = [
     "pytest>=8",
     "pytest-cov>=5",
 ]
-
-[tool.uv]
-default-groups = ["research", "docs"]
-
-[project.scripts]
-forge = "build_system.main:app"
-pyforge = "build_system.main:app"
-
-[build-system]
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
-
-[tool.hatch.version]
-path = "build_system/__init__.py"
-
-[tool.hatch.build.targets.wheel]
-packages = ["build_system"]
-exclude = ["build_system/tests"]
-
-[tool.pytest.ini_options]
-testpaths = ["build_system/tests"]
-addopts = "-ra"
-
-[tool.coverage.run]
-omit = ["build_system/tests/*"]
 
 [tool.pyright]
 stubPath = "OryxPython/stubs"

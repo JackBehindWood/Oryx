@@ -1,0 +1,47 @@
+[project]
+name = "pyforge"
+dynamic = ["version"]
+description = "A project-independent Premake driver CLI (`forge`), configured by forge.toml and extended by plugins."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "JackBehindWood" }
+]
+keywords = ["build-system", "premake", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+menu = ["questionary>=2.0.0"]
+plugins = ["pluggy>=1.5"]
+
+[project.scripts]
+forge = "pyforge.main:app"
+pyforge = "pyforge.main:app"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/pyforge/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyforge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+omit = ["tests/*"]

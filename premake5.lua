@@ -1,6 +1,8 @@
 -- Oryx: An open-source engine for games, strategies, simulation, and decision-making
 
-include "premake/forge.lua"
+-- forge.lua ships inside the installed pyforge package; `uv run forge` passes its location via
+-- --scripts=<path>, so this resolves regardless of where pyforge is installed.
+require "forge"
 include "premake/oryx.lua"
 include "premake/python.lua"
 
