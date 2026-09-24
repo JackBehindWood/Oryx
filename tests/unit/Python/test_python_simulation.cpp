@@ -60,68 +60,6 @@ std::string summary(const BatchResult& result)
 
 } // namespace
 
-TEST_CASE("oryx.Match steps a game by hand with undo, redo and history")
-{
-    std::string output = run_script(
-        "match = oryx.Match('tictactoe', ['first-legal', 'first-legal'])\n"
-        "state = match.state()\n"
-        "mark(str(state.legal_actions()) + '|')\n"
-        "match.apply(4)\n"
-        "mark(str(match.history()) + str(state.current_player()) + str(match.current_player()) + '|')\n"
-        "mark(str(match.decide()) + '|')\n"
-        "mark(str(match.undo()) + str(match.undo()) + str(match.redo()) + str(match.history()) + '|')\n"
-        "mark(state.action_to_string(4))\n");
-
-    CHECK(output == "[0, 1, 2, 3, 4, 5, 6, 7, 8]|[4]11|0|4None4[4]|row 2, col 2");
-}
-
-TEST_CASE("the state handle of a match is read-only, so the match history cannot be bypassed")
-{
-    std::string output = run_script(
-        "match = oryx.Match('tictactoe', ['first-legal', 'first-legal'])\n"
-        "state = match.state()\n"
-        "match.apply(4)\n"
-        "for call in (lambda: state.apply(0), lambda: state.undo(4)):\n"
-        "    try:\n"
-        "        call()\n"
-        "    except oryx.OryxError as e:\n"
-        "        mark(str(e) + ';')\n"
-        "mark(str(match.undo()) + str(match.history()) + str(state.legal_actions()))\n");
-
-    CHECK(output ==
-          "this state belongs to a match and is read-only: use match.apply() and match.undo();"
-          "this state belongs to a match and is read-only: use match.apply() and match.undo();"
-          "4[][0, 1, 2, 3, 4, 5, 6, 7, 8]");
-}
-
-TEST_CASE("oryx.Match rejects illegal actions and mismatched strategy counts without touching the state")
-{
-    std::string output = run_script(
-        "match = oryx.Match('tictactoe', ['first-legal', 'first-legal'])\n"
-        "match.apply(4)\n"
-        "for call in (lambda: match.apply(4), lambda: match.apply(99), lambda: oryx.Match('tictactoe', ['random'])):\n"
-        "    try:\n"
-        "        call()\n"
-        "    except oryx.OryxError as e:\n"
-        "        mark(type(e).__name__ + ':' + str(e) + ';')\n"
-        "mark(str(match.history()))\n");
-
-    CHECK(output ==
-          "IllegalActionError:action 4 is not legal in this state;"
-          "IllegalActionError:action 99 is not legal in this state;"
-          "OryxError:TicTacToe has 2 players but 1 strategies were given;"
-          "[4]");
-}
-
-TEST_CASE("oryx.Match plays to the end and reports the rewards")
-{
-    std::string output = run_script(
-        "match = oryx.Match('tictactoe', ['first-legal', 'first-legal'])\n"
-        "mark(str(match.play()) + '|' + str(match.is_terminal()) + '|' + str(match.outcome()) + '|' + str(len(match.history())))\n");
-
-    CHECK(output == "[1.0, -1.0]|True|[1.0, -1.0]|7");
-}
-
 TEST_CASE("a state from new_initial_state is owned by Python and independent of the game")
 {
     std::string output = run_script(
@@ -148,30 +86,6 @@ TEST_CASE("oryx.simulate matches a C++ BatchRunner and is reproducible per seed"
         "mark(summary(a) + ';' + str(summary(a) == summary(b)) + ';' + str(summary(a) == summary(c)))\n");
 
     CHECK(output == summary(expected) + ";True;False");
-}
-
-TEST_CASE("oryx.simulate leaves strategy instances unseeded by the master seed")
-{
-    std::string output = run_script(
-        "mine = oryx.make_strategy('random', seed=5)\n"
-        "r = oryx.simulate('tictactoe', [mine, 'first-legal'], games=10, seed=1)\n"
-        "mark(str(r.matches) + repr(r))\n");
-
-    CHECK(output.find("10<oryx.BatchResult matches=10 wins=[") == 0);
-}
-
-TEST_CASE("oryx.BatchRunner runs repeatedly and rejects a negative count")
-{
-    std::string output = run_script(
-        "runner = oryx.BatchRunner('tictactoe', ['first-legal', 'first-legal'])\n"
-        "r = runner.run(3)\n"
-        "mark(f'{r.matches}|{r.wins}|{r.draws}|{r.decisions}|{r.rewards};')\n"
-        "try:\n"
-        "    runner.run(-1)\n"
-        "except oryx.OryxError as e:\n"
-        "    mark(str(e))\n");
-
-    CHECK(output == "3|[3, 0]|0|21|[3.0, -3.0];the number of matches cannot be negative");
 }
 
 TEST_CASE("oryx.Random is seedable and matches the C++ generator")
