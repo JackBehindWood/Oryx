@@ -1,8 +1,7 @@
 -- Oryx: An open-source engine for games, strategies, simulation, and decision-making
 
 include "premake/forge.lua"
-include "premake/common.lua"
-include "premake/vendor.lua"
+include "premake/oryx.lua"
 include "premake/python.lua"
 
 workspace "oryx"

@@ -1,7 +1,7 @@
 -- Test executable
 project "Tests"
     kind "ConsoleApp"
-    useOryxProjectDefaults()
+    forge.project_defaults()
 
     pchheader "oxpch.h"
     pchsource "oxpch.cpp"
@@ -14,7 +14,7 @@ project "Tests"
 
     -- vendor/doctest is the upstream doctest submodule: exclude its own
     -- tests/examples/scripts from our project, we only need its header.
-    useVendorHeader("doctest", "doctest")
+    forge.header_dependency("doctest", "doctest")
 
     -- Oasis's game/strategy sources are compiled in (not the Oasis executable's app/UI code) so their rules are unit-testable.
     files {
@@ -40,7 +40,7 @@ project "Tests"
     }
     useOryxPython()
 
-    linkOryxWholeArchive()
+    useOryxWholeArchive()
     useOryxAllocationCensus()
     links {
         "spdlog",

@@ -1,6 +1,6 @@
 project "Oryx"
     kind "StaticLib"
-    useOryxProjectDefaults()
+    forge.project_defaults()
 
     pchheader "oxpch.h"
 	pchsource "src/oxpch.cpp"

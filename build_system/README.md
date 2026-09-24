@@ -351,9 +351,9 @@ doctest  = { include = "doctest", path = "tests/vendor/doctest" }
   `dependencies-dir` that no entry refers to.
 * `remove NAME` — deinit and remove a submodule (local files are kept) and drop the entry.
 
-`tests/premake5.lua` still wires doctest with `premake/vendor.lua`'s `useVendorHeader("doctest", "doctest")`,
+`tests/premake5.lua` still wires doctest with `premake/forge.lua`'s `forge.header_dependency("doctest", "doctest")`,
 which also excludes the submodule's own sources from compilation.
 
 `forge vendor` is a hidden alias kept for old scripts; `vendor add` forwards to `deps add`.
-`premake/common.lua` factors out the `language`/`cppdialect`/`staticruntime`/`targetdir`/`objdir`
-lines every project repeats, via `useOryxProjectDefaults()`.
+`premake/forge.lua` factors out the `language`/`cppdialect`/`staticruntime`/`targetdir`/`objdir`
+lines every project repeats, via `forge.project_defaults()`.

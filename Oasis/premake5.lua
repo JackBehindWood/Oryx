@@ -1,7 +1,7 @@
 -- Oasis: sandbox executable for games/experiments built on top of Oryx
 project "Oasis"
     kind "ConsoleApp"
-    useOryxProjectDefaults()
+    forge.project_defaults()
 
     pchheader "ospch.h"
     pchsource "src/ospch.cpp"
@@ -26,7 +26,7 @@ project "Oasis"
         "SPDLOG_COMPILED_LIB"
     }
 
-    linkOryxWholeArchive()
+    useOryxWholeArchive()
     useOryxAllocationCensus()
     links {
         "spdlog",
