@@ -5,7 +5,7 @@ from rich.console import Console
 
 from build_system import registry
 from build_system import tomledit
-from build_system.config import LOCAL_CONFIG_NAME, RunContext, local_config_file, local_data_for_save
+from build_system.config import LOCAL_CONFIG_NAME, RunContext, save_local
 
 console = Console()
 app = typer.Typer()
@@ -50,9 +50,7 @@ def init(
     resolved_debugger = debugger or run.local.editor.debugger
 
     if remember:
-        data = local_data_for_save(root)
-        data["editor"] = {**data.get("editor", {}), "kind": str(resolved_ide), "debugger": str(resolved_debugger)}
-        local_config_file(root).write_text(tomledit.dumps(data), encoding="utf-8")
+        save_local(root, "editor", {"kind": str(resolved_ide), "debugger": str(resolved_debugger)})
         console.print(f"[green]✓ Saved IDE preference to {LOCAL_CONFIG_NAME} (not committed).[/green]")
 
     if resolved_ide == "vscode":

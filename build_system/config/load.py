@@ -89,10 +89,22 @@ def validate_local(local: LocalConfig, cfg: ForgeConfig) -> LocalConfig:
     return local
 
 
-def local_data_for_save(root: Path) -> dict:
-    """The raw table a local-preference save starts from: forge.local.toml, else the legacy file's content."""
+def save_local(root: Path, table: str, values: dict) -> Path:
+    """Write `values` into forge.local.toml's [table], seeding a new file from oryx.local.toml when only that exists."""
+    from .. import tomledit
+
     path = local_config_file(root)
-    if path.is_file():
-        return _read(path)
     legacy = root / LEGACY_LOCAL_CONFIG_NAME
-    return _legacy_to_local(_read(legacy)) if legacy.is_file() else {}
+    if not path.is_file() and legacy.is_file():
+        seed = tomledit.dumps(_legacy_to_local(_read(legacy)))
+    else:
+        seed = None
+
+    def edit(text: str) -> str:
+        text = seed if seed is not None else text
+        for key, value in values.items():
+            text = tomledit.set_value(text, [table, key], value)
+        return text
+
+    tomledit.edit_file(path, edit, validate=lambda data: from_dict(LocalConfig, data, source=LOCAL_CONFIG_NAME))
+    return path

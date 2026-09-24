@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from ..project import Project
-from .load import LOCAL_CONFIG_NAME, load_config, load_local, local_config_file, local_data_for_save, parse_config, validate_local
+from .load import LOCAL_CONFIG_NAME, load_config, load_local, local_config_file, parse_config, save_local, validate_local
 from .schema import (
     DEPENDENCY_SOURCES,
     DOCS_TOOLS,
@@ -53,8 +53,8 @@ __all__ = [
     "load_config",
     "load_local",
     "local_config_file",
-    "local_data_for_save",
     "parse_config",
+    "save_local",
     "validate_local",
 ]
 
