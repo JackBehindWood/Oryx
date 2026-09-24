@@ -1,10 +1,11 @@
+import os
 from pathlib import Path
 
 from ..config import BuildConfig
 
 
 def _gmake_compile_command(cfg: BuildConfig, makefile_dir: Path) -> list[str]:
-    return ["make", "-C", str(makefile_dir), f"config={cfg.make_config_token}"]
+    return ["make", "-C", str(makefile_dir), f"-j{os.cpu_count() or 1}", f"config={cfg.make_config_token}"]
 
 
 # Maps a Premake generator name to a function that builds the shell command

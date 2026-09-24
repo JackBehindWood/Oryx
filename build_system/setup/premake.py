@@ -167,7 +167,8 @@ def installed_version(executable=None) -> str | None:
     if not executable.is_file():
         return None
     try:
-        result = subprocess.run([str(executable), "--version"], capture_output=True, text=True, check=True)
+        # Outside the repo root, or premake loads premake5.lua and fails on missing --python-* args.
+        result = subprocess.run([str(executable), "--version"], cwd=PREMAKE_DIR, capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None

@@ -65,7 +65,7 @@ def clear_outputs_if_python_changed(premake_options: list[str]) -> bool:
 
 
 SOURCE_MANIFEST_FILE = BUILD_DIR / ".sources"
-SOURCE_ROOTS = {"Oryx/src": "Oryx", "Oryx/backends": "Oryx", "Oasis": "Oasis", "tests": "Tests"}
+SOURCE_ROOTS = {"Oryx/src": "Oryx", "Oryx/backends": "Oryx", "OryxPython": "OryxPython", "Oasis": "Oasis", "tests": "Tests"}
 SOURCE_SUFFIXES = {".cpp", ".c", ".mm"}
 SKIPPED_DIRS = {"vendor", "build", "bin", "bin-int", ".git", "__pycache__"}
 
