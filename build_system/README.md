@@ -14,7 +14,7 @@ A Python-based CLI build automation system for the Oryx Engine. Built on top of 
 * **Configurable CLI Profiles**: Switch between `debug`, `release`, and `dist` build configurations via global context flags.
 * **Integrated Workflow Execution**: Run complete sequential pipelines (configure, compile, and test) with single-command convenience.
 * **Optional IDE Integration**: `forge config init --ide vscode` generates/merges `.vscode/{tasks,settings,c_cpp_properties,launch}.json`, including a single-button build-and-debug flow with one Debug/Release/Dist configuration each, selectable from VS Code's Run & Debug dropdown. `forge config init --ide visual_studio` instead generates a Visual Studio solution via Premake's own `vs2022` action. Neither is required — the CLI itself never imports IDE-specific code unless you ask for it.
-* **Generic Vendoring Convention**: Header-only third-party libraries (git submodules) live under `<project>/vendor/<lib>/`, wired up with one `useVendorHeader(...)` call in Premake and auto-discovered on the Python side — see "Vendoring third-party libraries" below.
+* **Declared dependencies**: third-party libraries are `[dependencies]` entries in `forge.toml` (a git submodule or a local folder); `forge deps` adds, fetches, updates and removes them, and Premake builds static ones from the same entries — see "Third-party dependencies" below.
 * **CLI Command Script**: Installs directly as the `build` executable via standard package entry points (`pyproject.toml`).
 
 ---
@@ -23,9 +23,9 @@ A Python-based CLI build automation system for the Oryx Engine. Built on top of 
 
 * **Python**: `>=3.11`
 * **Build Backend**: Hatchling
-* **Git submodules**: `tests/vendor/doctest` (the test framework) is a git submodule.
-  Run `git submodule update --init --recursive` after cloning — any command that
-  needs vendored headers checks for it and fails with this exact command if it's missing.
+* **Git submodules**: the `[dependencies]` in `forge.toml` are git submodules. With
+  `[build] fetch = "auto"` (the default) any command that needs them fetches the missing
+  ones; `forge deps sync` does it explicitly.
 
 ### Using `uv` (Recommended)
 
@@ -252,14 +252,13 @@ module-level `GROUP_ORDER = <int>` to pin a specific position.
 `@command(...)` accepts two extra flags:
 * `hidden=True` — keep a command callable from the CLI but leave it out of
   the interactive menu (for internal/plumbing commands).
-* `requires_vendor=True` — run `build_system.vendor.ensure_vendor_dirs()`
-  before the command's body (skipped under `--dry-run`), aborting with the
-  usual "run `git submodule update --init --recursive`" message if a
-  vendored submodule is missing. `build.py`'s `compile` command uses this
-  instead of a hand-written check.
+* `requires_dependencies=True` — run `commands.deps.ensure_or_exit()` before the
+  command's body (skipped under `--dry-run`): missing required dependencies are
+  fetched, asked about or reported according to `[build] fetch`. `build.py`'s
+  `compile` command uses this instead of a hand-written check.
 
-Commands read shared state via `ctx.obj`, a `RunContext` (`build_system/config.py`)
-carrying the loaded `BuildConfig`, `--verbose`, and `--dry-run`. The
+Commands read shared state via `ctx.obj`, a `RunContext` (`build_system/config/`)
+carrying the `Project`, the loaded `ForgeConfig`, option values, `--verbose`, and `--dry-run`. The
 interactive menu also auto-prompts for any extra `typer.Option` parameters a
 command declares (`inspect.signature` + the option's own type/help text) —
 `bool` renders as a confirm, `Literal[...]` as a select, anything else as free
@@ -305,33 +304,43 @@ are only a fallback for before `configure` has ever run.
 
 ---
 
-**Vendoring third-party libraries**
+**Third-party dependencies**
 
-Header-only third-party libraries (typically git submodules) live under
-`<project>/vendor/<lib>/` — see `tests/vendor/doctest` for the existing
-example, and the empty `Oryx/vendor/`, `Oasis/vendor/` directories ready for
-future ones. Two pieces make this a one-line convention rather than a
-bespoke, hand-wired path per library:
+Every third-party library is a `[dependencies]` entry in `forge.toml`:
 
-* **Premake**: `premake/vendor.lua`'s `useVendorHeader(libName, headerSubdir)`
-  sets `includedirs` to the library's real header directory and `removefiles`
-  to exclude the rest of the submodule (its own tests/examples/build files)
-  from compilation. `tests/premake5.lua` calls `useVendorHeader("doctest", "doctest")`.
-  `premake/common.lua` similarly factors out the `language`/`cppdialect`/
-  `staticruntime`/`targetdir`/`objdir` lines every project repeats, via
-  `useOryxProjectDefaults()`. Both are included once from the root
-  `premake5.lua` and are tracked in git — only the downloaded Premake5
-  binary under `premake/bin/` is gitignored.
-* **Python**: `build_system/vendor.py` scans `Oryx/vendor/*`, `Oasis/vendor/*`,
-  and `tests/vendor/*` on disk — `missing_vendor_dirs()` (backing the
-  `requires_vendor=True` command flag above) flags submodules that haven't
-  been checked out, and `vendor_include_paths()` feeds the VS Code
-  IntelliSense fallback paths and search excludes generically, instead of a
-  hardcoded doctest-specific path. With Python on, the fallback also adds
-  `Oryx/backends/Python` (backend + the `oryx` package), pybind11, the
-  interpreter's `Python.h` directory and the baked `OX_PYTHON_*` defines.
+```toml
+[dependencies]
+spdlog   = { kind = "static", include = "include", sources = "src", defines = ["SPDLOG_COMPILED_LIB"] }
+pybind11 = { include = "include", requires = ["python"] }
+doctest  = { include = "doctest", path = "tests/vendor/doctest" }
+```
 
-To vendor a new library: add it as a git submodule under `<project>/vendor/<lib>/`,
-add `useVendorHeader("<lib>")` (with a second argument if its header sits in
-a subdirectory, as doctest's does) to that project's `premake5.lua`, and
-nothing else — the Python side picks it up automatically.
+* `source` is `submodule` (default) or `local` (files you put in place; forge
+  never fetches or deletes them). `path` defaults to `<[build] dependencies-dir>/<name>`.
+* `kind = "static"` makes `forge.dependency_projects()` (in `premake/forge.lua`)
+  build a static library from `sources`; header-only entries only contribute
+  their include folder.
+* `requires` lists `[options]` that must be on (`!name` for off); an entry whose
+  requirements aren't met is neither fetched nor built.
+* Premake projects consume a dependency with `includedirs { forge.include("<name>") }`
+  and, for static ones, `links { "<name>" }`. Forge passes the resolved entries to
+  Premake through `build/forge/config.json`.
+
+`forge deps`:
+
+* `add NAME --submodule URL | --local` — adds the submodule (if needed), detects the
+  layout (`include/`, a `NAME/` header folder, `src/` sources), writes the entry through
+  `tomledit`, and prints the Premake lines to use it. `--kind/--include/--sources/--define/--requires`
+  override the detection.
+* `sync` — fetch every missing required dependency.
+* `update NAME [--rev REV]` — move a submodule to a new revision; commit the new pin.
+* `status` — source, kind, pin and state of each entry, plus folders under
+  `dependencies-dir` that no entry refers to.
+* `remove NAME` — deinit and remove a submodule (local files are kept) and drop the entry.
+
+`tests/premake5.lua` still wires doctest with `premake/vendor.lua`'s `useVendorHeader("doctest", "doctest")`,
+which also excludes the submodule's own sources from compilation.
+
+`forge vendor` is a hidden alias kept for old scripts; `vendor add` forwards to `deps add`.
+`premake/common.lua` factors out the `language`/`cppdialect`/`staticruntime`/`targetdir`/`objdir`
+lines every project repeats, via `useOryxProjectDefaults()`.

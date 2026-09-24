@@ -3,8 +3,9 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
-from ..config import Dependency, ForgeConfig, RunContext
+from ..config import Dependency, FetchMode, ForgeConfig, RunContext
 from ..project import Project
 
 PREMAKE_CONFIG_NAME = "config.json"
@@ -86,9 +87,29 @@ def write_premake_config(run: RunContext) -> Path:
     return path
 
 
-def ensure(run: RunContext) -> None:
-    """Fail with guidance when a required dependency is missing on disk."""
+def shown(run: RunContext, path: Path) -> str:
+    return path.relative_to(run.project.root).as_posix() if path.is_relative_to(run.project.root) else str(path)
+
+
+def fetch(run: RunContext, deps: list[ResolvedDependency]) -> None:
+    from .sources import source_for
+
+    for dep in deps:
+        source_for(dep).fetch(run.project.root, dep)
+
+
+def ensure(run: RunContext, confirm: Callable[[list[ResolvedDependency]], bool] | None = None) -> list[ResolvedDependency]:
+    """Make every dependency this run needs present, fetching per [build] fetch; returns what was fetched."""
     absent = missing(run)
-    if absent:
-        names = ", ".join(f"{dep.name} ({dep.dir.relative_to(run.project.root) if dep.dir.is_relative_to(run.project.root) else dep.dir})" for dep in absent)
-        raise DependencyError(f"Missing dependencies: {names}. Run: git submodule update --init --recursive")
+    if not absent:
+        return []
+    local = [dep for dep in absent if dep.spec.source == "local"]
+    if local:
+        fetch(run, local[:1])
+    listed = ", ".join(f"{dep.name} ({shown(run, dep.dir)})" for dep in absent)
+    if run.fetch == FetchMode.NEVER:
+        raise DependencyError(f"Missing dependencies: {listed}. Run: forge deps sync")
+    if run.fetch == FetchMode.ASK and not (confirm and confirm(absent)):
+        raise DependencyError(f"Missing dependencies: {listed}. Run: forge deps sync, or set [build] fetch = \"auto\"")
+    fetch(run, absent)
+    return absent

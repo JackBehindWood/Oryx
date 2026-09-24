@@ -24,7 +24,7 @@ app = typer.Typer(
 # requires no edits to this file. See build_system/registry.py.
 for _module in registry.discover_command_modules():
     _name = _module.__name__.rsplit(".", 1)[-1]
-    app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""))
+    app.add_typer(_module.app, name=_name, help=getattr(_module, "GROUP_HELP", ""), hidden=getattr(_module, "GROUP_HIDDEN", False))
 
 def _discover(ctx: typer.Context) -> Project:
     try:

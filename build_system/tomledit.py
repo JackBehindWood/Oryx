@@ -24,11 +24,11 @@ def _string(value: str) -> str:
     return f'"{escaped}"'
 
 
-def _key(key: str) -> str:
+def format_key(key: str) -> str:
     return key if _BARE_KEY.fullmatch(key) else _string(key)
 
 
-def _value(value) -> str:
+def format_value(value) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)):
@@ -36,16 +36,16 @@ def _value(value) -> str:
     if isinstance(value, str):
         return _string(value)
     if isinstance(value, list):
-        return "[" + ", ".join(_value(item) for item in value) + "]"
+        return "[" + ", ".join(format_value(item) for item in value) + "]"
     if isinstance(value, dict):
-        return "{ " + ", ".join(f"{_key(key)} = {_value(item)}" for key, item in value.items()) + " }" if value else "{}"
+        return "{ " + ", ".join(f"{format_key(key)} = {format_value(item)}" for key, item in value.items()) + " }" if value else "{}"
     raise TypeError(f"Cannot write {type(value).__name__} to TOML")
 
 
 def _table(table: dict, path: list[str], blocks: list[str]) -> None:
-    scalars = [f"{_key(key)} = {_value(value)}" for key, value in table.items() if not isinstance(value, dict)]
+    scalars = [f"{format_key(key)} = {format_value(value)}" for key, value in table.items() if not isinstance(value, dict)]
     if path and (scalars or not table):
-        scalars.insert(0, "[" + ".".join(_key(part) for part in path) + "]")
+        scalars.insert(0, "[" + ".".join(format_key(part) for part in path) + "]")
     if scalars:
         blocks.append("\n".join(scalars))
     for key, value in table.items():
@@ -203,7 +203,7 @@ def set_value(text: str, path: list[str], value: Any) -> str:
     section, index, is_table = _locate(lines, path)
     if is_table:
         raise TomlEditError(f"'{_dotted(path)}' is a table; set one of its keys instead")
-    line = f"{_key(path[-1])} = {_value(value)}"
+    line = f"{format_key(path[-1])} = {format_value(value)}"
     if section is None:
         return _append_table(lines, path[:-1], line)
     if index is None:
@@ -211,7 +211,7 @@ def set_value(text: str, path: list[str], value: Any) -> str:
         return _join(lines)
     _, prefix, rest = _key_line(lines[index])
     _, trailer = _split_value(rest, _dotted(path))
-    lines[index] = prefix + _value(value) + trailer
+    lines[index] = prefix + format_value(value) + trailer
     return _join(lines)
 
 
@@ -225,7 +225,7 @@ def _append_table(lines: list[str], table: list[str], line: str) -> str:
     position = siblings[-1].end if siblings and len(table) > 1 else len(lines)
     while position > 0 and not lines[position - 1].strip():
         position -= 1
-    block = ([""] if position > 0 else []) + ["[" + ".".join(_key(part) for part in table) + "]", line]
+    block = ([""] if position > 0 else []) + ["[" + ".".join(format_key(part) for part in table) + "]", line]
     lines[position:position] = block
     return _join(lines)
 

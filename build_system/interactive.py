@@ -92,7 +92,10 @@ def _prompt_for_extra_params(func) -> dict | None:
         help_text = (default.help if is_parameter else None) or name
         annotation = _unwrap_optional(param.annotation)
 
-        if annotation is bool:
+        if typing.get_origin(annotation) is list:
+            answer = questionary.text(f"{help_text} (space-separated)", default="").ask()
+            answer = None if answer is None else answer.split()
+        elif annotation is bool:
             answer = questionary.confirm(help_text, default=bool(typer_default)).ask()
         elif _is_literal(annotation):
             choices = [str(choice) for choice in typing.get_args(annotation)]

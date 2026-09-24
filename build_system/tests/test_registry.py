@@ -2,8 +2,8 @@ import typer
 
 from build_system import registry
 
-GROUPS = ["Build", "Config", "Docs", "Python", "Setup", "Test"]
-MODULES = ["Build", "Config", "Deps", "Docs", "Python", "Setup", "Test"]
+GROUPS = ["Build", "Config", "Deps", "Docs", "Python", "Setup", "Test"]
+MODULES = [*GROUPS, "Vendor"]
 
 
 def test_discovery_order():
@@ -27,6 +27,7 @@ def test_entries_for_group():
     assert labels == {
         "Build": ["configure", "compile_project", "clean", "run_all", "run_project"],
         "Config": ["init"],
+        "Deps": ["add", "sync", "update", "status", "remove"],
         "Docs": ["build_docs", "serve_docs", "clean_docs"],
         "Python": ["generate_stubs"],
         "Setup": ["premake"],
