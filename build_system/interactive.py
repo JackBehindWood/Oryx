@@ -3,7 +3,6 @@ import sys
 import types
 import typing
 
-import questionary
 import typer
 
 from build_system import registry
@@ -25,6 +24,8 @@ def run_menu(ctx: typer.Context) -> None:
     session. A failing action still exits immediately, since the underlying
     command raises typer.Exit(code=1), which unwinds out of this loop.
     """
+    import questionary
+
     while True:
         group_choices = registry.groups_in_order() + [QUIT]
         group_name = questionary.select("What would you like to do?", choices=group_choices).ask()
@@ -78,6 +79,8 @@ def _prompt_for_extra_params(func) -> dict | None:
     special-casing needed here. Returns None if the user cancels any prompt
     (Ctrl-C/Esc), matching how a None menu selection aborts today.
     """
+    import questionary
+
     kwargs = {}
     for name, param in inspect.signature(func).parameters.items():
         if name == "ctx":

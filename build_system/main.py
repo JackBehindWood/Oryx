@@ -3,7 +3,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from build_system import interactive, registry
+from build_system import registry
 from build_system.config import BuildConfig, DEFAULT_CONFIG_FILE, RunContext
 
 console = Console()
@@ -76,6 +76,8 @@ def main(
         raise typer.Exit(code=1)
 
     if ctx.invoked_subcommand is None:
+        from build_system import interactive
+
         if interactive.is_interactive():
             interactive.run_menu(ctx)
         else:
