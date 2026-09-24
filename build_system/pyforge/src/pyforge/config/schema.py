@@ -74,6 +74,7 @@ class ProjectTable:
 class PremakeTable:
     version: str = "5.0.0-beta8"
     generator: str = _open(GENERATORS, "gmake")
+    path: str = ""
 
 
 @dataclass(frozen=True)

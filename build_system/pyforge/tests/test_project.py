@@ -38,4 +38,3 @@ def test_paths(tmp_path):
     project = Project.from_config(tmp_path / "forge.toml")
     assert project.root == tmp_path.resolve()
     assert project.forge_dir == tmp_path.resolve() / "build" / "forge"
-    assert project.premake_bin_dir == tmp_path.resolve() / "premake" / "bin"

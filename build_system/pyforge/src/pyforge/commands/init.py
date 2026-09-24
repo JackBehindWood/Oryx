@@ -2,6 +2,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from pyforge import registry, tomledit, workspace
 from pyforge.config import RunContext, parse_config
@@ -123,7 +124,7 @@ def init(
         return tomledit.set_value(text, ["project", "default-target"], next(iter(targets)))
 
     tomledit.edit_file(config_file, edit, validate=parse_config)
-    console.print(f"[bold green]✓ forge.toml[/bold green] [targets]: {', '.join(targets)}")
+    console.print(f"[bold green]✓ forge.toml[/bold green] {escape('[targets]')}: {', '.join(targets)}")
 
 
 ROOT_COMMAND = init

@@ -2,7 +2,7 @@ import typer
 
 from pyforge import registry
 
-STATIC_GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Init", "Setup", "Target", "Test"]
+STATIC_GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Init", "Premake", "Target", "Test"]
 MODULES = STATIC_GROUPS
 # "Python" (from build_system/oryx/, the Oryx plugin — see pyforge/main.py's plugin
 # loading) mounts after every statically-discovered group, since it isn't one of the files
@@ -35,8 +35,8 @@ def test_entries_for_group():
         "Docs": ["build_docs", "serve_docs", "clean_docs"],
         "Editor": ["vscode", "vs2022"],
         "Init": ["init"],
+        "Premake": ["status", "install", "update"],
         "Python": ["generate_stubs"],
-        "Setup": ["premake"],
         "Target": ["add", "remove", "list_"],
         "Test": ["run_suites"],
     }

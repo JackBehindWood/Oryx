@@ -4,7 +4,7 @@ import pytest
 import typer
 
 from conftest import workspace_json
-from pyforge.setup.premake import lua_scripts_dir
+from pyforge.premake.install import lua_scripts_dir
 
 PYTHON_OPTIONS = "--python-include=/py/include/python3.11 --python-libdir=/py/lib --python-lib=python3.11"
 SCRIPTS_FLAG = f"--scripts={lua_scripts_dir()}"
@@ -22,7 +22,7 @@ def dry(forge):
 
 @pytest.fixture
 def premake(tmp_project):
-    return tmp_project / "premake" / "bin" / "premake5"
+    return tmp_project / "cache" / "premake" / "5.0.0-beta8" / "premake5"
 
 
 @pytest.fixture
@@ -258,10 +258,10 @@ def test_python_stubs_needs_a_stubs_dir(forge, tmp_project):
     assert "stubs-dir" in result.output
 
 
-def test_setup_premake_ignores_dry_run(dry, premake):
-    assert dry("setup", "premake") == [
+def test_premake_status_ignores_dry_run(dry, premake):
+    assert dry("premake", "status") == [
         f"✗ premake5: not installed locally (expected {premake}).",
-        "  Run 'forge configure' or 'forge setup premake --update' to install it.",
+        "  Run 'forge configure' or 'forge premake install' to install it.",
     ]
 
 
@@ -357,7 +357,7 @@ def test_editor_vscode_writes_four_files(forge, tmp_project):
 def test_bare_forge_prints_help_outside_a_tty(forge):
     result = forge()
     assert result.exit_code == 0
-    for name in ("configure", "compile", "all", "clean", "run", "config", "deps", "docs", "editor", "python", "setup", "test"):
+    for name in ("configure", "compile", "all", "clean", "run", "config", "deps", "docs", "editor", "python", "premake", "target", "init", "test"):
         assert name in result.output
     assert "vendor" not in result.output
 

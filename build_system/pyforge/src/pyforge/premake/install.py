@@ -1,39 +1,65 @@
+import hashlib
+import json
 import platform
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from rich.console import Console
 from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
 
+from ..cache import premake_dir
+from ..project import Project
+from ..setup.utils import download_file, extract_archive, make_executable, remove_file
 from ..utils import remove_directory
-from .utils import (
-    download_file,
-    extract_archive,
-    make_executable,
-    remove_file,
-)
 
 console = Console()
 
 DEFAULT_PREMAKE_VERSION = "5.0.0-beta8"
 
-PREMAKE_ASSETS = {
-    "Linux": "linux.tar.gz",
-    "Darwin": "macosx.tar.gz",
-    "Windows": "windows.zip",
+RELEASES_API = "https://api.github.com/repos/premake/premake-core/releases"
+
+PREMAKE_LICENSE_URL = "https://raw.githubusercontent.com/premake/premake-core/v{version}/LICENSE.txt"
+
+_ARM_MACHINES = {"arm64", "aarch64"}
+
+# The hashes pyforge ships for its own pinned default version, verified independently of
+# GitHub's API at release time — a defense a compromised/spoofed API response can't get past
+# for a version this table covers. Any other version relies on GitHub's asset `digest` field
+# alone (still TLS-fetched from api.github.com, not the download host).
+KNOWN_HASHES = {
+    "5.0.0-beta8": {
+        "premake-5.0.0-beta8-linux.tar.gz": "63edd3e7461eebdd45b500a3c7e8ad4e7a67d68f230010f9a97cbb71b4ec59c8",
+        "premake-5.0.0-beta8-macosx.tar.gz": "fa73a46f093fa6f17494a3d063421aa6cae3ea825a61c62dd59fc2f07a256d03",
+        "premake-5.0.0-beta8-macosx-x64.tar.gz": "84b5fa5a432dcebdc3dd12e8677d10e38e5b32a3fe06d83ae68967e4f5e2db8a",
+        "premake-5.0.0-beta8-windows.zip": "e64ce2ed8778e0098f63674cca61fe33941b5f0c8d9a4afd651152bdea3758ab",
+    },
 }
 
-PREMAKE_LICENSE_URL = (
-    "https://raw.githubusercontent.com/premake/"
-    "premake-core/master/LICENSE.txt"
-)
+
+class ChecksumError(RuntimeError):
+    pass
 
 
-def premake_url(version: str, system: str) -> str:
-    return (
-        "https://github.com/premake/premake-core/releases/"
-        f"download/v{version}/premake-{version}-{PREMAKE_ASSETS[system]}"
-    )
+def asset_name(system: str, machine: str) -> str | None:
+    """The Premake release asset for this OS/architecture, or None when there isn't one
+    (Linux has no arm64 build yet: use [premake] path to point at your own)."""
+    machine = machine.lower()
+    if system == "Linux":
+        return "linux.tar.gz"
+    if system == "Darwin":
+        return "macosx.tar.gz" if machine in _ARM_MACHINES else "macosx-x64.tar.gz"
+    if system == "Windows":
+        return "windows.zip"
+    return None
+
+
+def premake_url(version: str, system: str, machine: str) -> str | None:
+    suffix = asset_name(system, machine)
+    if suffix is None:
+        return None
+    return f"https://github.com/premake/premake-core/releases/download/v{version}/premake-{version}-{suffix}"
 
 
 def get_premake_executable(bin_dir: Path) -> Path:
@@ -46,6 +72,15 @@ def lua_scripts_dir() -> Path:
     --scripts so a project's premake5.lua can `require "forge"` regardless of where pyforge is
     installed, instead of hardcoding a path to it."""
     return Path(__file__).resolve().parent.parent / "lua"
+
+
+def resolve_bin_dir(project: Project, path_override: str, version: str) -> Path:
+    """[premake] path when set, otherwise the shared user cache keyed by version — never
+    a project-local directory, so worktrees and other projects on the same machine share
+    one download per version."""
+    if path_override:
+        return project.path(path_override)
+    return premake_dir(version)
 
 
 def check_local_premake(bin_dir: Path) -> bool:
@@ -71,15 +106,69 @@ def _download_with_progress(url: str, destination, description: str):
         download_file(url, destination, reporthook=reporthook)
 
 
-def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
-    """Download and install the required Premake5 version locally."""
-    system = platform.system()
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    if system not in PREMAKE_ASSETS:
-        console.print(f"[bold red]✗ Unsupported operating system:[/bold red] {system}")
+
+def _fetch_json(url: str):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            return json.load(response)
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+
+
+def release_digest(version: str, filename: str) -> str | None:
+    """The sha256 GitHub's release API reports for this asset, or None if it can't be reached."""
+    data = _fetch_json(f"{RELEASES_API}/tags/v{version}")
+    if data is None:
+        return None
+    for asset in data.get("assets", []):
+        if asset.get("name") == filename:
+            digest = asset.get("digest") or ""
+            if digest.startswith("sha256:"):
+                return digest.removeprefix("sha256:")
+    return None
+
+
+def latest_release_version() -> str | None:
+    """The tag of the newest Premake5 release (without its leading 'v'), or None if
+    GitHub couldn't be reached."""
+    data = _fetch_json(f"{RELEASES_API}/latest")
+    if data is None:
+        return None
+    tag = data.get("tag_name") or ""
+    return tag.removeprefix("v") or None
+
+
+def verify_checksum(path: Path, version: str, filename: str) -> None:
+    """Check `path` against pyforge's own pinned hash (when shipped for this version) and
+    against GitHub's release digest (when reachable); raise ChecksumError on a mismatch."""
+    actual = _sha256(path)
+    pinned = KNOWN_HASHES.get(version, {}).get(filename)
+    live = release_digest(version, filename)
+    if pinned is None and live is None:
+        console.print(f"[yellow]⚠️ Could not verify {filename}'s checksum (no pinned hash, and GitHub was unreachable); proceeding unverified.[/yellow]")
+        return
+    for source, expected in (("pyforge's pinned hash", pinned), ("GitHub's release digest", live)):
+        if expected is not None and actual != expected:
+            raise ChecksumError(f"{filename}: sha256 is {actual}, but {source} says {expected}")
+
+
+def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
+    """Download, checksum-verify, and install the given Premake5 version locally."""
+    system = platform.system()
+    url = premake_url(version, system, platform.machine())
+
+    if url is None:
+        console.print(f"[bold red]✗ No Premake5 build for {system}/{platform.machine()}.[/bold red]")
+        console.print("  [dim]Set [premake] path in forge.toml to point at a build of your own.[/dim]")
         return False
 
-    url = premake_url(version, system)
     filename = url.split("/")[-1]
     archive_path = bin_dir / filename
 
@@ -88,48 +177,47 @@ def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Download Premake
         _download_with_progress(url, archive_path, filename)
         console.print(f"[green]✓ Downloaded {filename}[/green]\n")
 
-        # Extract Premake
+        verify_checksum(archive_path, version, filename)
+        console.print("[green]✓ Checksum verified[/green]\n")
+
         console.print(f"[bold blue]📦 Extracting {filename}...[/bold blue]")
         extract_archive(archive_path, bin_dir)
         console.print("[green]✓ Extracted successfully[/green]\n")
 
-        # Remove downloaded archive
         remove_file(archive_path)
 
-        # Download Premake licence
         console.print("[bold blue]📄 Downloading Premake5 licence...[/bold blue]")
         license_path = bin_dir / "LICENSE.txt"
 
         try:
-            download_file(PREMAKE_LICENSE_URL, license_path)
+            download_file(PREMAKE_LICENSE_URL.format(version=version), license_path)
             console.print(f"[green]✓ Saved licence to {license_path}[/green]\n")
         except Exception as error:
             console.print(f"[yellow]⚠️ Could not download licence: {error}[/yellow]\n")
 
-        # Make executable on Unix-like systems
         executable = get_premake_executable(bin_dir)
         if system in {"Linux", "Darwin"} and executable.exists():
             make_executable(executable)
             console.print(f"[green]✓ Made executable:[/green] {executable}\n")
 
-        # -------------------------------------------------------------------
-        # Clean up extraneous files (keep ONLY the executable & LICENSE.txt)
-        # -------------------------------------------------------------------
+        # Keep only the executable & LICENSE.txt; discard whatever else the archive unpacked.
         allowed_files = {executable.name.lower(), "license.txt"}
 
         for item in bin_dir.iterdir():
             if item.is_file() and item.name.lower() not in allowed_files:
                 remove_file(item)
             elif item.is_dir():
-                # Remove extra directories if any were unpacked
                 remove_directory(item)
 
         return True
 
+    except ChecksumError as error:
+        console.print(f"[bold red]✗ Checksum mismatch, refusing to install:[/bold red] {error}")
+        remove_file(archive_path)
+        return False
     except Exception as error:
         console.print(f"[bold red]✗ Failed to download/extract Premake5:[/bold red] {error}")
         remove_file(archive_path)
@@ -149,9 +237,8 @@ def installed_version(executable: Path) -> str | None:
 
 
 def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
-    """Force a re-download of the pinned Premake5 version, overwriting whatever
-    is currently installed — unlike ensure_premake(), which leaves an existing
-    install alone even if it doesn't match the pinned version."""
+    """Force a re-download of `version`, overwriting whatever is currently installed at
+    `bin_dir` — unlike ensure_premake(), which leaves an existing install alone."""
     executable = get_premake_executable(bin_dir)
     previous = installed_version(executable)
     if previous:
@@ -172,16 +259,12 @@ def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     return executable
 
 
-# ---------------------------------------------------------------------------
-# Public setup function
-# ---------------------------------------------------------------------------
-
 def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     """
     Ensure the required local Premake5 installation exists.
 
-    Premake is always provided locally by the project. A system-wide
-    Premake installation is never used.
+    Premake is always provided locally (the shared user cache by default). A
+    system-wide Premake installation is never used.
 
     Returns:
         Path to the local Premake5 executable.

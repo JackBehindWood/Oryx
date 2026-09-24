@@ -14,8 +14,8 @@ from pyforge.compile_commands import generate_compile_commands
 from pyforge.deps.resolve import write_premake_config
 from pyforge.config import ForgeConfig, RunContext, Target
 from pyforge.config.schema import suggestion
+from pyforge.premake.install import ensure_premake, get_premake_executable, lua_scripts_dir, resolve_bin_dir
 from pyforge.setup.generators import build_compile_command
-from pyforge.setup.premake import ensure_premake, get_premake_executable, lua_scripts_dir
 from pyforge.setup.stale_objects import prune_stale_object_dirs, wipe_outputs_if_options_changed
 from pyforge.utils import remove_directory, run_command
 from pyforge.workspace import Workspace, WorkspaceError
@@ -69,15 +69,16 @@ def configure(ctx: typer.Context):
 
     generator = cfg.premake.generator
     premake_options = premake_args(run)
+    bin_dir = resolve_bin_dir(project, cfg.premake.path, cfg.premake.version)
 
     if run.dry_run:
-        premake = get_premake_executable(project.premake_bin_dir)
+        premake = get_premake_executable(bin_dir)
         command_line = [str(premake), generator, scripts_flag(), *premake_options, "--forge-export"]
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
     ensure_or_exit(run)
-    premake = ensure_premake(project.premake_bin_dir, cfg.premake.version)
+    premake = ensure_premake(bin_dir, cfg.premake.version)
     if not premake:
         raise typer.Exit(code=1)
 

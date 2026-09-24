@@ -47,7 +47,7 @@ def add(
         return text
 
     _write(run, edit)
-    console.print(f"[bold green]✓ forge.toml[/bold green] [targets.{escape(name)}]: project = {escape(tomledit.format_value(project))}")
+    console.print(f"[bold green]✓ forge.toml[/bold green] {escape(f'[targets.{name}]')}: project = {escape(tomledit.format_value(project))}")
 
 
 @command(name="remove", label="Remove — drop a [targets] entry")

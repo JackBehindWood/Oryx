@@ -1,6 +1,6 @@
 import subprocess
 
-from pyforge.setup import premake
+from pyforge.premake import install as premake
 
 
 def test_installed_version_runs_outside_repo_root(tmp_path, monkeypatch):

@@ -200,6 +200,9 @@ def fake_python(monkeypatch):
 @pytest.fixture
 def tmp_project(tmp_path, monkeypatch, linux_host) -> Path:
     monkeypatch.chdir(tmp_path)
+    # Isolates cache.user_cache_dir() from the real machine's ~/.cache (or platform
+    # equivalent), so tests never read or write a developer's actual Premake cache.
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path / "cache"))
     (tmp_path / ".gitmodules").write_text(GITMODULES, encoding="utf-8")
     for vendor_dir in VENDOR_DIRS:
         (tmp_path / vendor_dir).mkdir(parents=True)

@@ -135,7 +135,7 @@ def add(
     entry = _entry(source, folder, default_dir, layout, define, requires)
     _write(run, lambda text: tomledit.set_value(text, ["dependencies", name], entry))
 
-    console.print(f"[bold green]✓ forge.toml[/bold green] [dependencies]: {escape(tomledit.format_key(name))} = {escape(tomledit.format_value(entry))}")
+    console.print(f"[bold green]✓ forge.toml[/bold green] {escape('[dependencies]')}: {escape(tomledit.format_key(name))} = {escape(tomledit.format_value(entry))}")
     console.print(f"  [dim]Use it from a project's premake5.lua:[/dim]\n{escape(_consumer_snippet(name, layout['kind']))}")
 
 

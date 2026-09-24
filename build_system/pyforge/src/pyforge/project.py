@@ -50,7 +50,3 @@ class Project:
     @property
     def bin_dir(self) -> Path:
         return self.build_dir / "bin"
-
-    @property
-    def premake_bin_dir(self) -> Path:
-        return self.root / "premake" / "bin"

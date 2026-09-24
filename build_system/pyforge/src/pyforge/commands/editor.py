@@ -52,17 +52,18 @@ def write_vs2022(ctx: typer.Context, remember: bool) -> None:
     from pyforge.commands.build import premake_args, scripts_flag
     from pyforge.commands.deps import ensure_or_exit
     from pyforge.deps.resolve import write_premake_config
-    from pyforge.setup.premake import ensure_premake, get_premake_executable
+    from pyforge.premake.install import ensure_premake, get_premake_executable, resolve_bin_dir
     from pyforge.utils import run_command
 
     run: RunContext = ctx.obj
+    bin_dir = resolve_bin_dir(run.project, run.config.premake.path, run.config.premake.version)
     if run.dry_run:
-        console.print(f"[dim][dry-run] would run: {get_premake_executable(run.project.premake_bin_dir)} vs2022 {scripts_flag()} {' '.join(premake_args(run))}[/dim]")
+        console.print(f"[dim][dry-run] would run: {get_premake_executable(bin_dir)} vs2022 {scripts_flag()} {' '.join(premake_args(run))}[/dim]")
         return
     if remember:
         save_preference(run, "visual_studio", str(run.local.editor.debugger))
     ensure_or_exit(run)
-    premake = ensure_premake(run.project.premake_bin_dir, run.config.premake.version)
+    premake = ensure_premake(bin_dir, run.config.premake.version)
     if not premake:
         raise typer.Exit(code=1)
     write_premake_config(run)
