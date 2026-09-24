@@ -60,6 +60,20 @@ stubs-dir = "OryxPython/stubs"
 VENDOR_DIRS = ["Oryx/vendor/spdlog", "Oryx/vendor/pybind11", "Oryx/vendor/yaml-cpp", "tests/vendor/doctest"]
 
 
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def workspace_json(root: Path) -> str:
+    return (FIXTURES / "workspace.json").read_text(encoding="utf-8").replace("{root}", root.as_posix())
+
+
+def write_workspace(root: Path) -> Path:
+    path = root / "build" / "forge" / "workspace.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(workspace_json(root), encoding="utf-8")
+    return path
+
+
 def make_file(project: str) -> str:
     blocks = []
     for index, (token, outputdir) in enumerate(

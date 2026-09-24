@@ -1,0 +1,364 @@
+{
+ "format": 1,
+ "workspace": "oryx",
+ "location": "{root}/build",
+ "action": "gmake",
+ "scripts": [
+  "{root}/premake5.lua",
+  "{root}/premake/common.lua",
+  "{root}/premake/forge.lua",
+  "{root}/Oryx/vendor/premake/spdlog.lua",
+  "{root}/Oryx/premake5.lua",
+  "{root}/OryxPython/premake5.lua",
+  "{root}/Oasis/premake5.lua",
+  "{root}/tests/premake5.lua"
+ ],
+ "projects": {
+  "spdlog": {
+   "basedir": "{root}/Oryx/vendor/premake",
+   "script": "{root}/Oryx/vendor/premake/spdlog.lua",
+   "group": "Dependencies",
+   "configs": [
+    {
+     "buildcfg": "Debug",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "StaticLib",
+     "token": "debug_x64",
+     "target": "{root}/build/bin/Debug-linux-x86_64/spdlog/libspdlog.a",
+     "targetdir": "{root}/build/bin/Debug-linux-x86_64/spdlog",
+     "objdir": "{root}/build/bin-int/Debug-linux-x86_64/spdlog",
+     "defines": [
+      "OX_DEBUG",
+      "SPDLOG_COMPILED_LIB"
+     ],
+     "includedirs": [
+      "{root}/Oryx/vendor/spdlog/include"
+     ]
+    },
+    {
+     "buildcfg": "Release",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "StaticLib",
+     "token": "release_x64",
+     "target": "{root}/build/bin/Release-linux-x86_64/spdlog/libspdlog.a",
+     "targetdir": "{root}/build/bin/Release-linux-x86_64/spdlog",
+     "objdir": "{root}/build/bin-int/Release-linux-x86_64/spdlog",
+     "defines": [
+      "OX_RELEASE",
+      "SPDLOG_COMPILED_LIB"
+     ],
+     "includedirs": [
+      "{root}/Oryx/vendor/spdlog/include"
+     ]
+    },
+    {
+     "buildcfg": "Dist",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "StaticLib",
+     "token": "dist_x64",
+     "target": "{root}/build/bin/Dist-linux-x86_64/spdlog/libspdlog.a",
+     "targetdir": "{root}/build/bin/Dist-linux-x86_64/spdlog",
+     "objdir": "{root}/build/bin-int/Dist-linux-x86_64/spdlog",
+     "defines": [
+      "OX_DIST",
+      "SPDLOG_COMPILED_LIB"
+     ],
+     "includedirs": [
+      "{root}/Oryx/vendor/spdlog/include"
+     ]
+    }
+   ],
+   "files": [
+    "{root}/Oryx/vendor/spdlog/src/async.cpp",
+    "{root}/Oryx/vendor/spdlog/src/spdlog.cpp"
+   ]
+  },
+  "Oryx": {
+   "basedir": "{root}/Oryx",
+   "script": "{root}/Oryx/premake5.lua",
+   "group": "Core",
+   "configs": [
+    {
+     "buildcfg": "Debug",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "StaticLib",
+     "token": "debug_x64",
+     "target": "{root}/build/bin/Debug-linux-x86_64/Oryx/libOryx.a",
+     "targetdir": "{root}/build/bin/Debug-linux-x86_64/Oryx",
+     "objdir": "{root}/build/bin-int/Debug-linux-x86_64/Oryx",
+     "defines": [
+      "OX_DEBUG",
+      "SPDLOG_COMPILED_LIB",
+      "OX_ENABLE_PYTHON"
+     ],
+     "includedirs": [
+      "{root}/Oryx/vendor/spdlog/include",
+      "{root}/Oryx/src",
+      "{root}/Oryx/backends/Python",
+      "{root}//py/include/python3.11"
+     ]
+    },
+    {
+     "buildcfg": "Release",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "StaticLib",
+     "token": "release_x64",
+     "target": "{root}/build/bin/Release-linux-x86_64/Oryx/libOryx.a",
+     "targetdir": "{root}/build/bin/Release-linux-x86_64/Oryx",
+     "objdir": "{root}/build/bin-int/Release-linux-x86_64/Oryx",
+     "defines": [
+      "OX_RELEASE",
+      "SPDLOG_COMPILED_LIB",
+      "OX_ENABLE_PYTHON"
+     ],
+     "includedirs": [
+      "{root}/Oryx/vendor/spdlog/include",
+      "{root}/Oryx/src",
+      "{root}/Oryx/backends/Python",
+      "{root}//py/include/python3.11"
+     ]
+    },
+    {
+     "buildcfg": "Dist",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "StaticLib",
+     "token": "dist_x64",
+     "target": "{root}/build/bin/Dist-linux-x86_64/Oryx/libOryx.a",
+     "targetdir": "{root}/build/bin/Dist-linux-x86_64/Oryx",
+     "objdir": "{root}/build/bin-int/Dist-linux-x86_64/Oryx",
+     "defines": [
+      "OX_DIST",
+      "SPDLOG_COMPILED_LIB",
+      "OX_ENABLE_PYTHON"
+     ],
+     "includedirs": [
+      "{root}/Oryx/vendor/spdlog/include",
+      "{root}/Oryx/src",
+      "{root}/Oryx/backends/Python",
+      "{root}//py/include/python3.11"
+     ]
+    }
+   ],
+   "files": [
+    "{root}/Oryx/backends/Python/Glue.cpp",
+    "{root}/Oryx/src/Core/Log.cpp",
+    "{root}/Oryx/src/Core/Log.h",
+    "{root}/Oryx/src/oxpch.cpp"
+   ]
+  },
+  "OryxPython": {
+   "basedir": "{root}/OryxPython",
+   "script": "{root}/OryxPython/premake5.lua",
+   "group": "Bindings",
+   "configs": [
+    {
+     "buildcfg": "Debug",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "SharedLib",
+     "token": "debug_x64",
+     "target": "{root}/build/bin/Debug-linux-x86_64/OryxPython/oryx.so",
+     "targetdir": "{root}/build/bin/Debug-linux-x86_64/OryxPython",
+     "objdir": "{root}/build/bin-int/Debug-linux-x86_64/OryxPython",
+     "defines": [
+      "OX_DEBUG",
+      "SPDLOG_COMPILED_LIB",
+      "OX_ENABLE_PYTHON"
+     ],
+     "includedirs": [
+      "{root}/Oryx/src"
+     ]
+    },
+    {
+     "buildcfg": "Release",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "SharedLib",
+     "token": "release_x64",
+     "target": "{root}/build/bin/Release-linux-x86_64/OryxPython/oryx.so",
+     "targetdir": "{root}/build/bin/Release-linux-x86_64/OryxPython",
+     "objdir": "{root}/build/bin-int/Release-linux-x86_64/OryxPython",
+     "defines": [
+      "OX_RELEASE",
+      "SPDLOG_COMPILED_LIB",
+      "OX_ENABLE_PYTHON"
+     ],
+     "includedirs": [
+      "{root}/Oryx/src"
+     ]
+    },
+    {
+     "buildcfg": "Dist",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "SharedLib",
+     "token": "dist_x64",
+     "target": "{root}/build/bin/Dist-linux-x86_64/OryxPython/oryx.so",
+     "targetdir": "{root}/build/bin/Dist-linux-x86_64/OryxPython",
+     "objdir": "{root}/build/bin-int/Dist-linux-x86_64/OryxPython",
+     "defines": [
+      "OX_DIST",
+      "SPDLOG_COMPILED_LIB",
+      "OX_ENABLE_PYTHON"
+     ],
+     "includedirs": [
+      "{root}/Oryx/src"
+     ]
+    }
+   ],
+   "files": [
+    "{root}/OryxPython/src/Module.cpp"
+   ]
+  },
+  "Oasis": {
+   "basedir": "{root}/Oasis",
+   "script": "{root}/Oasis/premake5.lua",
+   "group": "Apps",
+   "configs": [
+    {
+     "buildcfg": "Debug",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "ConsoleApp",
+     "token": "debug_x64",
+     "target": "{root}/build/bin/Debug-linux-x86_64/Oasis/Oasis",
+     "targetdir": "{root}/build/bin/Debug-linux-x86_64/Oasis",
+     "objdir": "{root}/build/bin-int/Debug-linux-x86_64/Oasis",
+     "defines": [
+      "OX_DEBUG",
+      "SPDLOG_COMPILED_LIB"
+     ],
+     "includedirs": [
+      "{root}/Oasis/src",
+      "{root}/Oryx/src",
+      "{root}/Oryx/vendor/spdlog/include"
+     ]
+    },
+    {
+     "buildcfg": "Release",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "ConsoleApp",
+     "token": "release_x64",
+     "target": "{root}/build/bin/Release-linux-x86_64/Oasis/Oasis",
+     "targetdir": "{root}/build/bin/Release-linux-x86_64/Oasis",
+     "objdir": "{root}/build/bin-int/Release-linux-x86_64/Oasis",
+     "defines": [
+      "OX_RELEASE",
+      "SPDLOG_COMPILED_LIB"
+     ],
+     "includedirs": [
+      "{root}/Oasis/src",
+      "{root}/Oryx/src",
+      "{root}/Oryx/vendor/spdlog/include"
+     ]
+    },
+    {
+     "buildcfg": "Dist",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "ConsoleApp",
+     "token": "dist_x64",
+     "target": "{root}/build/bin/Dist-linux-x86_64/Oasis/Oasis",
+     "targetdir": "{root}/build/bin/Dist-linux-x86_64/Oasis",
+     "objdir": "{root}/build/bin-int/Dist-linux-x86_64/Oasis",
+     "defines": [
+      "OX_DIST",
+      "SPDLOG_COMPILED_LIB"
+     ],
+     "includedirs": [
+      "{root}/Oasis/src",
+      "{root}/Oryx/src",
+      "{root}/Oryx/vendor/spdlog/include"
+     ]
+    }
+   ],
+   "files": [
+    "{root}/Oasis/src/Oasis/Game/TicTacToeGame.cpp",
+    "{root}/Oasis/src/Oasis/Main.cpp",
+    "{root}/Oasis/src/ospch.cpp"
+   ]
+  },
+  "Tests": {
+   "basedir": "{root}/tests",
+   "script": "{root}/tests/premake5.lua",
+   "group": "Tests",
+   "configs": [
+    {
+     "buildcfg": "Debug",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "ConsoleApp",
+     "token": "debug_x64",
+     "target": "{root}/build/bin/Debug-linux-x86_64/Tests/Tests",
+     "targetdir": "{root}/build/bin/Debug-linux-x86_64/Tests",
+     "objdir": "{root}/build/bin-int/Debug-linux-x86_64/Tests",
+     "defines": [
+      "OX_DEBUG",
+      "SPDLOG_COMPILED_LIB",
+      "OX_BUILD_OUTPUT_DIR=\"build/bin/Debug-linux-x86_64\""
+     ],
+     "includedirs": [
+      "{root}/tests/vendor/doctest/doctest",
+      "{root}/tests",
+      "{root}/Oasis/src",
+      "{root}/Oryx/src"
+     ]
+    },
+    {
+     "buildcfg": "Release",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "ConsoleApp",
+     "token": "release_x64",
+     "target": "{root}/build/bin/Release-linux-x86_64/Tests/Tests",
+     "targetdir": "{root}/build/bin/Release-linux-x86_64/Tests",
+     "objdir": "{root}/build/bin-int/Release-linux-x86_64/Tests",
+     "defines": [
+      "OX_RELEASE",
+      "SPDLOG_COMPILED_LIB",
+      "OX_BUILD_OUTPUT_DIR=\"build/bin/Debug-linux-x86_64\""
+     ],
+     "includedirs": [
+      "{root}/tests/vendor/doctest/doctest",
+      "{root}/tests",
+      "{root}/Oasis/src",
+      "{root}/Oryx/src"
+     ]
+    },
+    {
+     "buildcfg": "Dist",
+     "platform": "x64",
+     "architecture": "x86_64",
+     "kind": "ConsoleApp",
+     "token": "dist_x64",
+     "target": "{root}/build/bin/Dist-linux-x86_64/Tests/Tests",
+     "targetdir": "{root}/build/bin/Dist-linux-x86_64/Tests",
+     "objdir": "{root}/build/bin-int/Dist-linux-x86_64/Tests",
+     "defines": [
+      "OX_DIST",
+      "SPDLOG_COMPILED_LIB",
+      "OX_BUILD_OUTPUT_DIR=\"build/bin/Debug-linux-x86_64\""
+     ],
+     "includedirs": [
+      "{root}/tests/vendor/doctest/doctest",
+      "{root}/tests",
+      "{root}/Oasis/src",
+      "{root}/Oryx/src"
+     ]
+    }
+   ],
+   "files": [
+    "{root}/Oasis/src/Oasis/Game/TicTacToeGame.cpp",
+    "{root}/tests/oxpch.cpp",
+    "{root}/tests/unit/test_math.cpp"
+   ]
+  }
+ }
+}
