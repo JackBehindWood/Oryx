@@ -7,7 +7,7 @@ from build_system.compile_commands import COMPILE_COMMANDS_NAME
 from build_system.config import RunContext
 from build_system.setup.python_env import PythonEnvError, python_build_info
 from build_system.utils import get_macos_sdk_path, load_json, merge_by_key, write_json
-from build_system.vendor import vendor_include_paths
+from build_system.deps.resolve import required
 
 COMPILE_COMMANDS_TOKEN = f"${{workspaceFolder}}/build/{COMPILE_COMMANDS_NAME}"
 
@@ -55,7 +55,10 @@ def _python_build_info(run: RunContext):
 def _fallback_include_paths(run: RunContext) -> list[str]:
     # Appends every <project>/vendor/<lib>/ header dir discovered on disk (see
     # build_system/vendor.py) instead of hardcoding each library's path here.
-    paths = FALLBACK_INCLUDE_PATHS + vendor_include_paths(run.project.root, _python_enabled(run))
+    root = run.project.root
+    paths = FALLBACK_INCLUDE_PATHS + [
+        f"${{workspaceFolder}}/{dep.include.relative_to(root).as_posix()}" for dep in required(run) if dep.include.is_relative_to(root)
+    ]
     if _python_enabled(run):
         paths.append(PYTHON_BACKEND_INCLUDE_PATH)
         paths.append("${workspaceFolder}/build/generated")

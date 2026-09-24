@@ -67,11 +67,17 @@ def init(
         from build_system.setup.premake import ensure_premake
         from build_system.utils import run_command
 
+        from build_system.commands.build import premake_args
+        from build_system.commands.deps import ensure_or_exit
+        from build_system.deps.resolve import write_premake_config
+
+        ensure_or_exit(run)
         premake = ensure_premake(run.project.premake_bin_dir, run.config.premake.version)
         if not premake:
             raise typer.Exit(code=1)
+        write_premake_config(run)
         try:
-            run_command([str(premake), "vs2022"], cwd=root)
+            run_command([str(premake), "vs2022", *premake_args(run)], cwd=root)
             console.print("[bold green]✓ Generated Visual Studio 2022 project files (premake5 vs2022).[/bold green]")
             console.print(
                 "  [dim]This is independent of `forge build compile`, which still uses the "

@@ -90,10 +90,10 @@ def test_launch_cppdbg_keys(run, monkeypatch, system, mode, tool):
     assert (entry["type"], entry["console"], entry["MIMode"], entry["miDebuggerPath"]) == ("cppdbg", "integratedTerminal", mode, f"/bin/{tool}")
 
 
-def test_settings_merge_keeps_user_keys(tmp_project):
+def test_settings_merge_keeps_user_keys(tmp_project, run):
     path = tmp_project / ".vscode" / "settings.json"
     _write(path, {"editor.tabSize": 2, "editor.formatOnSave": False, "search.exclude": {"docs/site": True}, "files.exclude": {"*.pyc": True}})
-    data = _read(settings.write_settings(tmp_project))
+    data = _read(settings.write_settings(run))
     assert data["editor.tabSize"] == 2
     assert data["editor.formatOnSave"] is True
     assert data["C_Cpp.default.intelliSenseEngine"] == "Tag Parser"
@@ -104,9 +104,9 @@ def test_settings_merge_keeps_user_keys(tmp_project):
         "bin-int": True,
         ".git": True,
         "premake/bin": True,
-        "Oryx/vendor/pybind11": True,
         "Oryx/vendor/spdlog": True,
         "Oryx/vendor/yaml-cpp": True,
+        "Oryx/vendor/pybind11": True,
         "tests/vendor/doctest": True,
     }
     assert data["files.exclude"] == {"*.pyc": True, ".DS_Store": True}
@@ -127,10 +127,10 @@ def test_c_cpp_properties_linux(tmp_project, run, fake_python, monkeypatch):
         "${workspaceFolder}/Oryx/src",
         "${workspaceFolder}/Oasis/src",
         "${workspaceFolder}/tests",
-        "${workspaceFolder}/Oryx/vendor/pybind11",
-        "${workspaceFolder}/Oryx/vendor/spdlog",
-        "${workspaceFolder}/Oryx/vendor/yaml-cpp",
-        "${workspaceFolder}/tests/vendor/doctest",
+        "${workspaceFolder}/Oryx/vendor/spdlog/include",
+        "${workspaceFolder}/Oryx/vendor/yaml-cpp/include",
+        "${workspaceFolder}/Oryx/vendor/pybind11/include",
+        "${workspaceFolder}/tests/vendor/doctest/doctest",
         "${workspaceFolder}/Oryx/backends/Python",
         "${workspaceFolder}/build/generated",
         "/py/include/python3.11",
@@ -144,7 +144,7 @@ def test_c_cpp_properties_defines_without_python(project, profile, defines):
     data = _read(c_cpp_properties.write_c_cpp_properties(make_run(project, profile, python=False)))
     config = data["configurations"][0]
     assert config["defines"] == ["SPDLOG_COMPILED_LIB", *defines]
-    assert "${workspaceFolder}/Oryx/vendor/pybind11" not in config["includePath"]
+    assert "${workspaceFolder}/Oryx/vendor/pybind11/include" not in config["includePath"]
 
 
 def test_c_cpp_properties_macos_has_two_configurations(project, monkeypatch):

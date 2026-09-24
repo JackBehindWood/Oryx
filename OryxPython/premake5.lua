@@ -14,7 +14,7 @@ project "OryxPython"
     includedirs {
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/backends/Python",
-        "%{IncludeDir.spdlog}",
+        forge.include("spdlog"),
     }
 
     defines { "SPDLOG_COMPILED_LIB" }

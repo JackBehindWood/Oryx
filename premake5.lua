@@ -3,7 +3,6 @@
 include "premake/forge.lua"
 include "premake/common.lua"
 include "premake/vendor.lua"
-include "premake/dependencies.lua"
 include "premake/python.lua"
 
 workspace "oryx"
@@ -42,9 +41,10 @@ workspace "oryx"
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
+forge.on_dependency(useOryxPythonPIC)
+
 group "Dependencies"
-    include "Oryx/vendor/premake/yaml-cpp.lua"
-    include "Oryx/vendor/premake/spdlog.lua"
+    forge.dependency_projects()
 group ""
 
 group "Core"

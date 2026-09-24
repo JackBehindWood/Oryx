@@ -49,7 +49,7 @@ function useOryxPythonHeaders()
     end
 
     includedirs {
-        "%{IncludeDir.pybind11}",
+        forge.include("pybind11"),
         requirePythonOption("python-include"),
     }
 end

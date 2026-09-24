@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from build_system.utils import load_json, write_json
-from build_system.vendor import vendor_dirs
+from build_system.config import RunContext
+from build_system.deps.resolve import resolve_all
 
 # Keys this CLI owns outright and overwrites on every run.
 GENERATED_SETTINGS = {
@@ -33,23 +34,22 @@ GENERATED_FILES_EXCLUDE = {
 }
 
 
-def _vendor_search_excludes(root: Path) -> dict[str, bool]:
-    # Every <project>/vendor/<lib>/ discovered on disk (see
-    # build_system/vendor.py), instead of a single hardcoded doctest path.
-    return {d.relative_to(root).as_posix(): True for d in vendor_dirs(root)}
+def _dependency_search_excludes(run: RunContext) -> dict[str, bool]:
+    root = run.project.root
+    return {dep.dir.relative_to(root).as_posix(): True for dep in resolve_all(run.project, run.config) if dep.dir.is_relative_to(root)}
 
 
-def write_settings(root: Path) -> Path:
+def write_settings(run: RunContext) -> Path:
     """Generate or merge .vscode/settings.json with this CLI's defaults.
 
     Only the keys above are ever written; any other setting already present
     in the file (unrelated preferences, extra excludes, etc.) is preserved.
     """
-    path = root / ".vscode" / "settings.json"
+    path = run.project.root / ".vscode" / "settings.json"
     existing = load_json(path, default={})
 
     existing.update(GENERATED_SETTINGS)
-    existing.setdefault("search.exclude", {}).update({**GENERATED_SEARCH_EXCLUDE_BASE, **_vendor_search_excludes(root)})
+    existing.setdefault("search.exclude", {}).update({**GENERATED_SEARCH_EXCLUDE_BASE, **_dependency_search_excludes(run)})
     existing.setdefault("files.exclude", {}).update(GENERATED_FILES_EXCLUDE)
 
     return write_json(path, existing)

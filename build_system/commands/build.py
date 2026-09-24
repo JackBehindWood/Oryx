@@ -9,7 +9,9 @@ from rich.console import Console
 from rich.markup import escape
 
 from build_system import freshness, options, registry, workspace
+from build_system.commands.deps import ensure_or_exit
 from build_system.compile_commands import generate_compile_commands
+from build_system.deps.resolve import write_premake_config
 from build_system.config import ForgeConfig, RunContext, Target
 from build_system.config.schema import suggestion
 from build_system.setup.generators import build_compile_command
@@ -69,9 +71,12 @@ def configure(ctx: typer.Context):
         console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
         return
 
+    ensure_or_exit(run)
     premake = ensure_premake(project.premake_bin_dir, cfg.premake.version)
     if not premake:
         raise typer.Exit(code=1)
+
+    write_premake_config(run)
 
     if run.options.get("python", False):
         write_python_config(python_build_info(), project.build_dir)
@@ -113,7 +118,7 @@ def configure(ctx: typer.Context):
         console.print(f"[yellow]⚠️ Could not generate compile_commands.json: {error}[/yellow]\n")
 
 
-@command(name="compile", label="Compile — build engine binaries", requires_vendor=True)
+@command(name="compile", label="Compile — build engine binaries", requires_dependencies=True)
 def compile_project(ctx: typer.Context):
     """Compile the engine binaries for the targeted configuration."""
     run: RunContext = ctx.obj

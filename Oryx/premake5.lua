@@ -12,8 +12,8 @@ project "Oryx"
     }
 
     includedirs {
-        "%{IncludeDir['yaml-cpp']}",
-        "%{IncludeDir.spdlog}",
+        forge.include("yaml-cpp"),
+        forge.include("spdlog"),
         "src"
     }
 

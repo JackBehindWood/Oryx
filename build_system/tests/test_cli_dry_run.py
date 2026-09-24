@@ -250,7 +250,7 @@ def test_config_init_vscode_writes_four_files(forge, tmp_project):
 def test_bare_forge_prints_help_outside_a_tty(forge):
     result = forge()
     assert result.exit_code == 0
-    for group in ("build", "config", "docs", "python", "setup", "test", "vendor"):
+    for group in ("build", "config", "docs", "python", "setup", "test"):
         assert group in result.output
 
 

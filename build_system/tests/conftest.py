@@ -39,6 +39,7 @@ default-target = "oasis"
 
 [build]
 dependencies-dir = "Oryx/vendor"
+fetch = "never"
 
 [options]
 python = { default = true, off = "--no-python" }
@@ -50,6 +51,12 @@ presets.bench = ["--simulate=random,first-legal,100", "--benchmark"]
 
 [tests]
 project = "Tests"
+
+[dependencies]
+spdlog = { kind = "static", include = "include", sources = "src", defines = ["SPDLOG_COMPILED_LIB"] }
+yaml-cpp = { kind = "static", include = "include", sources = "src" }
+pybind11 = { include = "include", requires = ["python"] }
+doctest = { include = "doctest", path = "tests/vendor/doctest" }
 
 [docs]
 tool = "mkdocs"
@@ -106,6 +113,17 @@ def _snapshot() -> dict[str, str | None]:
         str(path): hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
         for path in _protected_files()
     }
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    import urllib.request
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("tests must not download anything")
+
+    monkeypatch.setattr(urllib.request, "urlretrieve", refuse)
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -19,7 +19,7 @@ project "Oasis"
     includedirs {
         "src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
-        "%{IncludeDir.spdlog}",
+        forge.include("spdlog"),
     }
 
     defines {

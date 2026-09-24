@@ -2,12 +2,13 @@ import typer
 
 from build_system import registry
 
-GROUPS = ["Build", "Config", "Docs", "Python", "Setup", "Test", "Vendor"]
+GROUPS = ["Build", "Config", "Docs", "Python", "Setup", "Test"]
+MODULES = ["Build", "Config", "Deps", "Docs", "Python", "Setup", "Test"]
 
 
 def test_discovery_order():
     names = [module.__name__ for module in registry.discover_command_modules()]
-    assert names == [f"build_system.commands.{group.lower()}" for group in GROUPS]
+    assert names == [f"build_system.commands.{group.lower()}" for group in MODULES]
 
 
 def test_discovery_is_idempotent():
@@ -30,13 +31,12 @@ def test_entries_for_group():
         "Python": ["generate_stubs"],
         "Setup": ["premake"],
         "Test": ["run_tests", "run_benchmarks"],
-        "Vendor": ["add"],
     }
 
 
-def test_only_compile_requires_vendor():
+def test_only_compile_requires_dependencies():
     registry.discover_command_modules()
-    assert [entry.func.__name__ for entry in registry._REGISTRY if entry.requires_vendor] == ["compile_project"]
+    assert [entry.func.__name__ for entry in registry._REGISTRY if entry.requires_dependencies] == ["compile_project"]
 
 
 def test_new_group_is_listed_after_discovered_groups(monkeypatch):
@@ -68,25 +68,14 @@ def test_hidden_only_group_is_not_listed(monkeypatch):
     assert "Plumbing" not in registry.groups_in_order()
 
 
-def test_vendor_check_skipped_under_dry_run(forge):
+def test_dependency_check_skipped_under_dry_run(forge):
     assert forge("--dry-run", "build", "compile").exit_code == 0
 
 
-def test_vendor_check_blocks_compile_before_its_body(forge):
+def test_dependency_check_blocks_compile_before_its_body(forge, tmp_project):
+    (tmp_project / "forge.toml").write_text(
+        (tmp_project / "forge.toml").read_text(encoding="utf-8").replace('fetch = "never"', 'fetch = "never"'), encoding="utf-8"
+    )
     result = forge("build", "compile")
     assert result.exit_code == 1
-    assert result.output.splitlines() == [
-        "✗ Missing vendored submodule: Oryx/vendor/pybind11 is empty.",
-        "✗ Missing vendored submodule: Oryx/vendor/spdlog is empty.",
-        "✗ Missing vendored submodule: Oryx/vendor/yaml-cpp is empty.",
-        "✗ Missing vendored submodule: tests/vendor/doctest is empty.",
-        "  Run: git submodule update --init --recursive",
-    ]
-
-
-def test_vendor_check_ignores_pybind11_without_python(forge, tmp_project):
-    for name in ("Oryx/vendor/spdlog", "Oryx/vendor/yaml-cpp", "tests/vendor/doctest"):
-        (tmp_project / name / "README").touch()
-    result = forge("--no-python", "--dry-run", "build", "compile")
-    assert result.exit_code == 0
-    assert "Missing vendored submodule" not in result.output
+    assert "Missing dependencies: spdlog (Oryx/vendor/spdlog), yaml-cpp (Oryx/vendor/yaml-cpp), pybind11 (Oryx/vendor/pybind11)" in result.output

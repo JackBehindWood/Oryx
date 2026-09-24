@@ -2,7 +2,7 @@
 name = "Oryx"
 description = "Game strategy engine"
 license = "Apache-2.0"
-repository = "https://github.com/JackBehindWood/oryx"
+repository = "https://github.com/JackBehindWood/Oryx"
 default-target = "oasis"
 forge-version = ">=0.2"
 
@@ -26,6 +26,12 @@ presets.bench = ["--simulate=random,first-legal,100", "--benchmark"]
 
 [tests]
 project = "Tests"
+
+[dependencies]
+spdlog = { kind = "static", include = "include", sources = "src", defines = ["SPDLOG_COMPILED_LIB"] }
+yaml-cpp = { kind = "static", include = "include", sources = "src" }
+pybind11 = { include = "include", requires = ["python"] }
+doctest = { include = "doctest", path = "tests/vendor/doctest" }
 
 [docs]
 tool = "mkdocs"

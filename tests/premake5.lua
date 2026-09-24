@@ -26,7 +26,7 @@ project "Tests"
         ".",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
-        "%{IncludeDir.spdlog}",
+        forge.include("spdlog"),
     }
 
     defines {

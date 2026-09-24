@@ -29,7 +29,7 @@ class CommandEntry:
     func: Callable
     order: int
     hidden: bool = False
-    requires_vendor: bool = False
+    requires_dependencies: bool = False
 
 
 _REGISTRY: list[CommandEntry] = []
@@ -50,15 +50,13 @@ def make_group(app: typer.Typer, group: str):
     Extra keyword args:
         hidden: keep the command callable from the CLI but exclude it from
             the interactive menu (for future internal/plumbing commands).
-        requires_vendor: run build_system.vendor.ensure_vendor_dirs() before
-            the command's body, unless the command was invoked with
-            --dry-run — generalizes the "is the doctest submodule checked
-            out?" guard so any command that needs vendored headers gets it
-            declaratively instead of a hand-written check in its body.
+        requires_dependencies: make sure every forge.toml [dependencies]
+            entry this run needs is present before the command's body,
+            unless the command was invoked with --dry-run.
     """
-    def command(*, name: str, label: str, hidden: bool = False, requires_vendor: bool = False, **typer_kwargs):
+    def command(*, name: str, label: str, hidden: bool = False, requires_dependencies: bool = False, **typer_kwargs):
         def decorator(func: Callable) -> Callable:
-            target = _with_vendor_check(func) if requires_vendor else func
+            target = _with_dependency_check(func) if requires_dependencies else func
             wrapped = app.command(name, **typer_kwargs)(target)
             _REGISTRY.append(
                 CommandEntry(
@@ -67,7 +65,7 @@ def make_group(app: typer.Typer, group: str):
                     func=wrapped,
                     order=next(_counter),
                     hidden=hidden,
-                    requires_vendor=requires_vendor,
+                    requires_dependencies=requires_dependencies,
                 )
             )
             return wrapped
@@ -77,14 +75,13 @@ def make_group(app: typer.Typer, group: str):
     return command
 
 
-def _with_vendor_check(func: Callable) -> Callable:
+def _with_dependency_check(func: Callable) -> Callable:
     @functools.wraps(func)
     def guarded(ctx, *args, **kwargs):
-        from build_system.vendor import ensure_vendor_dirs
+        from build_system.commands.deps import ensure_or_exit
 
-        run = ctx.obj
-        if not run.dry_run:
-            ensure_vendor_dirs(run.project.root, run.options.get("python", False))
+        if not ctx.obj.dry_run:
+            ensure_or_exit(ctx.obj)
         return func(ctx, *args, **kwargs)
 
     return guarded
