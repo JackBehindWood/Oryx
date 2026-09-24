@@ -46,6 +46,7 @@ sanitize = { default = false, on = "--sanitize" }
 
 [targets.oasis]
 project = "Oasis"
+presets.bench = ["--simulate=random,first-legal,100", "--benchmark"]
 
 [tests]
 project = "Tests"

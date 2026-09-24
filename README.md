@@ -167,7 +167,7 @@ direct subcommands for scripts and CI:
 uv run forge                          # interactive menu
 uv run forge config init --ide vscode # forge.local.toml + .vscode/{tasks,launch,...}.json
 uv run forge build all                # configure, compile, test
-uv run forge build run                # run the Oasis sandbox executable
+uv run forge build run                # run the Oasis sandbox (`oasis:bench` = benchmark preset)
 uv run forge docs serve               # live-preview the documentation site
 build experiment
 build explain

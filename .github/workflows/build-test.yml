@@ -16,7 +16,7 @@ jobs:
     env:
       # Managed CPython ships a shared libpython, which the embedded scripting backend links.
       UV_PYTHON_PREFERENCE: only-managed
-      BUILD_FLAGS: ${{ matrix.python == 'off' && '--no-python' || '' }}
+      BUILD_FLAGS: ${{ matrix.python == 'off' && '--without python' || '' }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -63,7 +63,7 @@ jobs:
 
     - name: Benchmark smoke run
       run: |
-        output=$(uv run forge $BUILD_FLAGS build run --simulate=random,first-legal,100 --benchmark)
+        output=$(uv run forge $BUILD_FLAGS build run oasis:bench)
         echo "$output"
         echo "$output" | grep -q "Benchmark report"
 

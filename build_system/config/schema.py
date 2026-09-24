@@ -162,7 +162,7 @@ def _join(where: str, key: str) -> str:
     return f"{where}.{key}" if where else key
 
 
-def _suggestion(key: str, candidates: typing.Iterable[str]) -> str:
+def suggestion(key: str, candidates: typing.Iterable[str]) -> str:
     matches = difflib.get_close_matches(key, list(candidates), n=1)
     return f" — did you mean '{matches[0]}'?" if matches else ""
 
@@ -175,7 +175,7 @@ def _check_choice(value, choices, where: str, source: str) -> None:
     choices = list(choices)
     if value not in choices:
         allowed = ", ".join(repr(choice) for choice in choices)
-        hint = _suggestion(value, choices) if isinstance(value, str) else ""
+        hint = suggestion(value, choices) if isinstance(value, str) else ""
         raise SchemaError(f"{source}: '{where}' is {value!r}; expected one of {allowed}{hint}")
 
 
@@ -217,7 +217,7 @@ def from_dict(cls, data: dict, where: str = "", source: str = "forge.toml"):
 
     for key in data:
         if key not in fields:
-            raise SchemaError(f"{source}: unknown key '{_join(where, key)}'{_suggestion(key, fields)}")
+            raise SchemaError(f"{source}: unknown key '{_join(where, key)}'{suggestion(key, fields)}")
 
     values: dict[str, Any] = {}
     for key, f in fields.items():

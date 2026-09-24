@@ -87,9 +87,9 @@ def _prompt_for_extra_params(func) -> dict | None:
             continue
 
         default = param.default
-        is_option = isinstance(default, typer.models.OptionInfo)
-        typer_default = default.default if is_option else default
-        help_text = (default.help if is_option else None) or name
+        is_parameter = isinstance(default, typer.models.ParameterInfo)
+        typer_default = default.default if is_parameter else default
+        help_text = (default.help if is_parameter else None) or name
         annotation = _unwrap_optional(param.annotation)
 
         if annotation is bool:

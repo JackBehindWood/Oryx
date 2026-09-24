@@ -9,10 +9,10 @@ Python is on by default. Build with `--no-python` to leave it out; Oasis then ha
 The repository ships two example scripts in `Oasis/scripts/` (`nim.py` and `monte_carlo.py`): Nim and a Monte Carlo strategy that plays both Nim and TicTacToe. `Oasis/oryx.yaml` points Oasis at that directory.
 
 ```bash
-uv run forge build run                                   # menu: pick a game, then an opponent
-uv run forge build run --game nim --opponent monte-carlo # play Nim against the Python strategy
-uv run forge build run --game nim --simulate=monte-carlo,first-legal,20
-uv run forge build run --simulate=monte-carlo,tictactoe/heuristic,20
+uv run forge build run                                          # menu: pick a game, then an opponent
+uv run forge build run -- --game=nim --opponent=monte-carlo     # play Nim against the Python strategy
+uv run forge build run -- --game=nim --simulate=monte-carlo,first-legal,20
+uv run forge build run -- --simulate=monte-carlo,tictactoe/heuristic,20
 ```
 
 The menu prints each entry's description and its parameters with their defaults, for example `nim - Players alternate ... [stones=21, max_take=3]`. An entry with a required parameter (a typed field with no default) is left out of the menus, because Oasis cannot supply parameters yet; naming one with `--game` or `--opponent` reports which parameters it needs.

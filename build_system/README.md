@@ -102,7 +102,7 @@ Handles build lifecycle, Premake configuration, and binary compilation.
 | --- | --- |
 | `build configure` | Ensures local Premake5 binary exists and generates project build files. Records the compiled source files in `build/.sources`; when a source was removed since the last run it deletes that project's binaries so a stale archive member or executable cannot survive. |
 | `build compile` | Compiles engine binaries for the targeted configuration profile. Runs `configure` first when a source file was added or removed since the last configure. |
-| `build run` | Runs the compiled `Oasis` sandbox executable (`--game`, `--opponent`, `--simulate`, `--benchmark` are forwarded). |
+| `build run [TARGET[:PRESET]] [-- ARGS]` | Runs a `[targets]` executable (default: `[project] default-target`) from the project root. A preset prepends its arguments from `forge.toml` (`oasis:bench`); everything after `--` is passed through. On Linux/macOS forge `exec`s into the program, so no Python process stays resident. |
 | `build clean` | Removes the entire `build/` directory (binaries, object files, generated Makefiles, and `compile_commands.json`). |
 | `build all` | Executes `configure`, `compile`, and unit test commands sequentially. |
 
@@ -142,7 +142,8 @@ fetch = "auto"                    # auto | ask | never
 python = { default = true, off = "--no-python", help = "Embedded Python backend" }
 
 [targets.oasis]
-project = "Oasis"                 # a Premake project name
+project = "Oasis"                 # a Premake project; path and kind come from the export
+presets.bench = ["--simulate=random,first-legal,100", "--benchmark"]
 
 [tests]
 project = "Tests"

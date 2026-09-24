@@ -1,12 +1,17 @@
+import os
 import subprocess
+import sys
+from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from build_system import freshness, options, registry, workspace
 from build_system.compile_commands import generate_compile_commands
-from build_system.config import RunContext
+from build_system.config import ForgeConfig, RunContext, Target
+from build_system.config.schema import suggestion
 from build_system.setup.generators import build_compile_command
 from build_system.setup.premake import ensure_premake, get_premake_executable
 from build_system.setup.python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
@@ -177,61 +182,81 @@ def run_all(ctx: typer.Context):
     ctx.invoke(run_tests, ctx)
 
 
-@command(name="run", label="Run — launch the Oasis sandbox executable")
+EXECUTABLE_KINDS = ("ConsoleApp", "WindowedApp")
+
+
+def _fail(message: str) -> typer.Exit:
+    console.print(f"[bold red]✗ {escape(message)}[/bold red]")
+    return typer.Exit(code=1)
+
+
+def resolve_target(cfg: ForgeConfig, spec: str | None) -> tuple[str, Target, list[str]]:
+    """TARGET[:PRESET] → (name, target, preset arguments); no spec means [project] default-target."""
+    name, _, preset = (spec or cfg.project.default_target).partition(":")
+    if not name:
+        raise _fail("No target given and no [project] default-target in forge.toml.")
+    if name not in cfg.targets:
+        available = ", ".join(cfg.targets) or "(none in forge.toml)"
+        raise _fail(f"Unknown target '{name}'{suggestion(name, cfg.targets)} (available: {available})")
+    target = cfg.targets[name]
+    if not preset:
+        return name, target, []
+    if preset not in target.presets:
+        available = ", ".join(target.presets) or "(none)"
+        raise _fail(f"Unknown preset '{name}:{preset}'{suggestion(preset, target.presets)} (available: {available})")
+    return name, target, list(target.presets[preset])
+
+
+def _can_replace_process() -> bool:
+    return os.name == "posix"
+
+
+def _exec(argv: list[str], cwd: Path, replace_process: bool) -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if replace_process and _can_replace_process():
+        os.chdir(cwd)
+        os.execv(argv[0], argv)
+        return
+    code = subprocess.run(argv, cwd=cwd).returncode
+    if code:
+        raise typer.Exit(code=code)
+
+
+@command(
+    name="run",
+    label="Run — launch a [targets] executable",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
 def run_project(
     ctx: typer.Context,
-    simulate: Optional[str] = typer.Option(
+    target: Optional[str] = typer.Argument(
         None,
-        "--simulate",
-        help="Run a headless <strategyA>,<strategyB>,<matchCount> batch instead of the interactive prompt.",
-    ),
-    benchmark: bool = typer.Option(
-        False,
-        "--benchmark",
-        help="With --simulate: print a timing/throughput/Instrumentation report on completion.",
-    ),
-    game: Optional[str] = typer.Option(
-        None,
-        "--game",
-        help="Registered game id to play (built in or script-defined); prompts when omitted.",
-    ),
-    opponent: Optional[str] = typer.Option(
-        None,
-        "--opponent",
-        help="Opponent strategy id, or 'human'; prompts when omitted.",
+        metavar="[TARGET[:PRESET]]",
+        help="A forge.toml [targets] entry, optionally with one of its presets (default: [project] default-target). "
+        "Arguments after `--` go to the program.",
     ),
 ):
-    """Run the compiled Oasis sandbox executable."""
+    """Run a compiled [targets] executable from the project root, replacing forge's process."""
     run: RunContext = ctx.obj
-    cfg = run.config
+    extra = list(ctx.args)
+    if target and target.startswith("-"):
+        target, extra = None, [target, *extra]
 
-    target = cfg.targets[cfg.project.default_target]
-    exe_path = require_workspace(run).target_path(target.project, run.profile)
-
-    args = [str(exe_path)]
-    if game:
-        args.append(f"--game={game}")
-    if opponent:
-        args.append(f"--opponent={opponent}")
-    if simulate:
-        args.append(f"--simulate={simulate}")
-    if benchmark:
-        args.append("--benchmark")
+    name, entry, preset_args = resolve_target(run.config, target)
+    config = require_workspace(run).config(entry.project, run.profile)
+    if config.kind not in EXECUTABLE_KINDS:
+        raise _fail(f"Target '{name}' is Premake project '{entry.project}', a {config.kind}, not an executable.")
+    argv = [str(config.target), *preset_args, *extra]
 
     if run.dry_run:
-        console.print(f"[dim][dry-run] would run: {' '.join(args)}[/dim]")
+        console.print(f"[dim][dry-run] would run: {' '.join(argv)}[/dim]")
         return
 
-    console.print(f"[bold blue]🚀 Running {target.project} ({run.profile})...[/bold blue]")
-
-    if not exe_path.exists():
-        console.print(f"[bold red]✗ Executable missing at:[/bold red] {exe_path}")
+    if not config.target.exists():
+        console.print(f"[bold red]✗ Executable missing at:[/bold red] {config.target}")
         console.print("  [dim]Run 'forge build compile' first.[/dim]")
         raise typer.Exit(code=1)
 
-    try:
-        run_command(args, cwd=run.project.root, capture_output=False)
-        console.print(f"\n[bold green]✓ {target.project} exited successfully[/bold green]\n")
-    except subprocess.CalledProcessError:
-        console.print(f"[bold red]✗ {target.project} exited with an error.[/bold red]")
-        raise typer.Exit(code=1)
+    console.print(f"[bold blue]🚀 Running {name} ({run.profile})...[/bold blue]")
+    _exec(argv, run.project.root, replace_process=not run.interactive)

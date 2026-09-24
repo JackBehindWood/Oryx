@@ -74,13 +74,96 @@ def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tes
     ("args", "passed"),
     [
         ([], ""),
-        (["--game", "tictactoe", "--opponent", "human"], " --game=tictactoe --opponent=human"),
-        (["--simulate", "random,first-legal,100", "--benchmark"], " --simulate=random,first-legal,100 --benchmark"),
+        (["oasis"], ""),
+        (["oasis:bench"], " --simulate=random,first-legal,100 --benchmark"),
+        (["oasis", "--", "--game=tictactoe", "--opponent", "human"], " --game=tictactoe --opponent human"),
+        (["--", "--game=tictactoe"], " --game=tictactoe"),
+        (["oasis:bench", "--", "--seed=4"], " --simulate=random,first-legal,100 --benchmark --seed=4"),
+        (["--profile", "release"], ""),
     ],
 )
 def test_run(dry, tmp_project, args, passed):
-    oasis = tmp_project / "build" / "bin" / "Debug-linux-x86_64" / "Oasis" / "Oasis"
-    assert dry("build", "run", *args) == [f" would run: {oasis}{passed}"]
+    profile = "Release" if "release" in args else "Debug"
+    global_flags = args[:2] if "--profile" in args else []
+    command_args = args[2:] if global_flags else args
+    oasis = tmp_project / "build" / "bin" / f"{profile}-linux-x86_64" / "Oasis" / "Oasis"
+    assert dry(*global_flags, "build", "run", *command_args) == [f" would run: {oasis}{passed}"]
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["oasys"], "Unknown target 'oasys' — did you mean 'oasis'? (available: oasis, core)"),
+        (["oasis:bnech"], "Unknown preset 'oasis:bnech' — did you mean 'bench'? (available: bench)"),
+        (["core"], "Target 'core' is Premake project 'Oryx', a StaticLib, not an executable."),
+    ],
+)
+def test_run_errors(forge, tmp_project, args, message):
+    config = tmp_project / "forge.toml"
+    config.write_text(config.read_text(encoding="utf-8") + '\n[targets.core]\nproject = "Oryx"\n', encoding="utf-8")
+    result = forge("--dry-run", "build", "run", *args)
+    assert result.exit_code == 1
+    assert message in result.output
+
+
+def test_run_from_the_menu_keeps_the_menu_process(tmp_project, run, monkeypatch):
+    from build_system.commands import build
+
+    binary = _fake_binary(tmp_project)
+    run.interactive = True
+    calls = []
+    monkeypatch.setattr(build, "_can_replace_process", lambda: True)
+    monkeypatch.setattr(build.os, "execv", lambda *args: calls.append("execv"))
+    monkeypatch.setattr(build.subprocess, "run", lambda argv, cwd: calls.append(argv) or build.subprocess.CompletedProcess(argv, 0))
+    build._exec([str(binary)], tmp_project, replace_process=not run.interactive)
+    assert calls == [[str(binary)]]
+
+
+def test_run_without_a_default_target(forge, tmp_project):
+    config = tmp_project / "forge.toml"
+    config.write_text(config.read_text(encoding="utf-8").replace('default-target = "oasis"\n', ""), encoding="utf-8")
+    result = forge("--dry-run", "build", "run")
+    assert result.exit_code == 1
+    assert "no [project] default-target" in result.output
+
+
+def _fake_binary(tmp_project):
+    binary = tmp_project / "build" / "bin" / "Debug-linux-x86_64" / "Oasis" / "Oasis"
+    binary.parent.mkdir(parents=True)
+    binary.touch()
+    return binary
+
+
+def test_run_replaces_the_process_from_the_project_root(forge, tmp_project, monkeypatch):
+    from build_system.commands import build
+
+    binary = _fake_binary(tmp_project)
+    calls = []
+    monkeypatch.setattr(build, "_can_replace_process", lambda: True)
+    monkeypatch.setattr(build.os, "execv", lambda path, argv: calls.append((path, argv, build.os.getcwd())))
+    (tmp_project / "sub").mkdir()
+    monkeypatch.chdir(tmp_project / "sub")
+    result = forge("build", "run", "oasis:bench")
+    assert result.exit_code == 0, result.output
+    assert calls == [(str(binary), [str(binary), "--simulate=random,first-legal,100", "--benchmark"], str(tmp_project))]
+
+
+def test_run_uses_a_subprocess_on_windows(forge, tmp_project, monkeypatch):
+    from build_system.commands import build
+
+    binary = _fake_binary(tmp_project)
+    calls = []
+    monkeypatch.setattr(build, "_can_replace_process", lambda: False)
+    monkeypatch.setattr(build.subprocess, "run", lambda argv, cwd: calls.append((argv, cwd)) or build.subprocess.CompletedProcess(argv, 3))
+    result = forge("build", "run", "--", "--game=x")
+    assert result.exit_code == 3
+    assert calls == [([str(binary), "--game=x"], tmp_project)]
+
+
+def test_run_missing_binary(forge):
+    result = forge("build", "run")
+    assert result.exit_code == 1
+    assert "Executable missing at:" in result.output
 
 
 def test_run_before_configure_asks_for_it(forge, tmp_project):

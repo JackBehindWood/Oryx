@@ -4,7 +4,7 @@ import hashlib
 import re
 
 from .config import ForgeConfig, LocalConfig, OptionSpec, SchemaError
-from .config.schema import _suggestion
+from .config.schema import suggestion
 
 _DEFINE = re.compile(r"([A-Za-z0-9][A-Za-z0-9_-]*)(?:=(.*))?", re.DOTALL)
 
@@ -12,7 +12,7 @@ _DEFINE = re.compile(r"([A-Za-z0-9][A-Za-z0-9_-]*)(?:=(.*))?", re.DOTALL)
 def _check_name(name: str, specs: dict[str, OptionSpec], flag: str) -> None:
     if name not in specs:
         available = ", ".join(specs) or "(none in forge.toml)"
-        raise SchemaError(f"command line: {flag} {name}: unknown option{_suggestion(name, specs)} (available: {available})")
+        raise SchemaError(f"command line: {flag} {name}: unknown option{suggestion(name, specs)} (available: {available})")
 
 
 def resolve(cfg: ForgeConfig, local: LocalConfig, with_: list[str] = (), without: list[str] = ()) -> dict[str, bool]:

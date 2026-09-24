@@ -70,6 +70,7 @@ class RunContext:
     defines: list[str] = field(default_factory=list)
     verbose: bool = False
     dry_run: bool = False
+    interactive: bool = False
 
     @property
     def jobs(self) -> int:

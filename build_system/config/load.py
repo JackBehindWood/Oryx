@@ -2,7 +2,7 @@ import re
 import tomllib
 from pathlib import Path
 
-from .schema import ForgeConfig, LocalConfig, SchemaError, _suggestion, from_dict
+from .schema import ForgeConfig, LocalConfig, SchemaError, suggestion, from_dict
 
 LOCAL_CONFIG_NAME = "forge.local.toml"
 LEGACY_LOCAL_CONFIG_NAME = "oryx.local.toml"
@@ -41,11 +41,11 @@ def validate(cfg: ForgeConfig) -> ForgeConfig:
         for requirement in dependency.requires:
             option = _requirement_name(requirement)
             if option not in options:
-                raise SchemaError(f"forge.toml: 'dependencies.{name}.requires' names unknown option '{option}'{_suggestion(option, options)}")
+                raise SchemaError(f"forge.toml: 'dependencies.{name}.requires' names unknown option '{option}'{suggestion(option, options)}")
     default_target = cfg.project.default_target
     if default_target and default_target not in cfg.targets:
         raise SchemaError(
-            f"forge.toml: 'project.default-target' is '{default_target}', which is not in [targets]{_suggestion(default_target, cfg.targets)}"
+            f"forge.toml: 'project.default-target' is '{default_target}', which is not in [targets]{suggestion(default_target, cfg.targets)}"
         )
     return cfg
 
@@ -85,7 +85,7 @@ def load_local(root: Path) -> tuple[LocalConfig, Path | None]:
 def validate_local(local: LocalConfig, cfg: ForgeConfig) -> LocalConfig:
     for name in local.options:
         if name not in cfg.options:
-            raise SchemaError(f"{LOCAL_CONFIG_NAME}: unknown option '{name}' in [options]{_suggestion(name, cfg.options)}")
+            raise SchemaError(f"{LOCAL_CONFIG_NAME}: unknown option '{name}' in [options]{suggestion(name, cfg.options)}")
     return local
 
 

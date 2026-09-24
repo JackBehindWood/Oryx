@@ -128,6 +128,7 @@ def main(
         from build_system import interactive
 
         if interactive.is_interactive():
+            ctx.obj.interactive = True
             interactive.run_menu(ctx)
         else:
             # Plain print avoids Rich re-parsing Click's own markup-free help text.
