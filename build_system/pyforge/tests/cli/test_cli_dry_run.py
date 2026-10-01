@@ -29,67 +29,52 @@ def tests_binary(tmp_project):
     return tmp_project / "build" / "bin" / "Debug-linux-x86_64" / "Tests" / "Tests"
 
 
-def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
-    assert dry("configure") == [f" would run: {premake} gmake {DUMMY_OPTIONS} --forge-export"]
+CONFIGURE = " would run: {premake} gmake {options} --forge-export"
+COMPILE = " would run: make -C {build} -j8 config={token}"
+UNIT_TESTS = " would run: {tests} --source-file=*tests/unit/*,*tests/integration/*"
+RUN = " would run: {oasis_debug}{passed}"
+BENCH = " --simulate=random,first-legal,100 --benchmark"
+
+DRY_RUN_COMMANDS = [
+    pytest.param(["configure"], [CONFIGURE.format(premake="{premake}", options=DUMMY_OPTIONS)], id="configure"),
+    pytest.param(["--without", "python", "configure"], [CONFIGURE.format(premake="{premake}", options="--no-python " + DUMMY_OPTIONS)], id="configure-without-python"),
+    pytest.param(["--with", "sanitize", "--without", "python", "configure"], [CONFIGURE.format(premake="{premake}", options="--no-python --sanitize " + DUMMY_OPTIONS)], id="configure-sanitize"),
+    pytest.param(["--without", "python", "-D", "cc=clang", "-D", "verbose", "configure"], [CONFIGURE.format(premake="{premake}", options="--no-python --cc=clang --verbose " + DUMMY_OPTIONS)], id="configure-define"),
+    pytest.param(["compile"], [COMPILE.format(build="{build}", token="debug_x64")], id="compile"),
+    pytest.param(["--profile", "release", "compile"], [COMPILE.format(build="{build}", token="release_x64")], id="compile-release"),
+    pytest.param(["--profile", "DIST", "compile"], [COMPILE.format(build="{build}", token="dist_x64")], id="compile-dist"),
+    pytest.param(["--without", "python", "compile"], [COMPILE.format(build="{build}", token="debug_x64")], id="compile-without-python"),
+    pytest.param(["--with", "sanitize", "compile"], [COMPILE.format(build="{build}", token="debug_x64")], id="compile-sanitize"),
+    pytest.param(["clean"], [" would remove: {build}"], id="clean"),
+    pytest.param(
+        ["all"],
+        [CONFIGURE.format(premake="{premake}", options=DUMMY_OPTIONS), COMPILE.format(build="{build}", token="debug_x64"), UNIT_TESTS],
+        id="all-runs-configure-compile-test-in-order",
+    ),
+    pytest.param(["test"], [UNIT_TESTS], id="test"),
+    pytest.param(["test", "run"], ["Note: 'test run' is deprecated; use 'forge test'.", UNIT_TESTS], id="test-run-alias-is-deprecated"),
+    pytest.param(["test", "benchmark"], [" would run: {tests} --source-file=*tests/benchmark/*"], id="test-benchmark"),
+    pytest.param(["run"], [RUN.format(oasis_debug="{oasis_debug}", passed="")], id="run"),
+    pytest.param(["run", "oasis"], [RUN.format(oasis_debug="{oasis_debug}", passed="")], id="run-target"),
+    pytest.param(["run", "oasis:bench"], [RUN.format(oasis_debug="{oasis_debug}", passed=BENCH)], id="run-preset"),
+    pytest.param(["run", "oasis", "--", "--game=tictactoe", "--opponent", "human"], [RUN.format(oasis_debug="{oasis_debug}", passed=" --game=tictactoe --opponent human")], id="run-passthrough"),
+    pytest.param(["run", "--", "--game=tictactoe"], [RUN.format(oasis_debug="{oasis_debug}", passed=" --game=tictactoe")], id="run-default-target-passthrough"),
+    pytest.param(["run", "oasis:bench", "--", "--seed=4"], [RUN.format(oasis_debug="{oasis_debug}", passed=BENCH + " --seed=4")], id="run-preset-passthrough"),
+    pytest.param(["--profile", "release", "run"], [" would run: {oasis_release}"], id="run-release"),
+]
 
 
-@pytest.mark.parametrize(
-    ("flags", "options"),
-    [
-        ([], DUMMY_OPTIONS),
-        (["--without", "python"], "--no-python " + DUMMY_OPTIONS),
-        (["--with", "sanitize", "--without", "python"], "--no-python --sanitize " + DUMMY_OPTIONS),
-        (["--without", "python", "-D", "cc=clang", "-D", "verbose"], "--no-python --cc=clang --verbose " + DUMMY_OPTIONS),
-    ],
-)
-def test_configure(dry, premake, flags, options):
-    assert dry(*flags, "configure") == [f" would run: {premake} gmake {options} --forge-export"]
-
-
-@pytest.mark.parametrize(
-    ("flags", "token"),
-    [
-        ([], "debug_x64"),
-        (["--profile", "release"], "release_x64"),
-        (["--profile", "DIST"], "dist_x64"),
-        (["--without", "python"], "debug_x64"),
-        (["--with", "sanitize"], "debug_x64"),
-    ],
-)
-def test_compile(dry, tmp_project, flags, token):
-    assert dry(*flags, "compile") == [f" would run: make -C {tmp_project / 'build'} -j8 {'config=' + token}"]
-
-
-def test_clean(dry, tmp_project):
-    assert dry("clean") == [f" would remove: {tmp_project / 'build'}"]
-
-
-def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tests_binary):
-    assert dry("all") == [
-        f" would run: {premake} gmake {DUMMY_OPTIONS} --forge-export",
-        f" would run: make -C {tmp_project / 'build'} -j8 config=debug_x64",
-        f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
-    ]
-
-
-@pytest.mark.parametrize(
-    ("args", "passed"),
-    [
-        ([], ""),
-        (["oasis"], ""),
-        (["oasis:bench"], " --simulate=random,first-legal,100 --benchmark"),
-        (["oasis", "--", "--game=tictactoe", "--opponent", "human"], " --game=tictactoe --opponent human"),
-        (["--", "--game=tictactoe"], " --game=tictactoe"),
-        (["oasis:bench", "--", "--seed=4"], " --simulate=random,first-legal,100 --benchmark --seed=4"),
-        (["--profile", "release"], ""),
-    ],
-)
-def test_run(dry, tmp_project, args, passed):
-    profile = "Release" if "release" in args else "Debug"
-    global_flags = args[:2] if "--profile" in args else []
-    command_args = args[2:] if global_flags else args
-    oasis = tmp_project / "build" / "bin" / f"{profile}-linux-x86_64" / "Oasis" / "Oasis"
-    assert dry(*global_flags, "run", *command_args) == [f" would run: {oasis}{passed}"]
+@pytest.mark.parametrize(("argv", "expected"), DRY_RUN_COMMANDS)
+def test_dry_run_prints_the_exact_commands(dry, tmp_project, premake, tests_binary, argv, expected):
+    oasis = tmp_project / "build" / "bin" / "{profile}-linux-x86_64" / "Oasis" / "Oasis"
+    paths = {
+        "premake": premake,
+        "build": tmp_project / "build",
+        "tests": tests_binary,
+        "oasis_debug": str(oasis).replace("{profile}", "Debug"),
+        "oasis_release": str(oasis).replace("{profile}", "Release"),
+    }
+    assert dry(*argv) == [line.format(**paths) for line in expected]
 
 
 @pytest.mark.parametrize(
@@ -184,21 +169,6 @@ def test_compile_uses_the_launcher_from_forge_local_toml(dry, tmp_project, monke
 def test_compile_before_configure_uses_a_placeholder_token(dry, tmp_project):
     (tmp_project / "build" / "forge" / "workspace.json").unlink()
     assert dry("compile") == [f" would run: make -C {tmp_project / 'build'} -j8 config=<from export>"]
-
-
-def test_tests(dry, tests_binary):
-    assert dry("test") == [f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*"]
-
-
-def test_tests_run_alias_is_deprecated(dry, tests_binary):
-    assert dry("test", "run") == [
-        "Note: 'test run' is deprecated; use 'forge test'.",
-        f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
-    ]
-
-
-def test_benchmark(dry, tests_binary):
-    assert dry("test", "benchmark") == [f" would run: {tests_binary} --source-file=*tests/benchmark/*"]
 
 
 def test_tests_unknown_suite(forge):
