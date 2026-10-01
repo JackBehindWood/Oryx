@@ -132,11 +132,16 @@ def _snapshot() -> dict[str, str | None]:
 def no_network(monkeypatch):
     import urllib.request
 
-    def refuse(*args, **kwargs):
-        raise AssertionError("tests must not download anything")
+    def guard(real):
+        def call(url, *args, **kwargs):
+            if not str(getattr(url, "full_url", url)).startswith("http://127.0.0.1:"):
+                raise AssertionError("tests must not download anything")
+            return real(url, *args, **kwargs)
 
-    monkeypatch.setattr(urllib.request, "urlretrieve", refuse)
-    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+        return call
+
+    monkeypatch.setattr(urllib.request, "urlretrieve", guard(urllib.request.urlretrieve))
+    monkeypatch.setattr(urllib.request, "urlopen", guard(urllib.request.urlopen))
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -174,8 +174,8 @@ def test_add_submodule_runs_git_and_honours_overrides(forge, tmp_project, git_ca
 @pytest.mark.parametrize(
     ("args", "message"),
     [
-        (["glad"], "Pass exactly one of --local or --submodule URL."),
-        (["glad", "--local", "--submodule", "u"], "Pass exactly one of --local or --submodule URL."),
+        (["glad"], "Pass exactly one of --local, --submodule URL, or --archive URL."),
+        (["glad", "--local", "--submodule", "u"], "Pass exactly one of --local, --submodule URL, or --archive URL."),
         (["spdlog", "--local"], "'spdlog' is already in forge.toml [dependencies]."),
         (["glad", "--local"], "Put the files for 'glad' at Oryx/vendor/glad first"),
         (["glad", "--local", "--path", "x", "--requires", "gui"], "names unknown option 'gui'"),

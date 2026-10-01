@@ -48,7 +48,7 @@ class Choices:
 
 GENERATORS = Choices("gmake")
 LAUNCHERS = Choices("ccache")
-DEPENDENCY_SOURCES = Choices("submodule", "local")
+DEPENDENCY_SOURCES = Choices("submodule", "local", "archive")
 EDITORS = Choices("vscode", "visual_studio", "none")
 DOCS_TOOLS = Choices("mkdocs")
 
@@ -123,6 +123,8 @@ class Dependency:
     sources: str = ""
     defines: list[str] = field(default_factory=list)
     requires: list[str] = field(default_factory=list)
+    url: str = ""
+    sha256: str = ""
 
 
 @dataclass(frozen=True)

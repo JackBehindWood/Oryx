@@ -22,6 +22,7 @@ console = Console()
 app = typer.Typer(no_args_is_help=True)
 GROUP_HELP = "Third-party dependencies declared in forge.toml [dependencies]"
 command = registry.make_group(app, group="Deps")
+SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, or --archive URL."
 
 
 def _fail(message: str) -> typer.Exit:
@@ -65,10 +66,11 @@ def _write(run: RunContext, edit) -> None:
         raise _fail(str(error))
 
 
-def _entry(source: str, path: str, default_dir: str, layout: dict[str, str], defines: list[str], requires: list[str]) -> dict:
+def _entry(source: str, path: str, default_dir: str, layout: dict[str, str], defines: list[str], requires: list[str], fetched: dict[str, str] | None = None) -> dict:
     entry: dict = {}
     if source != "submodule":
         entry["source"] = source
+    entry.update(fetched or {})
     if path and path != default_dir:
         entry["path"] = path
     if layout["kind"] != "header":
@@ -90,12 +92,34 @@ def _consumer_snippet(name: str, kind: str) -> str:
     return "\n".join(f"    {line}" for line in lines)
 
 
-@command(name="add", label="Add — declare a dependency (local folder or git submodule)")
+def _add_archive(run: RunContext, name: str, url: str) -> ResolvedDependency:
+    import tempfile
+
+    from pyforge import cache
+    from pyforge.config import Dependency
+    from pyforge.deps.sources.archive import ArchiveSource, url_filename
+    from pyforge.utils import download_with_progress, sha256_file
+
+    with tempfile.TemporaryDirectory(prefix="forge-dl-") as scratch:
+        archive = Path(scratch) / url_filename(url)
+        try:
+            download_with_progress(url, archive, name)
+            digest = sha256_file(archive)
+            dep = ResolvedDependency(name, Dependency(source="archive", url=url, sha256=digest), cache.deps_dir(name, digest[:12]))
+            ArchiveSource().install(run.project.root, dep, archive)
+        except (OSError, DependencyError) as error:
+            raise _fail(str(error))
+    console.print(f"[bold green]✓ Downloaded {name}[/bold green] (sha256 {digest[:12]}…)")
+    return dep
+
+
+@command(name="add", label="Add — declare a dependency (local, submodule or archive)")
 def add(
     ctx: typer.Context,
     name: str = typer.Argument(..., help="Dependency name; also its folder name under [build] dependencies-dir."),
     local: bool = typer.Option(False, "--local", help="Files you put in place yourself (never fetched or deleted by forge)."),
     submodule: Optional[str] = typer.Option(None, "--submodule", metavar="URL", help="Add it as a git submodule from URL."),
+    archive: Optional[str] = typer.Option(None, "--archive", metavar="URL", help="Download a .tar.gz/.zip from URL into the shared cache; its sha256 is recorded."),
     path: Optional[str] = typer.Option(None, "--path", help="Folder relative to the project root (default: <dependencies-dir>/NAME)."),
     kind: Optional[Literal["static", "header"]] = typer.Option(None, "--kind", help="static (compiled from its sources) or header-only; detected when omitted."),
     include: Optional[str] = typer.Option(None, "--include", help="Include folder inside it; detected when omitted."),
@@ -105,23 +129,28 @@ def add(
 ):
     """Add a [dependencies] entry, detecting its layout when the files are present."""
     run: RunContext = ctx.obj
-    if local == bool(submodule):
-        raise _fail("Pass exactly one of --local or --submodule URL.")
+    if sum(bool(flag) for flag in (local, submodule, archive)) != 1:
+        raise _fail(SOURCE_FLAGS_MESSAGE)
     if name in run.config.dependencies:
         raise _fail(f"'{name}' is already in forge.toml [dependencies].")
 
     default_dir = Path(run.config.build.dependencies_dir, name).as_posix()
     folder = path or default_dir
-    source = "local" if local else "submodule"
+    source = "local" if local else "archive" if archive else "submodule"
     from pyforge.config import Dependency
 
     dep = ResolvedDependency(name, Dependency(source=source, path=folder), run.project.path(folder))
+    fetched: dict[str, str] = {}
 
     if run.dry_run:
         console.print(f"[dim][dry-run] would add {name} ({source}) at {folder}[/dim]")
         return
 
-    if submodule and not dep.present:
+    if archive:
+        dep = _add_archive(run, name, archive)
+        fetched = {"url": archive, "sha256": dep.spec.sha256}
+        folder = default_dir
+    elif submodule and not dep.present:
         from pyforge.deps.sources.submodule import SubmoduleSource
 
         try:
@@ -134,7 +163,7 @@ def add(
 
     layout = detect_layout(dep.dir, name)
     layout.update({key: value for key, value in (("kind", kind), ("include", include), ("sources", sources)) if value is not None})
-    entry = _entry(source, folder, default_dir, layout, define, requires)
+    entry = _entry(source, folder, default_dir, layout, define, requires, fetched)
     _write(run, lambda text: tomledit.set_value(text, ["dependencies", name], entry))
 
     console.print(f"[bold green]✓ forge.toml[/bold green] {escape('[dependencies]')}: {escape(tomledit.format_key(name))} = {escape(tomledit.format_value(entry))}")

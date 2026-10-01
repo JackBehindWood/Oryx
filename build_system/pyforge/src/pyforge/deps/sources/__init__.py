@@ -30,11 +30,13 @@ def source_for(dep: ResolvedDependency) -> Source:
 
 
 def _register_builtins() -> None:
+    from .archive import ArchiveSource
     from .local import LocalSource
     from .submodule import SubmoduleSource
 
     register("submodule", SubmoduleSource())
     register("local", LocalSource())
+    register("archive", ArchiveSource())
 
 
 _register_builtins()

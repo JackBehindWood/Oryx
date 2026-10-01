@@ -38,12 +38,16 @@ def extract_archive(archive, destination):
 
     destination.mkdir(parents=True, exist_ok=True)
 
-    if archive.name.endswith(".tar.gz"):
+    if archive.name.endswith((".tar.gz", ".tgz")):
         with tarfile.open(archive, "r:gz") as tar:
-            tar.extractall(path=destination)
+            tar.extractall(path=destination, filter="data")
 
     elif archive.suffix == ".zip":
         with zipfile.ZipFile(archive, "r") as zip_file:
+            root = destination.resolve()
+            for member in zip_file.namelist():
+                if not (root / member).resolve().is_relative_to(root):
+                    raise ValueError(f"Unsafe path in {archive.name}: {member}")
             zip_file.extractall(path=destination)
 
     else:
@@ -71,3 +75,13 @@ def download_with_progress(url, destination, description):
                 progress.update(task_id, total=total_size, completed=block_num * block_size)
 
         download_file(url, destination, reporthook=reporthook)
+
+
+def sha256_file(path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for block in iter(lambda: file.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()

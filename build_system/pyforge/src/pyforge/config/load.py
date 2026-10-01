@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .schema import ForgeConfig, LocalConfig, SchemaError, suggestion, from_dict
 
+URL_SOURCES = ("archive",)
 LOCAL_CONFIG_NAME = "forge.local.toml"
 LEGACY_LOCAL_CONFIG_NAME = "oryx.local.toml"
 
@@ -46,6 +47,8 @@ def validate(cfg: ForgeConfig) -> ForgeConfig:
     options = cfg.options.keys()
     for name, dependency in cfg.dependencies.items():
         _check_requires(f"dependencies.{name}", dependency.requires, options)
+        if dependency.source in URL_SOURCES and not (dependency.url and dependency.sha256):
+            raise SchemaError(f"forge.toml: 'dependencies.{name}' (source = {dependency.source!r}) needs both 'url' and 'sha256'")
     if cfg.tests:
         for name, suite in cfg.tests.suites.items():
             _check_requires(f"tests.suites.{name}", suite.requires, options)

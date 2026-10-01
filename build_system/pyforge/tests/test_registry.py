@@ -31,7 +31,7 @@ def test_entries_for_group():
     assert labels == {
         "Build": ["configure", "compile_project", "clean", "run_all", "run_project"],
         "Config": ["show", "get", "set_", "unset_"],
-        "Deps": ["add", "sync", "update", "status", "remove"],
+        "Deps": ["add", "sync", "update", "status", "clean_cache", "remove"],
         "Docs": ["build_docs", "serve_docs", "clean_docs"],
         "Editor": ["vscode", "vs2022"],
         "Init": ["init"],
