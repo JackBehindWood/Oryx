@@ -1,5 +1,6 @@
 import os
 import stat
+import sys
 
 import pytest
 
@@ -20,6 +21,8 @@ esac
 
 @pytest.fixture
 def pkg_config(tmp_path, monkeypatch):
+    if sys.platform == "win32":
+        pytest.skip("the pkg-config shim is a POSIX shell script")
     bin_dir = tmp_path / "shim"
     bin_dir.mkdir()
     script = bin_dir / "pkg-config"
@@ -52,7 +55,7 @@ def test_manual_paths(tmp_path, monkeypatch):
     (tmp_path / "libfoo.a").touch()
     dep = _dep(tmp_path, include="inc", lib="libfoo.a")
     cflags, libs = SystemSource().probe(tmp_path, dep)
-    assert cflags == [f"-I{tmp_path / 'inc'}"] and libs == [str(tmp_path / "libfoo.a")]
+    assert cflags == [f"-I{(tmp_path / 'inc').as_posix()}"] and libs == [(tmp_path / "libfoo.a").as_posix()]
     assert not _dep(tmp_path, include="missing").present
 
 

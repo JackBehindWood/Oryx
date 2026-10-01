@@ -1,4 +1,5 @@
 import subprocess
+import sys
 
 import pytest
 
@@ -27,6 +28,8 @@ def _linux_arm64(monkeypatch):
 
 
 def _fake_premake_on_path(tmp_path, monkeypatch):
+    if sys.platform == "win32":
+        pytest.skip("the premake5 stand-in is a POSIX shell script")
     bin_dir = tmp_path / "on-path"
     bin_dir.mkdir()
     fake = bin_dir / "premake5"

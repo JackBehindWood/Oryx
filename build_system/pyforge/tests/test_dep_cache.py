@@ -75,6 +75,7 @@ def _record_many(cache_dir: str, worker: int) -> None:
 
 def test_record_pin_keeps_every_update_across_processes(tmp_path, monkeypatch):
     import multiprocessing
+    from pathlib import Path
 
     monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path))
     workers = [multiprocessing.Process(target=_record_many, args=(str(tmp_path), n)) for n in range(4)]
@@ -83,7 +84,7 @@ def test_record_pin_keeps_every_update_across_processes(tmp_path, monkeypatch):
     for worker in workers:
         worker.join()
     pins = cache.read_pins()
-    assert {root: len(named) for root, named in pins.items()} == {f"/proj{n}": 25 for n in range(4)}
+    assert {root: len(named) for root, named in pins.items()} == {str(Path(f"/proj{n}")): 25 for n in range(4)}
 
 
 def test_rmtree_force_removes_read_only_files(tmp_path):

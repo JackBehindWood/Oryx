@@ -1,3 +1,4 @@
+import re
 import sys
 
 import pytest
@@ -409,7 +410,7 @@ def test_local_options_override_the_defaults(dry, premake, tmp_project):
 
 
 def test_no_python_and_sanitize_aliases_are_gone(forge):
-    output = forge("--help").output
+    output = re.sub(r"\x1b\[[0-9;]*m", "", forge("--help").output)
     assert "--with" in output and "--without" in output
     assert "--no-python" not in output and "--sanitize" not in output
     result = forge("--no-python", "configure")
