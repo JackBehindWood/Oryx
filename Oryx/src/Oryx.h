@@ -11,6 +11,7 @@
 #include "Oryx/Core/Settings.h"
 #include "Oryx/Core/Random.h"
 #include "Oryx/Core/Registry.h"
+#include "Oryx/Core/Metrics.h"
 
 #include "Oryx/Containers/Pair.h"
 #include "Oryx/Containers/SmallVector.h"
@@ -40,6 +41,8 @@
 #include "Oryx/Simulation/ActionHistory.h"
 #include "Oryx/Simulation/Match.h"
 #include "Oryx/Simulation/BatchRunner.h"
+#include "Oryx/Simulation/SeedSequence.h"
+#include "Oryx/Simulation/Experiment.h"
 #include "Oryx/Simulation/SimulationLayer.h"
 
 #include "Oryx/Scripting/Scripting.h"

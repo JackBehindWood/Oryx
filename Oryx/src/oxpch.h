@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
