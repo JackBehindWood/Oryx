@@ -70,7 +70,7 @@ def configure(ctx: typer.Context):
     run.pm.hook.forge_pre_configure(ctx=run)
 
     previous = freshness.load_stamp(project)
-    run_export(premake, generator, premake_options, project.root, verbose=run.verbose)
+    run_export(premake, generator, premake_options, project, verbose=run.verbose)
 
     options_hash = options.options_hash(premake_options)
     previous_hash = previous.options_hash if previous else None

@@ -1,5 +1,5 @@
 -- A tiny, non-Oryx project: proves pyforge drives an arbitrary Premake project, not just Oryx's.
-require "forge"
+include "premake/forge.lua"
 
 workspace "hello"
     configurations { "Debug", "Release", "Dist" }

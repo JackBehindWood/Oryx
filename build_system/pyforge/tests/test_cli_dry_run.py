@@ -4,10 +4,8 @@ import pytest
 import typer
 
 from conftest import workspace_json
-from pyforge.premake.install import lua_scripts_dir
 
 PYTHON_OPTIONS = "--python-include=/py/include/python3.11 --python-libdir=/py/lib --python-lib=python3.11"
-SCRIPTS_FLAG = f"--scripts={lua_scripts_dir()}"
 
 
 @pytest.fixture
@@ -31,7 +29,7 @@ def tests_binary(tmp_project):
 
 
 def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
-    assert dry("configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export"]
+    assert dry("configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export"]
 
 
 @pytest.mark.parametrize(
@@ -44,7 +42,7 @@ def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
     ],
 )
 def test_configure(dry, premake, flags, options):
-    assert dry(*flags, "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {options} --forge-export"]
+    assert dry(*flags, "configure") == [f" would run: {premake} gmake {options} --forge-export"]
 
 
 @pytest.mark.parametrize(
@@ -67,7 +65,7 @@ def test_clean(dry, tmp_project):
 
 def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tests_binary):
     assert dry("all") == [
-        f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export",
+        f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export",
         f" would run: make -C {tmp_project / 'build'} -j8 config=debug_x64",
         f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
     ]
@@ -398,8 +396,8 @@ def test_bad_option_flags_are_configuration_errors(forge, flags, message):
 
 def test_local_options_override_the_defaults(dry, premake, tmp_project):
     (tmp_project / "forge.local.toml").write_text("[options]\npython = false\n", encoding="utf-8")
-    assert dry("configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} --no-python --forge-export"]
-    assert dry("--with", "python", "configure") == [f" would run: {premake} gmake {SCRIPTS_FLAG} {PYTHON_OPTIONS} --forge-export"]
+    assert dry("configure") == [f" would run: {premake} gmake --no-python --forge-export"]
+    assert dry("--with", "python", "configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export"]
 
 
 def test_no_python_and_sanitize_aliases_are_gone(forge):
@@ -423,4 +421,4 @@ def test_editor_vscode_configures_first_without_an_export(forge, tmp_project, mo
 
 
 def test_editor_vs2022_dry_run(dry, premake):
-    assert dry("editor", "vs2022") == [f" would run: {premake} vs2022 {SCRIPTS_FLAG} {PYTHON_OPTIONS}"]
+    assert dry("editor", "vs2022") == [f" would run: {premake} vs2022 {PYTHON_OPTIONS}"]

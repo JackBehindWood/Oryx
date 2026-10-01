@@ -10,7 +10,7 @@ from pyforge.config import RunContext, parse_config
 console = Console()
 GROUP_HELP = "Create a forge.toml for this project"
 
-_APP_LUA = '''require "forge"
+_APP_LUA = '''include "premake/forge.lua"
 
 workspace "{name}"
     configurations {{ "Debug", "Release", "Dist" }}

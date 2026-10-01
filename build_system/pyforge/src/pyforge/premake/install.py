@@ -19,13 +19,6 @@ def get_premake_executable(bin_dir: Path) -> Path:
     return bin_dir / ("premake5.exe" if platform.system() == "Windows" else "premake5")
 
 
-def lua_scripts_dir() -> Path:
-    """Directory pyforge's own Premake helpers (lua/forge.lua) ship in. Passed to Premake via
-    --scripts so a project's premake5.lua can `require "forge"` regardless of where pyforge is
-    installed, instead of hardcoding a path to it."""
-    return Path(__file__).resolve().parent.parent / "lua"
-
-
 def resolve_bin_dir(project: Project, path_override: str, version: str) -> Path:
     """[premake] path when set, otherwise the shared user cache keyed by version — never
     a project-local directory, so worktrees and other projects on the same machine share
