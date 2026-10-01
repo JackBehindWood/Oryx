@@ -23,3 +23,9 @@ repository's `docs/design/decision-log.md` for the design history up to this poi
 - Pin-manifest updates are serialised across processes with a file lock.
 - A synthetic dummy plugin exercises the plugin hooks in pyforge's own tests.
 - CI checks that `build_system/pyforge` extracts cleanly with `git subtree split` and imports nothing outside itself.
+
+### Phase 8 — Windows
+
+- The CLI, config, dependencies, Premake install and editor files work natively on Windows; building C++ there is still unsupported.
+- Read-only files (cloned `.git` objects) are removed reliably, pin-manifest replacement retries on `PermissionError`, generated files use LF endings, subprocess output is decoded as UTF-8, and `forge run` exits 130 on Ctrl-C.
+- The `tooling` CI job runs the full pyforge suite plus a `forge` smoke run on `windows-latest`.

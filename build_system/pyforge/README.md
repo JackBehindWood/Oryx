@@ -71,6 +71,32 @@ global: --profile, --with X, --without X, -D KEY=VALUE, --verbose, --dry-run, --
 See [`docs/tooling.md`](../../docs/tooling.md) for the full `forge.toml` schema and a walkthrough
 of dependencies, presets, and the plugin hooks.
 
+## Platform support
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| CLI, `forge.toml`, `config`/`target`/`deps` editing | ✓ | ✓ | ✓ |
+| Dependency sources, cache, `--offline` | ✓ | ✓ | ✓ |
+| Premake install and `forge configure` | ✓ | ✓ | ✓ (`premake5.exe`, `windows.zip`) |
+| Editor files (`forge editor vscode\|vs2022`) | ✓ | ✓ | ✓ |
+| `forge compile`, `forge test`, `forge run` on a real project | ✓ | ✓ | not yet |
+
+The `windows-latest` tooling job runs the whole pyforge test suite plus a `forge --help`,
+`forge config show` and `forge --dry-run configure` smoke run. It does not compile anything.
+
+### Platform independence: not yet
+
+The tooling layer is cross-platform; the build path is POSIX/`make`-only:
+
+- The only generator is `gmake`, so compiling, `compile_commands.json` and stale-object pruning
+  shell out to `make`.
+- No Windows-native generator (Visual Studio, Ninja) is registered behind the generator registry.
+- Python-enabled builds need a shared libpython, which most Windows Python distributions lack.
+- Oryx's C++ core still `#error`s on Windows.
+
+Compiling on Windows is a separate future phase: a native generator, then a `windows-latest`
+build leg.
+
 ## Development
 
 ```bash

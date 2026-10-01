@@ -165,6 +165,15 @@ pyforge's own pinned default version — against a hash pyforge ships independen
 API response. `forge premake status|install|update [--version V]` manage the install directly;
 `update` also rewrites `forge.toml`'s `[premake] version`.
 
+## Windows
+
+pyforge itself runs natively on Windows: the CLI, `forge.toml` handling, dependency fetching,
+the Premake install (`premake5.exe` from the `windows.zip` asset into `%LOCALAPPDATA%\pyforge`)
+and `forge configure`, and editor files. The `windows-latest` tooling CI job verifies this. Building
+C++ with forge on Windows is unsupported: compiling is `make`-based, Python-enabled builds need
+a shared libpython, and Oryx's C++ core does not build on Windows. See the pyforge README's
+"Platform independence" section.
+
 ## Plugins
 
 A plugin is a Python module with `@hookimpl`-decorated functions, loaded from a `[plugins]
