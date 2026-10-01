@@ -57,7 +57,96 @@ public:
     }
 };
 
+class RecordingObserver : public IDecisionObserver
+{
+public:
+    void on_decision(const IState&, const Decision& decision) override { decisions.push_back(decision); }
+
+    std::vector<Decision> decisions;
+};
+
+class PublishingStrategy : public IStrategy
+{
+public:
+    ActionId decide(const Context& context) override
+    {
+        ActionId action = context.state().legal_actions()[0];
+        if (IDecisionObserver* observer = context.get<IDecisionObserver>())
+        {
+            ++published;
+            Decision decision;
+            decision.player = context.state().current_player();
+            decision.chosen = action;
+            set_value(decision, action, 7.0);
+            add_metric(decision.extra, "test/calls", 1);
+            observer->on_decision(context.state(), decision);
+        }
+        return action;
+    }
+
+    int32_t published = 0;
+};
+
 } // namespace
+
+TEST_CASE("Match emits a minimal Decision per ply when the strategy publishes nothing")
+{
+    DummyGame game(10);
+    DummyGreedyStrategy strategy_a;
+    DummyGreedyStrategy strategy_b;
+    RecordingObserver observer;
+    Match match(game, { &strategy_a, &strategy_b });
+    match.set_observer(&observer);
+
+    match.play();
+
+    REQUIRE(observer.decisions.size() == match.history().size());
+    for (size_t ply = 0; ply < observer.decisions.size(); ++ply)
+    {
+        CHECK(observer.decisions[ply].chosen == match.history().actions()[ply]);
+        CHECK(observer.decisions[ply].scores.empty());
+    }
+    CHECK(observer.decisions[0].player == 0);
+    CHECK(observer.decisions[1].player == 1);
+}
+
+TEST_CASE("Match forwards a strategy-published Decision without adding a minimal one")
+{
+    DummyGame game(10);
+    PublishingStrategy strategy_a;
+    PublishingStrategy strategy_b;
+    RecordingObserver observer;
+    Match match(game, { &strategy_a, &strategy_b });
+    match.set_observer(&observer);
+
+    match.play();
+
+    CHECK(observer.decisions.size() == match.history().size());
+    for (const Decision& decision : observer.decisions)
+    {
+        REQUIRE(decision.scores.size() == 1);
+        CHECK(decision.scores[0].has_value);
+        CHECK(decision.scores[0].value == doctest::Approx(7.0));
+        CHECK(get_metric(decision.extra, "test/calls") == doctest::Approx(1.0));
+    }
+}
+
+TEST_CASE("A detached Match gives strategies no observer and calls nothing")
+{
+    DummyGame game(10);
+    PublishingStrategy strategy_a;
+    PublishingStrategy strategy_b;
+    RecordingObserver observer;
+    Match match(game, { &strategy_a, &strategy_b });
+    match.set_observer(&observer);
+    match.set_observer(nullptr);
+
+    match.play();
+
+    CHECK(strategy_a.published == 0);
+    CHECK(strategy_b.published == 0);
+    CHECK(observer.decisions.empty());
+}
 
 TEST_CASE("Match::play() with two strategies reaches a terminal Outcome and records history")
 {

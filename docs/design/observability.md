@@ -47,7 +47,8 @@ ActionId decide(const Context& context) override
         Decision decision;
         decision.player = player;
         decision.chosen = best_action;
-        add_score(decision, action, probability, value);
+        set_probability(decision, action, probability);
+        set_value(decision, action, value);
         add_metric(decision.extra, "mystrategy/nodes", nodes);
         observer->on_decision(state, decision);
     }

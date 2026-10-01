@@ -14,12 +14,16 @@ Match::Match(const IGame& game, SmallVector<IStrategy*, 2> strategies)
                     "Match: strategies.size() must equal game.num_players()");
 }
 
-Context Match::build_context(const IGame& game, IState& state)
+Context Match::build_context(const IGame& game, IState& state, IDecisionObserver* observer)
 {
     Context context(state);
     if (IActionFeatures* features = game.action_features())
     {
         context.provide<IActionFeatures>(features);
+    }
+    if (observer != nullptr)
+    {
+        context.provide<IDecisionObserver>(observer);
     }
     return context;
 }
@@ -45,10 +49,28 @@ IStrategy& Match::current_strategy() const
 ActionId Match::decide() const
 {
     IStrategy& strategy = current_strategy();
-    Context context = build_context(m_game, *m_state);
+    if (m_observer == nullptr)
+    {
+        Context context = build_context(m_game, *m_state);
+        OX_CORE_ASSERT(missing_capabilities(strategy, context).empty(),
+                        "Match: current strategy requires a capability the game does not provide.");
+        return strategy.decide(context);
+    }
+
+    m_tracker.begin(m_observer);
+    Context context = build_context(m_game, *m_state, &m_tracker);
     OX_CORE_ASSERT(missing_capabilities(strategy, context).empty(),
                     "Match: current strategy requires a capability the game does not provide.");
-    return strategy.decide(context);
+    PlayerId player = current_player();
+    ActionId action = strategy.decide(context);
+    if (!m_tracker.published())
+    {
+        Decision decision;
+        decision.player = player;
+        decision.chosen = action;
+        m_observer->on_decision(*m_state, decision);
+    }
+    return action;
 }
 
 void Match::apply(ActionId action)
