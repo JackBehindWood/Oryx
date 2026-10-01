@@ -60,7 +60,7 @@ jobs:
       run: echo "UV_PYTHON=${{ matrix.py }}" >> "$GITHUB_ENV"
 
     - name: Install dependencies
-      run: uv sync
+      run: uv sync --group test
 
     - name: Restore Premake binary cache
       uses: actions/cache@v4

@@ -91,7 +91,9 @@ TEST_CASE("oryx.simulate matches a C++ BatchRunner and is reproducible per seed"
 TEST_CASE("oryx.Random is seedable and matches the C++ generator")
 {
     Random expected(5);
-    std::string expected_ints = std::to_string(expected.get_int(0, 9)) + "," + std::to_string(expected.get_int(0, 9));
+    int32_t first = expected.get_int(0, 9);
+    int32_t second = expected.get_int(0, 9);
+    std::string expected_ints = std::to_string(first) + "," + std::to_string(second);
 
     std::string output = run_script(
         "r = oryx.Random(5)\n"
