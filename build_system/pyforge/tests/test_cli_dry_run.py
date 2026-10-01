@@ -174,6 +174,12 @@ def test_run_before_configure_asks_for_it(forge, tmp_project):
     assert "run `forge configure` first" in result.output
 
 
+def test_compile_uses_the_launcher_from_forge_local_toml(dry, tmp_project, monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    (tmp_project / "forge.local.toml").write_text('[build]\nlauncher = "ccache"\n', encoding="utf-8")
+    assert dry("compile")[0].endswith("CC=ccache gcc CXX=ccache g++")
+
+
 def test_compile_before_configure_uses_a_placeholder_token(dry, tmp_project):
     (tmp_project / "build" / "forge" / "workspace.json").unlink()
     assert dry("compile") == [f" would run: make -C {tmp_project / 'build'} -j8 config=<from export>"]

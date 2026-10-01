@@ -110,7 +110,7 @@ def compile_project(ctx: typer.Context):
     ws = workspace.load(run.project)
     token = ws.token(run.profile) if ws else "<from export>"
     try:
-        command_line = build_compile_command(cfg.premake.generator, token, run.project.build_dir, run.jobs)
+        command_line = build_compile_command(cfg.premake.generator, token, run.project.build_dir, run.jobs, run.launcher)
     except ValueError as error:
         console.print(f"[bold red]✗ {escape(str(error))}[/bold red]")
         raise typer.Exit(code=1)

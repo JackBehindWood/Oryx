@@ -11,6 +11,7 @@ from .schema import (
     DOCS_TOOLS,
     EDITORS,
     GENERATORS,
+    LAUNCHERS,
     Choices,
     BuildTable,
     Debugger,
@@ -39,6 +40,7 @@ __all__ = [
     "DOCS_TOOLS",
     "EDITORS",
     "GENERATORS",
+    "LAUNCHERS",
     "Choices",
     "LOCAL_CONFIG_NAME",
     "BuildTable",
@@ -92,3 +94,7 @@ class RunContext:
     @property
     def fetch(self) -> FetchMode:
         return self.local.build.fetch or self.config.build.fetch
+
+    @property
+    def launcher(self) -> str:
+        return self.config.build.launcher if self.local.build.launcher is None else self.local.build.launcher

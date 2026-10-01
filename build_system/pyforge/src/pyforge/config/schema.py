@@ -47,12 +47,13 @@ class Choices:
 
 
 GENERATORS = Choices("gmake")
+LAUNCHERS = Choices("ccache")
 DEPENDENCY_SOURCES = Choices("submodule", "local")
 EDITORS = Choices("vscode", "visual_studio", "none")
 DOCS_TOOLS = Choices("mkdocs")
 
 
-def _open(choices: Choices, default: str):
+def _open(choices: Choices, default: str | None):
     return field(default=default, metadata={"choices": choices})
 
 
@@ -83,6 +84,7 @@ class BuildTable:
     jobs: int = 0
     dependencies_dir: str = "vendor"
     fetch: FetchMode = FetchMode.AUTO
+    launcher: str = _open(LAUNCHERS, "")
 
 
 @dataclass(frozen=True)
@@ -160,6 +162,7 @@ class LocalBuildTable:
     default_profile: Profile | None = None
     jobs: int | None = None
     fetch: FetchMode | None = None
+    launcher: str | None = _open(LAUNCHERS, None)
 
 
 @dataclass(frozen=True)

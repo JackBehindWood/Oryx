@@ -42,12 +42,19 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
+        sudo apt-get install -y build-essential ccache
 
     - name: Set up build environment (macOS)
       if: runner.os == 'macOS'
       run: |
-        brew install make
+        brew install make ccache
+
+    - name: Restore ccache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.os == 'macOS' && '~/Library/Caches/ccache' || '~/.cache/ccache' }}
+        key: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-${{ github.sha }}
+        restore-keys: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-
 
     - name: Select CPython
       run: echo "UV_PYTHON=${{ matrix.py }}" >> "$GITHUB_ENV"
@@ -55,8 +62,14 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
+    - name: Use ccache for CI builds
+      run: uv run forge config set build.launcher ccache --local
+
     - name: Configure and compile
       run: uv run forge $BUILD_FLAGS compile
+
+    - name: ccache statistics
+      run: ccache -s
 
     - name: Test (unit, integration, python when enabled)
       run: uv run forge $BUILD_FLAGS test
