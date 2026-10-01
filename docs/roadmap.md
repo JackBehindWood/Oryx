@@ -438,6 +438,14 @@ Potential capabilities:
 
 The observability model should be extensible rather than forcing all algorithms into the same schema.
 
+Milestone: an optional `IDecisionObserver` capability (no `IStrategy` change, zero
+cost when detached) with `Decision`/`Diagnostics` types shared with experiment
+metrics, a `Match` hook that makes every strategy traceable, in-memory, aggregating
+and JSON-lines sinks, `MinimaxStrategy` and `RandomStrategy` as reference
+instrumentation (this also delivers Phase 6's deferred nodes-explored metric), and
+thin Python bindings (`match.trace`, `simulate(..., trace=True)`). Out of Phase 9:
+dashboard transport (Phase 11), graphics, MCTS.
+
 ---
 
 # 12. Phase 10 — Graphics & Visualisation

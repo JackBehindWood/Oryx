@@ -545,6 +545,22 @@ Action
 
 The second path must not be mandatory for ordinary execution.
 
+## 6.1 Mechanism
+
+Observability rides on the existing capability mechanism ([§3.3](#33-strategy)): an `IDecisionObserver` is provided through `Context::provide<T>()` and read with `Context::get<T>()`. `IStrategy` is unchanged, so every strategy, including Python-scripted ones, keeps working.
+
+```text
+Match::set_observer(observer)
+    ↓
+Context provides IDecisionObserver
+    ↓
+strategy.decide(context)  →  observer->on_decision(state, Decision)   (only when attached)
+    ↓
+sinks: TraceRecorder · DiagnosticsAggregator · JSON lines
+```
+
+A detached run costs one null check per decision. If an attached run's strategy publishes nothing, `Match` emits a minimal `Decision` (player and chosen action). `Diagnostics` is the same key-value type as experiment `Metrics`, so a trace aggregated over a batch flows into experiment results. See [Design: Observability](design/observability.md).
+
 ---
 
 # 7. Strategy Dashboard
@@ -893,7 +909,7 @@ The following should **not** be considered settled yet:
 * Game history
 * Evaluation API
 * Experiment representation — resolved in Phase 8: id-based `ExperimentSpec` ([Decision Log](design/decision-log.md))
-* Observability protocol
+* Observability protocol — resolved in Phase 9: `IDecisionObserver` capability + `Decision`/`Diagnostics` ([Decision Log](design/decision-log.md)); dashboard transport stays open
 * Dashboard transport
 * Python ownership/lifetime beyond the scripting layer's scoped rules
   (below): how a pure-Python host owns C++ objects handed back to it, and
