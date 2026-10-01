@@ -12,6 +12,8 @@ from ..project import Project
 PREMAKE_CONFIG_NAME = "config.json"
 PREMAKE_CONFIG_FORMAT = 1
 OFFLINE_SOURCES = ("local", "system")
+PARALLEL_SOURCES = ("git", "archive", "file")
+MAX_PARALLEL_FETCHES = 4
 
 
 class DependencyError(RuntimeError):
@@ -135,8 +137,33 @@ def fetch(run: RunContext, deps: list[ResolvedDependency]) -> None:
     networked = [dep for dep in deps if dep.spec.source not in OFFLINE_SOURCES]
     if run.offline and networked:
         raise _offline_error(run, networked)
-    for dep in deps:
-        source_for(dep).fetch(run.project.root, dep)
+    failures = {dep.name: error for dep, error in fetch_each(run, deps) if error}
+    if failures:
+        raise DependencyError("\n".join(str(error) for error in failures.values()))
+
+
+def fetch_each(run: RunContext, deps: list[ResolvedDependency]) -> list[tuple[ResolvedDependency, DependencyError | None]]:
+    """Fetch every dependency, network ones concurrently; (dep, error-or-None) per dependency, sorted by name."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from ..utils import quiet_downloads
+    from .sources import source_for
+
+    def attempt(dep: ResolvedDependency) -> DependencyError | None:
+        try:
+            source_for(dep).fetch(run.project.root, dep)
+        except DependencyError as error:
+            return error
+        return None
+
+    remote = [dep for dep in deps if dep.spec.source in PARALLEL_SOURCES]
+    outcomes = {dep.name: attempt(dep) for dep in deps if dep not in remote}
+    if len(remote) > 1:
+        with quiet_downloads(), ThreadPoolExecutor(min(MAX_PARALLEL_FETCHES, len(remote))) as pool:
+            outcomes.update(zip((dep.name for dep in remote), pool.map(attempt, remote)))
+    else:
+        outcomes.update((dep.name, attempt(dep)) for dep in remote)
+    return sorted(((dep, outcomes[dep.name]) for dep in deps), key=lambda pair: pair[0].name)
 
 
 def ensure(run: RunContext, confirm: Callable[[list[ResolvedDependency]], bool] | None = None) -> list[ResolvedDependency]:
@@ -158,4 +185,4 @@ def ensure(run: RunContext, confirm: Callable[[list[ResolvedDependency]], bool] 
     if run.fetch == FetchMode.ASK and not (confirm and confirm(absent)):
         raise DependencyError(f"Missing dependencies: {listed}. Run: forge deps sync, or set [build] fetch = \"auto\"")
     fetch(run, absent)
-    return absent
+    return sorted(absent, key=lambda dep: dep.name)

@@ -12,7 +12,7 @@ from pyforge.deps.resolve import (
     DependencyError,
     ResolvedDependency,
     ensure,
-    fetch,
+    fetch_each,
     requirements_met,
     resolve_all,
     shown,
@@ -227,12 +227,15 @@ def sync(ctx: typer.Context):
         for dep in absent:
             console.print(f"[dim][dry-run] would fetch {dep.name} into {shown(run, dep.dir)}[/dim]")
         return
-    try:
-        fetch(run, absent)
-    except DependencyError as error:
-        raise _fail(str(error))
-    for dep in absent:
-        console.print(f"[green]✓ Fetched {dep.name}[/green] into {shown(run, dep.dir)}")
+    outcomes = fetch_each(run, absent)
+    for dep, error in outcomes:
+        if error is None:
+            console.print(f"[green]✓ Fetched {dep.name}[/green] into {shown(run, dep.dir)}")
+        else:
+            console.print(f"[bold red]✗ {dep.name}:[/bold red] {escape(str(error))}")
+    failed = sum(error is not None for _, error in outcomes)
+    if failed:
+        raise _fail(f"{failed} of {len(absent)} dependencies failed to fetch.")
     console.print(f"[bold green]✓ {len(absent)} fetched; every required dependency is present.[/bold green]")
 
 

@@ -1,3 +1,4 @@
+import contextlib
 from pathlib import Path
 
 
@@ -56,7 +57,25 @@ def extract_archive(archive, destination):
         )
 
 
+_progress_enabled = True
+
+
+@contextlib.contextmanager
+def quiet_downloads():
+    """Concurrent downloads would garble each other's progress bars, so parallel fetches turn them off."""
+    global _progress_enabled
+    previous, _progress_enabled = _progress_enabled, False
+    try:
+        yield
+    finally:
+        _progress_enabled = previous
+
+
 def download_with_progress(url, destination, description):
+    if not _progress_enabled:
+        download_file(url, destination)
+        return
+
     from rich.console import Console
     from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
 

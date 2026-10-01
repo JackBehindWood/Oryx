@@ -55,3 +55,10 @@ def test_unused_entries_keeps_only_referenced(tmp_path, monkeypatch):
         cache.deps_dir("lib", pin).mkdir(parents=True)
     cache.record_pin(project, "lib", "keep")
     assert [p.name for p in cache.unused_entries()] == ["orphan"]
+
+
+def test_concurrent_record_pin_loses_no_updates(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path))
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(lambda i: cache.record_pin(tmp_path, f"dep{i}", "p"), range(32)))
+    assert len(cache.read_pins()[str(tmp_path)]) == 32

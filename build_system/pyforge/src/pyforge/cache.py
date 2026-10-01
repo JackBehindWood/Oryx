@@ -29,6 +29,7 @@ def premake_dir(version: str) -> Path:
 
 
 PINS_NAME = ".pins.json"
+_pins_lock = threading.Lock()
 
 
 def deps_root() -> Path:
@@ -68,13 +69,14 @@ def read_pins() -> dict[str, dict[str, str]]:
 
 
 def record_pin(project_root: Path, name: str, pin: str) -> None:
-    pins = read_pins()
-    pins.setdefault(str(project_root), {})[name] = pin
-    path = deps_root() / PINS_NAME
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
-    tmp.write_text(json.dumps(pins, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    with _pins_lock:
+        pins = read_pins()
+        pins.setdefault(str(project_root), {})[name] = pin
+        path = deps_root() / PINS_NAME
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
+        tmp.write_text(json.dumps(pins, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
 
 
 def unused_entries() -> list[Path]:

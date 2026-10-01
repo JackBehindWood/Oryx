@@ -3,7 +3,7 @@ filesystem and download helpers, and JSON read/write/merge — everything comman
 editors/vscode generators share.
 """
 
-from .download import download_file, download_with_progress, extract_archive, sha256_file
+from .download import download_file, download_with_progress, extract_archive, quiet_downloads, sha256_file
 from .filesystem import ensure_directory, make_executable, remove_directory, remove_file
 from .json_files import load_json, merge_by_key, write_json
 from .streaming import stream_command
@@ -24,6 +24,7 @@ __all__ = [
     "download_file",
     "download_with_progress",
     "extract_archive",
+    "quiet_downloads",
     "sha256_file",
     "load_json",
     "write_json",
