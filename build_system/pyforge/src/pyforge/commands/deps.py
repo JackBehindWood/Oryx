@@ -207,6 +207,34 @@ def status(ctx: typer.Context):
         console.print(f"[yellow]untracked:[/yellow] {shown(run, folder)} → forge deps add {folder.name} --local")
 
 
+@command(name="clean-cache", label="Clean cache — delete fetched dependencies from the user cache")
+def clean_cache(
+    ctx: typer.Context,
+    unused: bool = typer.Option(False, "--unused", help="Only delete entries no forge project on this machine still pins."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Don't ask for confirmation."),
+):
+    """Delete the shared dependency cache (git/archive/file sources), or just its unreferenced entries."""
+    import shutil
+
+    from pyforge import cache
+
+    run: RunContext = ctx.obj
+    targets = cache.unused_entries() if unused else ([cache.deps_root()] if cache.deps_root().is_dir() else [])
+    if not targets:
+        console.print("[dim]Nothing to clean.[/dim]")
+        return
+    if run.dry_run:
+        for target in targets:
+            console.print(f"[dim][dry-run] would delete {target}[/dim]")
+        return
+    what = f"{len(targets)} unused cache entr{'y' if len(targets) == 1 else 'ies'}" if unused else f"the whole dependency cache at {targets[0]}"
+    if not yes and not typer.confirm(f"Delete {what}?"):
+        raise typer.Exit(code=1)
+    for target in targets:
+        shutil.rmtree(target, ignore_errors=True)
+    console.print(f"[bold green]✓ Deleted {what}[/bold green]")
+
+
 @command(name="remove", label="Remove — drop a dependency from forge.toml")
 def remove(
     ctx: typer.Context,

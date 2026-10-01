@@ -1,6 +1,10 @@
+import json
 import os
+import shutil
 import sys
+import threading
 from pathlib import Path
+from typing import Callable
 
 
 def user_cache_dir() -> Path:
@@ -22,3 +26,67 @@ def premake_dir(version: str) -> Path:
     """Shared across every project and worktree that pins this version; survives `forge clean`.
     [premake] path in forge.toml overrides this (e.g. a Linux arm64 build with no official asset)."""
     return user_cache_dir() / "premake" / version
+
+
+PINS_NAME = ".pins.json"
+
+
+def deps_root() -> Path:
+    return user_cache_dir() / "deps"
+
+
+def deps_dir(name: str, pin: str) -> Path:
+    """Shared across every project and worktree that pins this name+pin; `forge deps clean-cache` is the only deleter."""
+    return deps_root() / name / pin
+
+
+def atomic_extract(dest: Path, extractor: Callable[[Path], None]) -> bool:
+    """Fill `dest` via `extractor(tmp)` then rename into place; False when another writer got there first."""
+    if dest.exists():
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f"{dest.name}.tmp-{os.getpid()}-{threading.get_ident()}")
+    shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        extractor(tmp)
+        os.replace(tmp, dest)
+    except OSError:
+        if not dest.exists():
+            raise
+        return False
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return True
+
+
+def read_pins() -> dict[str, dict[str, str]]:
+    """{project_root: {name: pin}} for every project that fetched into the cache."""
+    try:
+        return json.loads((deps_root() / PINS_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def record_pin(project_root: Path, name: str, pin: str) -> None:
+    pins = read_pins()
+    pins.setdefault(str(project_root), {})[name] = pin
+    path = deps_root() / PINS_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
+    tmp.write_text(json.dumps(pins, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def unused_entries() -> list[Path]:
+    """Cache entries no still-existing project pins."""
+    live = {(name, pin) for root, named in read_pins().items() if Path(root).is_dir() for name, pin in named.items()}
+    root = deps_root()
+    if not root.is_dir():
+        return []
+    return sorted(
+        entry
+        for name_dir in root.iterdir()
+        if name_dir.is_dir()
+        for entry in name_dir.iterdir()
+        if entry.is_dir() and (name_dir.name, entry.name) not in live
+    )
