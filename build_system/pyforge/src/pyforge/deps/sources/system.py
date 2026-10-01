@@ -5,9 +5,11 @@ from pathlib import Path
 from ..resolve import DependencyError, ResolvedDependency
 
 
-def _pkg_config(*args: str) -> str | None:
+def _pkg_config(flag: str, name: str) -> str | None:
+    if name.startswith("-"):
+        return None
     try:
-        result = subprocess.run(["pkg-config", *args], capture_output=True, text=True)
+        result = subprocess.run(["pkg-config", flag, name], capture_output=True, text=True)
     except OSError:
         return None
     return result.stdout.strip() if result.returncode == 0 else None

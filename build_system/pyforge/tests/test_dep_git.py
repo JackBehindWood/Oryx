@@ -74,3 +74,12 @@ def test_cli_add_and_update_git(remote, tmp_project, forge):
     assert result.exit_code == 0, result.output
     text = (tmp_project / "forge.toml").read_text()
     assert f'commit = "{head}"' in text and 'rev = "main"' in text
+
+
+@pytest.mark.parametrize("url, rev", [("--upload-pack=touch /tmp/pwned", "main"), ("file:///x", "--upload-pack=x")])
+def test_option_like_url_or_rev_is_refused(tmp_path, monkeypatch, url, rev):
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path / "cache"))
+    with pytest.raises(DependencyError, match="starting with '-'"):
+        install_clone(tmp_path, "lib", url, rev)
+    with pytest.raises(DependencyError, match="starting with '-'"):
+        default_branch("--upload-pack=x")

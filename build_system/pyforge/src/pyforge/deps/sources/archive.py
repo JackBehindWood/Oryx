@@ -11,7 +11,7 @@ def download_verified(url: str, sha256: str, destination: Path, description: str
 
     try:
         download_with_progress(url, destination, description)
-    except OSError as error:
+    except (OSError, ValueError) as error:
         raise DependencyError(f"Could not download {url}: {error}") from error
     actual = sha256_file(destination)
     if actual != sha256:
@@ -20,7 +20,8 @@ def download_verified(url: str, sha256: str, destination: Path, description: str
 
 
 def url_filename(url: str) -> str:
-    return Path(urlparse(url).path).name or "download"
+    name = Path(urlparse(url).path).name
+    return name if name not in ("", ".", "..") else "download"
 
 
 def _flatten(directory: Path) -> None:

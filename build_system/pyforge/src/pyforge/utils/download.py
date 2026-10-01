@@ -13,6 +13,10 @@ def download_file(url, destination, reporthook=None):
             (block_num, block_size, total_size).
     """
     import urllib.request
+    from urllib.parse import urlparse
+
+    if urlparse(str(url)).scheme not in ("http", "https"):
+        raise ValueError(f"Refusing to download {url}: only http(s) URLs are supported")
 
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)

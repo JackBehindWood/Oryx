@@ -69,3 +69,10 @@ def _project(root):
     from pyforge.project import Project
 
     return Project(root=root, config_file=root / "forge.toml")
+
+
+def test_option_like_pkg_config_name_is_never_passed_to_pkg_config(monkeypatch):
+    from pyforge.deps.sources import system
+
+    monkeypatch.setattr(system.subprocess, "run", lambda *a, **k: pytest.fail("pkg-config must not run"))
+    assert system._pkg_config("--exists", "--print-errors") is None

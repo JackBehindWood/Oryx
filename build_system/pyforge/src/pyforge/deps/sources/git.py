@@ -11,19 +11,26 @@ from .submodule import _git
 _SHA = re.compile(r"[0-9a-f]{7,40}")
 
 
+def _refuse_option_like(url: str, ref: str) -> None:
+    if url.startswith("-") or ref.startswith("-"):
+        raise DependencyError(f"Refusing git url/rev starting with '-': {url!r} {ref!r}")
+
+
 def _clone(url: str, ref: str, dest: Path) -> None:
+    _refuse_option_like(url, ref)
     if _SHA.fullmatch(ref):
         dest.mkdir(parents=True)
         _git(dest, "init", "-q")
-        _git(dest, "remote", "add", "origin", url)
-        _git(dest, "fetch", "-q", "--depth", "1", "origin", ref)
+        _git(dest, "remote", "add", "--", "origin", url)
+        _git(dest, "fetch", "-q", "--depth", "1", "--", "origin", ref)
         _git(dest, "checkout", "-q", "FETCH_HEAD")
     else:
-        _git(dest.parent, "clone", "-q", "--depth", "1", "--branch", ref, url, str(dest))
+        _git(dest.parent, "clone", "-q", "--depth", "1", "--branch", ref, "--", url, str(dest))
 
 
 def default_branch(url: str) -> str:
-    output = _git(Path.cwd(), "ls-remote", "--symref", url, "HEAD")
+    _refuse_option_like(url, "")
+    output = _git(Path.cwd(), "ls-remote", "--symref", "--", url, "HEAD")
     match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", output)
     if not match:
         raise DependencyError(f"Could not find the default branch of {url}; pass --rev.")

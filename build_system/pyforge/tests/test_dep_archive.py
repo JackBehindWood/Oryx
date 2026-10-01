@@ -102,3 +102,19 @@ def test_cli_add_file_writes_url_and_sha(server, tmp_project, tmp_path, monkeypa
     assert result.exit_code == 0, result.output
     text = (tmp_project / "forge.toml").read_text()
     assert 'source = "file"' in text and hashlib.sha256(b"// stb").hexdigest() in text
+
+
+@pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://example.com/a.tar.gz"])
+def test_only_http_urls_are_downloaded(tmp_path, url):
+    from pyforge.utils import download_file
+
+    with pytest.raises(ValueError, match="only http"):
+        download_file(url, tmp_path / "a")
+    assert not (tmp_path / "a").exists()
+
+
+@pytest.mark.parametrize("url", ["https://x.test/..", "https://x.test/.", "https://x.test/"])
+def test_url_filename_never_escapes_its_directory(url):
+    from pyforge.deps.sources.archive import url_filename
+
+    assert url_filename(url) == "download"
