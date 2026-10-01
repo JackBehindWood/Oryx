@@ -194,7 +194,10 @@ def _exec(argv: list[str], cwd: Path, replace_process: bool) -> None:
         os.chdir(cwd)
         os.execv(argv[0], argv)
         return
-    code = subprocess.run(argv, cwd=cwd).returncode
+    try:
+        code = subprocess.run(argv, cwd=cwd).returncode
+    except KeyboardInterrupt:
+        raise typer.Exit(code=130)
     if code:
         raise typer.Exit(code=code)
 

@@ -430,3 +430,16 @@ def test_editor_vscode_configures_first_without_an_export(forge, tmp_project, mo
 
 def test_editor_vs2022_dry_run(dry, premake):
     assert dry("editor", "vs2022") == [f" would run: {premake} vs2022 {DUMMY_OPTIONS}"]
+
+
+def test_run_ctrl_c_on_windows_exits_130(forge, tmp_project, monkeypatch):
+    from pyforge.commands import build
+
+    _fake_binary(tmp_project)
+
+    def interrupted(argv, cwd):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(build, "_can_replace_process", lambda: False)
+    monkeypatch.setattr(build.subprocess, "run", interrupted)
+    assert forge("run").exit_code == 130
