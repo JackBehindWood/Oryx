@@ -1,6 +1,5 @@
 import tomllib
 
-from test_dep_git import _git, remote  # noqa: F401
 
 
 def _entry(root, name):
@@ -18,7 +17,7 @@ def test_glad_walkthrough(tmp_project, forge):
     assert _entry(tmp_project, "glad") == {"source": "local", "kind": "static", "include": "include", "sources": "src"}
 
 
-def test_git_walkthrough(tmp_project, forge, remote):  # noqa: F811
+def test_git_walkthrough(tmp_project, forge, remote):
     url, first, head = remote
     result = forge("deps", "add", "glfw", "--git", url, "--rev", "v1", "--define", "GLFW_STATIC")
     assert result.exit_code == 0, result.output

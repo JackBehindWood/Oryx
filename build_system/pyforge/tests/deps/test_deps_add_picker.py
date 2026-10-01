@@ -1,6 +1,5 @@
 import tomllib
 
-from test_dep_git import _git, remote  # noqa: F401
 
 
 class FakeQuestion:
@@ -27,7 +26,7 @@ def _entry(root):
     return tomllib.loads((root / "forge.toml").read_text())["dependencies"]["lib"]
 
 
-def test_picker_and_flag_produce_identical_entries(tmp_project, forge, remote, monkeypatch):  # noqa: F811
+def test_picker_and_flag_produce_identical_entries(tmp_project, forge, remote, monkeypatch):
     url, first, head = remote
     flagged = forge("deps", "add", "lib", "--git", url)
     assert flagged.exit_code == 0, flagged.output

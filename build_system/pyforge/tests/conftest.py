@@ -4,6 +4,7 @@ import os
 import pkgutil
 import platform
 import shutil
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -226,3 +227,28 @@ def make_run(project: Project, profile: str = "debug", **options: bool) -> RunCo
 @pytest.fixture
 def run(project) -> RunContext:
     return make_run(project)
+
+
+def _git(cwd, *args):
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main", *args],
+        cwd=cwd, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+@pytest.fixture
+def remote(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path / "cache"))
+    work = tmp_path / "work"
+    work.mkdir()
+    _git(work, "init", "-q")
+    (work / "a.h").write_text("1")
+    _git(work, "add", ".")
+    _git(work, "commit", "-qm", "one")
+    _git(work, "tag", "v1")
+    first = _git(work, "rev-parse", "HEAD")
+    (work / "a.h").write_text("2")
+    _git(work, "commit", "-qam", "two")
+    bare = tmp_path / "remote.git"
+    _git(tmp_path, "clone", "-q", "--bare", str(work), str(bare))
+    return f"file://{bare}", first, _git(work, "rev-parse", "HEAD")

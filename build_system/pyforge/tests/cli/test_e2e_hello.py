@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-FIXTURE = Path(__file__).parent / "fixtures" / "hello"
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "hello"
 
 _MISSING_TOOLCHAIN = platform.system() == "Windows" or shutil.which("make") is None or not any(shutil.which(cc) for cc in ("cc", "gcc", "clang"))
 
