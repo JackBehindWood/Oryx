@@ -45,6 +45,19 @@ Where appropriate for stochastic algorithms.
 
 Tests should avoid assuming that a stochastic result must equal one exact outcome unless the seed and execution model guarantee it.
 
+### Keeping the suite from growing linearly
+
+Where a test goes:
+
+* Behaviour of `import oryx` that a Python caller sees: `tests/python/` (pytest). Doctest keeps only the embedded runtime's lifecycle, the GIL and C++-computed expectations.
+* A property every game or strategy must have (valid initial state, apply/undo round trip, legal actions): `tests/integration/test_registry_conformance.cpp`, which iterates the registries. A new game or strategy gets these for free; its own test file holds only rules that are specific to it.
+* A rule specific to one game or strategy: that game's file under `tests/unit/`.
+* pyforge tests mirror `build_system/pyforge/src/pyforge` (`tests/deps/`, `tests/commands/`...), one module per source module. Test modules never import each other; shared fixtures live in `conftest.py`.
+* Exact command lines for `forge --dry-run`: a row in `DRY_RUN_COMMANDS` in `tests/cli/test_cli_dry_run.py`.
+* A behaviour every dependency source must have (CLI add records its pin, a failed integrity check leaves no cache entry): a case builder in `tests/deps/test_dep_source_contract.py`, not a new file.
+
+Parametrize or add a table row before copying a test; add a new test file only for a new source module or a new kind of behaviour. Totals per suite are printed by `forge test` in every CI log, so growth is visible without a separate report.
+
 ## Performance
 
 The project should follow:
