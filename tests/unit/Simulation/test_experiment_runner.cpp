@@ -30,6 +30,27 @@ std::filesystem::path temp_directory(const std::string& name)
     return directory;
 }
 
+std::string read_text(const std::filesystem::path& path)
+{
+    std::ifstream in(path);
+    std::stringstream text;
+    text << in.rdbuf();
+    return text.str();
+}
+
+void write_text(const std::filesystem::path& path, const std::string& text)
+{
+    std::ofstream out(path);
+    out << text;
+}
+
+std::string replace_first(std::string text, const std::string& from, const std::string& to)
+{
+    size_t at = text.find(from);
+    REQUIRE(at != std::string::npos);
+    return text.replace(at, from.size(), to);
+}
+
 } // namespace
 
 TEST_CASE("run_experiment() runs every matchup for every repeat")
@@ -267,6 +288,164 @@ TEST_CASE("load_result() rejects a missing directory, an unknown schema version,
     write(directory / kResultFileName, yaml);
     write(directory / kTrialsFileName, csv.substr(0, csv.size() / 2));
     CHECK_THROWS_AS(load_result(directory), ExperimentError);
+}
+
+TEST_CASE("load_result() reports a malformed result.yaml as an ExperimentError")
+{
+    std::filesystem::path directory = temp_directory("bad-yaml");
+    save_result(run_experiment(make_spec()), directory);
+    std::string yaml = read_text(directory / kResultFileName);
+
+    SUBCASE("not yaml at all")
+    {
+        write_text(directory / kResultFileName, "{ unclosed: [");
+    }
+    SUBCASE("empty file")
+    {
+        write_text(directory / kResultFileName, "");
+    }
+    SUBCASE("missing schema_version")
+    {
+        write_text(directory / kResultFileName, replace_first(yaml, "schema_version", "schema_versio"));
+    }
+    SUBCASE("missing metadata")
+    {
+        write_text(directory / kResultFileName, replace_first(yaml, "metadata:", "metadat:"));
+    }
+    SUBCASE("non-numeric master seed")
+    {
+        write_text(directory / kResultFileName, replace_first(yaml, "master_seed: 1234", "master_seed: 12x4"));
+    }
+    SUBCASE("master seed beyond 64 bits")
+    {
+        write_text(directory / kResultFileName, replace_first(yaml, "master_seed: 1234", "master_seed: 99999999999999999999999"));
+    }
+    SUBCASE("negative master seed")
+    {
+        write_text(directory / kResultFileName, replace_first(yaml, "master_seed: 1234", "master_seed: -5"));
+    }
+    CHECK_THROWS_AS(load_result(directory), ExperimentError);
+}
+
+TEST_CASE("load_result() reports a malformed trials.csv as an ExperimentError")
+{
+    std::filesystem::path directory = temp_directory("bad-csv");
+    save_result(run_experiment(make_spec()), directory);
+    std::string csv = read_text(directory / kTrialsFileName);
+    std::string first_row = csv.substr(csv.find('\n') + 1, csv.find('\n', csv.find('\n') + 1) - csv.find('\n') - 1);
+    std::string matchup = first_row.substr(0, first_row.find(','));
+
+    SUBCASE("empty file")
+    {
+        write_text(directory / kTrialsFileName, "");
+    }
+    SUBCASE("header only")
+    {
+        write_text(directory / kTrialsFileName, "matchup,repeat,metric,value\n");
+    }
+    SUBCASE("wrong column count")
+    {
+        write_text(directory / kTrialsFileName, csv + "a,b\n");
+    }
+    SUBCASE("repeat with trailing garbage")
+    {
+        write_text(directory / kTrialsFileName, replace_first(csv, "," + std::string("0,"), ",0x,"));
+    }
+    SUBCASE("value with trailing garbage")
+    {
+        write_text(directory / kTrialsFileName, replace_first(csv, first_row, first_row + "z"));
+    }
+    SUBCASE("matchup missing from the spec")
+    {
+        write_text(directory / kTrialsFileName, replace_first(csv, matchup, "no such matchup"));
+    }
+    SUBCASE("repeat outside the spec")
+    {
+        write_text(directory / kTrialsFileName, replace_first(csv, matchup + ",0,", matchup + ",7,"));
+    }
+    SUBCASE("metric listed twice")
+    {
+        write_text(directory / kTrialsFileName, csv + first_row + "\n");
+    }
+    CHECK_THROWS_AS(load_result(directory), ExperimentError);
+}
+
+TEST_CASE("load_result() reads a trials.csv with CRLF line endings")
+{
+    ExperimentResult result = run_experiment(make_spec());
+    std::filesystem::path directory = temp_directory("crlf");
+    save_result(result, directory);
+
+    std::string crlf;
+    for (char character : read_text(directory / kTrialsFileName))
+    {
+        crlf += character == '\n' ? "\r\n" : std::string(1, character);
+    }
+    write_text(directory / kTrialsFileName, crlf);
+    CHECK(trials_equal(load_result(directory), result));
+}
+
+TEST_CASE("A matchup label with a comma or quote survives the CSV round trip")
+{
+    ExperimentSpec spec = make_spec();
+    spec.matchups.resize(1);
+    spec.matchups[0].label = "a, \"quoted\" label";
+    ExperimentResult result = run_experiment(spec);
+    std::filesystem::path directory = temp_directory("label");
+    save_result(result, directory);
+    ExperimentResult loaded = load_result(directory);
+    CHECK(loaded.trials[0].matchup == spec.matchups[0].label);
+    CHECK(trials_equal(loaded, result));
+}
+
+TEST_CASE("save_result() writes nothing when a label cannot be stored in CSV")
+{
+    ExperimentSpec spec = make_spec();
+    spec.matchups.resize(1);
+    spec.matchups[0].label = "two\nlines";
+    ExperimentResult result = run_experiment(spec);
+    std::filesystem::path directory = temp_directory("newline");
+    CHECK_THROWS_AS(save_result(result, directory), ExperimentError);
+    CHECK_FALSE(std::filesystem::exists(directory / kResultFileName));
+}
+
+TEST_CASE("save_result() reports an uncreatable directory as an ExperimentError")
+{
+    std::filesystem::path blocker = temp_directory("blocker");
+    write_text(blocker, "a file, not a directory");
+    CHECK_THROWS_AS(save_result(run_experiment(make_spec()), blocker / "inside"), ExperimentError);
+    std::filesystem::remove(blocker);
+}
+
+TEST_CASE("A cancelled, incomplete result round-trips with its trials")
+{
+    ExperimentSpec spec = make_spec();
+    std::atomic<bool> cancel{ false };
+    RunOptions options;
+    options.cancel = &cancel;
+    options.progress = [&](int32_t completed, int32_t) { cancel = completed >= 3; };
+    ExperimentResult result = run_experiment(spec, options);
+    REQUIRE_FALSE(is_complete(result));
+
+    std::filesystem::path directory = temp_directory("incomplete");
+    save_result(result, directory);
+    ExperimentResult loaded = load_result(directory);
+    CHECK(loaded.trials.size() == 3);
+    CHECK(trials_equal(loaded, result));
+}
+
+TEST_CASE("A result with many trials saves and loads")
+{
+    ExperimentSpec spec = make_spec();
+    spec.matchups.resize(1);
+    spec.matches_per_trial = 1;
+    spec.repeats = 5000;
+    ExperimentResult result = run_experiment(spec);
+    std::filesystem::path directory = temp_directory("many");
+    save_result(result, directory);
+    ExperimentResult loaded = load_result(directory);
+    CHECK(loaded.trials.size() == 5000);
+    CHECK(trials_equal(loaded, result));
 }
 
 TEST_CASE("rerun() names a game or strategy that is no longer registered")
