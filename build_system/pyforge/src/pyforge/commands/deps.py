@@ -114,6 +114,36 @@ def _add_downloaded(run: RunContext, name: str, url: str, source: str) -> Resolv
     return dep
 
 
+SOURCE_PROMPTS = {
+    "local — files you put in place yourself": ("local", None),
+    "submodule — a git submodule": ("submodule", "Submodule URL"),
+    "archive — a .tar.gz/.zip download": ("archive", "Archive URL"),
+    "file — a single downloaded file": ("file", "File URL"),
+    "git — a shallow clone in the shared cache": ("git", "Git URL"),
+    "system — an installed library (pkg-config)": ("system", "pkg-config package name"),
+}
+
+
+def _prompt_source() -> tuple[bool, str | None, str | None, str | None, str | None, str | None]:
+    """(local, submodule, archive, file, git, system) from a TTY prompt; all-empty outside one so add() reports the flags."""
+    from pyforge.interactive import is_interactive, questionary_or_none
+
+    empty = (False, None, None, None, None, None)
+    questionary = questionary_or_none() if is_interactive() else None
+    if questionary is None:
+        return empty
+    choice = questionary.select("Where do its files come from?", choices=list(SOURCE_PROMPTS)).ask()
+    if choice is None:
+        raise typer.Exit(code=1)
+    source, question = SOURCE_PROMPTS[choice]
+    if source == "local":
+        return (True, *empty[1:])
+    value = (questionary.text(f"{question}:").ask() or "").strip()
+    if not value:
+        raise typer.Exit(code=1)
+    return (False, *(value if source == key else None for key in ("submodule", "archive", "file", "git", "system")))
+
+
 def _add_system(run: RunContext, name: str, package: str, defines: list[str], requires: list[str]) -> None:
     from pyforge.config import Dependency
     from pyforge.deps.sources.system import SystemSource
@@ -168,6 +198,8 @@ def add(
 ):
     """Add a [dependencies] entry, detecting its layout when the files are present."""
     run: RunContext = ctx.obj
+    if not (local or submodule or archive or file or git or system):
+        local, submodule, archive, file, git, system = _prompt_source()
     if sum(bool(flag) for flag in (local, submodule, archive, file, git, system)) != 1:
         raise _fail(SOURCE_FLAGS_MESSAGE)
     if name in run.config.dependencies:
