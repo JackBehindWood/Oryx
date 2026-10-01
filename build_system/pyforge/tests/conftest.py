@@ -1,11 +1,16 @@
+import functools
 import hashlib
+import http.server
 import importlib
+import io
 import os
 import pkgutil
 import platform
 import shutil
 import subprocess
 import sys
+import tarfile
+import threading
 import tomllib
 from pathlib import Path
 
@@ -252,3 +257,23 @@ def remote(tmp_path, monkeypatch):
     bare = tmp_path / "remote.git"
     _git(tmp_path, "clone", "-q", "--bare", str(work), str(bare))
     return f"file://{bare}", first, _git(work, "rev-parse", "HEAD")
+
+
+@pytest.fixture
+def server(tmp_path):
+    root = tmp_path / "www"
+    root.mkdir()
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+    handler.log_message = lambda *args: None
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield root, f"http://127.0.0.1:{httpd.server_port}"
+    httpd.shutdown()
+
+
+def _tarball(path, members):
+    with tarfile.open(path, "w:gz") as tar:
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))

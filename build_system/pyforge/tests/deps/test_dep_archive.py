@@ -1,38 +1,15 @@
-import functools
 import hashlib
-import http.server
-import io
 import tarfile
-import threading
 import zipfile
 
 import pytest
 
+from conftest import _tarball
 from pyforge import cache
 from pyforge.config import Dependency, SchemaError, parse_config
 from pyforge.deps.resolve import DependencyError, ResolvedDependency
 from pyforge.deps.sources.archive import ArchiveSource
 from pyforge.utils import extract_archive
-
-
-@pytest.fixture
-def server(tmp_path):
-    root = tmp_path / "www"
-    root.mkdir()
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
-    handler.log_message = lambda *args: None
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    yield root, f"http://127.0.0.1:{httpd.server_port}"
-    httpd.shutdown()
-
-
-def _tarball(path, members):
-    with tarfile.open(path, "w:gz") as tar:
-        for name, data in members.items():
-            info = tarfile.TarInfo(name)
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
 
 
 def _dep(url, sha, name="lib"):
