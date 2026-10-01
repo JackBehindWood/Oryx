@@ -68,3 +68,53 @@ def test_status_reports_the_system_premake(forge, tmp_project, tmp_path, monkeyp
     fake = _fake_premake_on_path(tmp_path, monkeypatch)
     result = forge("premake", "status")
     assert f"using system premake5 at {fake}" in result.output.replace("\n", "")
+
+
+def _windows(monkeypatch, machine="AMD64"):
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+    monkeypatch.setattr("platform.machine", lambda: machine)
+
+
+@pytest.mark.parametrize("machine", ["AMD64", "ARM64"])
+def test_windows_asset_is_the_zip(machine):
+    assert premake.asset_name("Windows", machine) == "windows.zip"
+    assert premake.premake_url("5.0.0-beta8", "Windows", machine).endswith("premake-5.0.0-beta8-windows.zip")
+
+
+def test_windows_executable_has_exe_suffix(tmp_path, monkeypatch):
+    _windows(monkeypatch)
+    assert premake.get_premake_executable(tmp_path).name == "premake5.exe"
+
+
+def test_windows_install_extracts_zip_keeps_only_exe_and_licence(tmp_path, monkeypatch):
+    import zipfile
+
+    _windows(monkeypatch)
+    bin_dir = tmp_path / "bin"
+
+    def fake_download(url, destination, name):
+        with zipfile.ZipFile(destination, "w") as archive:
+            archive.writestr("premake5.exe", "MZ")
+            archive.writestr("extra.dll", "x")
+
+    monkeypatch.setattr(premake, "download_with_progress", fake_download)
+    monkeypatch.setattr(premake, "verify_checksum", lambda *args: None)
+    monkeypatch.setattr(premake, "download_file", lambda url, destination: destination.write_text("licence"))
+
+    assert premake.install_premake(bin_dir, "5.0.0-beta8") is True
+    assert sorted(p.name for p in bin_dir.iterdir()) == ["LICENSE.txt", "premake5.exe"]
+
+
+def test_windows_install_refuses_zip_path_traversal(tmp_path, monkeypatch):
+    import zipfile
+
+    _windows(monkeypatch)
+
+    def fake_download(url, destination, name):
+        with zipfile.ZipFile(destination, "w") as archive:
+            archive.writestr("../evil.exe", "x")
+
+    monkeypatch.setattr(premake, "download_with_progress", fake_download)
+    monkeypatch.setattr(premake, "verify_checksum", lambda *args: None)
+    assert premake.install_premake(tmp_path / "bin", "5.0.0-beta8") is False
+    assert not (tmp_path / "evil.exe").exists()

@@ -123,7 +123,7 @@ def installed_version(executable: Path) -> str | None:
         return None
     try:
         # Outside the repo root, or premake loads premake5.lua and fails on missing --python-* args.
-        result = subprocess.run([str(executable), "--version"], cwd=executable.parent, capture_output=True, text=True, check=True)
+        result = subprocess.run([str(executable), "--version"], cwd=executable.parent, capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
         return result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
