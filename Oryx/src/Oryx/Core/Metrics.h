@@ -10,6 +10,13 @@ struct Metrics
     std::map<std::string, double> values;
 };
 
+// Keys ending "_max" combine by maximum instead of sum, so a peak survives merging trials.
+[[nodiscard]] inline bool is_max_metric(const std::string& key)
+{
+    constexpr std::string_view kMaxSuffix = "_max";
+    return key.size() > kMaxSuffix.size() && key.compare(key.size() - kMaxSuffix.size(), kMaxSuffix.size(), kMaxSuffix) == 0;
+}
+
 inline void add_metric(Metrics& metrics, const std::string& key, double value)
 {
     metrics.values[key] += value;
@@ -32,7 +39,14 @@ inline void merge(Metrics& metrics, const Metrics& other)
 {
     for (const auto& [key, value] : other.values)
     {
-        metrics.values[key] += value;
+        if (is_max_metric(key))
+        {
+            max_metric(metrics, key, value);
+        }
+        else
+        {
+            metrics.values[key] += value;
+        }
     }
 }
 

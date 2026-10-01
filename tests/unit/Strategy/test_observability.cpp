@@ -278,3 +278,57 @@ TEST_CASE("Every registered game and strategy plays identically with an observer
     }
     CHECK(combinations > 0);
 }
+
+TEST_CASE("Merging metrics sums counters but keeps the maximum of _max keys")
+{
+    Metrics total;
+    Metrics first;
+    add_metric(first, "minimax/nodes", 10);
+    add_metric(first, "minimax/depth_max", 3);
+    Metrics second;
+    add_metric(second, "minimax/nodes", 5);
+    add_metric(second, "minimax/depth_max", 7);
+    merge(total, first);
+    merge(total, second);
+    merge(total, first);
+    CHECK(get_metric(total, "minimax/nodes") == 25.0);
+    CHECK(get_metric(total, "minimax/depth_max") == 7.0);
+    CHECK(is_max_metric("a/b_max"));
+    CHECK_FALSE(is_max_metric("_max"));
+    CHECK_FALSE(is_max_metric("a/max"));
+}
+
+TEST_CASE("JsonLinesWriter escapes control characters and writes non-finite numbers as null")
+{
+    oasis::TicTacToeState state;
+    std::ostringstream out;
+    JsonLinesWriter writer(out);
+    Decision decision;
+    decision.player = 0;
+    decision.chosen = 4;
+    add_metric(decision.extra, "x/\"quoted\"\tkey", std::numeric_limits<double>::quiet_NaN());
+    add_metric(decision.extra, "x/inf", std::numeric_limits<double>::infinity());
+    writer.on_decision(state, decision);
+    std::string text = out.str();
+    CHECK(text.find("\\\"quoted\\\"\\tkey\":null") != std::string::npos);
+    CHECK(text.find("\"x/inf\":null") != std::string::npos);
+}
+
+TEST_CASE("Aggregating repeats keeps a diagnostic peak instead of summing it")
+{
+    ExperimentSpec spec;
+    spec.name = "peak";
+    spec.matchups = { Matchup{ "", "tictactoe", {}, { StrategySpec{ "random", {} }, StrategySpec{ "minimax", {} } } } };
+    spec.matches_per_trial = 1;
+    spec.repeats = 3;
+    RunOptions options;
+    options.collect_diagnostics = true;
+    ExperimentResult result = run_experiment(spec, options);
+    double largest = 0.0;
+    for (const TrialResult& trial : result.trials)
+    {
+        largest = std::max(largest, get_metric(trial.metrics, "minimax/depth_max"));
+    }
+    CHECK(largest > 0.0);
+    CHECK(get_metric(aggregate(result, matchup_key(spec.matchups[0])), "minimax/depth_max") == largest);
+}

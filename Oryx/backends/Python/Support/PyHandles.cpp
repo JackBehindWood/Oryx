@@ -92,10 +92,12 @@ void PyObserver::publish(ActionId chosen, const std::map<ActionId, double>& prob
     decision.chosen = chosen;
     for (const auto& [action, probability] : probabilities)
     {
+        check_legal(m_state, action, "observer.publish() probabilities action");
         set_probability(decision, action, probability);
     }
     for (const auto& [action, value] : values)
     {
+        check_legal(m_state, action, "observer.publish() values action");
         set_value(decision, action, value);
     }
     decision.extra.values = extra;

@@ -41,6 +41,7 @@ std::string number(double value)
         return "null";
     }
     std::ostringstream stream;
+    stream.imbue(std::locale::classic());
     stream << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
     return stream.str();
 }
@@ -50,19 +51,19 @@ std::string number(double value)
 JsonLinesWriter::JsonLinesWriter(std::ostream& out)
     : m_out(out)
 {
-    m_out << "{\"schema_version\":" << kTraceSchemaVersion << "}\n";
+    m_out << "{\"schema_version\":" << std::to_string(kTraceSchemaVersion) << "}\n";
 }
 
 void JsonLinesWriter::on_decision(const IState& state, const Decision& decision)
 {
-    m_out << "{\"ply\":" << m_ply++ << ",\"player\":" << decision.player << ",\"chosen\":" << decision.chosen
+    m_out << "{\"ply\":" << std::to_string(m_ply++) << ",\"player\":" << std::to_string(decision.player) << ",\"chosen\":" << std::to_string(decision.chosen)
           << ",\"chosen_label\":" << quoted(is_valid(decision.chosen) ? state.action_to_string(decision.chosen) : std::string());
 
     m_out << ",\"scores\":[";
     for (size_t i = 0; i < decision.scores.size(); ++i)
     {
         const ActionScore& score = decision.scores[i];
-        m_out << (i == 0 ? "" : ",") << "{\"action\":" << score.action << ",\"label\":" << quoted(state.action_to_string(score.action));
+        m_out << (i == 0 ? "" : ",") << "{\"action\":" << std::to_string(score.action) << ",\"label\":" << quoted(state.action_to_string(score.action));
         if (score.has_probability)
         {
             m_out << ",\"probability\":" << number(score.probability);
@@ -86,8 +87,8 @@ void JsonLinesWriter::on_decision(const IState& state, const Decision& decision)
     for (size_t i = 0; i < decision.tree.size(); ++i)
     {
         const SearchNode& node = decision.tree[i];
-        m_out << (i == 0 ? "" : ",") << "{\"parent\":" << node.parent << ",\"action\":" << node.action
-              << ",\"visits\":" << node.visits << ",\"value\":" << number(node.value) << "}";
+        m_out << (i == 0 ? "" : ",") << "{\"parent\":" << std::to_string(node.parent) << ",\"action\":" << std::to_string(node.action)
+              << ",\"visits\":" << std::to_string(node.visits) << ",\"value\":" << number(node.value) << "}";
     }
     m_out << "]}\n";
 }

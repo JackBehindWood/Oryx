@@ -115,6 +115,17 @@ def test_publishing_an_illegal_action_is_rejected():
         match.decide()
 
 
+def test_publishing_scores_for_an_illegal_action_is_rejected():
+    class Cheat(oryx.Strategy, id="observer-cheat-scores"):
+        def decide(self, context):
+            context.observer.publish(context.state.legal_actions()[0], probabilities={10**6: 1.0})
+            return context.state.legal_actions()[0]
+
+    match = oryx.Match("nim", ["observer-cheat-scores", "first-legal"], trace=True)
+    with pytest.raises(oryx.OryxError):
+        match.decide()
+
+
 def test_attached_and_detached_runs_play_identical_games():
     for strategies in (["minimax", "random"], ["random", "minimax"], ["random", "random"], ["first-legal", "minimax"]):
         plain = oryx.simulate(oryx.make_game("nim", **SMALL), strategies, games=15, seed=11)
