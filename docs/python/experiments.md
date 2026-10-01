@@ -29,7 +29,7 @@ Each trial's seeds come from `derive_seed(master, matchup key, role, seat, repea
 `run()` returns an `ExperimentResult`: the spec, build and seed metadata (Oryx version, git hash, profile, compiler, platform, spec hash, optional timestamp), and one metrics row per trial (`matches`, `wins/<seat>`, `draws`, `reward/<seat>`, `decisions`).
 
 * `summary()`, `to_dict()`, `to_dataframe()` (tidy rows, needs pandas), and a notebook table.
-* `series()`, `summarize()`, `compare()`: spread across repeats and a 95% interval for the difference between matchups.
+* `series()`, `summarize()`, `compare()`: spread across repeats and a 95% Student-t interval (Welch for the difference between matchups); an unknown matchup key raises.
 * `cross_table()` and `ratings()` for two-seat matchups: scores against each opponent and Bradley-Terry strengths on the Elo scale.
 
 ## Storage

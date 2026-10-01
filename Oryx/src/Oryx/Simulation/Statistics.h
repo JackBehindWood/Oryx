@@ -40,15 +40,19 @@ constexpr double kZ95 = 1.959963984540054;
 
 // Wilson score interval for a rate; {0, 0} for no trials.
 [[nodiscard]] Interval wilson_interval(int64_t successes, int64_t trials, double z = kZ95);
-// Sample stddev (n - 1) and a normal-approximation CI of the mean.
-[[nodiscard]] Summary summarize(const std::vector<double>& samples, double z = kZ95);
-// a - b with a Welch-style interval; significant when the interval excludes zero.
-[[nodiscard]] Comparison compare(const Summary& a, const Summary& b, double z = kZ95);
+// Two-sided 95% Student-t critical value; the normal one beyond 30 degrees of freedom.
+[[nodiscard]] double t_critical_95(int64_t degrees_of_freedom);
+// Sample stddev (n - 1) and a Student-t CI of the mean.
+[[nodiscard]] Summary summarize(const std::vector<double>& samples);
+// a - b with a Welch interval; significant when the interval excludes zero, never with fewer than two repeats on either side.
+[[nodiscard]] Comparison compare(const Summary& a, const Summary& b);
 
-// One value per repeat for the matchup, in repeat order.
+// One value per repeat for the matchup, in repeat order; throws ExperimentError for a matchup not in the spec.
 [[nodiscard]] std::vector<double> metric_series(const ExperimentResult& result, const std::string& matchup, const std::string& metric);
-// Sum of every repeat's metrics for the matchup.
+// Sum of every repeat's metrics for the matchup; throws ExperimentError for a matchup not in the spec.
 [[nodiscard]] Metrics aggregate(const ExperimentResult& result, const std::string& matchup);
+// aggregate() for every matchup in one pass over the trials, keyed by matchup key.
+[[nodiscard]] std::map<std::string, Metrics> aggregate_all(const ExperimentResult& result);
 
 // Two-seat matchups only; throws ExperimentError otherwise.
 [[nodiscard]] CrossTable cross_table(const ExperimentResult& result);

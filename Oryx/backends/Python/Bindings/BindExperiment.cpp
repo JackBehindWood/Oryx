@@ -50,6 +50,10 @@ Params params_of(const std::string& entry, const py::handle& value)
     {
         return {};
     }
+    if (!py::isinstance<py::dict>(value))
+    {
+        throw ExperimentError("parameters for '" + entry + "' must be a dict; got " + type_name_of(value));
+    }
     return to_params(entry, py::reinterpret_borrow<py::kwargs>(value));
 }
 
@@ -75,8 +79,16 @@ std::vector<StrategySpec> to_strategy_specs(const py::handle& items)
 
 Matchup to_matchup(const py::handle& item)
 {
+    if (!py::isinstance<py::dict>(item))
+    {
+        throw ExperimentError("a matchup is a dict with 'game' and 'strategies'; got " + type_name_of(item));
+    }
     py::dict entry = py::reinterpret_borrow<py::dict>(item);
     Matchup matchup;
+    if (!entry.contains("game") || !entry.contains("strategies"))
+    {
+        throw ExperimentError("a matchup needs both 'game' and 'strategies'");
+    }
     matchup.game = registry_id(entry["game"], "game");
     matchup.game_params = params_of(matchup.game, entry.attr("get")("game_params", py::none()));
     matchup.seats = to_strategy_specs(entry["strategies"]);
@@ -205,10 +217,11 @@ py::list trials_to_list(const ExperimentResult& result)
 py::list summary_to_list(const ExperimentResult& result)
 {
     py::list rows;
+    std::map<std::string, Metrics> aggregated = aggregate_all(result);
     for (const Matchup& matchup : result.spec.matchups)
     {
         std::string key = matchup_key(matchup);
-        BatchResult totals = to_batch_result(aggregate(result, key), matchup.seats.size());
+        BatchResult totals = to_batch_result(aggregated[key], matchup.seats.size());
         std::vector<int32_t> wins(totals.wins.begin(), totals.wins.end());
         std::vector<double> rates;
         std::vector<std::vector<double>> intervals;
@@ -282,10 +295,11 @@ std::string html_of(const ExperimentResult& result)
 {
     std::string html = "<table><caption>oryx.ExperimentResult: " + escape_html(result.spec.name) + ", " + std::to_string(result.trials.size())
         + " trials</caption><thead><tr><th>matchup</th><th>matches</th><th>wins</th><th>draws</th><th>win rates (95% CI)</th></tr></thead><tbody>";
+    std::map<std::string, Metrics> aggregated = aggregate_all(result);
     for (const Matchup& matchup : result.spec.matchups)
     {
         std::string key = matchup_key(matchup);
-        BatchResult totals = to_batch_result(aggregate(result, key), matchup.seats.size());
+        BatchResult totals = to_batch_result(aggregated[key], matchup.seats.size());
         std::string wins;
         std::string rates;
         for (size_t seat = 0; seat < matchup.seats.size(); ++seat)

@@ -177,13 +177,14 @@ Metadata read_metadata(const YAML::Node& node)
 YAML::Node summary_node(const ExperimentResult& result)
 {
     YAML::Node node(YAML::NodeType::Sequence);
+    std::map<std::string, Metrics> totals = aggregate_all(result);
     for (const Matchup& matchup : result.spec.matchups)
     {
         std::string key = matchup_key(matchup);
         YAML::Node entry = empty_map();
         entry["matchup"] = key;
         YAML::Node metrics = empty_map();
-        for (const auto& [name, value] : aggregate(result, key).values)
+        for (const auto& [name, value] : totals[key].values)
         {
             metrics[name] = format_double(value);
         }

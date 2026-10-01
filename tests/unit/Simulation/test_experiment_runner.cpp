@@ -488,6 +488,49 @@ TEST_CASE("summarize() and compare() report mean, spread and significance")
     CHECK_FALSE(compare(a, a).significant);
 }
 
+TEST_CASE("Intervals use Student-t critical values for few repeats")
+{
+    CHECK(t_critical_95(1) == doctest::Approx(12.706));
+    CHECK(t_critical_95(4) == doctest::Approx(2.776));
+    CHECK(t_critical_95(30) == doctest::Approx(2.042));
+    CHECK(t_critical_95(31) == doctest::Approx(kZ95));
+    Summary five = summarize({ 1.0, 2.0, 3.0, 4.0, 5.0 });
+    CHECK(five.ci_half_width == doctest::Approx(2.776 * five.stddev / std::sqrt(5.0)));
+}
+
+TEST_CASE("compare() is never significant with fewer than two repeats on a side")
+{
+    CHECK_FALSE(compare(summarize({ 10.0 }), summarize({ 1.0 })).significant);
+    CHECK_FALSE(compare(summarize({ 10.0, 10.1 }), summarize({ 1.0 })).significant);
+    CHECK(compare(summarize({ 10.0 }), summarize({ 1.0 })).difference == doctest::Approx(9.0));
+}
+
+TEST_CASE("series and aggregates reject a matchup that is not in the spec")
+{
+    ExperimentResult result = run_experiment(make_spec());
+    CHECK_THROWS_AS(metric_series(result, "typo", "wins/0"), ExperimentError);
+    CHECK_THROWS_AS(aggregate(result, "typo"), ExperimentError);
+}
+
+TEST_CASE("aggregate_all() equals aggregate() per matchup")
+{
+    ExperimentResult result = run_experiment(make_spec());
+    std::map<std::string, Metrics> all = aggregate_all(result);
+    CHECK(all.size() == result.spec.matchups.size());
+    for (const Matchup& matchup : result.spec.matchups)
+    {
+        CHECK(all[matchup_key(matchup)].values == aggregate(result, matchup_key(matchup)).values);
+    }
+}
+
+TEST_CASE("run_trial() rejects a repeat outside the spec")
+{
+    ExperimentSpec spec = make_spec();
+    CHECK_THROWS_AS(run_trial(spec, 0, -1), ExperimentError);
+    CHECK_THROWS_AS(run_trial(spec, 0, spec.repeats), ExperimentError);
+    CHECK_NOTHROW(run_trial(spec, 0, spec.repeats - 1));
+}
+
 TEST_CASE("cross_table() and bradley_terry() rank a stronger strategy above a weaker one")
 {
     ExperimentSpec spec;

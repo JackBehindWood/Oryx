@@ -105,6 +105,21 @@ def test_a_game_must_be_named_by_id_not_passed_as_an_instance():
         oryx.Experiment([{"game": 3, "strategies": ["random", "random"]}])
 
 
+def test_malformed_matchups_and_params_raise_oryx_errors():
+    with pytest.raises(oryx.OryxError, match="is a dict"):
+        oryx.Experiment([["nim", "random", "random"]])
+    with pytest.raises(oryx.OryxError, match="needs both"):
+        oryx.Experiment([{"game": "nim"}])
+    with pytest.raises(oryx.OryxError, match="must be a dict"):
+        oryx.Experiment([{"game": "nim", "strategies": [("random", 3), "random"]}])
+
+
+def test_unknown_matchups_are_errors_not_empty_series():
+    result = tournament().run()
+    with pytest.raises(oryx.OryxError, match="no matchup 'typo'"):
+        result.series("typo", "wins/0")
+
+
 def test_progress_is_reported_and_an_error_in_the_callback_stops_the_run():
     seen = []
     tournament().run(lambda done, total: seen.append((done, total)))

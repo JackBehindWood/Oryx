@@ -19,7 +19,19 @@ Interval wilson_interval(int64_t successes, int64_t trials, double z)
     return { std::max(0.0, centre - margin), std::min(1.0, centre + margin) };
 }
 
-Summary summarize(const std::vector<double>& samples, double z)
+double t_critical_95(int64_t degrees_of_freedom)
+{
+    constexpr double kTable[] = { 12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.160, 2.145, 2.131,
+                                  2.120, 2.110, 2.101, 2.093, 2.086, 2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042 };
+    constexpr int64_t kTableSize = static_cast<int64_t>(sizeof(kTable) / sizeof(kTable[0]));
+    if (degrees_of_freedom < 1)
+    {
+        return kTable[0];
+    }
+    return degrees_of_freedom <= kTableSize ? kTable[degrees_of_freedom - 1] : kZ95;
+}
+
+Summary summarize(const std::vector<double>& samples)
 {
     Summary summary;
     summary.count = static_cast<int64_t>(samples.size());
@@ -43,33 +55,51 @@ Summary summarize(const std::vector<double>& samples, double z)
             squares += (sample - summary.mean) * (sample - summary.mean);
         }
         summary.stddev = std::sqrt(squares / static_cast<double>(samples.size() - 1));
-        summary.ci_half_width = z * summary.stddev / std::sqrt(static_cast<double>(samples.size()));
+        summary.ci_half_width = t_critical_95(summary.count - 1) * summary.stddev / std::sqrt(static_cast<double>(samples.size()));
     }
     return summary;
 }
 
-Comparison compare(const Summary& a, const Summary& b, double z)
+Comparison compare(const Summary& a, const Summary& b)
 {
     Comparison comparison;
     comparison.difference = a.mean - b.mean;
+    if (a.count < 2 || b.count < 2)
+    {
+        return comparison;
+    }
 
-    double variance = 0.0;
-    if (a.count > 0)
-    {
-        variance += a.stddev * a.stddev / static_cast<double>(a.count);
-    }
-    if (b.count > 0)
-    {
-        variance += b.stddev * b.stddev / static_cast<double>(b.count);
-    }
-    double margin = z * std::sqrt(variance);
+    double variance_a = a.stddev * a.stddev / static_cast<double>(a.count);
+    double variance_b = b.stddev * b.stddev / static_cast<double>(b.count);
+    double variance = variance_a + variance_b;
+    double welch_denominator = variance_a * variance_a / static_cast<double>(a.count - 1) + variance_b * variance_b / static_cast<double>(b.count - 1);
+    int64_t degrees = welch_denominator > 0.0 ? static_cast<int64_t>(variance * variance / welch_denominator) : a.count + b.count - 2;
+    double margin = t_critical_95(degrees) * std::sqrt(variance);
     comparison.interval = { comparison.difference - margin, comparison.difference + margin };
     comparison.significant = comparison.interval.lower > 0.0 || comparison.interval.upper < 0.0;
     return comparison;
 }
 
+namespace
+{
+
+void require_matchup(const ExperimentResult& result, const std::string& matchup)
+{
+    for (const Matchup& candidate : result.spec.matchups)
+    {
+        if (matchup_key(candidate) == matchup)
+        {
+            return;
+        }
+    }
+    throw ExperimentError("no matchup '" + matchup + "' in experiment '" + result.spec.name + "'");
+}
+
+} // namespace
+
 std::vector<double> metric_series(const ExperimentResult& result, const std::string& matchup, const std::string& metric)
 {
+    require_matchup(result, matchup);
     std::vector<double> series;
     for (const TrialResult& trial : result.trials)
     {
@@ -83,6 +113,7 @@ std::vector<double> metric_series(const ExperimentResult& result, const std::str
 
 Metrics aggregate(const ExperimentResult& result, const std::string& matchup)
 {
+    require_matchup(result, matchup);
     Metrics total;
     for (const TrialResult& trial : result.trials)
     {
@@ -92,6 +123,24 @@ Metrics aggregate(const ExperimentResult& result, const std::string& matchup)
         }
     }
     return total;
+}
+
+std::map<std::string, Metrics> aggregate_all(const ExperimentResult& result)
+{
+    std::map<std::string, Metrics> totals;
+    for (const Matchup& matchup : result.spec.matchups)
+    {
+        totals[matchup_key(matchup)];
+    }
+    for (const TrialResult& trial : result.trials)
+    {
+        std::map<std::string, Metrics>::iterator found = totals.find(trial.matchup);
+        if (found != totals.end())
+        {
+            merge(found->second, trial.metrics);
+        }
+    }
+    return totals;
 }
 
 CrossTable cross_table(const ExperimentResult& result)
@@ -121,12 +170,13 @@ CrossTable cross_table(const ExperimentResult& result)
         seats.emplace_back(index_of(matchup.seats[0]), index_of(matchup.seats[1]));
     }
 
+    std::map<std::string, Metrics> totals = aggregate_all(result);
     size_t count = table.strategies.size();
     table.points.assign(count * count, 0.0);
     table.games.assign(count * count, 0.0);
     for (size_t matchup = 0; matchup < seats.size(); ++matchup)
     {
-        Metrics total = aggregate(result, matchup_key(result.spec.matchups[matchup]));
+        const Metrics& total = totals[matchup_key(result.spec.matchups[matchup])];
         double games = get_metric(total, "matches");
         double draws = get_metric(total, "draws");
         double first = get_metric(total, "wins/0") + 0.5 * draws;
