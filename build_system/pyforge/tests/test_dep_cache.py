@@ -62,3 +62,25 @@ def test_concurrent_record_pin_loses_no_updates(tmp_path, monkeypatch):
     with ThreadPoolExecutor(8) as pool:
         list(pool.map(lambda i: cache.record_pin(tmp_path, f"dep{i}", "p"), range(32)))
     assert len(cache.read_pins()[str(tmp_path)]) == 32
+
+
+def _record_many(cache_dir: str, worker: int) -> None:
+    import os
+    from pathlib import Path
+
+    os.environ["PYFORGE_CACHE"] = cache_dir
+    for index in range(25):
+        cache.record_pin(Path(f"/proj{worker}"), f"dep{index}", "pin")
+
+
+def test_record_pin_keeps_every_update_across_processes(tmp_path, monkeypatch):
+    import multiprocessing
+
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path))
+    workers = [multiprocessing.Process(target=_record_many, args=(str(tmp_path), n)) for n in range(4)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+    pins = cache.read_pins()
+    assert {root: len(named) for root, named in pins.items()} == {f"/proj{n}": 25 for n in range(4)}
