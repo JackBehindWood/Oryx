@@ -19,5 +19,6 @@ The decisions here are working assumptions until reviewed during the project's d
 | [Determinism](determinism.md) | Randomness, determinism and reproducibility |
 | [Quality](quality.md) | Testing, performance and the allocation audit, parallelism |
 | [Observability](observability.md) | Optional strategy observability |
+| [Graphics](graphics.md) | Phase 10 graphics and asset subsystem: layering, RHI, roadmap |
 | [Platform](platform.md) | Serialization, graphics, build system, documentation |
 | [Decision Log](decision-log.md) | What is settled, what is open, and why |

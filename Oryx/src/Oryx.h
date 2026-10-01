@@ -12,6 +12,10 @@
 #include "Oryx/Core/Random.h"
 #include "Oryx/Core/Registry.h"
 #include "Oryx/Core/Metrics.h"
+#include "Oryx/Core/Window.h"
+#include "Oryx/Core/KeyCode.h"
+#include "Oryx/Core/MouseCode.h"
+#include "Oryx/Core/Input.h"
 
 #include "Oryx/Containers/Pair.h"
 #include "Oryx/Containers/SmallVector.h"
@@ -21,6 +25,9 @@
 #include "Oryx/Events/ApplicationEvent.h"
 #include "Oryx/Events/SimulationEvent.h"
 #include "Oryx/Events/ScriptEvent.h"
+#include "Oryx/Events/WindowEvent.h"
+#include "Oryx/Events/KeyEvent.h"
+#include "Oryx/Events/MouseEvent.h"
 
 #include "Oryx/Math/Math.h"
 

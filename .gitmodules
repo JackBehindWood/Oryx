@@ -10,3 +10,9 @@
 [submodule "Oryx/vendor/yaml-cpp"]
 	path = Oryx/vendor/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "Oryx/vendor/glfw"]
+	path = Oryx/vendor/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "Oryx/vendor/stb"]
+	path = Oryx/vendor/stb
+	url = https://github.com/nothings/stb.git

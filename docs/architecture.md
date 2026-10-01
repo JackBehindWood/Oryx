@@ -319,6 +319,8 @@ default to no-ops (`attach()`, `detach()`, `update()`, `event()`).
 always after), calls `attach()`, and returns `T&`. On destruction the stack
 calls `detach()` on every layer in reverse order.
 
+Window, key and mouse events (`WindowEvent.h`, `KeyEvent.h`, `MouseEvent.h`) are always compiled; from Phase 10 milestone 2 `Application` owns the `Window` and a single `GraphicsLayer` overlay runs the frame.
+
 Layers communicate through `Event` (`Oryx/Events/Event.h`) — a Hazel-style
 base with a `handled` flag, an `EventType`/`EventCategory` pair for
 identifying and filtering events (`event_type()`, `category_flags()`,
@@ -621,6 +623,10 @@ The graphics system should eventually support the project's primary use cases:
 
 It is explicitly **not** intended to become a general-purpose engine comparable to Unity or Unreal.
 
+### Layers and modules (Phase 10)
+
+The graphics modules are layered `Graphics/` (RHI and GPU resources) → `Shaders/` → `Renderer/`, all behind the `graphics` build option and never included by `Game/`, `Strategy/`, `Simulation/` or `Core/`. `Window`/`Input` abstractions and window, key and mouse events live in Core and Events and are always compiled; `Application` will own the window (null when headless) and a single `GraphicsLayer` overlay will drive each frame (§3.6). See [Graphics and Assets](design/graphics.md).
+
 ### Board (Phase 3)
 
 The `Renderer / UI` role above starts, in Phase 3, as a concrete
@@ -630,7 +636,7 @@ shared `IBoard` interface yet: with only one game and one renderer, an
 interface has no second implementation to justify it (the same reasoning as
 the `Registry<T>` timing decision, §10). `IBoard` should be extracted once
 Phase 10 Graphics actually needs to swap in a graphical renderer
-polymorphically — not before.
+polymorphically — not before. Phase 10 keeps `TicTacToeBoard` console-only: the graphical view is a separate Oasis class, and there is still no shared `IBoard` until a second consumer needs one.
 
 ---
 

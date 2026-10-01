@@ -4,6 +4,7 @@
 include "premake/forge.lua"
 include "premake/oryx.lua"
 include "premake/python.lua"
+include "premake/graphics.lua"
 
 workspace "oryx"
 	startproject "Oryx"

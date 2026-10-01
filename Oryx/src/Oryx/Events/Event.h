@@ -11,13 +11,23 @@ enum class EventType
     AppTick,
     StartSimulation,
     SimulationComplete,
-    ReloadScripts
+    ReloadScripts,
+    WindowClose,
+    WindowResize,
+    KeyPressed,
+    KeyReleased,
+    MouseMoved,
+    MouseButtonPressed
 };
 
 enum EventCategory
 {
     EventCategoryNone = 0,
-    EventCategoryApplication = BIT(0)
+    EventCategoryApplication = BIT(0),
+    EventCategoryWindow = BIT(1),
+    EventCategoryInput = BIT(2),
+    EventCategoryKeyboard = BIT(3),
+    EventCategoryMouse = BIT(4)
 };
 
 #define OX_EVENT_CLASS_TYPE(type) static ::oryx::EventType static_type() { return ::oryx::EventType::type; }\

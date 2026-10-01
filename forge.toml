@@ -18,6 +18,7 @@ fetch = "auto"
 
 [options]
 python = { default = true, off = "--no-python", help = "Embedded Python backend" }
+graphics = { default = true, off = "--no-graphics", help = "Window backends, RHI and 2D renderer" }
 sanitize = { default = false, on = "--sanitize", help = "ASan+UBSan diagnostic build" }
 
 [targets.oasis]
@@ -35,6 +36,8 @@ suites.python = { dir = "tests/python", requires = ["python", "!sanitize"] }
 spdlog = { kind = "static", include = "include", sources = "src", defines = ["SPDLOG_COMPILED_LIB"] }
 yaml-cpp = { kind = "static", include = "include", sources = "src" }
 pybind11 = { include = "include", requires = ["python"] }
+glfw = { kind = "static", include = "include", sources = "src", requires = ["graphics"] }
+stb = { include = "." }
 doctest = { include = "doctest", path = "tests/vendor/doctest" }
 
 [docs]

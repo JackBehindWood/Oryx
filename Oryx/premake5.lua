@@ -47,3 +47,43 @@ project "Oryx"
         useOryxPythonHeaders()
         useOryxPythonEmbedding()
     end
+
+    useOryxGraphics()
+
+    if graphicsEnabled() then
+        files {
+            "backends/Null/**.h",
+            "backends/Null/**.cpp"
+        }
+        includedirs { "backends/Null" }
+
+        filter "system:macosx"
+            files {
+                "backends/Metal/**.h",
+                "backends/Metal/**.mm",
+                "backends/MacOS/**.h",
+                "backends/MacOS/**.mm"
+            }
+            includedirs {
+                "backends/Metal",
+                "backends/MacOS",
+                forge.include("glfw")
+            }
+            links { "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework" }
+
+        filter "files:backends/Metal/**.mm"
+            flags { "NoPCH" }
+            buildoptions { "-fobjc-arc" }
+
+        filter "files:backends/MacOS/**.mm"
+            flags { "NoPCH" }
+            buildoptions { "-fobjc-arc" }
+        filter {}
+    else
+        removefiles {
+            "src/Oryx/Graphics/**",
+            "src/Oryx/Shaders/**",
+            "src/Oryx/Renderer/**",
+            "src/Oryx/Assets/GpuAssetCache*"
+        }
+    end
