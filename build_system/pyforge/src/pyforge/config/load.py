@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .schema import ForgeConfig, LocalConfig, SchemaError, suggestion, from_dict
 
-URL_SOURCES = ("archive",)
+URL_SOURCES = ("archive", "file")
 LOCAL_CONFIG_NAME = "forge.local.toml"
 LEGACY_LOCAL_CONFIG_NAME = "oryx.local.toml"
 

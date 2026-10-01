@@ -48,7 +48,7 @@ class Choices:
 
 GENERATORS = Choices("gmake")
 LAUNCHERS = Choices("ccache")
-DEPENDENCY_SOURCES = Choices("submodule", "local", "archive")
+DEPENDENCY_SOURCES = Choices("submodule", "local", "archive", "file")
 EDITORS = Choices("vscode", "visual_studio", "none")
 DOCS_TOOLS = Choices("mkdocs")
 

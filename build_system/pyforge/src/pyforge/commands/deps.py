@@ -22,7 +22,7 @@ console = Console()
 app = typer.Typer(no_args_is_help=True)
 GROUP_HELP = "Third-party dependencies declared in forge.toml [dependencies]"
 command = registry.make_group(app, group="Deps")
-SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, or --archive URL."
+SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, --archive URL, or --file URL."
 
 
 def _fail(message: str) -> typer.Exit:
@@ -92,12 +92,13 @@ def _consumer_snippet(name: str, kind: str) -> str:
     return "\n".join(f"    {line}" for line in lines)
 
 
-def _add_archive(run: RunContext, name: str, url: str) -> ResolvedDependency:
+def _add_downloaded(run: RunContext, name: str, url: str, source: str) -> ResolvedDependency:
     import tempfile
 
     from pyforge import cache
     from pyforge.config import Dependency
-    from pyforge.deps.sources.archive import ArchiveSource, url_filename
+    from pyforge.deps.sources import source_for
+    from pyforge.deps.sources.archive import url_filename
     from pyforge.utils import download_with_progress, sha256_file
 
     with tempfile.TemporaryDirectory(prefix="forge-dl-") as scratch:
@@ -105,21 +106,22 @@ def _add_archive(run: RunContext, name: str, url: str) -> ResolvedDependency:
         try:
             download_with_progress(url, archive, name)
             digest = sha256_file(archive)
-            dep = ResolvedDependency(name, Dependency(source="archive", url=url, sha256=digest), cache.deps_dir(name, digest[:12]))
-            ArchiveSource().install(run.project.root, dep, archive)
+            dep = ResolvedDependency(name, Dependency(source=source, url=url, sha256=digest), cache.deps_dir(name, digest[:12]))
+            source_for(dep).install(run.project.root, dep, archive)
         except (OSError, DependencyError) as error:
             raise _fail(str(error))
     console.print(f"[bold green]✓ Downloaded {name}[/bold green] (sha256 {digest[:12]}…)")
     return dep
 
 
-@command(name="add", label="Add — declare a dependency (local, submodule or archive)")
+@command(name="add", label="Add — declare a dependency (local, submodule, archive or file)")
 def add(
     ctx: typer.Context,
     name: str = typer.Argument(..., help="Dependency name; also its folder name under [build] dependencies-dir."),
     local: bool = typer.Option(False, "--local", help="Files you put in place yourself (never fetched or deleted by forge)."),
     submodule: Optional[str] = typer.Option(None, "--submodule", metavar="URL", help="Add it as a git submodule from URL."),
     archive: Optional[str] = typer.Option(None, "--archive", metavar="URL", help="Download a .tar.gz/.zip from URL into the shared cache; its sha256 is recorded."),
+    file: Optional[str] = typer.Option(None, "--file", metavar="URL", help="Download a single file (e.g. a header) from URL into the shared cache; its sha256 is recorded."),
     path: Optional[str] = typer.Option(None, "--path", help="Folder relative to the project root (default: <dependencies-dir>/NAME)."),
     kind: Optional[Literal["static", "header"]] = typer.Option(None, "--kind", help="static (compiled from its sources) or header-only; detected when omitted."),
     include: Optional[str] = typer.Option(None, "--include", help="Include folder inside it; detected when omitted."),
@@ -129,14 +131,15 @@ def add(
 ):
     """Add a [dependencies] entry, detecting its layout when the files are present."""
     run: RunContext = ctx.obj
-    if sum(bool(flag) for flag in (local, submodule, archive)) != 1:
+    if sum(bool(flag) for flag in (local, submodule, archive, file)) != 1:
         raise _fail(SOURCE_FLAGS_MESSAGE)
     if name in run.config.dependencies:
         raise _fail(f"'{name}' is already in forge.toml [dependencies].")
 
     default_dir = Path(run.config.build.dependencies_dir, name).as_posix()
     folder = path or default_dir
-    source = "local" if local else "archive" if archive else "submodule"
+    url = archive or file
+    source = "local" if local else "archive" if archive else "file" if file else "submodule"
     from pyforge.config import Dependency
 
     dep = ResolvedDependency(name, Dependency(source=source, path=folder), run.project.path(folder))
@@ -146,9 +149,9 @@ def add(
         console.print(f"[dim][dry-run] would add {name} ({source}) at {folder}[/dim]")
         return
 
-    if archive:
-        dep = _add_archive(run, name, archive)
-        fetched = {"url": archive, "sha256": dep.spec.sha256}
+    if url:
+        dep = _add_downloaded(run, name, url, source)
+        fetched = {"url": url, "sha256": dep.spec.sha256}
         folder = default_dir
     elif submodule and not dep.present:
         from pyforge.deps.sources.submodule import SubmoduleSource

@@ -78,3 +78,27 @@ def test_traversal_members_rejected(tmp_path):
 def test_archive_requires_url_and_sha():
     with pytest.raises(SchemaError, match="url"):
         parse_config({"project": {"name": "p"}, "dependencies": {"x": {"source": "archive", "url": "http://h/x.zip"}}})
+
+
+def test_file_source_lands_unextracted(server, tmp_path, monkeypatch):
+    from pyforge.deps.sources.file import FileSource
+
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path / "cache"))
+    root, base = server
+    (root / "stb.h").write_bytes(b"// stb")
+    sha = hashlib.sha256(b"// stb").hexdigest()
+    spec = Dependency(source="file", url=f"{base}/stb.h", sha256=sha)
+    dep = ResolvedDependency("stb", spec, cache.deps_dir("stb", sha[:12]))
+    FileSource().fetch(tmp_path, dep)
+    assert [p.name for p in dep.dir.iterdir()] == ["stb.h"]
+    assert (dep.dir / "stb.h").read_bytes() == b"// stb"
+
+
+def test_cli_add_file_writes_url_and_sha(server, tmp_project, tmp_path, monkeypatch, forge):
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path / "cache"))
+    root, base = server
+    (root / "stb.h").write_bytes(b"// stb")
+    result = forge("deps", "add", "stb", "--file", f"{base}/stb.h")
+    assert result.exit_code == 0, result.output
+    text = (tmp_project / "forge.toml").read_text()
+    assert 'source = "file"' in text and hashlib.sha256(b"// stb").hexdigest() in text
