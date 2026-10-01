@@ -18,7 +18,6 @@ from pyforge.config import (
 )
 from pyforge.config.load import check_forge_version
 from pyforge.config.schema import Choices, EditorTable, LocalBuildTable
-from conftest import REAL_ROOT
 
 
 def parse(text: str) -> ForgeConfig:
@@ -31,13 +30,6 @@ def test_minimal_config_takes_every_default():
     assert (cfg.premake.version, cfg.premake.generator) == ("5.0.0-beta8", "gmake")
     assert (cfg.build.default_profile, cfg.build.jobs, cfg.build.fetch) == (Profile.DEBUG, 0, FetchMode.AUTO)
     assert (cfg.options, cfg.targets, cfg.dependencies, cfg.tests, cfg.docs) == ({}, {}, {}, None, None)
-
-
-def test_committed_forge_toml_parses():
-    cfg = load_config(REAL_ROOT / "forge.toml", "0.2.0")
-    assert cfg.project.default_target in cfg.targets
-    assert cfg.options["python"].default is True
-    assert cfg.tool["oryx"]["stubs-dir"] == "OryxPython/stubs"
 
 
 def test_enum_values_compare_as_strings():

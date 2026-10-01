@@ -4,10 +4,16 @@ from pyforge import registry
 
 STATIC_GROUPS = ["Build", "Config", "Deps", "Docs", "Editor", "Init", "Premake", "Target", "Test"]
 MODULES = STATIC_GROUPS
-# "Python" (from build_system/oryx/, the Oryx plugin — see pyforge/main.py's plugin
+# "Dummy" (from build_system/oryx/, the Oryx plugin — see pyforge/main.py's plugin
 # loading) mounts after every statically-discovered group, since it isn't one of the files
 # pkgutil finds under pyforge/commands/.
-GROUPS = [*STATIC_GROUPS, "Python"]
+GROUPS = [*STATIC_GROUPS, "Dummy"]
+
+
+def _known(groups: list[str]) -> list[str]:
+    # Other plugins' groups register into the same process-wide registry when a wider pytest run
+    # imports them (e.g. `pytest build_system`), so only the groups this suite owns are compared.
+    return [group for group in groups if group in {*GROUPS, "Extra"}]
 
 
 def test_discovery_order():
@@ -23,7 +29,7 @@ def test_discovery_is_idempotent():
 
 
 def test_groups_in_order():
-    assert registry.groups_in_order() == GROUPS
+    assert _known(registry.groups_in_order()) == GROUPS
 
 
 def test_entries_for_group():
@@ -36,7 +42,7 @@ def test_entries_for_group():
         "Editor": ["vscode", "vs2022"],
         "Init": ["init"],
         "Premake": ["status", "install", "update"],
-        "Python": ["generate_stubs"],
+        "Dummy": ["hello"],
         "Target": ["add", "remove", "list_"],
         "Test": ["run_suites"],
     }
@@ -62,7 +68,7 @@ def test_new_group_is_listed_after_discovered_groups(monkeypatch):
 
     assert [c.name for c in app.registered_commands] == ["visible", "internal"]
     assert [entry.label for entry in registry.entries_for_group("Extra")] == ["Visible"]
-    assert registry.groups_in_order() == [*GROUPS, "Extra"]
+    assert _known(registry.groups_in_order()) == [*GROUPS, "Extra"]
 
 
 def test_hidden_only_group_is_not_listed(monkeypatch):

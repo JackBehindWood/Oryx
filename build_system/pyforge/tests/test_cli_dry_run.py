@@ -5,7 +5,7 @@ import typer
 
 from conftest import workspace_json
 
-PYTHON_OPTIONS = "--python-include=/py/include/python3.11 --python-libdir=/py/lib --python-lib=python3.11"
+DUMMY_OPTIONS = "--dummy-flag=1"
 
 
 @pytest.fixture
@@ -29,16 +29,16 @@ def tests_binary(tmp_project):
 
 
 def test_rich_swallows_the_dry_run_prefix_as_markup(dry, premake):
-    assert dry("configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export"]
+    assert dry("configure") == [f" would run: {premake} gmake {DUMMY_OPTIONS} --forge-export"]
 
 
 @pytest.mark.parametrize(
     ("flags", "options"),
     [
-        ([], PYTHON_OPTIONS),
-        (["--without", "python"], "--no-python"),
-        (["--with", "sanitize", "--without", "python"], "--no-python --sanitize"),
-        (["--without", "python", "-D", "cc=clang", "-D", "verbose"], "--no-python --cc=clang --verbose"),
+        ([], DUMMY_OPTIONS),
+        (["--without", "python"], "--no-python " + DUMMY_OPTIONS),
+        (["--with", "sanitize", "--without", "python"], "--no-python --sanitize " + DUMMY_OPTIONS),
+        (["--without", "python", "-D", "cc=clang", "-D", "verbose"], "--no-python --cc=clang --verbose " + DUMMY_OPTIONS),
     ],
 )
 def test_configure(dry, premake, flags, options):
@@ -65,7 +65,7 @@ def test_clean(dry, tmp_project):
 
 def test_all_runs_configure_compile_test_in_order(dry, tmp_project, premake, tests_binary):
     assert dry("all") == [
-        f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export",
+        f" would run: {premake} gmake {DUMMY_OPTIONS} --forge-export",
         f" would run: make -C {tmp_project / 'build'} -j8 config=debug_x64",
         f" would run: {tests_binary} --source-file=*tests/unit/*,*tests/integration/*",
     ]
@@ -231,8 +231,10 @@ def test_docs(dry, tmp_project):
     assert dry("docs", "clean") == [f" would remove: {tmp_project / 'site'}"]
 
 
-def test_python_stubs(dry):
-    assert dry("python", "stubs") == [f" would run: {sys.executable} -m pybind11_stubgen oryx -o OryxPython/stubs"]
+def test_plugin_command_reads_its_tool_table(forge):
+    result = forge("dummy", "hello")
+    assert result.exit_code == 0
+    assert "hello from the dummy plugin" in result.output
 
 
 def test_docs_follow_the_docs_table(dry, tmp_project):
@@ -254,12 +256,12 @@ def test_missing_mkdocs_names_uv_and_pip(forge, monkeypatch):
     assert "uv sync --group docs" in output and "-m pip install mkdocs mkdocs-material" in output
 
 
-def test_python_stubs_needs_a_stubs_dir(forge, tmp_project):
+def test_plugin_command_needs_its_tool_table(forge, tmp_project):
     config = tmp_project / "forge.toml"
-    config.write_text(config.read_text(encoding="utf-8").replace('stubs-dir = "OryxPython/stubs"\n', ""), encoding="utf-8")
-    result = forge("--dry-run", "python", "stubs")
+    config.write_text(config.read_text(encoding="utf-8").replace('greeting = "hello from the dummy plugin"\n', ""), encoding="utf-8")
+    result = forge("dummy", "hello")
     assert result.exit_code == 1
-    assert "stubs-dir" in result.output
+    assert "greeting" in result.output
 
 
 def test_premake_status_ignores_dry_run(dry, premake):
@@ -361,7 +363,7 @@ def test_editor_vscode_writes_four_files(forge, tmp_project):
 def test_bare_forge_prints_help_outside_a_tty(forge):
     result = forge()
     assert result.exit_code == 0
-    for name in ("configure", "compile", "all", "clean", "run", "config", "deps", "docs", "editor", "python", "premake", "target", "init", "test"):
+    for name in ("configure", "compile", "all", "clean", "run", "config", "deps", "docs", "editor", "dummy", "premake", "target", "init", "test"):
         assert name in result.output
     assert "vendor" not in result.output
 
@@ -402,8 +404,8 @@ def test_bad_option_flags_are_configuration_errors(forge, flags, message):
 
 def test_local_options_override_the_defaults(dry, premake, tmp_project):
     (tmp_project / "forge.local.toml").write_text("[options]\npython = false\n", encoding="utf-8")
-    assert dry("configure") == [f" would run: {premake} gmake --no-python --forge-export"]
-    assert dry("--with", "python", "configure") == [f" would run: {premake} gmake {PYTHON_OPTIONS} --forge-export"]
+    assert dry("configure") == [f" would run: {premake} gmake --no-python {DUMMY_OPTIONS} --forge-export"]
+    assert dry("--with", "python", "configure") == [f" would run: {premake} gmake {DUMMY_OPTIONS} --forge-export"]
 
 
 def test_no_python_and_sanitize_aliases_are_gone(forge):
@@ -427,4 +429,4 @@ def test_editor_vscode_configures_first_without_an_export(forge, tmp_project, mo
 
 
 def test_editor_vs2022_dry_run(dry, premake):
-    assert dry("editor", "vs2022") == [f" would run: {premake} vs2022 {PYTHON_OPTIONS}"]
+    assert dry("editor", "vs2022") == [f" would run: {premake} vs2022 {DUMMY_OPTIONS}"]
