@@ -135,7 +135,11 @@ std::string matchup_key(const Matchup& matchup)
     {
         return matchup.label;
     }
-    std::string key = matchup.game + "(" + canonical_string(matchup.game_params) + ")";
+    std::string key = matchup.game;
+    if (!matchup.game_params.empty())
+    {
+        key += "(" + canonical_string(matchup.game_params) + ")";
+    }
     for (const StrategySpec& seat : matchup.seats)
     {
         key += "|" + strategy_key(seat);

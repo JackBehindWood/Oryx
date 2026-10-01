@@ -33,10 +33,10 @@ ExperimentSpec make_spec(std::vector<Matchup> matchups)
 TEST_CASE("matchup_key() prefers the label and otherwise describes the content, not the position")
 {
     Matchup matchup = tictactoe_matchup("random", "first-legal");
-    CHECK(matchup_key(matchup) == "tictactoe()|random|first-legal");
+    CHECK(matchup_key(matchup) == "tictactoe|random|first-legal");
 
     matchup.seats[0].params["seed"] = int64_t{ 3 };
-    CHECK(matchup_key(matchup) == "tictactoe()|random(seed=i:3)|first-legal");
+    CHECK(matchup_key(matchup) == "tictactoe|random(seed=i:3)|first-legal");
 
     matchup.label = "mine";
     CHECK(matchup_key(matchup) == "mine");

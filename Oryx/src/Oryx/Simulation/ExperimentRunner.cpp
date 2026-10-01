@@ -12,6 +12,8 @@ namespace
 {
 
 constexpr const char* kSeedParam = "seed";
+// Seed params are Int, and script seeds (oryx.Random) reject negatives.
+constexpr uint64_t kMaxInt64 = 0x7FFFFFFFFFFFFFFFULL;
 
 bool declares_seed(const EntryInfo* info)
 {
@@ -33,7 +35,7 @@ Params with_derived_seed(const EntryInfo* info, Params params, uint64_t seed)
 {
     if (declares_seed(info) && !has_param(params, kSeedParam))
     {
-        params[kSeedParam] = static_cast<int64_t>(seed);
+        params[kSeedParam] = static_cast<int64_t>(seed & kMaxInt64);
     }
     return params;
 }

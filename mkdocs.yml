@@ -53,5 +53,6 @@ nav:
   - Python:
       - python/index.md
       - Scripting in Oasis: python/scripting.md
+      - Experiments: python/experiments.md
   - Build tooling: tooling.md
   - Roadmap: roadmap.md

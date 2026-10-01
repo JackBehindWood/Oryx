@@ -394,14 +394,19 @@ void validate_py(const PyExperiment& experiment)
     validate(experiment.spec);
 }
 
+std::string path_text(const py::object& path)
+{
+    return py::module_::import("os").attr("fspath")(path).cast<std::string>();
+}
+
 ExperimentResult load_py(const hints::Named<"str | os.PathLike[str]">& path)
 {
-    return load_result(py::str(path.attr("__fspath__")()).cast<std::string>());
+    return load_result(path_text(path));
 }
 
 void save_py(const ExperimentResult& result, const hints::Named<"str | os.PathLike[str]">& path)
 {
-    save_result(result, py::str(path.attr("__fspath__")()).cast<std::string>());
+    save_result(result, path_text(path));
 }
 
 py::dict cross_table_py(const ExperimentResult& result)

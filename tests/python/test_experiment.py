@@ -41,6 +41,12 @@ def test_save_load_rerun_reproduces_the_counts(tmp_path):
     assert loaded.rerun().same_trials(loaded)
 
 
+def test_save_and_load_accept_a_plain_string_path(tmp_path):
+    result = tournament().run()
+    result.save(str(tmp_path / "text"))
+    assert oryx.ExperimentResult.load(str(tmp_path / "text")).same_trials(result)
+
+
 def test_a_sweep_varies_a_game_parameter_across_matchups():
     experiment = oryx.Experiment.sweep("nim", ["first-legal", "first-legal"], {"game.max_take": [2, 3], "game.stones": [10, 11]}, matches=5)
     params = [(m["game_params"]["max_take"], m["game_params"]["stones"]) for m in experiment.spec["matchups"]]
@@ -114,3 +120,12 @@ def test_progress_is_reported_and_an_error_in_the_callback_stops_the_run():
 def test_loading_rejects_a_missing_result_directory(tmp_path):
     with pytest.raises(oryx.OryxError, match="has no result.yaml"):
         oryx.ExperimentResult.load(tmp_path)
+
+
+def test_derived_seeds_reach_script_strategies_as_valid_params():
+    import monte_carlo
+
+    experiment = oryx.Experiment.sweep("nim", [monte_carlo.MonteCarlo, "random"], {"seats.0.playouts": [1, 2]}, matches=4, repeats=2, seed=7)
+    result = experiment.run()
+    assert result.same_trials(experiment.run())
+    assert len(result.summary()) == 2
