@@ -117,6 +117,32 @@ jobs:
       working-directory: build_system/pyforge
       run: uv run --no-default-groups --group test pytest -q --cov=pyforge --cov-report=term
 
+  extraction:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Split pyforge into its own history
+      run: |
+        git subtree split --prefix=build_system/pyforge -b pyforge-extracted
+        git worktree add "$RUNNER_TEMP/pyforge-extracted" pyforge-extracted
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Test the extracted tree in a fresh venv
+      working-directory: ${{ runner.temp }}/pyforge-extracted
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        pip install -e ".[menu,plugins]" pytest
+        pytest -q
+
   pip:
     runs-on: ubuntu-latest
 
