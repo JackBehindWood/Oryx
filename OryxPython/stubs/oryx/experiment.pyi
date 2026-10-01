@@ -20,9 +20,9 @@ class Experiment:
         """
     def __repr__(self) -> str:
         ...
-    def run(self, progress: collections.abc.Callable[[int, int], typing.Any] | None = None, *, timestamp: bool = False) -> ...:
+    def run(self, progress: collections.abc.Callable[[int, int], typing.Any] | None = None, *, timestamp: bool = False, diagnostics: bool = False) -> ...:
         """
-        Runs every trial; `progress(done, total)` is called after each, and Ctrl-C stops between trials.
+        Runs every trial; `progress(done, total)` is called after each, and Ctrl-C stops between trials. `diagnostics=True` adds what strategies publish (minimax/nodes) to each trial's metrics.
         """
     def validate(self) -> None:
         """
@@ -54,9 +54,9 @@ class ExperimentResult:
         """
         Bradley-Terry strengths on the Elo scale, centred on 0; two-seat matchups only.
         """
-    def rerun(self, progress: collections.abc.Callable[[int, int], typing.Any] | None = None, *, timestamp: bool = False) -> ExperimentResult:
+    def rerun(self, progress: collections.abc.Callable[[int, int], typing.Any] | None = None, *, timestamp: bool = False, diagnostics: bool = False) -> ExperimentResult:
         """
-        Runs the stored spec again; the trials must match exactly.
+        Runs the stored spec again; the trials must match exactly, so pass the same `diagnostics`.
         """
     def same_trials(self, other: ExperimentResult) -> bool:
         """

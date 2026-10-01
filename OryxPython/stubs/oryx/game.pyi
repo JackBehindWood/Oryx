@@ -2,6 +2,7 @@
 Games, states and strategies, whether implemented in C++ or in a script.
 """
 from __future__ import annotations
+import oryx.observability
 import typing
 __all__: list[str] = ['ActionFeatures', 'Context', 'Game', 'GameHandle', 'State', 'StateHandle', 'Strategy', 'StrategyHandle']
 class ActionFeatures:
@@ -17,6 +18,11 @@ class Context:
     @property
     def action_features(self) -> ActionFeatures:
         ...
+    @property
+    def observer(self) -> oryx.observability.Observer:
+        """
+        Where decide() can publish a Decision; None when nothing is observing.
+        """
     @property
     def state(self) -> StateHandle:
         ...

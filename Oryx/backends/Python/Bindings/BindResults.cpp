@@ -56,6 +56,15 @@ hints::OptionalAnyDict metadata_of(const PyBatchResult& result)
     return hints::OptionalAnyDict(metadata);
 }
 
+hints::Named<"list[list[oryx.observability.Decision]] | None"> trace_of(const PyBatchResult& result)
+{
+    if (!result.has_trace)
+    {
+        return hints::Named<"list[list[oryx.observability.Decision]] | None">(py::none());
+    }
+    return hints::Named<"list[list[oryx.observability.Decision]] | None">(py::cast(result.trace));
+}
+
 py::dict to_dict(const PyBatchResult& result)
 {
     py::dict values;
@@ -170,6 +179,7 @@ void bind_results(py::module_& module)
         .def_property_readonly("draw_rate", [](const PyBatchResult& result) { return draw_rate(result.counts); })
         .def_property_readonly("mean_rewards", &mean_rewards_of)
         .def_property_readonly("metadata", &metadata_of, "game, strategies, games, seed and oryx_version of a simulate() run; None for a BatchRunner.")
+        .def_property_readonly("trace", &trace_of, "Every decision of a simulate(..., trace=True) run, one list per match; None otherwise.")
         .def("to_dict", &to_dict)
         .def("to_numpy", &to_numpy, "The counts and rates as numpy arrays; needs numpy.")
         .def("to_dataframe", &to_dataframe, "One row per player; needs pandas.")

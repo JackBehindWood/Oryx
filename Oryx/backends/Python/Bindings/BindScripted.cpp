@@ -268,7 +268,8 @@ void bind_scripted(py::module_& module)
 
     py::class_<PyContext, SharedPtr<PyContext>>(game_module, "Context", "What decide() receives; only valid until decide() returns.")
         .def_property_readonly("state", &PyContext::state)
-        .def_property_readonly("action_features", &PyContext::action_features);
+        .def_property_readonly("action_features", &PyContext::action_features)
+        .def_property_readonly("observer", &PyContext::observer, "Where decide() can publish a Decision; None when nothing is observing.");
 
     py::object game = make_base(game_module, "Game", "Base class of games defined in Python: `class Nim(oryx.Game, id=\"nim\")` registers on import.");
     game.attr("__init_subclass__") = init_subclass_for(Kind::Game);

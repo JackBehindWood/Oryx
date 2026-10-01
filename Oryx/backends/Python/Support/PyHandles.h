@@ -6,6 +6,7 @@
 #include "Oryx/Game/IState.h"
 #include "Oryx/Scripting/Support/ScriptLease.h"
 #include "Oryx/Strategy/IStrategy.h"
+#include "Oryx/Strategy/Observability/IDecisionObserver.h"
 
 namespace oryx::python
 {
@@ -85,6 +86,25 @@ private:
     SharedPtr<IStrategy> m_strategy;
 };
 
+// What a Python strategy publishes its Decision through: valid only until decide() returns.
+class PyObserver
+{
+public:
+    PyObserver(IDecisionObserver& observer, IState& state, SharedPtr<ScriptLease> lease)
+        : m_observer(observer)
+        , m_state(state)
+        , m_lease(std::move(lease))
+    {
+    }
+
+    void publish(ActionId chosen, const std::map<ActionId, double>& probabilities, const std::map<ActionId, double>& values, const std::map<std::string, double>& extra) const;
+
+private:
+    IDecisionObserver& m_observer;
+    IState& m_state;
+    SharedPtr<ScriptLease> m_lease;
+};
+
 // What a Python strategy's decide() receives: valid only until decide() returns.
 class PyContext
 {
@@ -93,10 +113,12 @@ public:
 
     [[nodiscard]] SharedPtr<PyState> state() const;
     [[nodiscard]] SharedPtr<PyActionFeatures> action_features() const;
+    [[nodiscard]] SharedPtr<PyObserver> observer() const;
 
 private:
     SharedPtr<PyState> m_state;
     SharedPtr<PyActionFeatures> m_features;
+    SharedPtr<PyObserver> m_observer;
     SharedPtr<ScriptLease> m_lease;
 };
 

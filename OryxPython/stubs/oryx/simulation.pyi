@@ -3,6 +3,7 @@ Playing matches and batches of matches.
 """
 from __future__ import annotations
 import oryx.game
+import oryx.observability
 import oryx.results
 import typing
 __all__: list[str] = ['BatchRunner', 'Match', 'simulate']
@@ -18,7 +19,7 @@ class Match:
     """
     One game between strategies, stepped by hand or played to the end.
     """
-    def __init__(self, game: str | oryx.game.GameHandle | oryx.game.Game | type[oryx.game.Game], strategies: str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy] | collections.abc.Sequence[str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy]]) -> None:
+    def __init__(self, game: str | oryx.game.GameHandle | oryx.game.Game | type[oryx.game.Game], strategies: str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy] | collections.abc.Sequence[str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy]], *, trace: bool = False) -> None:
         ...
     def apply(self, action: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
@@ -40,7 +41,12 @@ class Match:
         ...
     def undo(self) -> int | None:
         ...
-def simulate(game: str | oryx.game.GameHandle | oryx.game.Game | type[oryx.game.Game], strategies: str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy] | collections.abc.Sequence[str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy]], games: typing.SupportsInt | typing.SupportsIndex = 1000, seed: int | None = None) -> oryx.results.BatchResult:
+    @property
+    def trace(self) -> list[oryx.observability.Decision]:
+        """
+        The decisions made so far when created with trace=True, else empty; undo() does not remove them.
+        """
+def simulate(game: str | oryx.game.GameHandle | oryx.game.Game | type[oryx.game.Game], strategies: str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy] | collections.abc.Sequence[str | oryx.game.StrategyHandle | oryx.game.Strategy | type[oryx.game.Strategy]], games: typing.SupportsInt | typing.SupportsIndex = 1000, seed: int | None = None, *, trace: bool = False) -> oryx.results.BatchResult:
     """
-    Plays `games` matches; strategies created by name that take a `seed` get seed + seat index.
+    Plays `games` matches; strategies created by name that take a `seed` get seed + seat index. `trace=True` keeps every decision in `result.trace`, one list per match.
     """

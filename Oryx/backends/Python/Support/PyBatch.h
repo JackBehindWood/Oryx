@@ -4,6 +4,7 @@
 
 #include "Oryx/Simulation/BatchRunner.h"
 #include "Oryx/Strategy/IStrategy.h"
+#include "Oryx/Strategy/Observability/TraceRecorder.h"
 
 namespace oryx::python
 {
@@ -24,6 +25,9 @@ struct PyBatchResult
     BatchResult counts;
     RunMetadata metadata;
     bool has_metadata = false;
+    // One entry list per match; only simulate(..., trace=True) fills it.
+    std::vector<std::vector<TraceEntry>> trace;
+    bool has_trace = false;
 };
 
 using Strategies = std::vector<SharedPtr<IStrategy>>;

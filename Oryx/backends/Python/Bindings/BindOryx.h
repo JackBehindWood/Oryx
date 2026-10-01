@@ -17,6 +17,7 @@ void bind_errors(pybind11::module_& module);
 void bind_debug(pybind11::module_& module);
 void bind_game(pybind11::module_& module);
 void bind_registry(pybind11::module_& module);
+void bind_observability(pybind11::module_& module);
 void bind_results(pybind11::module_& module);
 void bind_simulation(pybind11::module_& module);
 void bind_experiment(pybind11::module_& module);

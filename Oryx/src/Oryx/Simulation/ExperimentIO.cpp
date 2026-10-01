@@ -13,6 +13,55 @@ namespace
 
 constexpr const char* kCsvHeader = "matchup,repeat,metric,value";
 
+uint64_t parse_unsigned(const std::string& text, const char* what)
+{
+    if (!text.empty() && text.find_first_not_of("0123456789") == std::string::npos)
+    {
+        try
+        {
+            return std::stoull(text);
+        }
+        catch (const std::out_of_range&)
+        {
+        }
+    }
+    throw ExperimentError(std::string(what) + " '" + text + "' is not an unsigned 64-bit integer");
+}
+
+int32_t parse_repeat(const std::string& text)
+{
+    size_t used = 0;
+    try
+    {
+        int32_t value = static_cast<int32_t>(std::stoi(text, &used));
+        if (used == text.size())
+        {
+            return value;
+        }
+    }
+    catch (const std::logic_error&)
+    {
+    }
+    throw ExperimentError(std::string(kTrialsFileName) + ": repeat '" + text + "' is not an integer");
+}
+
+double parse_value(const std::string& text)
+{
+    size_t used = 0;
+    try
+    {
+        double value = std::stod(text, &used);
+        if (used == text.size())
+        {
+            return value;
+        }
+    }
+    catch (const std::logic_error&)
+    {
+    }
+    throw ExperimentError(std::string(kTrialsFileName) + ": value '" + text + "' is not a number");
+}
+
 YAML::Node empty_map()
 {
     return YAML::Node(YAML::NodeType::Map);
@@ -81,7 +130,7 @@ ExperimentSpec read_spec(const YAML::Node& node)
     spec.name = node["name"].as<std::string>();
     spec.matches_per_trial = node["matches_per_trial"].as<int32_t>();
     spec.repeats = node["repeats"].as<int32_t>();
-    spec.master_seed = std::stoull(node["master_seed"].as<std::string>());
+    spec.master_seed = parse_unsigned(node["master_seed"].as<std::string>(), "master_seed");
     for (const YAML::Node& entry : node["matchups"])
     {
         Matchup matchup;
@@ -119,8 +168,8 @@ Metadata read_metadata(const YAML::Node& node)
     metadata.build.profile = node["profile"].as<std::string>();
     metadata.build.compiler = node["compiler"].as<std::string>();
     metadata.build.platform = node["platform"].as<std::string>();
-    metadata.spec_hash = std::stoull(node["spec_hash"].as<std::string>());
-    metadata.master_seed = std::stoull(node["master_seed"].as<std::string>());
+    metadata.spec_hash = parse_unsigned(node["spec_hash"].as<std::string>(), "spec_hash");
+    metadata.master_seed = parse_unsigned(node["master_seed"].as<std::string>(), "master_seed");
     metadata.timestamp = node["timestamp"].as<std::string>("");
     return metadata;
 }
@@ -204,16 +253,36 @@ std::vector<std::string> split_csv_line(const std::string& line)
     return fields;
 }
 
-std::vector<TrialResult> read_trials_csv(std::istream& in)
+std::vector<TrialResult> read_trials_csv(std::istream& in, const ExperimentSpec& spec)
 {
+    auto next_line = [&in](std::string& line)
+    {
+        if (!std::getline(in, line))
+        {
+            return false;
+        }
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.pop_back();
+        }
+        return true;
+    };
+
     std::string line;
-    if (!std::getline(in, line) || line != kCsvHeader)
+    if (!next_line(line) || line != kCsvHeader)
     {
         throw ExperimentError(std::string(kTrialsFileName) + ": missing or unrecognised header");
     }
 
+    std::map<std::string, int32_t> repeats_of;
+    for (const Matchup& matchup : spec.matchups)
+    {
+        repeats_of[matchup_key(matchup)] = spec.repeats;
+    }
+
     std::vector<TrialResult> trials;
-    while (std::getline(in, line))
+    std::set<std::pair<std::string, int32_t>> seen;
+    while (next_line(line))
     {
         if (line.empty())
         {
@@ -224,17 +293,43 @@ std::vector<TrialResult> read_trials_csv(std::istream& in)
         {
             throw ExperimentError(std::string(kTrialsFileName) + ": malformed row '" + line + "'");
         }
-        int32_t repeat = static_cast<int32_t>(std::stol(fields[1]));
+        int32_t repeat = parse_repeat(fields[1]);
         if (trials.empty() || trials.back().matchup != fields[0] || trials.back().repeat != repeat)
         {
+            if (repeats_of.find(fields[0]) == repeats_of.end())
+            {
+                throw ExperimentError(std::string(kTrialsFileName) + ": matchup '" + fields[0] + "' is not in the spec");
+            }
+            if (repeat < 0 || repeat >= spec.repeats)
+            {
+                throw ExperimentError(std::string(kTrialsFileName) + ": repeat " + fields[1] + " of '" + fields[0] + "' is outside 0.." + std::to_string(spec.repeats - 1));
+            }
+            if (!seen.emplace(fields[0], repeat).second)
+            {
+                throw ExperimentError(std::string(kTrialsFileName) + ": trial '" + fields[0] + "' repeat " + fields[1] + " appears in more than one block");
+            }
             TrialResult trial;
             trial.matchup = fields[0];
             trial.repeat = repeat;
             trials.push_back(std::move(trial));
         }
-        trials.back().metrics.values[fields[2]] = std::stod(fields[3]);
+        if (!trials.back().metrics.values.emplace(fields[2], parse_value(fields[3])).second)
+        {
+            throw ExperimentError(std::string(kTrialsFileName) + ": metric '" + fields[2] + "' is listed twice for '" + fields[0] + "' repeat " + fields[1]);
+        }
     }
     return trials;
+}
+
+void write_file(const std::filesystem::path& path, const std::string& text)
+{
+    std::ofstream out(path);
+    out << text;
+    out.close();
+    if (!out)
+    {
+        throw ExperimentError("could not write '" + path.string() + "'");
+    }
 }
 
 std::filesystem::path require_file(const std::filesystem::path& directory, const char* name)
@@ -264,8 +359,6 @@ void write_trials_csv(const ExperimentResult& result, std::ostream& out)
 
 void save_result(const ExperimentResult& result, const std::filesystem::path& directory)
 {
-    std::filesystem::create_directories(directory);
-
     YAML::Node root = empty_map();
     root["schema_version"] = kResultSchemaVersion;
     root["spec"] = spec_node(result.spec);
@@ -273,14 +366,19 @@ void save_result(const ExperimentResult& result, const std::filesystem::path& di
     root["trial_count"] = static_cast<int64_t>(result.trials.size());
     root["summary"] = summary_node(result);
 
-    std::ofstream yaml(directory / kResultFileName);
+    std::ostringstream yaml;
     yaml << YAML::Dump(root) << '\n';
-    std::ofstream csv(directory / kTrialsFileName);
+    std::ostringstream csv;
     write_trials_csv(result, csv);
-    if (!yaml || !csv)
+
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    if (error)
     {
-        throw ExperimentError("could not write results into '" + directory.string() + "'");
+        throw ExperimentError("could not create '" + directory.string() + "': " + error.message());
     }
+    write_file(directory / kResultFileName, yaml.str());
+    write_file(directory / kTrialsFileName, csv.str());
 }
 
 ExperimentResult load_result(const std::filesystem::path& directory)
@@ -313,14 +411,7 @@ ExperimentResult load_result(const std::filesystem::path& directory)
     }
 
     std::ifstream csv(csv_path);
-    try
-    {
-        result.trials = read_trials_csv(csv);
-    }
-    catch (const std::logic_error& error)
-    {
-        throw ExperimentError("'" + csv_path.string() + "' is not a valid trials file: " + error.what());
-    }
+    result.trials = read_trials_csv(csv, result.spec);
     if (static_cast<int64_t>(result.trials.size()) != expected_trials)
     {
         throw ExperimentError("'" + csv_path.string() + "' has " + std::to_string(result.trials.size()) + " trials but the result records " + std::to_string(expected_trials));

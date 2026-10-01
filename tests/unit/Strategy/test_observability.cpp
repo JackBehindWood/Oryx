@@ -182,3 +182,99 @@ TEST_CASE("run_trial adds strategy diagnostics only when collect_diagnostics is 
     CHECK(get_metric(observed.metrics, "random/decisions") > 0.0);
     CHECK(get_metric(observed.metrics, "wins/0") == get_metric(plain.metrics, "wins/0"));
 }
+
+namespace
+{
+
+Params seeded(const std::string& id)
+{
+    Params params;
+    const EntryInfo* info = StrategyRegistry::info(id);
+    if (info != nullptr)
+    {
+        for (const ParamSpec& spec : info->schema)
+        {
+            if (spec.name == "seed")
+            {
+                params["seed"] = static_cast<int64_t>(7);
+            }
+        }
+    }
+    return params;
+}
+
+struct Played
+{
+    std::vector<ActionId> actions;
+    std::vector<double> rewards;
+};
+
+Played play_game(const IGame& game, const std::vector<std::string>& ids, IDecisionObserver* observer)
+{
+    std::vector<UniquePtr<IStrategy>> owned;
+    SmallVector<IStrategy*, 2> strategies;
+    for (const std::string& id : ids)
+    {
+        owned.push_back(StrategyRegistry::create(id, seeded(id)));
+        strategies.push_back(owned.back().get());
+    }
+
+    Match match(game, std::move(strategies));
+    match.set_observer(observer);
+    Outcome outcome = match.play();
+
+    Played played;
+    for (ActionId action : match.history().actions())
+    {
+        played.actions.push_back(action);
+    }
+    for (size_t player = 0; player < outcome.rewards.player_count(); ++player)
+    {
+        played.rewards.push_back(outcome.rewards[static_cast<PlayerId>(player)]);
+    }
+    return played;
+}
+
+} // namespace
+
+TEST_CASE("Every registered game and strategy plays identically with an observer attached or detached")
+{
+    int32_t combinations = 0;
+    for (const std::string& game_id : GameRegistry::names())
+    {
+        UniquePtr<IGame> game = GameRegistry::create(game_id);
+        if (game == nullptr)
+        {
+            continue;
+        }
+
+        for (const std::string& strategy_id : StrategyRegistry::names())
+        {
+            size_t slash = strategy_id.find('/');
+            if (slash != std::string::npos && strategy_id.substr(0, slash) != game_id)
+            {
+                continue;
+            }
+
+            UniquePtr<IStrategy> probe = StrategyRegistry::create(strategy_id, seeded(strategy_id));
+            UniquePtr<IState> state = game->new_initial_state();
+            Context context = Match::build_context(*game, *state);
+            if (probe == nullptr || !Match::missing_capabilities(*probe, context).empty())
+            {
+                continue;
+            }
+
+            std::vector<std::string> seats(static_cast<size_t>(game->num_players()), strategy_id);
+            TraceRecorder trace;
+            Played detached = play_game(*game, seats, nullptr);
+            Played attached = play_game(*game, seats, &trace);
+
+            INFO(game_id << " x " << strategy_id);
+            CHECK(attached.actions == detached.actions);
+            CHECK(attached.rewards == detached.rewards);
+            CHECK(trace.entries().size() == attached.actions.size());
+            ++combinations;
+        }
+    }
+    CHECK(combinations > 0);
+}

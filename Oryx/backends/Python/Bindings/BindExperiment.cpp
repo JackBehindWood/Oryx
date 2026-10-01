@@ -331,7 +331,7 @@ bool spec_involves_script(const ExperimentSpec& spec)
 }
 
 // The progress callback is the cancellation point: a KeyboardInterrupt or an error in the user's callback stops the run and is raised afterwards.
-ExperimentResult run_with_signals(const ExperimentSpec& spec, const py::object& progress, bool timestamp)
+ExperimentResult run_with_signals(const ExperimentSpec& spec, const py::object& progress, bool timestamp, bool diagnostics)
 {
     validate(spec);
     bool holds_gil = spec_involves_script(spec);
@@ -341,6 +341,7 @@ ExperimentResult run_with_signals(const ExperimentSpec& spec, const py::object& 
     RunOptions options;
     options.cancel = &cancel;
     options.record_timestamp = timestamp;
+    options.collect_diagnostics = diagnostics;
     options.progress = [&](int32_t completed, int32_t total)
     {
         py::gil_scoped_acquire acquire;
@@ -379,14 +380,14 @@ ExperimentResult run_with_signals(const ExperimentSpec& spec, const py::object& 
     return result;
 }
 
-ExperimentResult run_experiment_py(const PyExperiment& experiment, const ProgressArg& progress, bool timestamp)
+ExperimentResult run_experiment_py(const PyExperiment& experiment, const ProgressArg& progress, bool timestamp, bool diagnostics)
 {
-    return run_with_signals(experiment.spec, progress, timestamp);
+    return run_with_signals(experiment.spec, progress, timestamp, diagnostics);
 }
 
-ExperimentResult rerun_py(const ExperimentResult& result, const ProgressArg& progress, bool timestamp)
+ExperimentResult rerun_py(const ExperimentResult& result, const ProgressArg& progress, bool timestamp, bool diagnostics)
 {
-    return run_with_signals(result.spec, progress, timestamp);
+    return run_with_signals(result.spec, progress, timestamp, diagnostics);
 }
 
 void validate_py(const PyExperiment& experiment)
@@ -473,8 +474,8 @@ void bind_classes(py::module_& module)
                     "One matchup per combination of `axes`, keyed by 'game.<param>' or 'seats.<index>.<param>'.")
         .def_property_readonly("spec", [](const PyExperiment& experiment) { return spec_to_dict(experiment.spec); })
         .def("validate", OX_GUARDED_FUNC(validate_py, "oryx.Experiment.validate"), "Checks ids, parameters and capabilities without running anything.")
-        .def("run", OX_GUARDED_FUNC(run_experiment_py, "oryx.Experiment.run"), py::arg("progress") = py::none(), py::kw_only(), py::arg("timestamp") = false,
-             "Runs every trial; `progress(done, total)` is called after each, and Ctrl-C stops between trials.")
+        .def("run", OX_GUARDED_FUNC(run_experiment_py, "oryx.Experiment.run"), py::arg("progress") = py::none(), py::kw_only(), py::arg("timestamp") = false, py::arg("diagnostics") = false,
+             "Runs every trial; `progress(done, total)` is called after each, and Ctrl-C stops between trials. `diagnostics=True` adds what strategies publish (minimax/nodes) to each trial's metrics.")
         .def("__repr__", [](const PyExperiment& experiment) { return repr_of(experiment); });
 
     py::class_<PyTournament, PyExperiment, SharedPtr<PyTournament>>(module, "Tournament", "A round robin of a strategy pool: every pair plays, with both seatings when `rotate_seats` cancels first-player bias.")
@@ -494,7 +495,7 @@ void bind_classes(py::module_& module)
         .def("ratings", &ratings_py, "Bradley-Terry strengths on the Elo scale, centred on 0; two-seat matchups only.")
         .def("save", OX_GUARDED_FUNC(save_py, "oryx.ExperimentResult.save"), py::arg("path"), "Writes result.yaml and trials.csv into the directory `path`.")
         .def_static("load", OX_GUARDED_FUNC(load_py, "oryx.ExperimentResult.load"), py::arg("path"))
-        .def("rerun", OX_GUARDED_FUNC(rerun_py, "oryx.ExperimentResult.rerun"), py::arg("progress") = py::none(), py::kw_only(), py::arg("timestamp") = false, "Runs the stored spec again; the trials must match exactly.")
+        .def("rerun", OX_GUARDED_FUNC(rerun_py, "oryx.ExperimentResult.rerun"), py::arg("progress") = py::none(), py::kw_only(), py::arg("timestamp") = false, py::arg("diagnostics") = false, "Runs the stored spec again; the trials must match exactly, so pass the same `diagnostics`.")
         .def("same_trials", &trials_equal, py::arg("other"), "Whether both results hold identical trials, ignoring order and metadata.")
         .def("_repr_html_", &html_of)
         .def("__repr__", [](const ExperimentResult& result) { return repr_of(result); });

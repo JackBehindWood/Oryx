@@ -76,6 +76,30 @@ PyContext::PyContext(const Context& context, SharedPtr<ScriptLease> lease)
     {
         m_features = create_shared<PyActionFeatures>(*features, m_lease);
     }
+    if (IDecisionObserver* observer = context.get<IDecisionObserver>())
+    {
+        m_observer = create_shared<PyObserver>(*observer, context.state(), m_lease);
+    }
+}
+
+void PyObserver::publish(ActionId chosen, const std::map<ActionId, double>& probabilities, const std::map<ActionId, double>& values, const std::map<std::string, double>& extra) const
+{
+    m_lease->require("observer");
+    check_legal(m_state, chosen, "observer.publish() chosen action");
+
+    Decision decision;
+    decision.player = m_state.current_player();
+    decision.chosen = chosen;
+    for (const auto& [action, probability] : probabilities)
+    {
+        set_probability(decision, action, probability);
+    }
+    for (const auto& [action, value] : values)
+    {
+        set_value(decision, action, value);
+    }
+    decision.extra.values = extra;
+    m_observer.on_decision(m_state, decision);
 }
 
 SharedPtr<PyState> PyContext::state() const
@@ -88,6 +112,12 @@ SharedPtr<PyActionFeatures> PyContext::action_features() const
 {
     m_lease->require("context");
     return m_features;
+}
+
+SharedPtr<PyObserver> PyContext::observer() const
+{
+    m_lease->require("context");
+    return m_observer;
 }
 
 } // namespace oryx::python

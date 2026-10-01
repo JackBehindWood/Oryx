@@ -2,6 +2,7 @@
 The totals of a batch of matches.
 """
 from __future__ import annotations
+import oryx.observability
 import typing
 __all__: list[str] = ['BatchResult']
 class BatchResult:
@@ -45,6 +46,11 @@ class BatchResult:
     @property
     def rewards(self) -> list[float]:
         ...
+    @property
+    def trace(self) -> list[list[oryx.observability.Decision]] | None:
+        """
+        Every decision of a simulate(..., trace=True) run, one list per match; None otherwise.
+        """
     @property
     def win_rates(self) -> list[float]:
         ...
