@@ -22,7 +22,7 @@ console = Console()
 app = typer.Typer(no_args_is_help=True)
 GROUP_HELP = "Third-party dependencies declared in forge.toml [dependencies]"
 command = registry.make_group(app, group="Deps")
-SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, --archive URL, --file URL, or --git URL."
+SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, --archive URL, --file URL, --git URL, or --system PKG."
 
 
 def _fail(message: str) -> typer.Exit:
@@ -114,6 +114,26 @@ def _add_downloaded(run: RunContext, name: str, url: str, source: str) -> Resolv
     return dep
 
 
+def _add_system(run: RunContext, name: str, package: str, defines: list[str], requires: list[str]) -> None:
+    from pyforge.config import Dependency
+    from pyforge.deps.sources.system import SystemSource
+
+    dep = ResolvedDependency(name, Dependency(source="system", pkg_config=package), None, run.project.root)
+    try:
+        SystemSource().probe(run.project.root, dep)
+    except DependencyError as error:
+        raise _fail(str(error))
+    entry: dict = {"source": "system", "pkg-config": package}
+    if defines:
+        entry["defines"] = defines
+    if requires:
+        entry["requires"] = requires
+    _write(run, lambda text: tomledit.set_value(text, ["dependencies", name], entry))
+    console.print(f"[bold green]✓ forge.toml[/bold green] {escape('[dependencies]')}: {escape(tomledit.format_key(name))} = {escape(tomledit.format_value(entry))}")
+    snippet = f'forge.use("{name}")'
+    console.print(f"  [dim]Use it from a project's premake5.lua:[/dim]\n    {escape(snippet)}")
+
+
 def _add_git(run: RunContext, name: str, url: str, rev: str | None) -> ResolvedDependency:
     from pyforge import cache
     from pyforge.config import Dependency
@@ -128,7 +148,7 @@ def _add_git(run: RunContext, name: str, url: str, rev: str | None) -> ResolvedD
     return ResolvedDependency(name, Dependency(source="git", url=url, rev=rev, commit=commit), cache.deps_dir(name, commit))
 
 
-@command(name="add", label="Add — declare a dependency (local, submodule, archive, file or git)")
+@command(name="add", label="Add — declare a dependency (local, submodule, archive, file, git or system)")
 def add(
     ctx: typer.Context,
     name: str = typer.Argument(..., help="Dependency name; also its folder name under [build] dependencies-dir."),
@@ -138,6 +158,7 @@ def add(
     file: Optional[str] = typer.Option(None, "--file", metavar="URL", help="Download a single file (e.g. a header) from URL into the shared cache; its sha256 is recorded."),
     git: Optional[str] = typer.Option(None, "--git", metavar="URL", help="Shallow-clone URL into the shared cache; the resolved commit is recorded."),
     rev: Optional[str] = typer.Option(None, "--rev", help="Tag, branch or commit for --git (default: the remote's default branch)."),
+    system: Optional[str] = typer.Option(None, "--system", metavar="PKG", help="A library installed on the machine, found through pkg-config PKG."),
     path: Optional[str] = typer.Option(None, "--path", help="Folder relative to the project root (default: <dependencies-dir>/NAME)."),
     kind: Optional[Literal["static", "header"]] = typer.Option(None, "--kind", help="static (compiled from its sources) or header-only; detected when omitted."),
     include: Optional[str] = typer.Option(None, "--include", help="Include folder inside it; detected when omitted."),
@@ -147,7 +168,7 @@ def add(
 ):
     """Add a [dependencies] entry, detecting its layout when the files are present."""
     run: RunContext = ctx.obj
-    if sum(bool(flag) for flag in (local, submodule, archive, file, git)) != 1:
+    if sum(bool(flag) for flag in (local, submodule, archive, file, git, system)) != 1:
         raise _fail(SOURCE_FLAGS_MESSAGE)
     if name in run.config.dependencies:
         raise _fail(f"'{name}' is already in forge.toml [dependencies].")
@@ -155,7 +176,7 @@ def add(
     default_dir = Path(run.config.build.dependencies_dir, name).as_posix()
     folder = path or default_dir
     url = archive or file
-    source = "local" if local else "archive" if archive else "file" if file else "git" if git else "submodule"
+    source = "local" if local else "archive" if archive else "file" if file else "git" if git else "system" if system else "submodule"
     from pyforge.config import Dependency
 
     dep = ResolvedDependency(name, Dependency(source=source, path=folder), run.project.path(folder))
@@ -163,6 +184,10 @@ def add(
 
     if run.dry_run:
         console.print(f"[dim][dry-run] would add {name} ({source}) at {folder}[/dim]")
+        return
+
+    if system:
+        _add_system(run, name, system, define, requires)
         return
 
     if url:
@@ -325,10 +350,12 @@ def remove(
     from pyforge.deps.sources import source_for
 
     action = "deinit and remove the submodule" if dep.spec.source == "submodule" else "keep its files"
+    if dep.dir is None:
+        action = "leave the installed library alone"
     if run.dry_run:
         console.print(f"[dim][dry-run] would remove {name} from forge.toml and {action}[/dim]")
         return
-    if not yes and not typer.confirm(f"Remove '{name}' from forge.toml and {action} at {shown(run, dep.dir)}?"):
+    if not yes and not typer.confirm(f"Remove '{name}' from forge.toml and {action} ({shown(run, dep.dir)})?"):
         raise typer.Exit(code=1)
     try:
         source_for(dep).remove(run.project.root, dep)

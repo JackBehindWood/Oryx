@@ -35,12 +35,14 @@ def _register_builtins() -> None:
     from .git import GitSource
     from .local import LocalSource
     from .submodule import SubmoduleSource
+    from .system import SystemSource
 
     register("submodule", SubmoduleSource())
     register("local", LocalSource())
     register("archive", ArchiveSource())
     register("file", FileSource())
     register("git", GitSource())
+    register("system", SystemSource())
 
 
 _register_builtins()

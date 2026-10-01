@@ -27,6 +27,23 @@ function forge.include(name)
     return forge.dependency(name).include
 end
 
+-- Applies a dependency to the project being defined: include dirs/links for a built one, compiler flags for a system one.
+function forge.use(name)
+    local dependency = forge.dependency(name)
+    if dependency.kind == "system" then
+        buildoptions(dependency.cflags or {})
+        linkoptions(dependency.libs or {})
+        if #(dependency.defines or {}) > 0 then
+            defines(dependency.defines)
+        end
+        return
+    end
+    includedirs { dependency.include }
+    if dependency.kind == "static" then
+        links { name }
+    end
+end
+
 local dependency_callbacks = {}
 
 -- fn(name, dependency) runs inside each generated dependency project, for project-specific settings.

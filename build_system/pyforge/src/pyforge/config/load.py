@@ -49,6 +49,8 @@ def validate(cfg: ForgeConfig) -> ForgeConfig:
         _check_requires(f"dependencies.{name}", dependency.requires, options)
         if dependency.source in URL_SOURCES and not (dependency.url and dependency.sha256):
             raise SchemaError(f"forge.toml: 'dependencies.{name}' (source = {dependency.source!r}) needs both 'url' and 'sha256'")
+        if dependency.source == "system" and not (dependency.pkg_config or dependency.include):
+            raise SchemaError(f"forge.toml: 'dependencies.{name}' (source = 'system') needs 'pkg-config' or an explicit 'include' path")
         if dependency.source == "git" and not (dependency.url and dependency.commit):
             raise SchemaError(f"forge.toml: 'dependencies.{name}' (source = 'git') needs both 'url' and 'commit'; add it with `forge deps add {name} --git URL`")
     if cfg.tests:

@@ -48,7 +48,7 @@ class Choices:
 
 GENERATORS = Choices("gmake")
 LAUNCHERS = Choices("ccache")
-DEPENDENCY_SOURCES = Choices("submodule", "local", "archive", "file", "git")
+DEPENDENCY_SOURCES = Choices("submodule", "local", "archive", "file", "git", "system")
 EDITORS = Choices("vscode", "visual_studio", "none")
 DOCS_TOOLS = Choices("mkdocs")
 
@@ -127,6 +127,8 @@ class Dependency:
     sha256: str = ""
     rev: str = ""
     commit: str = ""
+    pkg_config: str = ""
+    lib: str = ""
 
 
 @dataclass(frozen=True)

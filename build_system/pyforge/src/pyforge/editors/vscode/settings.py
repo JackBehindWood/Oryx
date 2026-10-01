@@ -36,7 +36,7 @@ GENERATED_FILES_EXCLUDE = {
 
 def _dependency_search_excludes(run: RunContext) -> dict[str, bool]:
     root = run.project.root
-    return {dep.dir.relative_to(root).as_posix(): True for dep in resolve_all(run.project, run.config) if dep.dir.is_relative_to(root)}
+    return {dep.dir.relative_to(root).as_posix(): True for dep in resolve_all(run.project, run.config) if dep.dir is not None and dep.dir.is_relative_to(root)}
 
 
 def write_settings(run: RunContext) -> Path:
