@@ -50,7 +50,7 @@ def write_vscode(ctx: typer.Context, debugger: str, remember: bool) -> None:
 def write_vs2022(ctx: typer.Context, remember: bool) -> None:
     import subprocess
 
-    from pyforge.commands.build import premake_args, scripts_flag
+    from pyforge.premake.driver import premake_args, scripts_flag
     from pyforge.commands.deps import ensure_or_exit
     from pyforge.deps.resolve import write_premake_config
     from pyforge.premake.install import ensure_premake, get_premake_executable, resolve_bin_dir

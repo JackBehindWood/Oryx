@@ -14,7 +14,8 @@ from pyforge.compile_commands import generate_compile_commands
 from pyforge.deps.resolve import write_premake_config
 from pyforge.config import ForgeConfig, RunContext, Target
 from pyforge.config.schema import suggestion
-from pyforge.premake.install import ensure_premake, get_premake_executable, lua_scripts_dir, resolve_bin_dir
+from pyforge.premake.driver import export_command, premake_args, run_export
+from pyforge.premake.install import ensure_premake, get_premake_executable, resolve_bin_dir
 from pyforge.setup.generators import build_compile_command
 from pyforge.setup.stale_objects import prune_stale_object_dirs, wipe_outputs_if_options_changed
 from pyforge.utils import remove_directory, run_command
@@ -44,22 +45,6 @@ def _clear_targets_that_lost_sources(previous: freshness.Stamp | None, ws: Works
         console.print(f"[yellow]⚠️ Cleared {name} binaries (a source file was removed).[/yellow]\n")
 
 
-def premake_args(run: RunContext) -> list[str]:
-    """Every Premake flag this run's options produce, in a stable order (their hash decides an output wipe)."""
-    try:
-        plugin_args = [arg for result in run.pm.hook.forge_premake_args(ctx=run) if result for arg in result]
-    except RuntimeError as error:
-        console.print(f"[bold red]✗ {escape(str(error))}[/bold red]")
-        raise typer.Exit(code=1)
-    return options.premake_flags(run.config.options, run.options, run.defines) + plugin_args
-
-
-def scripts_flag() -> str:
-    """`--scripts=<pyforge's lua dir>`, so a project's premake5.lua can `require "forge"` regardless
-    of where pyforge is installed, instead of an `include` with a hardcoded relative path."""
-    return f"--scripts={lua_scripts_dir()}"
-
-
 @command(name="configure", label="Configure — generate Premake build files", rich_help_panel="Build")
 def configure(ctx: typer.Context):
     """Generate build files using Premake5."""
@@ -73,8 +58,7 @@ def configure(ctx: typer.Context):
 
     if run.dry_run:
         premake = get_premake_executable(bin_dir)
-        command_line = [str(premake), generator, scripts_flag(), *premake_options, "--forge-export"]
-        console.print(f"[dim][dry-run] would run: {' '.join(command_line)}[/dim]")
+        console.print(f"[dim][dry-run] would run: {' '.join(export_command(premake, generator, premake_options))}[/dim]")
         return
 
     ensure_or_exit(run)
@@ -85,18 +69,8 @@ def configure(ctx: typer.Context):
     write_premake_config(run)
     run.pm.hook.forge_pre_configure(ctx=run)
 
-    command_line = [str(premake), generator, scripts_flag(), *premake_options, "--forge-export"]
     previous = freshness.load_stamp(project)
-
-    try:
-        with console.status("[bold blue]⚙️ Configuring build...[/bold blue]"):
-            result = run_command(command_line, cwd=project.root)
-        if run.verbose and result.stdout:
-            console.print(result.stdout)
-        console.print("[bold green]✓ Build files generated successfully.[/bold green]\n")
-    except subprocess.CalledProcessError as error:
-        console.print(f"[bold red]✗ Failed to configure build:[/bold red]\n{error.stderr}")
-        raise typer.Exit(code=1)
+    run_export(premake, generator, premake_options, project.root, verbose=run.verbose)
 
     options_hash = options.options_hash(premake_options)
     previous_hash = previous.options_hash if previous else None

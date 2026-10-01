@@ -7,54 +7,11 @@ from rich.markup import escape
 
 from ..cache import premake_dir
 from ..project import Project
-from ..utils import download_file, extract_archive, make_executable, remove_directory, remove_file
+from ..utils import download_file, download_with_progress, extract_archive, make_executable, remove_directory, remove_file
+from .assets import DEFAULT_PREMAKE_VERSION, PREMAKE_LICENSE_URL, asset_name, premake_url
+from .checksum import ChecksumError, latest_release_version, verify_checksum  # noqa: F401
 
 console = Console()
-
-DEFAULT_PREMAKE_VERSION = "5.0.0-beta8"
-
-RELEASES_API = "https://api.github.com/repos/premake/premake-core/releases"
-
-PREMAKE_LICENSE_URL = "https://raw.githubusercontent.com/premake/premake-core/v{version}/LICENSE.txt"
-
-_ARM_MACHINES = {"arm64", "aarch64"}
-
-# The hashes pyforge ships for its own pinned default version, verified independently of
-# GitHub's API at release time — a defense a compromised/spoofed API response can't get past
-# for a version this table covers. Any other version relies on GitHub's asset `digest` field
-# alone (still TLS-fetched from api.github.com, not the download host).
-KNOWN_HASHES = {
-    "5.0.0-beta8": {
-        "premake-5.0.0-beta8-linux.tar.gz": "63edd3e7461eebdd45b500a3c7e8ad4e7a67d68f230010f9a97cbb71b4ec59c8",
-        "premake-5.0.0-beta8-macosx.tar.gz": "fa73a46f093fa6f17494a3d063421aa6cae3ea825a61c62dd59fc2f07a256d03",
-        "premake-5.0.0-beta8-macosx-x64.tar.gz": "84b5fa5a432dcebdc3dd12e8677d10e38e5b32a3fe06d83ae68967e4f5e2db8a",
-        "premake-5.0.0-beta8-windows.zip": "e64ce2ed8778e0098f63674cca61fe33941b5f0c8d9a4afd651152bdea3758ab",
-    },
-}
-
-
-class ChecksumError(RuntimeError):
-    pass
-
-
-def asset_name(system: str, machine: str) -> str | None:
-    """The Premake release asset for this OS/architecture, or None when there isn't one
-    (Linux has no arm64 build yet: use [premake] path to point at your own)."""
-    machine = machine.lower()
-    if system == "Linux":
-        return "linux.tar.gz"
-    if system == "Darwin":
-        return "macosx.tar.gz" if machine in _ARM_MACHINES else "macosx-x64.tar.gz"
-    if system == "Windows":
-        return "windows.zip"
-    return None
-
-
-def premake_url(version: str, system: str, machine: str) -> str | None:
-    suffix = asset_name(system, machine)
-    if suffix is None:
-        return None
-    return f"https://github.com/premake/premake-core/releases/download/v{version}/premake-{version}-{suffix}"
 
 
 def get_premake_executable(bin_dir: Path) -> Path:
@@ -83,85 +40,6 @@ def check_local_premake(bin_dir: Path) -> bool:
     return get_premake_executable(bin_dir).is_file()
 
 
-def _download_with_progress(url: str, destination, description: str):
-    from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
-
-    with Progress(
-        "[progress.description]{task.description}",
-        BarColumn(),
-        DownloadColumn(),
-        TransferSpeedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        task_id = progress.add_task(description, total=None)
-
-        def reporthook(block_num, block_size, total_size):
-            if total_size > 0:
-                progress.update(task_id, total=total_size, completed=block_num * block_size)
-
-        download_file(url, destination, reporthook=reporthook)
-
-
-def _sha256(path: Path) -> str:
-    import hashlib
-
-    digest = hashlib.sha256()
-    with open(path, "rb") as file:
-        for chunk in iter(lambda: file.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _fetch_json(url: str):
-    import json
-    import urllib.error
-    import urllib.request
-
-    try:
-        with urllib.request.urlopen(url, timeout=10) as response:
-            return json.load(response)
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        return None
-
-
-def release_digest(version: str, filename: str) -> str | None:
-    """The sha256 GitHub's release API reports for this asset, or None if it can't be reached."""
-    data = _fetch_json(f"{RELEASES_API}/tags/v{version}")
-    if data is None:
-        return None
-    for asset in data.get("assets", []):
-        if asset.get("name") == filename:
-            digest = asset.get("digest") or ""
-            if digest.startswith("sha256:"):
-                return digest.removeprefix("sha256:")
-    return None
-
-
-def latest_release_version() -> str | None:
-    """The tag of the newest Premake5 release (without its leading 'v'), or None if
-    GitHub couldn't be reached."""
-    data = _fetch_json(f"{RELEASES_API}/latest")
-    if data is None:
-        return None
-    tag = data.get("tag_name") or ""
-    return tag.removeprefix("v") or None
-
-
-def verify_checksum(path: Path, version: str, filename: str) -> None:
-    """Check `path` against pyforge's own pinned hash (when shipped for this version) and
-    against GitHub's release digest (when reachable); raise ChecksumError on a mismatch."""
-    actual = _sha256(path)
-    pinned = KNOWN_HASHES.get(version, {}).get(filename)
-    live = release_digest(version, filename)
-    if pinned is None and live is None:
-        console.print(f"[yellow]⚠️ Could not verify {filename}'s checksum (no pinned hash, and GitHub was unreachable); proceeding unverified.[/yellow]")
-        return
-    for source, expected in (("pyforge's pinned hash", pinned), ("GitHub's release digest", live)):
-        if expected is not None and actual != expected:
-            raise ChecksumError(f"{filename}: sha256 is {actual}, but {source} says {expected}")
-
-
 def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     """Download, checksum-verify, and install the given Premake5 version locally."""
     system = platform.system()
@@ -180,7 +58,7 @@ def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        _download_with_progress(url, archive_path, filename)
+        download_with_progress(url, archive_path, filename)
         console.print(f"[green]✓ Downloaded {filename}[/green]\n")
 
         verify_checksum(archive_path, version, filename)

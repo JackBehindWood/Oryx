@@ -50,3 +50,24 @@ def extract_archive(archive, destination):
         raise ValueError(
             f"Unsupported archive format: {archive.name}"
         )
+
+
+def download_with_progress(url, destination, description):
+    from rich.console import Console
+    from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
+
+    with Progress(
+        "[progress.description]{task.description}",
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        TimeRemainingColumn(),
+        console=Console(),
+    ) as progress:
+        task_id = progress.add_task(description, total=None)
+
+        def reporthook(block_num, block_size, total_size):
+            if total_size > 0:
+                progress.update(task_id, total=total_size, completed=block_num * block_size)
+
+        download_file(url, destination, reporthook=reporthook)
