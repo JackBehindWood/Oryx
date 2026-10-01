@@ -9,6 +9,7 @@ from pyforge.deps.detect import detect_layout
 from pyforge.deps.resolve import DependencyError, ensure, missing, required, requirements_met
 from pyforge.deps.sources import submodule as submodule_source
 from conftest import make_run
+from pyforge.commands.deps import SOURCE_FLAGS_MESSAGE
 
 
 def _populate(root, *dirs):
@@ -174,8 +175,8 @@ def test_add_submodule_runs_git_and_honours_overrides(forge, tmp_project, git_ca
 @pytest.mark.parametrize(
     ("args", "message"),
     [
-        (["glad"], "Pass exactly one of --local, --submodule URL, --archive URL, or --file URL."),
-        (["glad", "--local", "--submodule", "u"], "Pass exactly one of --local, --submodule URL, --archive URL, or --file URL."),
+        (["glad"], SOURCE_FLAGS_MESSAGE),
+        (["glad", "--local", "--submodule", "u"], SOURCE_FLAGS_MESSAGE),
         (["spdlog", "--local"], "'spdlog' is already in forge.toml [dependencies]."),
         (["glad", "--local"], "Put the files for 'glad' at Oryx/vendor/glad first"),
         (["glad", "--local", "--path", "x", "--requires", "gui"], "names unknown option 'gui'"),

@@ -24,9 +24,7 @@ def test_atomic_extract_concurrent_writers_leave_one_entry(tmp_path, monkeypatch
 def test_dependency_dir_git_and_archive_resolve_into_cache(project, tmp_path, monkeypatch):
     monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path))
     cfg = make_run(project).config
-    git = Dependency.__new__(Dependency)
-    object.__setattr__(git, "source", "git")
-    object.__setattr__(git, "commit", "deadbeef")
+    git = Dependency(source="git", url="u", commit="deadbeef")
     assert dependency_dir(project, cfg, "lib", git) == cache.deps_dir("lib", "deadbeef")
     assert dependency_dir(project, cfg, "lib", Dependency(source="local")) == project.path(cfg.build.dependencies_dir) / "lib"
 

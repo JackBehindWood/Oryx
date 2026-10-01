@@ -48,7 +48,7 @@ class Choices:
 
 GENERATORS = Choices("gmake")
 LAUNCHERS = Choices("ccache")
-DEPENDENCY_SOURCES = Choices("submodule", "local", "archive", "file")
+DEPENDENCY_SOURCES = Choices("submodule", "local", "archive", "file", "git")
 EDITORS = Choices("vscode", "visual_studio", "none")
 DOCS_TOOLS = Choices("mkdocs")
 
@@ -125,6 +125,8 @@ class Dependency:
     requires: list[str] = field(default_factory=list)
     url: str = ""
     sha256: str = ""
+    rev: str = ""
+    commit: str = ""
 
 
 @dataclass(frozen=True)

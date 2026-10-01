@@ -22,7 +22,7 @@ console = Console()
 app = typer.Typer(no_args_is_help=True)
 GROUP_HELP = "Third-party dependencies declared in forge.toml [dependencies]"
 command = registry.make_group(app, group="Deps")
-SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, --archive URL, or --file URL."
+SOURCE_FLAGS_MESSAGE = "Pass exactly one of --local, --submodule URL, --archive URL, --file URL, or --git URL."
 
 
 def _fail(message: str) -> typer.Exit:
@@ -114,7 +114,21 @@ def _add_downloaded(run: RunContext, name: str, url: str, source: str) -> Resolv
     return dep
 
 
-@command(name="add", label="Add — declare a dependency (local, submodule, archive or file)")
+def _add_git(run: RunContext, name: str, url: str, rev: str | None) -> ResolvedDependency:
+    from pyforge import cache
+    from pyforge.config import Dependency
+    from pyforge.deps.sources.git import default_branch, install_clone
+
+    try:
+        rev = rev or default_branch(url)
+        commit = install_clone(run.project.root, name, url, rev)
+    except DependencyError as error:
+        raise _fail(str(error))
+    console.print(f"[bold green]✓ Cloned {name}[/bold green] at {rev} ({commit[:12]})")
+    return ResolvedDependency(name, Dependency(source="git", url=url, rev=rev, commit=commit), cache.deps_dir(name, commit))
+
+
+@command(name="add", label="Add — declare a dependency (local, submodule, archive, file or git)")
 def add(
     ctx: typer.Context,
     name: str = typer.Argument(..., help="Dependency name; also its folder name under [build] dependencies-dir."),
@@ -122,6 +136,8 @@ def add(
     submodule: Optional[str] = typer.Option(None, "--submodule", metavar="URL", help="Add it as a git submodule from URL."),
     archive: Optional[str] = typer.Option(None, "--archive", metavar="URL", help="Download a .tar.gz/.zip from URL into the shared cache; its sha256 is recorded."),
     file: Optional[str] = typer.Option(None, "--file", metavar="URL", help="Download a single file (e.g. a header) from URL into the shared cache; its sha256 is recorded."),
+    git: Optional[str] = typer.Option(None, "--git", metavar="URL", help="Shallow-clone URL into the shared cache; the resolved commit is recorded."),
+    rev: Optional[str] = typer.Option(None, "--rev", help="Tag, branch or commit for --git (default: the remote's default branch)."),
     path: Optional[str] = typer.Option(None, "--path", help="Folder relative to the project root (default: <dependencies-dir>/NAME)."),
     kind: Optional[Literal["static", "header"]] = typer.Option(None, "--kind", help="static (compiled from its sources) or header-only; detected when omitted."),
     include: Optional[str] = typer.Option(None, "--include", help="Include folder inside it; detected when omitted."),
@@ -131,7 +147,7 @@ def add(
 ):
     """Add a [dependencies] entry, detecting its layout when the files are present."""
     run: RunContext = ctx.obj
-    if sum(bool(flag) for flag in (local, submodule, archive, file)) != 1:
+    if sum(bool(flag) for flag in (local, submodule, archive, file, git)) != 1:
         raise _fail(SOURCE_FLAGS_MESSAGE)
     if name in run.config.dependencies:
         raise _fail(f"'{name}' is already in forge.toml [dependencies].")
@@ -139,7 +155,7 @@ def add(
     default_dir = Path(run.config.build.dependencies_dir, name).as_posix()
     folder = path or default_dir
     url = archive or file
-    source = "local" if local else "archive" if archive else "file" if file else "submodule"
+    source = "local" if local else "archive" if archive else "file" if file else "git" if git else "submodule"
     from pyforge.config import Dependency
 
     dep = ResolvedDependency(name, Dependency(source=source, path=folder), run.project.path(folder))
@@ -152,6 +168,10 @@ def add(
     if url:
         dep = _add_downloaded(run, name, url, source)
         fetched = {"url": url, "sha256": dep.spec.sha256}
+        folder = default_dir
+    elif git:
+        dep = _add_git(run, name, git, rev)
+        fetched = {"url": git, "rev": dep.spec.rev, "commit": dep.spec.commit}
         folder = default_dir
     elif submodule and not dep.present:
         from pyforge.deps.sources.submodule import SubmoduleSource
@@ -207,11 +227,33 @@ def update(
         return
     try:
         source = source_for(dep)
-        source.update(run.project.root, dep, rev)
+        result = source.update(run.project.root, dep, rev)
+        if dep.spec.source == "git":
+            dep = _record_git_update(run, dep, rev, result)
         pin = source.pin(run.project.root, dep)
     except DependencyError as error:
         raise _fail(str(error))
-    console.print(f"[bold green]✓ {name} is now at {pin or rev or 'the remote head'}[/bold green]; commit {shown(run, dep.dir)} to record it.")
+    tail = "forge.toml updated; commit it to record the pin." if dep.spec.source == "git" else f"commit {shown(run, dep.dir)} to record it."
+    console.print(f"[bold green]✓ {name} is now at {pin or rev or 'the remote head'}[/bold green]; {tail}")
+
+
+def _record_git_update(run: RunContext, dep: ResolvedDependency, rev: str | None, commit: str) -> ResolvedDependency:
+    import dataclasses
+
+    from pyforge import cache
+
+    from pyforge.deps.sources.git import default_branch
+
+    new_rev = rev or default_branch(dep.spec.url)
+    import tomllib
+
+    def edit(text: str) -> str:
+        entry = {**tomllib.loads(text)["dependencies"][dep.name], "rev": new_rev, "commit": commit}
+        return tomledit.set_value(text, ["dependencies", dep.name], entry)
+
+    _write(run, edit)
+    spec = dataclasses.replace(dep.spec, rev=new_rev, commit=commit)
+    return ResolvedDependency(dep.name, spec, cache.deps_dir(dep.name, commit))
 
 
 def _untracked(run: RunContext, deps: list[ResolvedDependency]) -> list[Path]:
@@ -233,7 +275,11 @@ def status(ctx: typer.Context):
     for dep in deps:
         needed = requirements_met(dep.spec.requires, run.options)
         state = ("[green]present[/green]" if dep.present else "[red]missing[/red]") if needed else "[dim]not needed[/dim]"
-        table.add_row(dep.name, dep.spec.source, str(dep.spec.kind), shown(run, dep.dir), source_for(dep).pin(run.project.root, dep), state, ", ".join(dep.spec.requires))
+        try:
+            pin = source_for(dep).pin(run.project.root, dep)
+        except DependencyError as error:
+            pin, state = "[red]mismatch[/red]", escape(str(error))
+        table.add_row(dep.name, dep.spec.source, str(dep.spec.kind), shown(run, dep.dir), pin, state, ", ".join(dep.spec.requires))
     console.print(table)
     for folder in _untracked(run, deps):
         console.print(f"[yellow]untracked:[/yellow] {shown(run, folder)} → forge deps add {folder.name} --local")

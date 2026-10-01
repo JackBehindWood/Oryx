@@ -32,6 +32,7 @@ def source_for(dep: ResolvedDependency) -> Source:
 def _register_builtins() -> None:
     from .archive import ArchiveSource
     from .file import FileSource
+    from .git import GitSource
     from .local import LocalSource
     from .submodule import SubmoduleSource
 
@@ -39,6 +40,7 @@ def _register_builtins() -> None:
     register("local", LocalSource())
     register("archive", ArchiveSource())
     register("file", FileSource())
+    register("git", GitSource())
 
 
 _register_builtins()

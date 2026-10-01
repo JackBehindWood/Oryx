@@ -38,14 +38,14 @@ class ResolvedDependency:
 
 def cache_pin(spec: Dependency) -> str:
     if spec.source == "git":
-        return getattr(spec, "commit", "")
-    if spec.source == "archive":
-        return getattr(spec, "sha256", "")[:12]
+        return spec.commit
+    if spec.source in ("archive", "file"):
+        return spec.sha256[:12]
     return ""
 
 
 def dependency_dir(project: Project, cfg: ForgeConfig, name: str, spec: Dependency) -> Path:
-    if spec.source in ("git", "archive"):
+    if spec.source in ("git", "archive", "file"):
         return cache.deps_dir(name, cache_pin(spec) or "unpinned")
     return project.path(spec.path) if spec.path else project.path(cfg.build.dependencies_dir) / name
 
