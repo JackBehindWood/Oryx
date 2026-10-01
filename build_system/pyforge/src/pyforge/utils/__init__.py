@@ -1,10 +1,10 @@
 """General-purpose CLI utilities: platform info, subprocess execution,
-filesystem helpers, and JSON read/write/merge — everything commands and the
-editors/vscode generators share that isn't specific to fetching a toolchain (see
-pyforge/setup/utils.py for that).
+filesystem and download helpers, and JSON read/write/merge — everything commands and the
+editors/vscode generators share.
 """
 
-from .filesystem import ensure_directory, remove_directory
+from .download import download_file, extract_archive
+from .filesystem import ensure_directory, make_executable, remove_directory, remove_file
 from .json_files import load_json, merge_by_key, write_json
 from .streaming import stream_command
 from .system import child_env, get_architecture, get_macos_sdk_path, get_os, missing_module_hint, run_command
@@ -19,6 +19,10 @@ __all__ = [
     "missing_module_hint",
     "remove_directory",
     "ensure_directory",
+    "remove_file",
+    "make_executable",
+    "download_file",
+    "extract_archive",
     "load_json",
     "write_json",
     "merge_by_key",

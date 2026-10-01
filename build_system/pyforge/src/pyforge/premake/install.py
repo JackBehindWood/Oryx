@@ -7,8 +7,7 @@ from rich.markup import escape
 
 from ..cache import premake_dir
 from ..project import Project
-from ..setup.utils import download_file, extract_archive, make_executable, remove_file
-from ..utils import remove_directory
+from ..utils import download_file, extract_archive, make_executable, remove_directory, remove_file
 
 console = Console()
 

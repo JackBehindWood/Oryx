@@ -1,6 +1,3 @@
-import os
-import tarfile
-import zipfile
 from pathlib import Path
 
 
@@ -33,6 +30,9 @@ def extract_archive(archive, destination):
     Raises:
         ValueError: If the archive format is unsupported.
     """
+    import tarfile
+    import zipfile
+
     archive = Path(archive)
     destination = Path(destination)
 
@@ -50,18 +50,3 @@ def extract_archive(archive, destination):
         raise ValueError(
             f"Unsupported archive format: {archive.name}"
         )
-
-
-def make_executable(path):
-    """Make a file executable on Unix-like systems."""
-    path = Path(path)
-
-    current_mode = path.stat().st_mode
-    path.chmod(current_mode | 0o111)
-
-def remove_file(path):
-    """Remove a file if it exists."""
-    path = Path(path)
-
-    if path.exists():
-        path.unlink()
