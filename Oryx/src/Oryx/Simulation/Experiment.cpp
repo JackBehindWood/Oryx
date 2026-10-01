@@ -12,33 +12,14 @@ namespace oryx
 namespace
 {
 
-std::string double_text(double value)
-{
-    std::ostringstream stream;
-    stream << std::setprecision(17) << value;
-    return stream.str();
-}
-
-std::string value_text(const ParamValue& value)
+std::string typed_param_value_text(const ParamValue& value)
 {
     switch (param_type_of(value))
     {
-        case ParamType::Bool: return std::get<bool>(value) ? "true" : "false";
-        case ParamType::Int: return std::to_string(std::get<int64_t>(value));
-        case ParamType::Double: return double_text(std::get<double>(value));
-        case ParamType::String: return std::get<std::string>(value);
-    }
-    return "";
-}
-
-std::string typed_value_text(const ParamValue& value)
-{
-    switch (param_type_of(value))
-    {
-        case ParamType::Bool: return "b:" + value_text(value);
-        case ParamType::Int: return "i:" + value_text(value);
-        case ParamType::Double: return "d:" + value_text(value);
-        case ParamType::String: return "s:\"" + value_text(value) + "\"";
+        case ParamType::Bool: return "b:" + param_value_text(value);
+        case ParamType::Int: return "i:" + param_value_text(value);
+        case ParamType::Double: return "d:" + param_value_text(value);
+        case ParamType::String: return "s:\"" + param_value_text(value) + "\"";
     }
     return "";
 }
@@ -90,12 +71,55 @@ Matchup make_matchup(const std::string& game, const Params& game_params, std::ve
 
 } // namespace
 
+std::string format_double(double value)
+{
+    std::ostringstream stream;
+    stream << std::setprecision(17) << value;
+    return stream.str();
+}
+
+std::string param_value_text(const ParamValue& value)
+{
+    switch (param_type_of(value))
+    {
+        case ParamType::Bool: return std::get<bool>(value) ? "true" : "false";
+        case ParamType::Int: return std::to_string(std::get<int64_t>(value));
+        case ParamType::Double: return format_double(std::get<double>(value));
+        case ParamType::String: return std::get<std::string>(value);
+    }
+    return "";
+}
+
+ParamValue parse_param_value(ParamType type, const std::string& text)
+{
+    try
+    {
+        switch (type)
+        {
+            case ParamType::Bool:
+                if (text != "true" && text != "false")
+                {
+                    throw ExperimentError("'" + text + "' is not a bool");
+                }
+                return text == "true";
+            case ParamType::Int: return static_cast<int64_t>(std::stoll(text));
+            case ParamType::Double: return std::stod(text);
+            case ParamType::String: return text;
+        }
+    }
+    catch (const std::logic_error&)
+    {
+        throw ExperimentError("'" + text + "' is not a valid " + to_string(type));
+    }
+    throw ExperimentError("unknown parameter type");
+}
+
 std::string canonical_string(const Params& params)
 {
     std::string text;
     for (const auto& [key, value] : params)
     {
-        text += (text.empty() ? "" : ",") + key + "=" + typed_value_text(value);
+        text += (text.empty() ? "" : ",") + key + "=" + typed_param_value_text(value);
     }
     return text;
 }
@@ -162,7 +186,7 @@ std::vector<Matchup> sweep(const Matchup& base, const std::vector<SweepAxis>& ax
             std::string key;
             const ParamValue& value = axes[axis].values[cursor[axis]];
             params_at_path(matchup, axes[axis].path, key)[key] = value;
-            suffix += (suffix.empty() ? "" : ",") + axes[axis].path + "=" + value_text(value);
+            suffix += (suffix.empty() ? "" : ",") + axes[axis].path + "=" + param_value_text(value);
         }
         if (!axes.empty())
         {

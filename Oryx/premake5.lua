@@ -26,6 +26,14 @@ project "Oryx"
         "SPDLOG_COMPILED_LIB",
     }
 
+    -- File-scoped so a new commit recompiles one file, not the library.
+    filter "files:src/Oryx/Simulation/BuildInfo.cpp"
+        local hash = os.outputof("git rev-parse --short=12 HEAD")
+        if hash and hash:match("^%x+$") then
+            defines { "OX_GIT_HASH=" .. hash }
+        end
+    filter {}
+
     useOryxPythonPIC()
 
     if pythonEnabled() then

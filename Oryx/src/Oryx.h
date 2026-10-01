@@ -43,6 +43,10 @@
 #include "Oryx/Simulation/BatchRunner.h"
 #include "Oryx/Simulation/SeedSequence.h"
 #include "Oryx/Simulation/Experiment.h"
+#include "Oryx/Simulation/BuildInfo.h"
+#include "Oryx/Simulation/ExperimentRunner.h"
+#include "Oryx/Simulation/Statistics.h"
+#include "Oryx/Simulation/ExperimentIO.h"
 #include "Oryx/Simulation/SimulationLayer.h"
 
 #include "Oryx/Scripting/Scripting.h"

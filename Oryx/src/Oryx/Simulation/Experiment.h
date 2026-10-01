@@ -45,6 +45,11 @@ public:
     [[nodiscard]] const char* category() const noexcept override { return "experiment"; }
 };
 
+// Shortest-exact-enough text (17 significant digits) so a double survives a save/load round trip.
+[[nodiscard]] std::string format_double(double value);
+[[nodiscard]] std::string param_value_text(const ParamValue& value);
+[[nodiscard]] ParamValue parse_param_value(ParamType type, const std::string& text);
+
 [[nodiscard]] std::string canonical_string(const Params& params);
 [[nodiscard]] std::string strategy_key(const StrategySpec& strategy);
 // The label when set, else a canonical string of the matchup's content - never its position in a spec.
