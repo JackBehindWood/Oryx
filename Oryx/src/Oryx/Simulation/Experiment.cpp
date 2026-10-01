@@ -41,11 +41,11 @@ Params& params_at_path(Matchup& matchup, const std::string& path, std::string& k
             std::string index_text = path.substr(kSeats.size(), dot - kSeats.size());
             if (index_text.find_first_not_of("0123456789") == std::string::npos)
             {
-                size_t index = static_cast<size_t>(std::stoul(index_text));
-                if (index < matchup.seats.size())
+                constexpr size_t kMaxIndexDigits = 9;
+                if (index_text.size() <= kMaxIndexDigits && std::stoul(index_text) < matchup.seats.size())
                 {
                     key = path.substr(dot + 1);
-                    return matchup.seats[index].params;
+                    return matchup.seats[std::stoul(index_text)].params;
                 }
                 throw ExperimentError("sweep path '" + path + "': the matchup has only " + std::to_string(matchup.seats.size()) + " seats");
             }
@@ -74,6 +74,7 @@ Matchup make_matchup(const std::string& game, const Params& game_params, std::ve
 std::string format_double(double value)
 {
     std::ostringstream stream;
+    stream.imbue(std::locale::classic());
     stream << std::setprecision(17) << value;
     return stream.str();
 }

@@ -100,6 +100,11 @@ TrialResult run_trial(const ExperimentSpec& spec, size_t matchup_index, int32_t 
         throw ExperimentError("run_trial: matchup index " + std::to_string(matchup_index) + " is out of range");
     }
 
+    if (repeat < 0 || repeat >= spec.repeats)
+    {
+        throw ExperimentError("run_trial: repeat " + std::to_string(repeat) + " is outside 0.." + std::to_string(spec.repeats - 1));
+    }
+
     const Matchup& matchup = spec.matchups[matchup_index];
     std::string key = matchup_key(matchup);
     std::string where = "matchup '" + key + "': ";

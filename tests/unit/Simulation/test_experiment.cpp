@@ -91,6 +91,7 @@ TEST_CASE("sweep() rejects malformed paths and empty axes")
     CHECK_THROWS_AS(sweep(base, { { "seed", { ParamValue{ int64_t{ 1 } } } } }), ExperimentError);
     CHECK_THROWS_AS(sweep(base, { { "seats.2.seed", { ParamValue{ int64_t{ 1 } } } } }), ExperimentError);
     CHECK_THROWS_AS(sweep(base, { { "seats.x.seed", { ParamValue{ int64_t{ 1 } } } } }), ExperimentError);
+    CHECK_THROWS_AS(sweep(base, { { "seats.99999999999999999999.seed", { ParamValue{ int64_t{ 1 } } } } }), ExperimentError);
     CHECK_THROWS_AS(sweep(base, { { "game.size", {} } }), ExperimentError);
 }
 
@@ -162,4 +163,11 @@ TEST_CASE("validate() rejects duplicate matchup keys")
     Matchup labelled = matchup;
     labelled.label = "second";
     CHECK_NOTHROW(validate(make_spec({ matchup, labelled })));
+}
+
+TEST_CASE("format_double() ignores the global locale")
+{
+    std::locale previous = std::locale::global(std::locale(std::locale::classic(), new std::numpunct_byname<char>("C")));
+    CHECK(format_double(1.5) == "1.5");
+    std::locale::global(previous);
 }
