@@ -1,11 +1,13 @@
 import contextlib
 import json
 import os
-import shutil
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Callable
+
+from .utils import rmtree_force
 
 
 def user_cache_dir() -> Path:
@@ -48,7 +50,7 @@ def atomic_extract(dest: Path, extractor: Callable[[Path], None]) -> bool:
         return False
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(f"{dest.name}.tmp-{os.getpid()}-{threading.get_ident()}")
-    shutil.rmtree(tmp, ignore_errors=True)
+    rmtree_force(tmp, ignore_errors=True)
     try:
         extractor(tmp)
         os.replace(tmp, dest)
@@ -57,7 +59,7 @@ def atomic_extract(dest: Path, extractor: Callable[[Path], None]) -> bool:
             raise
         return False
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        rmtree_force(tmp, ignore_errors=True)
     return True
 
 
@@ -95,6 +97,17 @@ def _pins_file_lock():
                 fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+def _replace_retrying(source: Path, dest: Path, attempts: int = 10) -> None:
+    for attempt in range(attempts):
+        try:
+            os.replace(source, dest)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05)
+
+
 def record_pin(project_root: Path, name: str, pin: str) -> None:
     with _pins_lock, _pins_file_lock():
         pins = read_pins()
@@ -103,7 +116,7 @@ def record_pin(project_root: Path, name: str, pin: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
         tmp.write_text(json.dumps(pins, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(tmp, path)
+        _replace_retrying(tmp, path)
 
 
 def unused_entries() -> list[Path]:

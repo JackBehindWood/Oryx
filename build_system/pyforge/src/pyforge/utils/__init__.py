@@ -4,7 +4,7 @@ editors/vscode generators share.
 """
 
 from .download import download_file, download_with_progress, extract_archive, quiet_downloads, sha256_file
-from .filesystem import ensure_directory, make_executable, remove_directory, remove_file
+from .filesystem import ensure_directory, make_executable, remove_directory, remove_file, rmtree_force, write_text_lf
 from .json_files import load_json, merge_by_key, write_json
 from .streaming import stream_command
 from .system import child_env, get_architecture, get_macos_sdk_path, get_os, missing_module_hint, run_command
@@ -20,6 +20,8 @@ __all__ = [
     "remove_directory",
     "ensure_directory",
     "remove_file",
+    "rmtree_force",
+    "write_text_lf",
     "make_executable",
     "download_file",
     "download_with_progress",

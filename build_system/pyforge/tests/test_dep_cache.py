@@ -84,3 +84,60 @@ def test_record_pin_keeps_every_update_across_processes(tmp_path, monkeypatch):
         worker.join()
     pins = cache.read_pins()
     assert {root: len(named) for root, named in pins.items()} == {f"/proj{n}": 25 for n in range(4)}
+
+
+def test_rmtree_force_removes_read_only_files(tmp_path):
+    import os
+    import stat
+
+    from pyforge.utils import rmtree_force
+
+    tree = tmp_path / "repo" / ".git" / "objects"
+    tree.mkdir(parents=True)
+    pack = tree / "pack"
+    pack.write_text("x")
+    os.chmod(pack, stat.S_IREAD)
+    rmtree_force(tmp_path / "repo")
+    assert not (tmp_path / "repo").exists()
+
+
+def test_rmtree_force_ignore_errors_swallows_missing(tmp_path):
+    from pyforge.utils import rmtree_force
+
+    rmtree_force(tmp_path / "absent", ignore_errors=True)
+
+
+def test_user_cache_dir_windows_uses_localappdata(monkeypatch, tmp_path):
+    monkeypatch.delenv("PYFORGE_CACHE", raising=False)
+    monkeypatch.setattr("sys.platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert cache.user_cache_dir() == tmp_path / "pyforge"
+
+
+def test_pins_lock_uses_msvcrt_on_windows(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    calls = []
+    fake = types.SimpleNamespace(LK_LOCK=1, LK_UNLCK=2, locking=lambda fd, mode, nbytes: calls.append(mode))
+    monkeypatch.setitem(sys.modules, "msvcrt", fake)
+    monkeypatch.setattr("sys.platform", "win32")
+    monkeypatch.setenv("PYFORGE_CACHE", str(tmp_path))
+    with cache._pins_file_lock():
+        assert calls == [1]
+    assert calls == [1, 2]
+
+
+def test_replace_retrying_survives_transient_permission_error(monkeypatch, tmp_path):
+    real = cache.os.replace
+    failures = iter([PermissionError, PermissionError])
+
+    def flaky(source, dest):
+        if next(failures, None):
+            raise PermissionError
+        real(source, dest)
+
+    monkeypatch.setattr(cache.os, "replace", flaky)
+    (tmp_path / "a").write_text("1")
+    cache._replace_retrying(tmp_path / "a", tmp_path / "b")
+    assert (tmp_path / "b").read_text() == "1"

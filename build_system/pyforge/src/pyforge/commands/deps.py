@@ -352,7 +352,7 @@ def clean_cache(
     yes: bool = typer.Option(False, "--yes", "-y", help="Don't ask for confirmation."),
 ):
     """Delete the shared dependency cache (git/archive/file sources), or just its unreferenced entries."""
-    import shutil
+    from pyforge.utils import rmtree_force
 
     from pyforge import cache
 
@@ -369,7 +369,7 @@ def clean_cache(
     if not yes and not typer.confirm(f"Delete {what}?"):
         raise typer.Exit(code=1)
     for target in targets:
-        shutil.rmtree(target, ignore_errors=True)
+        rmtree_force(target, ignore_errors=True)
     console.print(f"[bold green]✓ Deleted {what}[/bold green]")
 
 

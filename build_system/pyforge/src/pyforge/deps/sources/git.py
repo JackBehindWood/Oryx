@@ -1,10 +1,10 @@
 import os
 import re
-import shutil
 import tempfile
 from pathlib import Path
 
 from ... import cache
+from ...utils import rmtree_force
 from ..resolve import DependencyError, ResolvedDependency
 from .submodule import _git
 
@@ -46,7 +46,7 @@ def install_clone(root: Path, name: str, url: str, ref: str) -> str:
         commit = _git(clone, "rev-parse", "HEAD")
         cache.atomic_extract(cache.deps_dir(name, commit), lambda tmp: os.replace(clone, tmp))
     finally:
-        shutil.rmtree(scratch, ignore_errors=True)
+        rmtree_force(scratch, ignore_errors=True)
     cache.record_pin(root, name, commit)
     return commit
 
@@ -68,14 +68,14 @@ class GitSource:
             try:
                 _clone(spec.url, spec.commit, clone)
             except DependencyError:
-                shutil.rmtree(clone, ignore_errors=True)
+                rmtree_force(clone, ignore_errors=True)
                 _clone(spec.url, spec.rev, clone)
             actual = _git(clone, "rev-parse", "HEAD")
             if actual != spec.commit:
                 raise DependencyError(f"{dep.name}: '{spec.rev}' resolves to {actual} but forge.toml pins commit {spec.commit}. Run: forge deps update {dep.name}")
             cache.atomic_extract(dep.dir, lambda tmp: os.replace(clone, tmp))
         finally:
-            shutil.rmtree(scratch, ignore_errors=True)
+            rmtree_force(scratch, ignore_errors=True)
         cache.record_pin(root, dep.name, spec.commit)
 
     def update(self, root: Path, dep: ResolvedDependency, rev: str | None) -> str:
