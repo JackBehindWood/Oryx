@@ -109,6 +109,14 @@ TEST_CASE("round_robin() pairs the pool, and rotating seats doubles it")
     CHECK(rotated[0].label == "random vs first-legal");
 }
 
+TEST_CASE("round_robin() does not rotate a pair of identical strategies into a duplicate matchup")
+{
+    std::vector<Matchup> matchups = round_robin("tictactoe", {}, { strategy("random"), strategy("random") }, true);
+
+    CHECK(matchups.size() == 1);
+    CHECK_NOTHROW(validate(make_spec(matchups)));
+}
+
 TEST_CASE("self_play() seats one strategy everywhere")
 {
     std::vector<Matchup> matchups = self_play("tictactoe", {}, strategy("minimax"));

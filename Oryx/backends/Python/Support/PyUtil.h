@@ -9,6 +9,11 @@ namespace oryx::python
 
 [[nodiscard]] std::string type_name_of(const pybind11::handle& value);
 
+[[nodiscard]] std::string escape_html(const std::string& text);
+
+// Imports an optional dependency, or throws an Error naming the method that needs it and how to install it.
+[[nodiscard]] pybind11::module_ import_optional(const char* name, const char* method);
+
 // The first line of the Python error as the message, the full traceback as detail.
 [[nodiscard]] ScriptError to_script_error(const pybind11::error_already_set& error, const std::string& context);
 

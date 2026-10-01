@@ -5,6 +5,7 @@
 
 #include "Support/PyBatch.h"
 #include "Support/PyTypeHints.h"
+#include "Support/PyUtil.h"
 #include "Oryx/Scripting/Support/ScriptUtil.h"
 
 namespace py = pybind11;
@@ -80,24 +81,6 @@ std::string repr_of(const PyBatchResult& result)
     return "<oryx.BatchResult matches=" + std::to_string(result.counts.matches) + " wins=[" + wins + "] draws=" + std::to_string(result.counts.draws) + ">";
 }
 
-std::string escape_html(const std::string& text)
-{
-    std::string escaped;
-    for (char c : text)
-    {
-        switch (c)
-        {
-        case '&': escaped += "&amp;"; break;
-        case '<': escaped += "&lt;"; break;
-        case '>': escaped += "&gt;"; break;
-        case '"': escaped += "&quot;"; break;
-        case '\'': escaped += "&#39;"; break;
-        default: escaped += c; break;
-        }
-    }
-    return escaped;
-}
-
 std::string fixed(double value)
 {
     std::ostringstream stream;
@@ -131,22 +114,6 @@ std::string html_of(const PyBatchResult& result)
         html += "<tr><td>" + std::to_string(player) + "</td><td>" + std::to_string(result.counts.wins[player]) + "</td><td>" + fixed(rates[player]) + "</td><td>" + fixed(means[player]) + "</td></tr>";
     }
     return html + "</tbody></table>";
-}
-
-py::module_ import_optional(const char* name, const char* method)
-{
-    try
-    {
-        return py::module_::import(name);
-    }
-    catch (const py::error_already_set& error)
-    {
-        if (!error.matches(PyExc_ImportError))
-        {
-            throw;
-        }
-        throw Error(std::string(method) + " needs " + name + "; install it with `pip install " + name + "`");
-    }
 }
 
 py::dict to_numpy(const PyBatchResult& result)

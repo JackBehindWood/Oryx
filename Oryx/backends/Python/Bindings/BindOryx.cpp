@@ -12,8 +12,8 @@ namespace
 {
 
 // Order matters: the exception types come first and scripted classes after the handles they refer to.
-constexpr std::array<void (*)(py::module_&), 10> kBinders = {
-    &bind_errors, &bind_debug, &bind_game, &bind_registry, &bind_results, &bind_simulation, &bind_random, &bind_math, &bind_benchmark, &bind_scripted,
+constexpr std::array<void (*)(py::module_&), 11> kBinders = {
+    &bind_errors, &bind_debug, &bind_game, &bind_registry, &bind_results, &bind_simulation, &bind_experiment, &bind_random, &bind_math, &bind_benchmark, &bind_scripted,
 };
 
 // Each name is defined in one submodule and also reachable at the top level, so oryx.Match is oryx.simulation.Match.
@@ -41,6 +41,7 @@ void bind_oryx(py::module_& module)
     reexport(module, "registry", { "make_game", "make_strategy", "list_games", "list_strategies", "describe_game", "describe_strategy", "register_game", "register_strategy" });
     reexport(module, "results", { "BatchResult" });
     reexport(module, "simulation", { "Match", "BatchRunner", "simulate" });
+    reexport(module, "experiment", { "Experiment", "Tournament", "ExperimentResult" });
     reexport(module, "random", { "Random" });
 
     module.attr("__version__") = version_string();

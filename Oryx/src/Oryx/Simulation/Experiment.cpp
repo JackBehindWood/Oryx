@@ -214,7 +214,7 @@ std::vector<Matchup> round_robin(const std::string& game, const Params& game_par
         for (size_t second = first + 1; second < pool.size(); ++second)
         {
             matchups.push_back(make_matchup(game, game_params, { pool[first], pool[second] }));
-            if (rotate_seats)
+            if (rotate_seats && strategy_key(pool[first]) != strategy_key(pool[second]))
             {
                 matchups.push_back(make_matchup(game, game_params, { pool[second], pool[first] }));
             }

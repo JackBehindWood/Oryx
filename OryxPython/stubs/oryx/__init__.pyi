@@ -9,6 +9,9 @@ from oryx.errors import OryxError
 from oryx.errors import ParamError
 from oryx.errors import ScriptError
 from oryx.errors import SettingsError
+from oryx.experiment import Experiment
+from oryx.experiment import ExperimentResult
+from oryx.experiment import Tournament
 from oryx.game import ActionFeatures
 from oryx.game import Context
 from oryx.game import Game
@@ -34,13 +37,14 @@ import typing
 from . import benchmark
 from . import debug
 from . import errors
+from . import experiment
 from . import game
 from . import math
 from . import random
 from . import registry
 from . import results
 from . import simulation
-__all__: list[str] = ['ActionFeatures', 'BatchResult', 'BatchRunner', 'Context', 'Game', 'GameHandle', 'IllegalActionError', 'Match', 'NotInitialisedError', 'OryxAssertionError', 'OryxError', 'ParamError', 'Random', 'ScriptError', 'SettingsError', 'State', 'StateHandle', 'Strategy', 'StrategyHandle', 'benchmark', 'debug', 'describe_game', 'describe_strategy', 'errors', 'game', 'init', 'list_games', 'list_strategies', 'make_game', 'make_strategy', 'math', 'random', 'register_game', 'register_strategy', 'registry', 'results', 'simulate', 'simulation']
+__all__: list[str] = ['ActionFeatures', 'BatchResult', 'BatchRunner', 'Context', 'Experiment', 'ExperimentResult', 'Game', 'GameHandle', 'IllegalActionError', 'Match', 'NotInitialisedError', 'OryxAssertionError', 'OryxError', 'ParamError', 'Random', 'ScriptError', 'SettingsError', 'State', 'StateHandle', 'Strategy', 'StrategyHandle', 'Tournament', 'benchmark', 'debug', 'describe_game', 'describe_strategy', 'errors', 'experiment', 'game', 'init', 'list_games', 'list_strategies', 'make_game', 'make_strategy', 'math', 'random', 'register_game', 'register_strategy', 'registry', 'results', 'simulate', 'simulation']
 def init(settings: str | os.PathLike[str] | None = None) -> None:
     """
     Initialises Oryx for a standalone Python process and installs the throwing assertion handler, so a C++ assert reached from Python raises OryxAssertionError. Reads `settings` (else the nearest oryx.yaml above the working directory, if any) and imports the scripts under its `scripting.roots`; calling it again loads nothing new.

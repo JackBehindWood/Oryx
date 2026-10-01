@@ -30,4 +30,39 @@ void rethrow_if_interpreter_control(const py::error_already_set& error)
     }
 }
 
+
+std::string escape_html(const std::string& text)
+{
+    std::string escaped;
+    for (char c : text)
+    {
+        switch (c)
+        {
+        case '&': escaped += "&amp;"; break;
+        case '<': escaped += "&lt;"; break;
+        case '>': escaped += "&gt;"; break;
+        case '"': escaped += "&quot;"; break;
+        case '\'': escaped += "&#39;"; break;
+        default: escaped += c; break;
+        }
+    }
+    return escaped;
+}
+
+py::module_ import_optional(const char* name, const char* method)
+{
+    try
+    {
+        return py::module_::import(name);
+    }
+    catch (const py::error_already_set& error)
+    {
+        if (!error.matches(PyExc_ImportError))
+        {
+            throw;
+        }
+        throw Error(std::string(method) + " needs " + name + "; install it with `pip install " + name + "`");
+    }
+}
+
 } // namespace oryx::python
