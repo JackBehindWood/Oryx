@@ -56,7 +56,7 @@ def install(
         console.print(f"[green]✓ premake5 v{target} is already installed at {get_premake_executable(bin_dir)}[/green]")
         return
 
-    if not ensure_premake(bin_dir, target, run.config.premake.path):
+    if not ensure_premake(bin_dir, target, run.config.premake.path, run.offline):
         raise typer.Exit(code=1)
 
 
@@ -79,7 +79,7 @@ def update(
         console.print(f"[dim][dry-run] would update premake5 to v{target} and set {escape('[premake]')} version in forge.toml[/dim]")
         return
 
-    if not update_premake(bin_dir, target):
+    if not update_premake(bin_dir, target, run.offline):
         raise typer.Exit(code=1)
 
     if target != run.config.premake.version:

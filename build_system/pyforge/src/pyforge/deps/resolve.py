@@ -11,6 +11,7 @@ from ..project import Project
 
 PREMAKE_CONFIG_NAME = "config.json"
 PREMAKE_CONFIG_FORMAT = 1
+OFFLINE_SOURCES = ("local", "system")
 
 
 class DependencyError(RuntimeError):
@@ -123,9 +124,17 @@ def shown(run: RunContext, path: Path | None) -> str:
     return path.relative_to(run.project.root).as_posix() if path.is_relative_to(run.project.root) else str(path)
 
 
+def _offline_error(run: RunContext, deps: list[ResolvedDependency]) -> DependencyError:
+    listed = ", ".join(f"{dep.name} ({shown(run, dep.dir)})" for dep in deps)
+    return DependencyError(f"Missing dependencies: {listed}. --offline forbids fetching them; run once without --offline: forge deps sync")
+
+
 def fetch(run: RunContext, deps: list[ResolvedDependency]) -> None:
     from .sources import source_for
 
+    networked = [dep for dep in deps if dep.spec.source not in OFFLINE_SOURCES]
+    if run.offline and networked:
+        raise _offline_error(run, networked)
     for dep in deps:
         source_for(dep).fetch(run.project.root, dep)
 
@@ -142,6 +151,8 @@ def ensure(run: RunContext, confirm: Callable[[list[ResolvedDependency]], bool] 
     if local:
         fetch(run, local[:1])
     listed = ", ".join(f"{dep.name} ({shown(run, dep.dir)})" for dep in absent)
+    if run.offline:
+        raise _offline_error(run, absent)
     if run.fetch == FetchMode.NEVER:
         raise DependencyError(f"Missing dependencies: {listed}. Run: forge deps sync")
     if run.fetch == FetchMode.ASK and not (confirm and confirm(absent)):

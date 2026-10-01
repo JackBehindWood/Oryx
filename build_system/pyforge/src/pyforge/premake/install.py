@@ -36,8 +36,16 @@ def check_local_premake(bin_dir: Path) -> bool:
     return get_premake_executable(bin_dir).is_file()
 
 
-def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
+def _offline_refusal(bin_dir: Path, version: str) -> None:
+    console.print(f"[bold red]✗ Missing: premake5 v{version} (expected at {bin_dir}); --offline forbids downloading it.[/bold red]")
+    console.print("  [dim]Run once without --offline: forge premake install[/dim]")
+
+
+def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION, offline: bool = False):
     """Download, checksum-verify, and install the given Premake5 version locally."""
+    if offline:
+        _offline_refusal(bin_dir, version)
+        return False
     system = platform.system()
     url = premake_url(version, system, platform.machine())
 
@@ -121,7 +129,7 @@ def installed_version(executable: Path) -> str | None:
         return None
 
 
-def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
+def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION, offline: bool = False):
     """Force a re-download of `version`, overwriting whatever is currently installed at
     `bin_dir` — unlike ensure_premake(), which leaves an existing install alone."""
     executable = get_premake_executable(bin_dir)
@@ -131,7 +139,7 @@ def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
 
     console.print(f"[bold blue]📦 Updating Premake5 to v{version}...[/bold blue]\n")
 
-    if not install_premake(bin_dir, version):
+    if not install_premake(bin_dir, version, offline):
         console.print("[bold red]✗ Could not update Premake5.[/bold red]")
         return None
 
@@ -144,7 +152,7 @@ def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     return executable
 
 
-def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION, path_override: str = ""):
+def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION, path_override: str = "", offline: bool = False):
     """
     Ensure the required local Premake5 installation exists.
 
@@ -170,6 +178,10 @@ def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION, path_o
             return None
         console.print(f"[green]✓ premake5:[/green] using system premake5 at {system} ({installed_version(system) or 'unknown version'})\n")
         return system
+
+    if offline:
+        _offline_refusal(bin_dir, version)
+        return None
 
     console.print("[yellow]✗ premake5: local installation not found.[/yellow]")
     console.print(f"  [dim]Expected: {executable}[/dim]\n")

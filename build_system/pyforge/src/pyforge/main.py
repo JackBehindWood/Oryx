@@ -107,6 +107,11 @@ def main(
         "--dry-run",
         help="Print the commands that would run without executing them.",
     ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Never touch the network: fail fast, listing what is missing, instead of fetching dependencies or Premake.",
+    ),
     with_: list[str] = typer.Option(
         [],
         "--with",
@@ -145,6 +150,7 @@ def main(
             defines=list(defines),
             verbose=verbose,
             dry_run=dry_run,
+            offline=offline,
             pm=pm,
         )
     except (ProjectNotFound, SchemaError, PluginError) as err:

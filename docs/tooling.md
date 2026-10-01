@@ -88,16 +88,69 @@ overrides of `[build]`/`[options]`.
 
 ## Dependencies
 
-A `[dependencies.<name>]` entry's `source` is `submodule` (default, tracked by git) or `local`
-(files you put in place yourself — forge never fetches, updates, or deletes them, only checks
-they exist). `kind = "static"` builds it from `sources`; header-only entries just contribute an
-include path. `requires` lists `[options]` that must be on (`!name` for off) — an entry whose
-requirements aren't met is neither fetched nor built.
+A `[dependencies.<name>]` entry's `source` says how its files get onto disk:
 
-`forge deps add NAME (--local | --submodule URL)` detects the layout (an `include/` folder, a
-`src/` folder) and writes the entry; `forge deps sync` fetches everything a build currently
-needs; `forge deps status` lists every entry's state, plus folders under `dependencies-dir` that
-no entry refers to.
+| `source` | Files come from | Needs |
+|---|---|---|
+| `submodule` (default) | a git submodule, tracked by the superproject | — |
+| `local` | files you put in place yourself; forge never fetches, updates, or deletes them | — |
+| `git` | a shallow clone in the shared user cache, pinned to a commit | `url`, `commit` (and `rev`) |
+| `archive` | a `.tar.gz`/`.zip` extracted into the shared user cache (a single top-level folder is flattened) | `url`, `sha256` |
+| `file` | one file (e.g. a single header) downloaded as-is into the shared user cache | `url`, `sha256` |
+| `system` | a library already installed on the machine, found through `pkg-config` | `pkg-config`, or `include` (and `lib`) paths |
+
+`kind = "static"` builds it from `sources`; header-only entries just contribute an include path.
+`requires` lists `[options]` that must be on (`!name` for off) — an entry whose requirements aren't
+met is neither fetched nor built.
+
+`forge deps add NAME (--local | --submodule URL | --archive URL | --file URL | --git URL [--rev R] |
+--system PKG)` detects the layout (an `include/` folder, a `src/` folder) and writes the entry;
+`--archive`, `--file` and `--git` fetch once and record the `sha256` / resolved `commit` for you.
+`forge deps sync` fetches everything a build currently needs; `forge deps status` lists every
+entry's state, plus folders under `dependencies-dir` that no entry refers to; `forge deps update`
+moves a `git` dependency to a new `--rev` and rewrites its `commit`.
+
+Fetched sources (`git`, `archive`, `file`) share one cache, `<user cache>/deps/<name>/<pin>`, across
+every project and worktree. `forge deps clean-cache` deletes it; `--unused` deletes only entries no
+forge project on the machine still pins. A `system` dependency has no folder: consume it from a
+project's `premake5.lua` with `forge.use("name")`, which adds its compiler and linker flags.
+
+`forge --offline <command>` never touches the network: a missing `git`/`archive`/`file`
+dependency (or an uncached Premake) fails immediately, listing everything that is missing.
+
+### Walkthrough: glad (`local`)
+
+Generate glad with its web service or CLI and put the result at `vendor/glad` (your
+`dependencies-dir`), with headers under `include/` and `glad.c` under `src/`. Then:
+
+```bash
+forge deps add glad --local
+```
+
+forge detects the layout and writes:
+
+```toml
+[dependencies]
+glad = { source = "local", kind = "static", include = "include", sources = "src" }
+```
+
+and from a project's `premake5.lua`, `includedirs { forge.include("glad") }` and `links { "glad" }`.
+
+### Walkthrough: GLFW (`git`)
+
+```bash
+forge deps add glfw --git https://github.com/glfw/glfw.git --rev 3.4
+```
+
+forge shallow-clones tag `3.4` into the shared cache, detects its layout, and records both the tag
+and the commit it resolved to:
+
+```toml
+[dependencies]
+glfw = { source = "git", url = "https://github.com/glfw/glfw.git", rev = "3.4", commit = "<40-hex commit>", ... }
+```
+
+Later runs fetch that exact commit, and fail if the cache entry doesn't match it.
 
 ## Premake
 

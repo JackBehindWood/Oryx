@@ -64,7 +64,7 @@ def write_vs2022(ctx: typer.Context, remember: bool) -> None:
     if remember:
         save_preference(run, "visual_studio", str(run.local.editor.debugger))
     ensure_or_exit(run)
-    premake = ensure_premake(bin_dir, run.config.premake.version, run.config.premake.path)
+    premake = ensure_premake(bin_dir, run.config.premake.version, run.config.premake.path, run.offline)
     if not premake:
         raise typer.Exit(code=1)
     write_premake_config(run)

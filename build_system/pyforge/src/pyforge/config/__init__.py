@@ -84,6 +84,7 @@ class RunContext:
     defines: list[str] = field(default_factory=list)
     verbose: bool = False
     dry_run: bool = False
+    offline: bool = False
     interactive: bool = False
     pm: Any = field(default_factory=get_plugin_manager)  # pluggy.PluginManager, or _NullPluginManager without the [plugins] extra
 
