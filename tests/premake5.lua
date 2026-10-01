@@ -27,10 +27,12 @@ project "Tests"
         "%{_MAIN_SCRIPT_DIR}/Oasis/src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
         forge.include("spdlog"),
+        forge.include("stb"),
     }
 
     defines {
         "SPDLOG_COMPILED_LIB",
+        "OX_TEST_DATA_DIR=\"tests/data\"",
         -- A literal path, deliberately not %{wks.location}-based: that token (like every
         -- location-relative token) resolves relative to the generated build file's own
         -- directory (build/), which is right for targetdir/objdir (make runs from there) but

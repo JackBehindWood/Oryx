@@ -1,6 +1,6 @@
 # Graphics and Assets
 
-> **Status: Phase 10 in progress. Step 0 (scaffold and gating) is done; later milestones are design only.**
+> **Status: Phase 10 in progress. Steps 0 (scaffold and gating) and 1 (headless assets) are done; later milestones are design only.**
 
 Presentation is a strictly downstream concern: it reads `IState` and never the reverse. Graphics are on by default and removed with `uv run forge --without graphics <command>`. The rules below are checked by `build_system/oryx/boundaries.py` (include layering plus a symbol scan of a graphics-off `libOryx.a`), which CI runs.
 
@@ -77,8 +77,8 @@ GraphicsLayer (single overlay, pushed last): flush -> RHICommandList -> acquire 
 
 Each milestone builds on its own, is tested headless where possible, and keeps `forge all` green on Linux and macOS.
 
-- [ ] Step 0. **Scaffold & gating (done):** `graphics` option (default on), vendor `glfw` + `stb`, empty modules, CI graphics-off leg, decision-log and roadmap entries, `docs/design/graphics.md`.
-- [ ] Step 1. **Assets (headless):** `AssetManager`, `AssetHandle`, `ImageAsset` (stb_image), `FontAsset` (stb_truetype). Tests need no window or GPU.
+- [x] Step 0. **Scaffold & gating (done):** `graphics` option (default on), vendor `glfw` + `stb`, empty modules, CI graphics-off leg, decision-log and roadmap entries, `docs/design/graphics.md`.
+- [x] Step 1. **Assets (headless, done):** `AssetManager`, `AssetHandle<T>` (`{AssetId, generation}`), `IAssetLoader<T>` (registered per extension through `Registry<IAssetLoader<T>>` and `OX_REGISTER_ASSET_LOADER`), `ImageAsset` (stb_image, RGBA8), `FontAsset` (stb_truetype, `rasterise` to an A8 bitmap). `load` is synchronous and never throws for I/O or decode errors: it returns a handle in `Failed` state with an error message, cached by normalised path until released. Handles are manually ref-counted (`load` acquires, `release` drops; at zero the slot is freed and its generation bumped). Tests need no window or GPU.
 - [ ] Step 2. **Window & Input:** `Core/Window.h`, `Core/Input.h`, events, NullWindow, MacOS/GLFW backend, `GraphicsLayer`; Oasis opens and closes a blank window.
 - [ ] Step 3. **RHI contracts + NullRHI:** `RefCounted`/`Ref<T>` (with tests: counts, retire-hook, allocator, thread safety), `RHIResource`, `RHI*` resource classes, device retire queue, descriptors, `RHICommandList`, `RHIBackend` enum + `create_rhi()`, NullRHI; contract tests run on Linux CI and later unchanged against Metal.
 - [ ] Step 4. **Metal device** (`backends/Metal`): `MetalRHI`, queue, `RHIViewport` over `CAMetalLayer`, clear-colour frame, buffers/textures/samplers (macOS only).
@@ -104,4 +104,5 @@ Out of scope: ECS, scene graph, PBR, physics, audio, render graph, GUI toolkit, 
 1. When a third backend or external backend appears, replace the `RHIBackend` switch with a registry.
 2. Whether a `Layer::render()` phase is worth adding later (default: no core change; queued drawing makes it unnecessary).
 3. HiDPI: `Input` reports logical coordinates, the RHI works in pixels; `Renderer` owns conversion.
+4. Persistent asset identity (UUID): `AssetId` is a runtime slot index and the handle carries a generation, so stale handles are caught without one. A UUID (as in Hazel) is deferred until serialization or an asset registry needs identity across runs (open question §14). It must be deterministic (e.g. a hash of the normalised path or an id stored in asset metadata), not seeded from `std::random_device`, to respect `docs/design/determinism.md`.
 

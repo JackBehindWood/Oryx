@@ -29,6 +29,14 @@
 #include "Oryx/Events/KeyEvent.h"
 #include "Oryx/Events/MouseEvent.h"
 
+#include "Oryx/Assets/AssetId.h"
+#include "Oryx/Assets/AssetHandle.h"
+#include "Oryx/Assets/IAssetLoader.h"
+#include "Oryx/Assets/AssetManager.h"
+#include "Oryx/Assets/AssetFile.h"
+#include "Oryx/Assets/ImageAsset.h"
+#include "Oryx/Assets/FontAsset.h"
+
 #include "Oryx/Math/Math.h"
 
 #include "Oryx/Game/ActionId.h"

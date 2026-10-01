@@ -41,3 +41,8 @@ def test_only_gpu_asset_cache_may_reach_graphics(tmp_path):
 def test_public_header_including_backend_is_flagged(tmp_path):
     src = _tree(tmp_path, {"Core/X.h": '#include "backends/Null/NullRHI.h"\n'})
     assert len(boundaries.check_includes(src)) == 1
+
+
+def test_cpu_assets_may_not_include_window_headers(tmp_path):
+    src = _tree(tmp_path, {"Assets/ImageAsset.h": '#include "Oryx/Core/Window.h"\n', "Assets/GpuAssetCache.h": '#include "Oryx/Core/Window.h"\n'})
+    assert len(boundaries.check_includes(src)) == 1

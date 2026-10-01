@@ -186,5 +186,6 @@ The purpose is to identify the **smallest coherent core** from which those featu
 | Graphics: RHI lifetime | intrusive `RefCounted`/`Ref<T>` for `RHI*` resources only; last release goes to the device retire queue; `UniquePtr`/`SharedPtr` unchanged elsewhere | Working decision (design) |
 | Graphics: Window ownership | `Application` holds `UniquePtr<Window>`, null when headless | Working decision (design) |
 | Graphics: Layout | Metal in `backends/Metal`; `backends/MacOS` holds all macOS-specific code (window/input first); shader tooling/programs in `Shaders/`, between `Graphics/` and `Renderer/` | Working decision (design) |
+| Graphics: Assets (Step 1) | `AssetHandle<T>` = `{AssetId (slot index), generation}`; `load` returns a `Failed`-state handle instead of throwing; cache key is the lexically normalised path (no filesystem access), failures stay cached until released; loaders reuse `Registry<IAssetLoader<T>>` keyed by lowercase extension; ref-counting is manual (`load`/`release`); not thread-safe. Persistent asset identity (UUID) deferred with serialization | Working decision (built) |
 | Graphics: GPU cache | `Assets/GpuAssetCache`, graphics-only, the single Assets->Renderer edge; yields wrappers | Working decision (design) |
 | Graphics: Build | `graphics` option default on; NullRHI always; CPU Assets always on | Working decision (design) |

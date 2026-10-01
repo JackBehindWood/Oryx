@@ -463,7 +463,7 @@ Initial focus:
 
 The graphics system should remain lightweight and specialised to Oryx's use cases.
 
-Design and milestone order: [Graphics and Assets](design/graphics.md). Step 0 (scaffold, `graphics` build option, vendors, CI graphics-off leg and boundary checks) is done; Step 1 (headless assets) is next.
+Design and milestone order: [Graphics and Assets](design/graphics.md). Step 0 (scaffold, `graphics` build option, vendors, CI graphics-off leg and boundary checks) is done; Step 1 (headless assets) is done; Step 2 (window and input) is next.
 
 ---
 

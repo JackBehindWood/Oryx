@@ -14,6 +14,7 @@ project "Oryx"
     includedirs {
         forge.include("yaml-cpp"),
         forge.include("spdlog"),
+        forge.include("stb"),
         "src"
     }
 
