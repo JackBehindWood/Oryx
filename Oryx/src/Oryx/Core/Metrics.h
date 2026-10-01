@@ -15,6 +15,19 @@ inline void add_metric(Metrics& metrics, const std::string& key, double value)
     metrics.values[key] += value;
 }
 
+inline void max_metric(Metrics& metrics, const std::string& key, double value)
+{
+    std::map<std::string, double>::iterator found = metrics.values.find(key);
+    if (found == metrics.values.end())
+    {
+        metrics.values.emplace(key, value);
+    }
+    else if (value > found->second)
+    {
+        found->second = value;
+    }
+}
+
 inline void merge(Metrics& metrics, const Metrics& other)
 {
     for (const auto& [key, value] : other.values)

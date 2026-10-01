@@ -10,6 +10,8 @@
 #include <array>
 #include <atomic>
 #include <iomanip>
+#include <limits>
+#include <cstdio>
 #include <functional>
 
 #include <typeindex>

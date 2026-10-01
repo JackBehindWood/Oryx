@@ -91,6 +91,7 @@ BatchResult BatchRunner::run(int32_t match_count)
     for (int32_t i = 0; i < match_count; ++i)
     {
         Match match(m_game, m_strategies);
+        match.set_observer(m_observer);
         accumulate(result, match.play());
         result.decisions += static_cast<int64_t>(match.history().size());
     }

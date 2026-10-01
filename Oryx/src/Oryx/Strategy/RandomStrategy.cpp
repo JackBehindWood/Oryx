@@ -1,6 +1,7 @@
 #include "RandomStrategy.h"
 
 #include "Oryx/Core/Registry.h"
+#include "Oryx/Strategy/Observability/IDecisionObserver.h"
 
 namespace oryx
 {
@@ -23,7 +24,22 @@ ActionId RandomStrategy::decide(const Context& context)
         return INVALID_ACTION;
     }
     int64_t index = m_random.get_int(0, static_cast<int64_t>(actions.size()) - 1);
-    return actions[static_cast<size_t>(index)];
+    ActionId chosen = actions[static_cast<size_t>(index)];
+
+    if (IDecisionObserver* observer = context.get<IDecisionObserver>())
+    {
+        Decision decision;
+        decision.player = context.state().current_player();
+        decision.chosen = chosen;
+        double probability = 1.0 / static_cast<double>(actions.size());
+        for (ActionId action : actions)
+        {
+            set_probability(decision, action, probability);
+        }
+        add_metric(decision.extra, "random/legal_actions", static_cast<double>(actions.size()));
+        observer->on_decision(context.state(), decision);
+    }
+    return chosen;
 }
 
 } // namespace oryx

@@ -4,6 +4,7 @@
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Simulation/SeedSequence.h"
 #include "Oryx/Strategy/IStrategy.h"
+#include "Oryx/Strategy/Observability/DiagnosticsAggregator.h"
 
 namespace oryx
 {
@@ -92,7 +93,7 @@ BatchResult to_batch_result(const Metrics& metrics, size_t player_count)
     return batch;
 }
 
-TrialResult run_trial(const ExperimentSpec& spec, size_t matchup_index, int32_t repeat)
+TrialResult run_trial(const ExperimentSpec& spec, size_t matchup_index, int32_t repeat, const RunOptions& options)
 {
     if (matchup_index >= spec.matchups.size())
     {
@@ -127,10 +128,16 @@ TrialResult run_trial(const ExperimentSpec& spec, size_t matchup_index, int32_t 
     }
 
     BatchRunner runner(*game, std::move(strategies));
+    DiagnosticsAggregator aggregator;
+    if (options.collect_diagnostics)
+    {
+        runner.set_observer(&aggregator);
+    }
     TrialResult trial;
     trial.matchup = key;
     trial.repeat = repeat;
     trial.metrics = to_metrics(runner.run(spec.matches_per_trial));
+    merge(trial.metrics, aggregator.metrics());
     return trial;
 }
 
@@ -158,7 +165,7 @@ ExperimentResult run_experiment(const ExperimentSpec& spec, const RunOptions& op
             {
                 return result;
             }
-            result.trials.push_back(run_trial(spec, matchup, repeat));
+            result.trials.push_back(run_trial(spec, matchup, repeat, options));
             if (options.progress)
             {
                 options.progress(static_cast<int32_t>(result.trials.size()), total);

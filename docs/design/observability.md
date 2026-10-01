@@ -71,7 +71,7 @@ Rules:
 | Sink | Purpose |
 | ---- | ------- |
 | `TraceRecorder` | In-memory, one entry per ply |
-| `DiagnosticsAggregator` | Folds decisions into `Metrics`: sums plus a per-namespace decision count so means are derivable; non-additive values (max depth) via `max_metric` |
+| `DiagnosticsAggregator` | Folds decisions into `Metrics`: sums plus a per-namespace decision count so means are derivable; keys ending `_max` keep the maximum (`max_metric`); keys must be `namespace/name` and may not use the built-in `wins`/`reward` namespaces |
 | JSON-lines writer | One object per ply behind a `schema_version` header line, deterministic key order |
 
 Experiments opt in with `RunOptions::collect_diagnostics`; it is not part of `ExperimentSpec`, so the spec hash and `result.yaml` schema are unchanged. A `rerun` must pass the same option.

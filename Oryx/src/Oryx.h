@@ -37,6 +37,11 @@
 #include "Oryx/Strategy/FirstLegalStrategy.h"
 #include "Oryx/Strategy/MinimaxStrategy.h"
 #include "Oryx/Strategy/ExternalStrategy.h"
+#include "Oryx/Strategy/Observability/Decision.h"
+#include "Oryx/Strategy/Observability/IDecisionObserver.h"
+#include "Oryx/Strategy/Observability/TraceRecorder.h"
+#include "Oryx/Strategy/Observability/DiagnosticsAggregator.h"
+#include "Oryx/Strategy/Observability/JsonLinesWriter.h"
 
 #include "Oryx/Simulation/ActionHistory.h"
 #include "Oryx/Simulation/Match.h"

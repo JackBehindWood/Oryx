@@ -37,13 +37,15 @@ struct RunOptions
     std::function<void(int32_t completed, int32_t total)> progress;
     const std::atomic<bool>* cancel = nullptr;
     bool record_timestamp = false;
+    // Adds each strategy's published diagnostics ("minimax/nodes") to the trial metrics; rerun must pass the same option to reproduce them.
+    bool collect_diagnostics = false;
 };
 
 [[nodiscard]] Metrics to_metrics(const BatchResult& batch);
 [[nodiscard]] BatchResult to_batch_result(const Metrics& metrics, size_t player_count);
 
 // A pure job: fresh game and strategies from the registries, seeds derived from the matchup key and repeat.
-[[nodiscard]] TrialResult run_trial(const ExperimentSpec& spec, size_t matchup_index, int32_t repeat);
+[[nodiscard]] TrialResult run_trial(const ExperimentSpec& spec, size_t matchup_index, int32_t repeat, const RunOptions& options = {});
 
 // Validates first. A cancelled run returns the trials finished so far; see is_complete().
 [[nodiscard]] ExperimentResult run_experiment(const ExperimentSpec& spec, const RunOptions& options = {});

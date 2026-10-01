@@ -4,6 +4,7 @@
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Game/Outcome.h"
 #include "Oryx/Strategy/IStrategy.h"
+#include "Oryx/Strategy/Observability/IDecisionObserver.h"
 
 namespace oryx
 {
@@ -31,11 +32,15 @@ class BatchRunner
 public:
     BatchRunner(const IGame& game, SmallVector<IStrategy*, 2> strategies);
 
+    // Non-owning; every match of every run() reports to it.
+    void set_observer(IDecisionObserver* observer) { m_observer = observer; }
+
     BatchResult run(int32_t match_count);
 
 private:
     const IGame& m_game;
     SmallVector<IStrategy*, 2> m_strategies;
+    IDecisionObserver* m_observer = nullptr;
 };
 
 } // namespace oryx
