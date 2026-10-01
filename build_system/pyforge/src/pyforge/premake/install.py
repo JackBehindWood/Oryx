@@ -1,4 +1,5 @@
 import platform
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from .assets import DEFAULT_PREMAKE_VERSION, PREMAKE_LICENSE_URL, asset_name, pr
 from .checksum import ChecksumError, latest_release_version, verify_checksum  # noqa: F401
 
 console = Console()
+
+SYSTEM_PREMAKE_HINT = "  [dim]forge premake install can't fetch a build for this platform; install premake5 yourself and either put it on PATH or set \\[premake] path in forge.toml.[/dim]"
 
 
 def get_premake_executable(bin_dir: Path) -> Path:
@@ -40,7 +43,7 @@ def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
 
     if url is None:
         console.print(f"[bold red]✗ No Premake5 build for {system}/{platform.machine()}.[/bold red]")
-        console.print("  [dim]Set [premake] path in forge.toml to point at a build of your own.[/dim]")
+        console.print(SYSTEM_PREMAKE_HINT)
         return False
 
     filename = url.split("/")[-1]
@@ -98,6 +101,14 @@ def install_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
         return False
 
 
+def system_premake(path_override: str = "") -> Path | None:
+    """premake5 from PATH, for a platform with no release asset (Linux arm64) and no [premake] path."""
+    if path_override or asset_name(platform.system(), platform.machine()) is not None:
+        return None
+    found = shutil.which("premake5")
+    return Path(found) if found else None
+
+
 def installed_version(executable: Path) -> str | None:
     """Report the version string the local Premake5 binary identifies itself as."""
     if not executable.is_file():
@@ -133,12 +144,13 @@ def update_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     return executable
 
 
-def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
+def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION, path_override: str = ""):
     """
     Ensure the required local Premake5 installation exists.
 
-    Premake is always provided locally (the shared user cache by default). A
-    system-wide Premake installation is never used.
+    Premake is provided locally (the shared user cache by default). A system-wide
+    premake5 is used only where no release asset exists for this platform (Linux arm64)
+    and [premake] path isn't set.
 
     Returns:
         Path to the local Premake5 executable.
@@ -149,6 +161,15 @@ def ensure_premake(bin_dir: Path, version: str = DEFAULT_PREMAKE_VERSION):
     if check_local_premake(bin_dir):
         console.print(f"[green]✓ premake5:[/green] found locally at {executable}\n")
         return executable
+
+    if not path_override and asset_name(platform.system(), platform.machine()) is None:
+        system = system_premake()
+        if system is None:
+            console.print(f"[bold red]✗ No Premake5 build for {platform.system()}/{platform.machine()}, and no premake5 on PATH.[/bold red]")
+            console.print(SYSTEM_PREMAKE_HINT)
+            return None
+        console.print(f"[green]✓ premake5:[/green] using system premake5 at {system} ({installed_version(system) or 'unknown version'})\n")
+        return system
 
     console.print("[yellow]✗ premake5: local installation not found.[/yellow]")
     console.print(f"  [dim]Expected: {executable}[/dim]\n")

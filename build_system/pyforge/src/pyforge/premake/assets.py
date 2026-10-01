@@ -25,7 +25,7 @@ def asset_name(system: str, machine: str) -> str | None:
     (Linux has no arm64 build yet: use [premake] path to point at your own)."""
     machine = machine.lower()
     if system == "Linux":
-        return "linux.tar.gz"
+        return None if machine in _ARM_MACHINES else "linux.tar.gz"
     if system == "Darwin":
         return "macosx.tar.gz" if machine in _ARM_MACHINES else "macosx-x64.tar.gz"
     if system == "Windows":

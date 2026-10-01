@@ -6,7 +6,7 @@ from rich.markup import escape
 
 from pyforge import registry, tomledit
 from pyforge.config import RunContext, parse_config
-from pyforge.premake.install import check_local_premake, ensure_premake, get_premake_executable, installed_version, latest_release_version, resolve_bin_dir, update_premake
+from pyforge.premake.install import check_local_premake, ensure_premake, get_premake_executable, installed_version, latest_release_version, resolve_bin_dir, system_premake, update_premake
 
 console = Console()
 app = typer.Typer(no_args_is_help=True)
@@ -31,6 +31,8 @@ def status(ctx: typer.Context):
         console.print(f"[green]✓ premake5:[/green] {version} at {executable}")
         if pinned not in version:
             console.print(f"[yellow]  Pinned version is v{pinned}. Run 'forge premake install' to fetch it.[/yellow]")
+    elif system := system_premake(run.config.premake.path):
+        console.print(f"[green]✓ premake5:[/green] using system premake5 at {system} ({installed_version(system) or 'unknown version'})")
     else:
         console.print(f"[yellow]✗ premake5: not installed locally (expected {executable}).[/yellow]")
         console.print("  [dim]Run 'forge configure' or 'forge premake install' to install it.[/dim]")
@@ -54,7 +56,7 @@ def install(
         console.print(f"[green]✓ premake5 v{target} is already installed at {get_premake_executable(bin_dir)}[/green]")
         return
 
-    if not ensure_premake(bin_dir, target):
+    if not ensure_premake(bin_dir, target, run.config.premake.path):
         raise typer.Exit(code=1)
 
 

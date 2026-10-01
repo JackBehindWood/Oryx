@@ -62,7 +62,7 @@ def configure(ctx: typer.Context):
         return
 
     ensure_or_exit(run)
-    premake = ensure_premake(bin_dir, cfg.premake.version)
+    premake = ensure_premake(bin_dir, cfg.premake.version, cfg.premake.path)
     if not premake:
         raise typer.Exit(code=1)
 
