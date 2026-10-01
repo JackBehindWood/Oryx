@@ -117,6 +117,17 @@ jobs:
       working-directory: build_system/pyforge
       run: uv run --no-default-groups --group test pytest -q --cov=pyforge --cov-report=term
 
+    - name: Smoke-test the forge CLI against a minimal project
+      shell: bash
+      run: |
+        smoke="$RUNNER_TEMP/smoke"
+        cp -r build_system/pyforge/tests/fixtures/hello "$smoke"
+        forge() { uv run --no-default-groups --project "$GITHUB_WORKSPACE/build_system/pyforge" forge "$@"; }
+        cd "$smoke"
+        forge --help
+        forge config show
+        forge --dry-run configure
+
   extraction:
     runs-on: ubuntu-latest
 
