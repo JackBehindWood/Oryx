@@ -8,6 +8,7 @@ from typing import Callable
 from .. import cache
 from ..config import Dependency, FetchMode, ForgeConfig, RunContext
 from ..project import Project
+from ..utils import write_text_lf
 
 PREMAKE_CONFIG_NAME = "config.json"
 PREMAKE_CONFIG_FORMAT = 1
@@ -116,7 +117,7 @@ def write_premake_config(run: RunContext) -> Path:
     text = json.dumps(premake_config(run), indent=1) + "\n"
     if not path.is_file() or path.read_text(encoding="utf-8") != text:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        write_text_lf(path, text)
     return path
 
 

@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from .utils import rmtree_force
+from .utils import rmtree_force, write_text_lf
 
 
 def user_cache_dir() -> Path:
@@ -115,7 +115,7 @@ def record_pin(project_root: Path, name: str, pin: str) -> None:
         path = deps_root() / PINS_NAME
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
-        tmp.write_text(json.dumps(pins, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        write_text_lf(tmp, json.dumps(pins, indent=1, sort_keys=True) + "\n")
         _replace_retrying(tmp, path)
 
 

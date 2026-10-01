@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .config.load import LEGACY_LOCAL_CONFIG_NAME, LOCAL_CONFIG_NAME
 from .project import Project
+from .utils.filesystem import write_text_lf
 from .workspace import Workspace
 
 STAMP_NAME = "stamp.json"
@@ -55,7 +56,7 @@ def record(project: Project, workspace: Workspace, options_hash: str = "") -> St
     )
     path = stamp_file(project)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"mtimes": stamp.mtimes, "options_hash": stamp.options_hash, "sources": stamp.sources}), encoding="utf-8")
+    write_text_lf(path, json.dumps({"mtimes": stamp.mtimes, "options_hash": stamp.options_hash, "sources": stamp.sources}))
     return stamp
 
 

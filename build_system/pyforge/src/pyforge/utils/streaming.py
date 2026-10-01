@@ -23,6 +23,8 @@ def stream_command(command: list[str], cwd: Path | None = None, env: dict | None
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
     )
     assert process.stdout is not None

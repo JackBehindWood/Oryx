@@ -8,7 +8,7 @@ from rich.markup import escape
 from .. import options
 from ..config import RunContext
 from ..project import Project
-from ..utils import run_command
+from ..utils import run_command, write_text_lf
 
 console = Console()
 
@@ -35,7 +35,7 @@ def render_forge_lua(project: Project, lua_dir: Path = LUA_DIR) -> Path:
     path = project.root / "premake" / "forge.lua"
     if not path.is_file() or path.read_text(encoding="utf-8") != text:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        write_text_lf(path, text)
     return path
 
 

@@ -9,7 +9,7 @@ def _pkg_config(flag: str, name: str) -> str | None:
     if name.startswith("-"):
         return None
     try:
-        result = subprocess.run(["pkg-config", flag, name], capture_output=True, text=True)
+        result = subprocess.run(["pkg-config", flag, name], capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError:
         return None
     return result.stdout.strip() if result.returncode == 0 else None

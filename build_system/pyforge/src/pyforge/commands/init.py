@@ -6,6 +6,7 @@ from rich.markup import escape
 
 from pyforge import registry, tomledit, workspace
 from pyforge.config import RunContext, parse_config
+from pyforge.utils import write_text_lf
 
 console = Console()
 GROUP_HELP = "Create a forge.toml for this project"
@@ -61,10 +62,10 @@ def _project_name(run: RunContext, yes: bool) -> str:
 
 
 def _scaffold_app(run: RunContext, name: str) -> None:
-    (run.project.root / "premake5.lua").write_text(_APP_LUA.format(name=name), encoding="utf-8")
+    write_text_lf(run.project.root / "premake5.lua", _APP_LUA.format(name=name))
     src = run.project.root / "src"
     src.mkdir(exist_ok=True)
-    (src / "main.cpp").write_text(_APP_MAIN_CPP.format(name=name), encoding="utf-8")
+    write_text_lf(src / "main.cpp", _APP_MAIN_CPP.format(name=name))
 
 
 def _derive_targets(ctx: typer.Context, run: RunContext) -> dict[str, str]:
@@ -104,7 +105,7 @@ def init(
         return
 
     name = _project_name(run, yes)
-    config_file.write_text(tomledit.dumps({"project": {"name": name}}), encoding="utf-8")
+    write_text_lf(config_file, tomledit.dumps({"project": {"name": name}}))
     console.print(f"✓ Created default build configuration at: {config_file}")
 
     has_premake = (run.project.root / "premake5.lua").is_file()

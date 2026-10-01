@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from .filesystem import write_text_lf
+
 
 def load_json(path: Path, default: dict) -> dict:
     """Load a JSON file, or return a copy of `default` if it doesn't exist."""
@@ -14,7 +16,7 @@ def load_json(path: Path, default: dict) -> dict:
 
 def write_json(path: Path, data) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=4) + "\n", encoding="utf-8")
+    write_text_lf(path, json.dumps(data, indent=4) + "\n")
     return path
 
 

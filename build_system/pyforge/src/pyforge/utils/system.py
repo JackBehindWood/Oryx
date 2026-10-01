@@ -41,6 +41,8 @@ def run_command(command, cwd=None, capture_output=True, env=None):
         capture_output=capture_output,
         env=env,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=True,
     )
 
