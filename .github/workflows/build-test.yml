@@ -62,6 +62,12 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
+    - name: Restore Premake binary cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.os == 'macOS' && '~/Library/Caches/pyforge/premake' || '~/.cache/pyforge/premake' }}
+        key: ${{ runner.os }}-${{ runner.arch }}-premake-${{ hashFiles('forge.toml') }}
+
     - name: Use ccache for CI builds
       run: uv run forge config set build.launcher ccache --local
 
@@ -128,6 +134,12 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
+
+    - name: Restore Premake binary cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pyforge/premake
+        key: ${{ runner.os }}-${{ runner.arch }}-premake-${{ hashFiles('forge.toml') }}
 
     - name: Install pyforge and Oryx's dev dependencies with plain pip
       run: |
