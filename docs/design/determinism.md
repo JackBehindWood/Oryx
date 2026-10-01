@@ -68,3 +68,14 @@ The system should distinguish between:
 * Bit-for-bit reproducibility
 
 These are not necessarily equivalent.
+
+## Experiment seeding (Phase 8)
+
+Phase 8 answers the open questions above for experiments:
+
+* **Who owns the RNG:** each component owns its own `oryx::Random`; the experiment layer only chooses seeds.
+* **How seeds are assigned:** `derive_seed(master, key, role)` hashes the matchup key (FNV-1a-64) and mixes in the master seed, the role (game, strategy seat, experiment) and the repeat with a splitmix64-style finaliser. The key is content-based (a label or a canonical matchup string), so seeds do not depend on execution order or on which other matchups exist.
+* **Parallel simulations:** a trial's seeds depend only on its key and repeat, so any executor, order or resume point yields identical results.
+* **Independent streams:** one stream per (role, seat), so adding a chance stream to a game later does not shift strategy streams.
+* **Reaching components:** by the `"seed"` Int param convention; an entry whose schema declares no `seed` is assumed deterministic.
+* **Reproducing:** result metadata records the master seed, spec hash, Oryx version and build information; `rerun` must reproduce identical counts.

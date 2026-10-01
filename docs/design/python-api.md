@@ -111,6 +111,10 @@ Research use is a first-class requirement, not a by-product:
 * **Introspection:** `list_games()`, `list_strategies()`, `describe("nim")` (schema and origin), docstrings and `.pyi` stubs.
 * **Graduation path:** a Python prototype and its C++ port share the ABC contract, the registry id and the schema, so call sites do not change; differential testing (same seeds, both implementations, compare `BatchResult`) validates a port.
 
+### Experiments (Phase 8)
+
+`Experiment` and `Tournament` are thin wrappers over the C++ experiment framework: they build an id-based spec (so Python-defined games and strategies work once registered) and the C++ side validates and runs it. `ExperimentResult` offers `to_dict()`, `to_dataframe()`, `save()`, `load()` and `_repr_html_()`; the file format is read and written in C++ (YAML summary plus CSV rows), so Python needs no YAML dependency. `rerun` of a loaded result in a fresh process needs any Python-defined entries re-registered first. Python-defined strategies need the GIL, so running them in parallel is a separate decision from the executor seam.
+
 ### Open questions
 
 Closed in step 11: the assertion hook (`oryx.init()` installs `throw_on_assertion`), Ctrl-C/long-batch interruption (`run_interruptible()`, see Interruptible batches above), and the extension module/pch question — it **dissolved** rather than resolved, once the extension went Oryx-only: there is no Oasis source compiled into `OryxPython` at all, so no pch question remains.

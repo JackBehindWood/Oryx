@@ -413,6 +413,12 @@ Potential features:
 
 A central goal is making large experiments easy to describe and repeat.
 
+Milestone: an id-based `ExperimentSpec` with sweep and round-robin expanders,
+content-keyed seed derivation, a validating runner built from independent trials,
+statistics (Wilson intervals, comparisons, cross-table), reproducibility metadata,
+YAML + CSV result storage with `rerun`, and thin Python `Experiment`/`Tournament`
+bindings. Out of Phase 8: parallel execution, game/state serialisation.
+
 ---
 
 # 11. Phase 9 — Strategy Observability

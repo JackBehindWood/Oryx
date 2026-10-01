@@ -892,14 +892,15 @@ The following should **not** be considered settled yet:
 * Imperfect information
 * Game history
 * Evaluation API
-* Experiment representation
+* Experiment representation — resolved in Phase 8: id-based `ExperimentSpec` ([Decision Log](design/decision-log.md))
 * Observability protocol
 * Dashboard transport
 * Python ownership/lifetime beyond the scripting layer's scoped rules
   (below): how a pure-Python host owns C++ objects handed back to it, and
   interpreter-finalisation ordering
 * Serialization — YAML (yaml-cpp, already used by the settings system) is the
-  intended format; what is serialised, schemas and versioning are undecided
+  intended format. Phase 8 settles it for experiment results only (YAML summary
+  plus CSV rows, versioned); game/state serialisation is undecided
 * Graphics abstraction
 * Multi-threaded simulation model — explicitly deferred rather than merely
   unaddressed: Phase 5's batch runner is single-threaded by design
