@@ -14,6 +14,7 @@ constexpr std::string_view kGameFlagPrefix = "--game=";
 constexpr std::string_view kOpponentFlagPrefix = "--opponent=";
 constexpr std::string_view kSimulateFlagPrefix = "--simulate=";
 constexpr std::string_view kBenchmarkFlag = "--benchmark";
+constexpr std::string_view kNoWindowFlag = "--no-window";
 
 std::string flag_value(const oryx::ApplicationCommandLineArgs& args, std::string_view prefix)
 {
@@ -55,7 +56,25 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
     {
         push_layer<oryx::ScriptingLayer>(oryx::script_options(args));
     }
+#if 0
     push_layer<OasisLayer>(flag_value(args, kGameFlagPrefix), flag_value(args, kOpponentFlagPrefix), flag_value(args, kSimulateFlagPrefix), has_flag(args, kBenchmarkFlag));
+#endif
+
+#ifdef OX_ENABLE_GRAPHICS
+    if (!has_flag(args, kNoWindowFlag))
+    {
+        try
+        {
+            create_window({ "Oasis" });
+            push_overlay<oryx::GraphicsLayer>();
+        }
+        catch (const oryx::Error& error)
+        {
+            error.log();
+            close(1);
+        }
+    }
+#endif
 }
 
 void OasisApp::on_event(oryx::Event& event)

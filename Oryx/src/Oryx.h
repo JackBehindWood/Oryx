@@ -16,6 +16,7 @@
 #include "Oryx/Core/KeyCode.h"
 #include "Oryx/Core/MouseCode.h"
 #include "Oryx/Core/Input.h"
+#include "Oryx/Core/PolledInput.h"
 
 #include "Oryx/Containers/Pair.h"
 #include "Oryx/Containers/SmallVector.h"
@@ -72,3 +73,6 @@
 #include "Oryx/Scripting/Scripting.h"
 #include "Oryx/Scripting/ScriptingLayer.h"
 
+#ifdef OX_ENABLE_GRAPHICS
+#include "Oryx/Renderer/GraphicsLayer.h"
+#endif

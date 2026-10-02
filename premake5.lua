@@ -43,6 +43,7 @@ workspace "oryx"
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 forge.on_dependency(useOryxPythonPIC)
+forge.on_dependency(useOryxGlfw)
 
 group "Dependencies"
     forge.dependency_projects()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/LayerStack.h"
+#include "Oryx/Core/Window.h"
 #include "Oryx/Events/Event.h"
 
 namespace oryx
@@ -54,6 +55,10 @@ public:
 
     void post_event(Event& event);
 
+    Window& create_window(WindowDesc desc);
+    Window& adopt_window(UniquePtr<Window> window);
+    [[nodiscard]] Window* window() { return m_window.get(); }
+
     static Application& Get() { return *s_instance; }
 
 protected:
@@ -66,6 +71,8 @@ protected:
 private:
     bool m_running = true;
     int32_t m_exit_code = 0;
+    // Declared before the layer stack so layers detach while the window is still alive.
+    UniquePtr<Window> m_window;
     LayerStack m_layer_stack;
 
     static Application* s_instance;

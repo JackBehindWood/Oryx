@@ -12,4 +12,5 @@ end
 
 function useOryxWholeArchive()
     forge.whole_archive("Oryx", { "yaml-cpp" })
+    linkOryxGraphics()
 end

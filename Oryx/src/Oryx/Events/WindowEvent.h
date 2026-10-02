@@ -28,4 +28,18 @@ private:
     int32_t m_height;
 };
 
+class WindowFocusEvent : public Event
+{
+public:
+    explicit WindowFocusEvent(bool focused) : m_focused(focused) {}
+
+    [[nodiscard]] bool focused() const { return m_focused; }
+
+    OX_EVENT_CLASS_TYPE(WindowFocus)
+    OX_EVENT_CLASS_CATEGORY(EventCategoryWindow)
+
+private:
+    bool m_focused;
+};
+
 } // namespace oryx

@@ -26,6 +26,7 @@ project "Tests"
         ".",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
+        "%{_MAIN_SCRIPT_DIR}/Oryx/backends/Null",
         forge.include("spdlog"),
         forge.include("stb"),
     }
@@ -41,6 +42,10 @@ project "Tests"
         "OX_BUILD_OUTPUT_DIR=\"" .. "build/bin/" .. outputdir .. "\"",
     }
     useOryxPython()
+    useOryxGraphics()
+    if not graphicsEnabled() then
+        removefiles { "unit/Renderer/**" }
+    end
 
     useOryxWholeArchive()
     useOryxAllocationCensus()

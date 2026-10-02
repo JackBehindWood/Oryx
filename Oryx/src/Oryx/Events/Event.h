@@ -17,7 +17,10 @@ enum class EventType
     KeyPressed,
     KeyReleased,
     MouseMoved,
-    MouseButtonPressed
+    MouseButtonPressed,
+    MouseButtonReleased,
+    MouseScrolled,
+    WindowFocus
 };
 
 enum EventCategory

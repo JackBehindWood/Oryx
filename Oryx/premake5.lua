@@ -51,12 +51,17 @@ project "Oryx"
 
     useOryxGraphics()
 
+    files {
+        "backends/Null/NullWindow.h",
+        "backends/Null/NullWindow.cpp"
+    }
+    includedirs { "backends/Null" }
+
     if graphicsEnabled() then
         files {
-            "backends/Null/**.h",
-            "backends/Null/**.cpp"
+            "backends/Null/NullRHI.h",
+            "backends/Null/NullRHI.cpp"
         }
-        includedirs { "backends/Null" }
 
         filter "system:macosx"
             files {
@@ -70,7 +75,7 @@ project "Oryx"
                 "backends/MacOS",
                 forge.include("glfw")
             }
-            links { "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework" }
+            links { "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework", "CoreFoundation.framework" }
 
         filter "files:backends/Metal/**.mm"
             flags { "NoPCH" }

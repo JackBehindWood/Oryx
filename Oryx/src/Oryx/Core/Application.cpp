@@ -76,6 +76,17 @@ void Application::run()
     }
 }
 
+Window& Application::create_window(WindowDesc desc)
+{
+    return adopt_window(Window::create(std::move(desc)));
+}
+
+Window& Application::adopt_window(UniquePtr<Window> window)
+{
+    m_window = std::move(window);
+    return *m_window;
+}
+
 void Application::post_event(Event& event)
 {
     on_event(event);

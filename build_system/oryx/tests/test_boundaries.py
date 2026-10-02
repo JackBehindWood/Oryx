@@ -46,3 +46,14 @@ def test_public_header_including_backend_is_flagged(tmp_path):
 def test_cpu_assets_may_not_include_window_headers(tmp_path):
     src = _tree(tmp_path, {"Assets/ImageAsset.h": '#include "Oryx/Core/Window.h"\n', "Assets/GpuAssetCache.h": '#include "Oryx/Core/Window.h"\n'})
     assert len(boundaries.check_includes(src)) == 1
+
+
+def test_core_window_and_input_headers_stay_graphics_free(tmp_path):
+    src = _tree(tmp_path, {"Core/Window.h": '#include "Oryx/Renderer/GraphicsLayer.h"\n', "Core/Input.h": '#include "Oryx/Graphics/RHI/RHI.h"\n'})
+    assert len(boundaries.check_includes(src)) == 2
+
+
+def test_real_core_window_and_input_include_no_graphics_module():
+    for name in ("Window.h", "Input.h", "PolledInput.h"):
+        includes = boundaries._includes(REPO_SRC / "Oryx" / "Core" / name)
+        assert not [i for i in includes if boundaries._module_of(i) in boundaries.GRAPHICS_MODULES]

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Base.h"
+#include "Oryx/Core/Input.h"
 
 namespace oryx
 {
@@ -30,8 +31,16 @@ public:
 
     [[nodiscard]] const WindowDesc& desc() const { return m_desc; }
 
+    // Selects the platform backend at compile time (MacOS/GLFW with graphics, else Null); never returns null.
+    [[nodiscard]] static UniquePtr<Window> create(WindowDesc desc);
+
     [[nodiscard]] virtual bool should_close() const = 0;
     [[nodiscard]] virtual NativeWindowHandle native_handle() const = 0;
+    [[nodiscard]] virtual const IInput& input() const = 0;
+
+    // Polls the OS, updates input() and posts events through Application::Get().post_event.
+    virtual void poll_events() = 0;
+    virtual void request_close() = 0;
 
 private:
     WindowDesc m_desc;

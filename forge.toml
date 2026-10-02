@@ -23,7 +23,7 @@ sanitize = { default = false, on = "--sanitize", help = "ASan+UBSan diagnostic b
 
 [targets.oasis]
 project = "Oasis"
-presets.bench = ["--simulate=random,first-legal,100", "--benchmark"]
+presets.bench = ["--simulate=random,first-legal,100", "--benchmark", "--no-window"]
 
 [tests]
 project = "Tests"

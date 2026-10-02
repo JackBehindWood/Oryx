@@ -30,6 +30,8 @@ project "Oasis"
         "SPDLOG_COMPILED_LIB"
     }
 
+    useOryxGraphics()
+
     useOryxWholeArchive()
     useOryxAllocationCensus()
     links {

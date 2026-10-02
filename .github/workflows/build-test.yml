@@ -98,7 +98,7 @@ jobs:
       run: uv run forge $BUILD_FLAGS test
 
     - name: Run Oasis sandbox
-      run: uv run forge $BUILD_FLAGS run
+      run: uv run forge $BUILD_FLAGS run -- --no-window
 
     - name: Benchmark smoke run
       run: |

@@ -36,4 +36,34 @@ private:
     MouseCode m_button;
 };
 
+class MouseButtonReleasedEvent : public Event
+{
+public:
+    explicit MouseButtonReleasedEvent(MouseCode button) : m_button(button) {}
+
+    [[nodiscard]] MouseCode button() const { return m_button; }
+
+    OX_EVENT_CLASS_TYPE(MouseButtonReleased)
+    OX_EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput)
+
+private:
+    MouseCode m_button;
+};
+
+class MouseScrolledEvent : public Event
+{
+public:
+    MouseScrolledEvent(float dx, float dy) : m_dx(dx), m_dy(dy) {}
+
+    [[nodiscard]] float dx() const { return m_dx; }
+    [[nodiscard]] float dy() const { return m_dy; }
+
+    OX_EVENT_CLASS_TYPE(MouseScrolled)
+    OX_EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput)
+
+private:
+    float m_dx;
+    float m_dy;
+};
+
 } // namespace oryx
