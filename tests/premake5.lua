@@ -44,7 +44,7 @@ project "Tests"
     useOryxPython()
     useOryxGraphics()
     if not graphicsEnabled() then
-        removefiles { "unit/Renderer/**" }
+        removefiles { "unit/Renderer/**", "unit/Graphics/**" }
     end
 
     useOryxWholeArchive()

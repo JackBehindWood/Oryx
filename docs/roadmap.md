@@ -463,7 +463,7 @@ Initial focus:
 
 The graphics system should remain lightweight and specialised to Oryx's use cases.
 
-Design and milestone order: [Graphics and Assets](design/graphics.md). Step 0 (scaffold, `graphics` build option, vendors, CI graphics-off leg and boundary checks) is done; Step 1 (headless assets) is done; Step 2 (window, input, `NullWindow`, macOS/GLFW backend, `GraphicsLayer`) is done; Step 3 (RHI contracts and NullRHI) is next.
+Design and milestone order: [Graphics and Assets](design/graphics.md). Step 0 (scaffold, `graphics` build option, vendors, CI graphics-off leg and boundary checks) is done; Step 1 (headless assets) is done; Step 2 (window, input, `NullWindow`, macOS/GLFW backend, `GraphicsLayer`) is done; Step 3 (RHI contracts, retire queue and NullRHI) is done; Step 4 (Metal device) is next.
 
 ---
 

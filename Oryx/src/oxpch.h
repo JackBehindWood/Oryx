@@ -11,6 +11,8 @@
 #include <atomic>
 #include <iomanip>
 #include <limits>
+#include <mutex>
+#include <cstring>
 #include <cstdio>
 #include <functional>
 

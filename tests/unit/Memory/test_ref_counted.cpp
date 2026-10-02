@@ -38,23 +38,22 @@ public:
     ThrowingResource() { throw std::runtime_error("constructor failed"); }
 };
 
-class DeferringRetirer final : public IRetirer
+class DeferredResource final : public RefCounted
 {
 public:
-    void retire(RefCounted& object) noexcept override
+    ~DeferredResource() override { ++g_destroyed; }
+
+    void destroy_pending() noexcept { detail::destroy_now(*this); }
+
+    static inline int32_t retired = 0;
+    static inline DeferredResource* pending = nullptr;
+
+private:
+    void on_last_release() noexcept override
     {
         ++retired;
-        pending = &object;
+        pending = this;
     }
-
-    void destroy_pending() noexcept
-    {
-        detail::destroy_now(*pending);
-        pending = nullptr;
-    }
-
-    int32_t retired = 0;
-    RefCounted* pending = nullptr;
 };
 
 } // namespace
@@ -159,21 +158,20 @@ TEST_CASE("Default release returns the allocation to the census")
     CHECK(after.allocation_count - before.allocation_count == after.deallocation_count - before.deallocation_count);
 }
 
-TEST_CASE("A retirer defers destruction until it destroys the object")
+TEST_CASE("An on_last_release override defers destruction until it destroys the object")
 {
     g_destroyed = 0;
-    DeferringRetirer retirer;
+    DeferredResource::retired = 0;
     {
-        Ref<Resource> ref = make_ref<Resource>();
-        ref->set_retirer(&retirer);
-        Ref<Resource> copy = ref;
+        Ref<DeferredResource> ref = make_ref<DeferredResource>();
+        Ref<DeferredResource> copy = ref;
         ref.reset();
-        CHECK(retirer.retired == 0);
+        CHECK(DeferredResource::retired == 0);
     }
-    CHECK(retirer.retired == 1);
+    CHECK(DeferredResource::retired == 1);
     CHECK(g_destroyed == 0);
 
-    retirer.destroy_pending();
+    DeferredResource::pending->destroy_pending();
     CHECK(g_destroyed == 1);
 }
 

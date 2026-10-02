@@ -17,15 +17,6 @@ void destroy_now(RefCounted& object) noexcept;
 
 } // namespace detail
 
-// Takes over destruction when the last reference drops; it must end in detail::destroy_now.
-class IRetirer
-{
-public:
-    virtual ~IRetirer() = default;
-
-    virtual void retire(RefCounted& object) noexcept = 0;
-};
-
 // Intrusive atomic reference count for objects created by make_ref / allocate_ref, which must be the only way to create them.
 class RefCounted
 {
@@ -40,24 +31,17 @@ public:
     {
         if (m_count.fetch_sub(1, std::memory_order_acq_rel) == 1)
         {
-            RefCounted& object = const_cast<RefCounted&>(*this);
-            if (m_retirer != nullptr)
-            {
-                m_retirer->retire(object);
-            }
-            else
-            {
-                detail::destroy_now(object);
-            }
+            const_cast<RefCounted&>(*this).on_last_release();
         }
     }
 
     [[nodiscard]] uint32_t ref_count() const noexcept { return m_count.load(std::memory_order_relaxed); }
 
-    void set_retirer(IRetirer* retirer) noexcept { m_retirer = retirer; }
-
 protected:
     RefCounted() = default;
+
+    // Runs when the last reference drops; an override takes over destruction and must end in detail::destroy_now.
+    virtual void on_last_release() noexcept { detail::destroy_now(*this); }
 
 private:
     friend void detail::destroy_now(RefCounted& object) noexcept;
@@ -65,10 +49,9 @@ private:
     friend Ref<T> allocate_ref(IAllocator& allocator, Args&&... args);
 
     mutable std::atomic<uint32_t> m_count{ 1 };
+    uint32_t m_size = 0;
+    uint32_t m_alignment = 0;
     IAllocator* m_allocator = nullptr;
-    size_t m_size = 0;
-    size_t m_alignment = 0;
-    IRetirer* m_retirer = nullptr;
 };
 
 template<typename T>
@@ -215,10 +198,11 @@ template<typename T, typename... Args>
     }
 
     RefCounted& base = *object;
+    static_assert(sizeof(Object) <= std::numeric_limits<uint32_t>::max(), "RefCounted objects are limited to 4 GiB");
     OX_ASSERT(static_cast<void*>(&base) == block, "RefCounted must be the first base so the allocation can be freed through it");
     base.m_allocator = &allocator;
-    base.m_size = sizeof(Object);
-    base.m_alignment = alignof(Object);
+    base.m_size = static_cast<uint32_t>(sizeof(Object));
+    base.m_alignment = static_cast<uint32_t>(alignof(Object));
     return Ref<T>(object);
 }
 

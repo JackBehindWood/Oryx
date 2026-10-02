@@ -74,5 +74,6 @@
 #include "Oryx/Scripting/ScriptingLayer.h"
 
 #ifdef OX_ENABLE_GRAPHICS
+#include "Oryx/Graphics/RHI/RHI.h"
 #include "Oryx/Renderer/GraphicsLayer.h"
 #endif
