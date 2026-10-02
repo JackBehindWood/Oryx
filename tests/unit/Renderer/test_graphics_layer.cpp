@@ -66,7 +66,7 @@ TEST_CASE("GraphicsLayer update pumps the window")
     GraphicsApp app(true);
     app.window->inject_key(KeyCode::A, true);
     CHECK(app.window->input().key_pressed(KeyCode::A));
-    app.layer->update();
+    app.layer->update(0.016);
     CHECK_FALSE(app.window->input().key_pressed(KeyCode::A));
     CHECK(app.window->input().key_down(KeyCode::A));
 }

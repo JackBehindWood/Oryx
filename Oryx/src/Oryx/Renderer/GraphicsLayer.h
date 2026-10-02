@@ -13,7 +13,7 @@ public:
     GraphicsLayer();
 
     void attach() override;
-    void update() override;
+    void update(double delta_time) override;
     void event(Event& event) override;
 
     [[nodiscard]] int32_t width() const { return m_width; }

@@ -26,7 +26,7 @@ void GraphicsLayer::attach()
     m_height = handle.framebuffer_height;
 }
 
-void GraphicsLayer::update()
+void GraphicsLayer::update(double)
 {
     m_window->poll_events();
     if (m_window->should_close())

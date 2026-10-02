@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Benchmark/Timer.h"
+#include "Oryx/Core/Timer.h"
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
 #include "Oryx/Memory/MemoryStats.h"
@@ -23,7 +23,7 @@ public:
     explicit SimulationLayer(bool benchmark = false);
 
     void event(Event& event) override;
-    void update() override;
+    void update(double delta_time) override;
 
     [[nodiscard]] const BatchResult& result() const { return m_result; }
 

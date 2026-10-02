@@ -14,7 +14,7 @@ public:
 
     virtual void attach() {}
     virtual void detach() {}
-    virtual void update() {}
+    virtual void update(double /*delta_time*/) {}
     virtual void event(Event&) {}
 
     const std::string& name() const { return m_name; }

@@ -72,7 +72,7 @@ void Application::run()
 {
     while (m_running)
     {
-        m_layer_stack.update();
+        m_layer_stack.update(m_timer.tick());
     }
 }
 

@@ -39,7 +39,7 @@ public:
         return ref;
     }
 
-    void update();
+    void update(double delta_time);
     void dispatch_event(Event& event);
 
     std::vector<LayerPtr>::iterator begin() { return m_layers.begin(); }

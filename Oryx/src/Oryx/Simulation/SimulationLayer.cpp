@@ -62,7 +62,7 @@ bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
     return true;
 }
 
-void SimulationLayer::update()
+void SimulationLayer::update(double)
 {
     if (!m_game)
     {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/LayerStack.h"
+#include "Oryx/Core/Timer.h"
 #include "Oryx/Core/Window.h"
 #include "Oryx/Events/Event.h"
 
@@ -74,6 +75,7 @@ private:
     // Declared before the layer stack so layers detach while the window is still alive.
     UniquePtr<Window> m_window;
     LayerStack m_layer_stack;
+    Timer m_timer;
 
     static Application* s_instance;
 };

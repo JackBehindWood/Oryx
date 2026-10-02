@@ -16,7 +16,7 @@ public:
     {
     }
 
-    void update() override { throw Error("layer failure"); }
+    void update(double) override { throw Error("layer failure"); }
 };
 
 class ThrowingStrategy : public IStrategy

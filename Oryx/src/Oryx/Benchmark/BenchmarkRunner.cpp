@@ -1,6 +1,6 @@
 #include "BenchmarkRunner.h"
 
-#include "Oryx/Benchmark/Timer.h"
+#include "Oryx/Core/Timer.h"
 #include "Oryx/Debug/Instrumentation.h"
 
 namespace oryx

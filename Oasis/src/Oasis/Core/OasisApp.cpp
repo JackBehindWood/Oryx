@@ -7,6 +7,10 @@
 #include "Oryx/Scripting/ScriptSettings.h"
 #include "Oryx/Simulation/SimulationLayer.h"
 
+#ifdef OX_ENABLE_GRAPHICS
+#include "Oasis/Graphics/PlaygroundLayer.h"
+#endif
+
 namespace 
 {
 
@@ -15,6 +19,8 @@ constexpr std::string_view kOpponentFlagPrefix = "--opponent=";
 constexpr std::string_view kSimulateFlagPrefix = "--simulate=";
 constexpr std::string_view kBenchmarkFlag = "--benchmark";
 constexpr std::string_view kNoWindowFlag = "--no-window";
+constexpr std::string_view kPlaygroundFlag = "--playground";
+constexpr std::string_view kNoPlaygroundFlag = "--no-playground";
 
 std::string flag_value(const oryx::ApplicationCommandLineArgs& args, std::string_view prefix)
 {
@@ -66,6 +72,10 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
         try
         {
             create_window({ "Oasis" });
+            if (has_flag(args, kPlaygroundFlag) || !has_flag(args, kNoPlaygroundFlag))
+            {
+                push_layer<PlaygroundLayer>();
+            }
             push_overlay<oryx::GraphicsLayer>();
         }
         catch (const oryx::Error& error)

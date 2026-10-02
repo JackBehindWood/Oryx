@@ -5,7 +5,7 @@
 #include "Oryx/Benchmark/BenchmarkReport.h"
 #include "Oryx/Benchmark/BenchmarkRunner.h"
 #include "Oryx/Benchmark/MemoryBenchmarkRunner.h"
-#include "Oryx/Benchmark/Timer.h"
+#include "Oryx/Core/Timer.h"
 
 using namespace oryx;
 using namespace oryx::test;
@@ -17,6 +17,14 @@ TEST_CASE("Timer measures a non-negative interval between start and stop")
     timer.stop();
 
     CHECK(timer.elapsed_seconds() >= 0.0);
+}
+
+TEST_CASE("Timer::tick returns 0 on the first call and a non-negative delta afterwards")
+{
+    Timer timer;
+
+    CHECK(timer.tick() == 0.0);
+    CHECK(timer.tick() >= 0.0);
 }
 
 TEST_CASE("Throughput helpers divide by elapsed time and return 0 instead of infinity when no time elapsed")

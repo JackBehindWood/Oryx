@@ -15,7 +15,7 @@ public:
 
     void attach() override { m_log.push_back(name() + ":attach"); }
     void detach() override { m_log.push_back(name() + ":detach"); }
-    void update() override { m_log.push_back(name() + ":update"); }
+    void update(double) override { m_log.push_back(name() + ":update"); }
 
 private:
     std::vector<std::string>& m_log;
@@ -72,6 +72,28 @@ TEST_CASE("LayerStack preserves push order and overlays land after layers")
     CHECK(order == std::vector<std::string>{ "A", "B", "Overlay" });
 }
 
+namespace {
+
+class DeltaLayer : public oryx::Layer
+{
+public:
+    DeltaLayer() : oryx::Layer("Delta") {}
+    void update(double delta_time) override { last = delta_time; }
+    double last = 0.0;
+};
+
+} // namespace
+
+TEST_CASE("LayerStack::update passes the delta time to each layer")
+{
+    oryx::LayerStack stack;
+    DeltaLayer& layer = stack.push_layer<DeltaLayer>();
+
+    stack.update(0.25);
+
+    CHECK(layer.last == 0.25);
+}
+
 TEST_CASE("LayerStack::push_layer constructs the layer, attaches it immediately, and returns a usable reference")
 {
     std::vector<std::string> log;
@@ -87,7 +109,7 @@ TEST_CASE("LayerStack::push_layer constructs the layer, attaches it immediately,
     log.clear();
     for (auto& layer : stack)
     {
-        layer->update();
+        layer->update(0.016);
     }
 
     CHECK(log == std::vector<std::string>{ "A:update", "B:update" });
@@ -153,7 +175,7 @@ public:
 
     void attach() override { run(Phase::Attach, "attach"); }
     void detach() override { run(Phase::Detach, "detach"); }
-    void update() override { run(Phase::Update, "update"); }
+    void update(double) override { run(Phase::Update, "update"); }
     void event(oryx::Event&) override { run(Phase::Event, "event"); }
 
 private:
@@ -187,12 +209,12 @@ TEST_CASE("A layer that throws in update is disabled and skipped afterwards whil
     stack.push_layer<RecordingLayer>("B", log);
     log.clear();
 
-    CHECK_NOTHROW(stack.update());
+    CHECK_NOTHROW(stack.update(0.016));
     CHECK(failing.is_disabled());
     CHECK(log == std::vector<std::string>{ "A:update", "F:update", "B:update" });
 
     log.clear();
-    stack.update();
+    stack.update(0.016);
     CHECK(log == std::vector<std::string>{ "A:update", "B:update" });
 }
 
@@ -202,7 +224,7 @@ TEST_CASE("A layer that throws a plain std::exception is handled the same way")
     oryx::LayerStack stack;
     FailingLayer& failing = stack.push_layer<FailingLayer>("F", log, Phase::Update, /*throw_oryx_error=*/false);
 
-    CHECK_NOTHROW(stack.update());
+    CHECK_NOTHROW(stack.update(0.016));
     CHECK(failing.is_disabled());
 }
 
@@ -215,7 +237,7 @@ TEST_CASE("A layer that throws in attach is disabled but stays in the stack and 
         CHECK(failing.is_disabled());
 
         log.clear();
-        stack.update();
+        stack.update(0.016);
         CHECK(log.empty());
     }
 
@@ -283,7 +305,7 @@ TEST_CASE("The disabled handler reports a layer that failed in attach, update or
         stack.push_layer<FailingLayer>("UpdateFail", log, Phase::Update);
         stack.push_layer<FailingLayer>("EventFail", log, Phase::Event);
         stack.push_layer<FailingLayer>("DetachFail", log, Phase::Detach);
-        stack.update();
+        stack.update(0.016);
         NullEvent event;
         stack.dispatch_event(event);
 
@@ -300,7 +322,7 @@ TEST_CASE("A healthy layer never reaches the disabled handler")
     oryx::LayerStack stack;
     stack.set_disabled_handler([&called](oryx::Layer&, std::string_view) { called = true; });
     stack.push_layer<RecordingLayer>("A", log);
-    stack.update();
+    stack.update(0.016);
 
     CHECK_FALSE(called);
 }
