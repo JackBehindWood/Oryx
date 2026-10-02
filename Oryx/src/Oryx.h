@@ -76,4 +76,5 @@
 #ifdef OX_ENABLE_GRAPHICS
 #include "Oryx/Graphics/RHI/RHI.h"
 #include "Oryx/Renderer/GraphicsLayer.h"
+#include "Oryx/Renderer/Renderer.h"
 #endif

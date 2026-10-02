@@ -97,7 +97,7 @@ TEST_CASE("NullWindow resize, focus and close")
     app.window->inject_close();
     CHECK(app.window->should_close());
 
-    std::vector<EventType> expected = { EventType::WindowResize, EventType::WindowFocus, EventType::WindowClose };
+    std::vector<EventType> expected = { EventType::WindowResize, EventType::WindowFocus, EventType::ApplicationClose, EventType::WindowClose };
     CHECK(app.recorder->types == expected);
 }
 

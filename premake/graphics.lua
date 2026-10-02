@@ -45,7 +45,7 @@ end
 function linkOryxGraphics()
     if graphicsEnabled() then
         filter "system:macosx"
-            links { "glfw", "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework", "CoreFoundation.framework" }
+            links { "glfw", "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework", "CoreFoundation.framework", "CoreGraphics.framework" }
         filter {}
     end
 end

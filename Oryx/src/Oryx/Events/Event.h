@@ -9,6 +9,7 @@ enum class EventType
 {
     None = 0,
     AppTick,
+    ApplicationClose,
     StartSimulation,
     SimulationComplete,
     ReloadScripts,

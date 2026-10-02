@@ -11,7 +11,7 @@ oryx::Colour playground_clear_colour(double time, oryx::Vec2f cursor, oryx::Vec2
 class PlaygroundLayer : public oryx::Layer
 {
 public:
-    PlaygroundLayer();
+    explicit PlaygroundLayer(oryx::RHIBackend backend = oryx::default_rhi_backend());
 
     void attach() override;
     void update(double delta_time) override;
@@ -23,6 +23,7 @@ private:
     bool on_window_resize(oryx::WindowResizeEvent& event);
     bool on_window_focus(oryx::WindowFocusEvent& event);
     bool on_window_close(oryx::WindowCloseEvent& event);
+    bool on_application_close(oryx::ApplicationCloseEvent& event);
     bool on_key_pressed(oryx::KeyPressedEvent& event);
     bool on_key_released(oryx::KeyReleasedEvent& event);
     bool on_mouse_moved(oryx::MouseMovedEvent& event);
@@ -31,6 +32,7 @@ private:
     bool on_mouse_scrolled(oryx::MouseScrolledEvent& event);
 
     oryx::Window* m_window = nullptr;
+    oryx::RHIBackend m_backend;
     oryx::Colour m_clear;
     oryx::Vec2f m_size;
     double m_time = 0.0;

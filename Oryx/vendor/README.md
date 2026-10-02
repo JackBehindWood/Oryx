@@ -13,3 +13,5 @@ Both flows are scaffolded by `uv run forge vendor add` — see
 ## Pinned versions
 
 `pybind11/` is a git submodule pinned to an untagged upstream commit (`v3.0.2-82-g97bf890d`), not a release tag. It is the snapshot the Python backend was developed and tested against (CPython 3.11 and 3.14); move it to a release tag once one contains that commit, then re-run the Python-on and `--no-python` builds.
+
+`metal-cpp/` is a plain copy (not a submodule) of https://github.com/apple/metal-cpp at commit `27c4382b7151` (2026-06-08, the macOS 27 / iOS 27 headers): `Foundation/`, `Metal/`, `QuartzCore/`, `LICENSE.txt`, `README.md` only (no `SingleHeader/` or `MetalFX/`). Header-only; exactly one TU (`backends/Metal/MetalImplementation.cpp`) defines the `*_PRIVATE_IMPLEMENTATION` macros.

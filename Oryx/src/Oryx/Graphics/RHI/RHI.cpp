@@ -3,6 +3,9 @@
 
 #include "Oryx/Core/Error.h"
 #include "NullRHI.h"
+#ifdef OX_PLATFORM_MACOS
+#include "MetalRHI.h"
+#endif
 
 namespace oryx
 {
@@ -75,7 +78,11 @@ UniquePtr<IRHI> create_rhi(RHIBackend backend)
     switch (backend)
     {
     case RHIBackend::Null: return create_unique<NullRHI>();
+#ifdef OX_PLATFORM_MACOS
+    case RHIBackend::Metal: return create_unique<MetalRHI>();
+#else
     case RHIBackend::Metal: not_implemented(backend);
+#endif
     case RHIBackend::OpenGL: not_implemented(backend);
     case RHIBackend::Vulkan: not_implemented(backend);
     case RHIBackend::D3D12: not_implemented(backend);

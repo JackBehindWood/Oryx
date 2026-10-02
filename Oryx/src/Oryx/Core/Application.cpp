@@ -1,6 +1,7 @@
 #include "oxpch.h"
 #include "Oryx/Core/Application.h"
 #include "Oryx/Core/Error.h"
+#include "Oryx/Events/WindowEvent.h"
 
 namespace oryx 
 {
@@ -85,6 +86,16 @@ Window& Application::adopt_window(UniquePtr<Window> window)
 {
     m_window = std::move(window);
     return *m_window;
+}
+
+void Application::on_event(Event& event)
+{
+    EventDispatcher dispatcher(event);
+    dispatcher.dispatch<WindowCloseEvent>([this](WindowCloseEvent&)
+    {
+        close();
+        return false;
+    });
 }
 
 void Application::post_event(Event& event)

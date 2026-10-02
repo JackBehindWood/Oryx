@@ -138,7 +138,7 @@ NullViewport::NullViewport(const RHIViewportDesc& desc)
 {
 }
 
-void NullViewport::resize(uint32_t width, uint32_t height, float)
+void NullViewport::resize(uint32_t width, uint32_t height)
 {
     if (width != m_width || height != m_height)
     {
@@ -267,6 +267,16 @@ RHIViewportPtr NullRHI::create_viewport(const RHIViewportDesc& desc)
         throw Error("RHI viewport format is not supported by NullRHI");
     }
     return make_ref<NullViewport>(desc);
+}
+
+void NullRHI::resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float)
+{
+    NullViewport* null_viewport = dynamic_cast<NullViewport*>(&viewport);
+    if (null_viewport == nullptr)
+    {
+        throw Error("RHI resize_viewport received a viewport from a different backend");
+    }
+    null_viewport->resize(width, height);
 }
 
 void NullRHI::submit(RHICommandList& commands)

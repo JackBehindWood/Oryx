@@ -2,6 +2,7 @@
 
 #include "Oryx/Core/Layer.h"
 #include "Oryx/Core/Window.h"
+#include "Oryx/Graphics/RHI/RHIViewport.h"
 
 namespace oryx
 {
@@ -13,6 +14,7 @@ public:
     GraphicsLayer();
 
     void attach() override;
+    void detach() override;
     void update(double delta_time) override;
     void event(Event& event) override;
 
@@ -21,6 +23,8 @@ public:
 
 private:
     Window* m_window = nullptr;
+    // Created only when a Renderer exists at attach time; released in detach, before the device goes away.
+    RHIViewportPtr m_viewport;
     int32_t m_width = 0;
     int32_t m_height = 0;
 };

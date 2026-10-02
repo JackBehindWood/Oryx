@@ -56,7 +56,9 @@ TEST_CASE("GraphicsLayer takes its size from the window and follows resizes")
 TEST_CASE("GraphicsLayer closes the application on window close")
 {
     GraphicsApp app(true);
+    CHECK_FALSE(app.closing());
     app.window->inject_close();
+    CHECK(app.closing());
     CHECK(app.exit_code() == 0);
     CHECK(app.disabled == 0);
 }

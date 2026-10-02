@@ -19,8 +19,9 @@ oryx::Colour playground_clear_colour(double time, oryx::Vec2f cursor, oryx::Vec2
     return colour;
 }
 
-PlaygroundLayer::PlaygroundLayer()
+PlaygroundLayer::PlaygroundLayer(oryx::RHIBackend backend)
     : Layer("PlaygroundLayer")
+    , m_backend(backend)
 {
 }
 
@@ -35,6 +36,16 @@ void PlaygroundLayer::attach()
     oryx::NativeWindowHandle handle = m_window->native_handle();
     m_size = oryx::Vec2f(static_cast<float>(handle.width), static_cast<float>(handle.height));
     OX_INFO("Playground window {}x{}, content scale {}", handle.width, handle.height, handle.content_scale);
+
+    oryx::Renderer::init({ m_backend });
+    oryx::IRHI& rhi = oryx::Renderer::rhi();
+    OX_INFO("Playground RHI {} on '{}', {} frames in flight", oryx::to_string(m_backend), rhi.capabilities().name, rhi.capabilities().frames_in_flight);
+   
+    // Created and dropped at once to exercise deferred retirement.
+    const std::array<uint8_t, 64> pixels = {};
+    rhi.create_buffer({ .size = 64, .initial_data = pixels.data(), .initial_data_size = 64 });
+    rhi.create_texture({ .width = 4, .height = 4, .initial_data = pixels.data(), .initial_data_size = 64 });
+    rhi.create_sampler({});
 }
 
 void PlaygroundLayer::update(double delta_time)
@@ -44,6 +55,7 @@ void PlaygroundLayer::update(double delta_time)
     oryx::Vec2f cursor;
     oryx::Input::cursor_position(cursor);
     m_clear = playground_clear_colour(m_time, cursor, m_size);
+    oryx::Renderer::clear(m_clear);
 }
 
 void PlaygroundLayer::event(oryx::Event& event)
@@ -52,6 +64,7 @@ void PlaygroundLayer::event(oryx::Event& event)
     dispatcher.dispatch<oryx::WindowResizeEvent>(OX_BIND_EVENT_FN(on_window_resize));
     dispatcher.dispatch<oryx::WindowFocusEvent>(OX_BIND_EVENT_FN(on_window_focus));
     dispatcher.dispatch<oryx::WindowCloseEvent>(OX_BIND_EVENT_FN(on_window_close));
+    dispatcher.dispatch<oryx::ApplicationCloseEvent>(OX_BIND_EVENT_FN(on_application_close));
     dispatcher.dispatch<oryx::KeyPressedEvent>(OX_BIND_EVENT_FN(on_key_pressed));
     dispatcher.dispatch<oryx::KeyReleasedEvent>(OX_BIND_EVENT_FN(on_key_released));
     dispatcher.dispatch<oryx::MouseMovedEvent>(OX_BIND_EVENT_FN(on_mouse_moved));
@@ -76,6 +89,12 @@ bool PlaygroundLayer::on_window_focus(oryx::WindowFocusEvent& event)
 bool PlaygroundLayer::on_window_close(oryx::WindowCloseEvent&)
 {
     OX_INFO("Playground window close requested");
+    return false;
+}
+
+bool PlaygroundLayer::on_application_close(oryx::ApplicationCloseEvent& event)
+{
+    OX_INFO("Playground application closing (exit code {})", event.exit_code());
     return false;
 }
 

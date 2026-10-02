@@ -38,6 +38,7 @@ yaml-cpp = { kind = "static", include = "include", sources = "src" }
 pybind11 = { include = "include", requires = ["python"] }
 glfw = { kind = "static", include = "include", sources = "src", requires = ["graphics"] }
 stb = { include = "." }
+metal-cpp = { include = ".", requires = ["graphics"] }
 doctest = { include = "doctest", path = "tests/vendor/doctest" }
 
 [docs]

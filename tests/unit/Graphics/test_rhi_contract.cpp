@@ -128,11 +128,11 @@ void run_rhi_contract(IRHI& rhi)
         CHECK(back_buffer->height() == 32);
         CHECK(viewport->acquire_back_buffer().get() == back_buffer.get());
 
-        viewport->resize(0, 0, 1.0f);
+        rhi.resize_viewport(*viewport, 0, 0, 1.0f);
         CHECK(viewport->width() == 0);
         CHECK_FALSE(viewport->acquire_back_buffer());
 
-        viewport->resize(16, 8, 2.0f);
+        rhi.resize_viewport(*viewport, 16, 8, 2.0f);
         RHIRenderTargetPtr resized = viewport->acquire_back_buffer();
         REQUIRE(resized);
         CHECK(resized->width() == 16);
@@ -199,7 +199,7 @@ TEST_CASE("RHI contract: Null backend")
 
 TEST_CASE("RHI contract: unimplemented backends throw Error")
 {
-    for (RHIBackend backend : { RHIBackend::Metal, RHIBackend::OpenGL, RHIBackend::Vulkan, RHIBackend::D3D12, RHIBackend::WebGPU })
+    for (RHIBackend backend : { RHIBackend::OpenGL, RHIBackend::Vulkan, RHIBackend::D3D12, RHIBackend::WebGPU })
     {
         CAPTURE(to_string(backend));
         CHECK_THROWS_AS(create_rhi(backend), Error);

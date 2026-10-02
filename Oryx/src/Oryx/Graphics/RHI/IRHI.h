@@ -32,6 +32,8 @@ public:
     virtual RHIGraphicsPipelinePtr create_graphics_pipeline(const RHIGraphicsPipelineDesc& desc) = 0;
     virtual RHIRenderTargetPtr create_render_target(const RHIRenderTargetDesc& desc) = 0;
     virtual RHIViewportPtr create_viewport(const RHIViewportDesc& desc) = 0;
+    // Size is in pixels; zero is allowed (the viewport then has no back buffer). Drops the current back buffer; frames in flight keep theirs.
+    virtual void resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float scale) = 0;
 
     // Consumes the list: its retained resources move to the current frame and stay alive until that frame completes.
     virtual void submit(RHICommandList& commands) = 0;

@@ -66,6 +66,7 @@ project "Oryx"
         filter "system:macosx"
             files {
                 "backends/Metal/**.h",
+                "backends/Metal/**.cpp",
                 "backends/Metal/**.mm",
                 "backends/MacOS/**.h",
                 "backends/MacOS/**.mm"
@@ -73,9 +74,17 @@ project "Oryx"
             includedirs {
                 "backends/Metal",
                 "backends/MacOS",
-                forge.include("glfw")
+                forge.include("glfw"),
+                forge.include("metal-cpp")
             }
-            links { "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework", "CoreFoundation.framework" }
+            links { "Metal.framework", "QuartzCore.framework", "Foundation.framework", "AppKit.framework", "IOKit.framework", "Cocoa.framework", "CoreFoundation.framework", "CoreGraphics.framework" }
+
+        filter "files:backends/Metal/**.cpp"
+            flags { "NoPCH" }
+
+        -- metal-cpp's NS::SharedPtr deliberately messages nil (a no-op) on null objects, which UBSan's null check flags; RHI.cpp instantiates it through MetalRHI.h.
+        filter { "files:backends/Metal/**.cpp or src/Oryx/Graphics/RHI/RHI.cpp" }
+            buildoptions { "-fno-sanitize=null" }
 
         filter "files:backends/Metal/**.mm"
             flags { "NoPCH" }

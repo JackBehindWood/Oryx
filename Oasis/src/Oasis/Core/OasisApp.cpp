@@ -21,6 +21,7 @@ constexpr std::string_view kBenchmarkFlag = "--benchmark";
 constexpr std::string_view kNoWindowFlag = "--no-window";
 constexpr std::string_view kPlaygroundFlag = "--playground";
 constexpr std::string_view kNoPlaygroundFlag = "--no-playground";
+constexpr std::string_view kRhiFlagPrefix = "--rhi=";
 
 std::string flag_value(const oryx::ApplicationCommandLineArgs& args, std::string_view prefix)
 {
@@ -74,7 +75,8 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
             create_window({ "Oasis" });
             if (has_flag(args, kPlaygroundFlag) || !has_flag(args, kNoPlaygroundFlag))
             {
-                push_layer<PlaygroundLayer>();
+                std::string rhi = flag_value(args, kRhiFlagPrefix);
+                push_layer<PlaygroundLayer>(rhi.empty() ? oryx::default_rhi_backend() : oryx::parse_rhi_backend(rhi));
             }
             push_overlay<oryx::GraphicsLayer>();
         }
@@ -89,6 +91,8 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
 
 void OasisApp::on_event(oryx::Event& event)
 {
+    Application::on_event(event);
+
     oryx::EventDispatcher dispatcher(event);
     dispatcher.dispatch<oryx::StartSimulationEvent>(OX_BIND_EVENT_FN(on_start_simulation));
 }

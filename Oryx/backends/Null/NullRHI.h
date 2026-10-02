@@ -92,7 +92,7 @@ class NullViewport final : public RHIViewport
 public:
     explicit NullViewport(const RHIViewportDesc& desc);
 
-    void resize(uint32_t width, uint32_t height, float scale) override;
+    void resize(uint32_t width, uint32_t height);
     [[nodiscard]] uint32_t width() const override { return m_width; }
     [[nodiscard]] uint32_t height() const override { return m_height; }
     [[nodiscard]] RHIFormat format() const override { return m_format; }
@@ -123,6 +123,7 @@ public:
     RHIGraphicsPipelinePtr create_graphics_pipeline(const RHIGraphicsPipelineDesc& desc) override;
     RHIRenderTargetPtr create_render_target(const RHIRenderTargetDesc& desc) override;
     RHIViewportPtr create_viewport(const RHIViewportDesc& desc) override;
+    void resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float scale) override;
 
     void submit(RHICommandList& commands) override;
     void present(RHIViewport& viewport, RHITexture* source = nullptr) override;

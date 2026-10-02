@@ -20,7 +20,6 @@ struct RHIViewportDesc
 class RHIViewport : public RHIResource
 {
 public:
-    virtual void resize(uint32_t width, uint32_t height, float scale) = 0;
     [[nodiscard]] virtual uint32_t width() const = 0;
     [[nodiscard]] virtual uint32_t height() const = 0;
     [[nodiscard]] virtual RHIFormat format() const = 0;
