@@ -116,8 +116,8 @@ TEST_CASE("NullRHI buffers store updates and clears write the colour")
 TEST_CASE("NullRHI rejects mismatched shader stages and unsupported render target formats")
 {
     NullRHI rhi;
-    CHECK_THROWS_AS(rhi.create_vertex_shader({ .stage = ShaderStage::Pixel }), Error);
-    CHECK_THROWS_AS(rhi.create_pixel_shader({ .stage = ShaderStage::Compute }), Error);
+    CHECK_THROWS_AS(rhi.create_vertex_shader({ .stage = RHIShaderStage::Pixel }), Error);
+    CHECK_THROWS_AS(rhi.create_pixel_shader({ .stage = RHIShaderStage::Compute }), Error);
     RHITexturePtr depth = rhi.create_texture({ .width = 2, .height = 2, .format = RHIFormat::Depth32Float, .usage = RHITextureUsage::RenderTarget });
     CHECK_THROWS_AS(rhi.create_render_target({ .colour = depth }), Error);
 }
@@ -254,8 +254,8 @@ namespace
 RHIGraphicsPipelineDesc minimal_pipeline_desc(NullRHI& rhi)
 {
     RHIGraphicsPipelineDesc desc;
-    desc.vertex = rhi.create_vertex_shader({ .stage = ShaderStage::Vertex });
-    desc.pixel = rhi.create_pixel_shader({ .stage = ShaderStage::Pixel });
+    desc.vertex = rhi.create_vertex_shader({ .stage = RHIShaderStage::Vertex });
+    desc.pixel = rhi.create_pixel_shader({ .stage = RHIShaderStage::Pixel });
     desc.colour_formats[0] = RHIFormat::RGBA8Unorm;
     return desc;
 }

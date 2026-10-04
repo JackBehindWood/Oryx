@@ -75,6 +75,15 @@
 
 #ifdef OX_ENABLE_GRAPHICS
 #include "Oryx/Graphics/RHI/RHI.h"
+#include "Oryx/Shaders/ShaderCache.h"
+#include "Oryx/Shaders/ShaderHash.h"
+#include "Oryx/Shaders/ShaderInclude.h"
+#include "Oryx/Shaders/MslShaderCompiler.h"
+#include "Oryx/Shaders/ShaderBindings.h"
+#include "Oryx/Shaders/ShaderLibrary.h"
+#include "Oryx/Shaders/ShaderSet.h"
+#include "Oryx/Shaders/Builtin/BuiltinShaders.h"
+#include "Oryx/Graphics/Resources/Pipeline.h"
 #include "Oryx/Renderer/GraphicsLayer.h"
 #include "Oryx/Renderer/Renderer.h"
 #endif

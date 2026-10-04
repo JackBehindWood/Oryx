@@ -6,7 +6,7 @@ namespace oryx
 {
 
 // Compute and tessellation stages are reserved; no backend creates them yet.
-enum class ShaderStage : uint8_t
+enum class RHIShaderStage : uint8_t
 {
     Vertex,
     Pixel,
@@ -15,12 +15,12 @@ enum class ShaderStage : uint8_t
     TessEval
 };
 
-inline constexpr uint32_t SHADER_STAGE_COUNT = static_cast<uint32_t>(ShaderStage::TessEval) + 1;
+inline constexpr uint32_t RHI_SHADER_STAGE_COUNT = static_cast<uint32_t>(RHIShaderStage::TessEval) + 1;
 
 // code is backend-defined (MSL text for Metal); code and entry_point are only read during creation.
 struct RHIShaderDesc
 {
-    ShaderStage stage = ShaderStage::Vertex;
+    RHIShaderStage stage = RHIShaderStage::Vertex;
     const char* entry_point = "main";
     const uint8_t* code = nullptr;
     uint32_t code_size = 0;
@@ -29,35 +29,28 @@ struct RHIShaderDesc
 class RHIShader : public RHIResource
 {
 public:
-    [[nodiscard]] ShaderStage stage() const { return m_stage; }
+    [[nodiscard]] virtual inline RHIShaderStage stage() const = 0;
 
 protected:
-    explicit RHIShader(const RHIShaderDesc& desc)
-        : RHIResource()
-        , m_stage(desc.stage)
-    {
-    }
-
-private:
-    ShaderStage m_stage;
+    RHIShader() = default;
 };
 
 class RHIVertexShader : public RHIShader
 {
+public:
+    [[nodiscard]] inline RHIShaderStage stage() const final { return RHIShaderStage::Vertex; }
+
 protected:
-    explicit RHIVertexShader(const RHIShaderDesc& desc)
-        : RHIShader(desc)
-    {
-    }
+    explicit RHIVertexShader(const RHIShaderDesc&) {}
 };
 
 class RHIPixelShader : public RHIShader
 {
+public:
+    [[nodiscard]] inline RHIShaderStage stage() const final { return RHIShaderStage::Pixel; }
+
 protected:
-    explicit RHIPixelShader(const RHIShaderDesc& desc)
-        : RHIShader(desc)
-    {
-    }
+    explicit RHIPixelShader(const RHIShaderDesc&) {}
 };
 
 using RHIShaderPtr = Ref<RHIShader>;

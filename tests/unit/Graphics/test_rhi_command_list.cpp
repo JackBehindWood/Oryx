@@ -41,8 +41,8 @@ struct CommandListFixture
             { .kind = RHIBindingKind::SampledTexture, .stage_mask = RHIShaderStageMask::Pixel, .data_type = RHIDataType::Depth, .slot = 5 },
         };
         RHIGraphicsPipelineDesc desc;
-        desc.vertex = rhi.create_vertex_shader({ .stage = ShaderStage::Vertex });
-        desc.pixel = rhi.create_pixel_shader({ .stage = ShaderStage::Pixel });
+        desc.vertex = rhi.create_vertex_shader({ .stage = RHIShaderStage::Vertex });
+        desc.pixel = rhi.create_pixel_shader({ .stage = RHIShaderStage::Pixel });
         desc.colour_formats[0] = colour;
         desc.depth_format = depth;
         desc.bindings = bindings;
@@ -491,8 +491,8 @@ TEST_CASE("RHICommandList rejects a pipeline whose sample count differs from the
     CommandListFixture f;
     const RHIBindingDesc binding = { .kind = RHIBindingKind::Sampler, .stage_mask = RHIShaderStageMask::Pixel };
     RHIGraphicsPipelineDesc desc;
-    desc.vertex = f.rhi.create_vertex_shader({ .stage = ShaderStage::Vertex });
-    desc.pixel = f.rhi.create_pixel_shader({ .stage = ShaderStage::Pixel });
+    desc.vertex = f.rhi.create_vertex_shader({ .stage = RHIShaderStage::Vertex });
+    desc.pixel = f.rhi.create_pixel_shader({ .stage = RHIShaderStage::Pixel });
     desc.colour_formats[0] = RHIFormat::RGBA8Unorm;
     desc.sample_count = 4;
     desc.bindings = &binding;

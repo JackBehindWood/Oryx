@@ -306,18 +306,18 @@ RHISamplerPtr NullRHI::create_sampler(const RHISamplerDesc& desc)
 
 RHIVertexShaderPtr NullRHI::create_vertex_shader(const RHIShaderDesc& desc)
 {
-    if (desc.stage != ShaderStage::Vertex)
+    if (desc.stage != RHIShaderStage::Vertex)
     {
-        throw Error("create_vertex_shader requires ShaderStage::Vertex");
+        throw Error("create_vertex_shader requires RHIShaderStage::Vertex");
     }
     return make_ref<NullVertexShader>(desc);
 }
 
 RHIPixelShaderPtr NullRHI::create_pixel_shader(const RHIShaderDesc& desc)
 {
-    if (desc.stage != ShaderStage::Pixel)
+    if (desc.stage != RHIShaderStage::Pixel)
     {
-        throw Error("create_pixel_shader requires ShaderStage::Pixel");
+        throw Error("create_pixel_shader requires RHIShaderStage::Pixel");
     }
     return make_ref<NullPixelShader>(desc);
 }

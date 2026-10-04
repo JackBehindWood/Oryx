@@ -117,7 +117,7 @@ TEST_CASE("Metal RHI: pipelines and draws are not implemented yet")
         return;
     }
     CHECK_THROWS_AS(rhi->create_vertex_shader({}), Error);
-    CHECK_THROWS_AS(rhi->create_pixel_shader({ .stage = ShaderStage::Pixel }), Error);
+    CHECK_THROWS_AS(rhi->create_pixel_shader({ .stage = RHIShaderStage::Pixel }), Error);
 }
 
 TEST_CASE("Metal RHI: present copies a source texture into the viewport")
