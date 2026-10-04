@@ -5,10 +5,10 @@
 namespace oryx
 {
 
-// Base of the engine's own shaders (`class QuadPS : public BuiltinShader<PixelShader>`); register one with OX_REGISTER_SHADER.
-// A subclass shadows defines_for/should_compile to add permutations.
+// Base of a shader whose source is fixed in code, the engine's own or an application's (`class QuadPS : public StaticShader<PixelShader>`);
+// register one with OX_REGISTER_SHADER and ShaderLibrary::compile_all builds it. A subclass shadows defines_for/should_compile to add permutations.
 template<typename StageShader>
-class BuiltinShader : public StageShader
+class StaticShader : public StageShader
 {
 public:
     using StageShader::StageShader;

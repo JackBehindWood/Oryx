@@ -75,8 +75,9 @@ OasisApp::OasisApp(oryx::ApplicationCommandLineArgs args)
             create_window({ "Oasis" });
             if (has_flag(args, kPlaygroundFlag) || !has_flag(args, kNoPlaygroundFlag))
             {
-                std::string rhi = flag_value(args, kRhiFlagPrefix);
-                push_layer<PlaygroundLayer>(rhi.empty() ? oryx::default_rhi_backend() : oryx::parse_rhi_backend(rhi));
+                const std::string rhi = flag_value(args, kRhiFlagPrefix);
+                oryx::Renderer::init({ .backend = rhi.empty() ? oryx::default_rhi_backend() : oryx::parse_rhi_backend(rhi) });
+                push_layer<PlaygroundLayer>();
             }
             push_overlay<oryx::GraphicsLayer>();
         }

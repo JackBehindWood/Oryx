@@ -6,7 +6,7 @@
 namespace oryx
 {
 
-struct PipelineState
+struct GraphicsPipelineState
 {
     VertexLayout vertex_layout;
     RHITopology topology = RHITopology::Triangles;
@@ -20,10 +20,10 @@ struct PipelineState
 };
 
 // Owns an RHI pipeline and resolves binding names to the ids its commands take; `names[i]` names binding id `i`.
-class Pipeline
+class GraphicsPipeline
 {
 public:
-    Pipeline(RHIGraphicsPipelinePtr pipeline, std::vector<std::string> names);
+    GraphicsPipeline(RHIGraphicsPipelinePtr pipeline, std::vector<std::string> names);
 
     [[nodiscard]] RHIGraphicsPipeline& rhi() const { return *m_pipeline; }
     [[nodiscard]] const RHIGraphicsPipelinePtr& rhi_ptr() const { return m_pipeline; }

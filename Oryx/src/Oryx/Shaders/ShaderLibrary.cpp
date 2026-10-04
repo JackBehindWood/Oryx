@@ -39,9 +39,9 @@ void ShaderLibrary::compile_all(IRHI& rhi, ShaderCache& cache)
     }
 }
 
-const Ref<Shader>& ShaderLibrary::find(std::type_index type, uint32_t permutation) const
+const ShaderPtr& ShaderLibrary::find(std::type_index type, uint32_t permutation) const
 {
-    const std::map<std::pair<std::type_index, uint32_t>, Ref<Shader>>::const_iterator it = m_shaders.find({ type, permutation });
+    const std::map<std::pair<std::type_index, uint32_t>, ShaderPtr>::const_iterator it = m_shaders.find({ type, permutation });
     if (it == m_shaders.end())
     {
         throw Error(std::string("shader '") + type.name() + "' permutation " + std::to_string(permutation) + " is not in the library");

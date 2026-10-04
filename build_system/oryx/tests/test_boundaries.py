@@ -57,3 +57,13 @@ def test_real_core_window_and_input_include_no_graphics_module():
     for name in ("Window.h", "Input.h", "PolledInput.h"):
         includes = boundaries._includes(REPO_SRC / "Oryx" / "Core" / name)
         assert not [i for i in includes if boundaries._module_of(i) in boundaries.GRAPHICS_MODULES]
+
+
+def test_backend_factories_may_include_backend_headers_but_nothing_else(tmp_path):
+    src = _tree(tmp_path, {
+        "Graphics/RHI/RHI.cpp": '#include "NullRHI.h"\n#include "MetalRHI.h"\n',
+        "Core/Window.cpp": '#include "NullWindow.h"\n',
+        "Graphics/RHI/Other.cpp": '#include "NullRHI.h"\n',
+        "Renderer/R.cpp": '#include "MetalRHI.h"\n',
+    })
+    assert len(boundaries.check_includes(src)) == 2

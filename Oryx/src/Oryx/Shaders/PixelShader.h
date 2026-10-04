@@ -26,4 +26,6 @@ private:
     RHIPixelShaderPtr m_rhi;
 };
 
+using PixelShaderPtr = Ref<PixelShader>;
+
 } // namespace oryx

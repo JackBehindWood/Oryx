@@ -1,19 +1,10 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIResource.h"
 
 namespace oryx
 {
-
-// Compute and tessellation stages are reserved; no backend creates them yet.
-enum class RHIShaderStage : uint8_t
-{
-    Vertex,
-    Pixel,
-    Compute,
-    TessControl,
-    TessEval
-};
 
 inline constexpr uint32_t RHI_SHADER_STAGE_COUNT = static_cast<uint32_t>(RHIShaderStage::TessEval) + 1;
 

@@ -18,13 +18,13 @@ uint32_t layout_extent(const VertexLayout& layout)
     return extent;
 }
 
-struct BuiltinFixture
+struct StaticFixture
 {
     NullRHI rhi;
     ShaderCache cache;
     ShaderLibrary library;
 
-    BuiltinFixture()
+    StaticFixture()
     {
         library.compile(rhi, cache, shader_type_of<SolidVS>());
         library.compile(rhi, cache, shader_type_of<SolidPS>());
@@ -37,10 +37,10 @@ struct BuiltinFixture
 
 void check_frame_binding(const Shader& shader)
 {
-    const ShaderBinding& frame = shader.binding(BUILTIN_FRAME_BINDING);
+    const ShaderBinding& frame = shader.binding(SHADER_FRAME_BINDING);
     CHECK(frame.kind == ShaderBindingKind::Constants);
     CHECK(frame.slot == 0);
-    CHECK(frame.size == BUILTIN_FRAME_SIZE);
+    CHECK(frame.size == SHADER_FRAME_SIZE);
     REQUIRE(frame.members.size() == 1);
     CHECK(frame.members[0].name == "view_projection");
     CHECK(frame.members[0].size == 64);
@@ -50,7 +50,7 @@ void check_frame_binding(const Shader& shader)
 
 TEST_CASE("Built-in shaders compile and are registered")
 {
-    BuiltinFixture f;
+    StaticFixture f;
     CHECK(f.library.contains<SolidVS>());
     CHECK(f.library.contains<SolidPS>());
     CHECK(f.library.contains<QuadVS>());
@@ -65,7 +65,7 @@ TEST_CASE("Built-in shaders compile and are registered")
 
 TEST_CASE("Built-in vertex shaders share the frame constants and match their layouts")
 {
-    BuiltinFixture f;
+    StaticFixture f;
     check_frame_binding(*f.library.get<SolidVS>());
     check_frame_binding(*f.library.get<QuadVS>());
     check_frame_binding(*f.library.get<CircleVS>());
@@ -83,7 +83,7 @@ TEST_CASE("Built-in vertex shaders share the frame constants and match their lay
 
 TEST_CASE("Quad vertex and pixel shaders reflect the texture array")
 {
-    BuiltinFixture f;
+    StaticFixture f;
     const ShaderReflection& vertex = f.library.get<QuadVS>()->reflection();
     REQUIRE(vertex.inputs.size() == 4);
     CHECK(vertex.inputs[3].name == "tex_index");
@@ -107,7 +107,7 @@ TEST_CASE("Quad vertex and pixel shaders reflect the texture array")
 
 TEST_CASE("Circle shaders carry thickness and fade to the pixel stage")
 {
-    BuiltinFixture f;
+    StaticFixture f;
     const ShaderReflection& vertex = f.library.get<CircleVS>()->reflection();
     REQUIRE(vertex.inputs.size() == 5);
     CHECK(vertex.inputs[2].name == "local_position");
@@ -118,30 +118,30 @@ TEST_CASE("Circle shaders carry thickness and fade to the pixel stage")
 
 TEST_CASE("Built-in sets validate and create pipelines")
 {
-    BuiltinFixture f;
-    PipelineState state;
+    StaticFixture f;
+    GraphicsPipelineState state;
 
     state.vertex_layout = solid_vertex_layout();
-    ShaderSet solid{ f.library.get<SolidVS>(), f.library.get<SolidPS>() };
-    CHECK_NOTHROW(validate_shader_set(solid));
-    Pipeline solid_pipeline = make_pipeline(f.rhi, solid, state);
+    GraphicsShaderSet solid{ f.library.get<SolidVS>(), f.library.get<SolidPS>() };
+    CHECK_NOTHROW(validate_graphics_shader_set(solid));
+    GraphicsPipeline solid_pipeline = make_graphics_pipeline(f.rhi, solid, state);
     CHECK(solid_pipeline.binding_count() == 1);
 
     state.vertex_layout = quad_vertex_layout();
-    ShaderSet quad{ f.library.get<QuadVS>(), f.library.get<QuadPS>() };
-    Pipeline quad_pipeline = make_pipeline(f.rhi, quad, state);
+    GraphicsShaderSet quad{ f.library.get<QuadVS>(), f.library.get<QuadPS>() };
+    GraphicsPipeline quad_pipeline = make_graphics_pipeline(f.rhi, quad, state);
     CHECK(quad_pipeline.binding_count() == 3);
 
     state.vertex_layout = circle_vertex_layout();
-    ShaderSet circle{ f.library.get<CircleVS>(), f.library.get<CirclePS>() };
-    CHECK_NOTHROW(make_pipeline(f.rhi, circle, state));
+    GraphicsShaderSet circle{ f.library.get<CircleVS>(), f.library.get<CirclePS>() };
+    CHECK_NOTHROW(make_graphics_pipeline(f.rhi, circle, state));
 
     state.vertex_layout = solid_vertex_layout();
-    CHECK_THROWS_AS(make_pipeline(f.rhi, quad, state), Error);
+    CHECK_THROWS_AS(make_graphics_pipeline(f.rhi, quad, state), Error);
 }
 
 TEST_CASE("Shader binding lookup throws for unknown names")
 {
-    BuiltinFixture f;
+    StaticFixture f;
     CHECK_THROWS_AS(f.library.get<SolidVS>()->binding("nope"), Error);
 }

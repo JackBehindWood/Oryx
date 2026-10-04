@@ -22,10 +22,10 @@ fragment float4 test_ps(array<texture2d<float>, N> t [[texture(0)]])
 }
 )msl";
 
-class LibraryTestPS : public BuiltinShader<PixelShader>
+class LibraryTestPS : public StaticShader<PixelShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 
     static std::vector<ShaderDefine> defines_for(uint32_t permutation) { return { { "N", std::to_string(permutation + 1) } }; }
     static bool should_compile(uint32_t permutation) { return permutation < 3; }

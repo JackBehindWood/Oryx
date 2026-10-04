@@ -1,30 +1,12 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIFlags.h"
 #include "Oryx/Graphics/RHI/RHIFormat.h"
 #include "Oryx/Graphics/RHI/RHIResource.h"
 
 namespace oryx
 {
-
-enum class RHITextureUsage : uint8_t
-{
-    Sampled = BIT(0),
-    RenderTarget = BIT(1),
-    DepthStencil = BIT(2)
-};
-
-template<>
-inline constexpr bool rhi_flags_enum<RHITextureUsage> = true;
-
-enum class RHITextureDimension : uint8_t
-{
-    Tex2D,
-    Tex2DArray,
-    Cube,
-    Tex3D,
-    Tex2DMultisample
-};
 
 // initial_data is only read during creation.
 struct RHITextureDesc

@@ -1,27 +1,11 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIFlags.h"
 #include "Oryx/Graphics/RHI/RHIResource.h"
 
 namespace oryx
 {
-
-enum class RHIBufferUsage : uint8_t
-{
-    Vertex = BIT(0),
-    Index = BIT(1),
-    Uniform = BIT(2),
-    Storage = BIT(3)
-};
-
-template<>
-inline constexpr bool rhi_flags_enum<RHIBufferUsage> = true;
-
-enum class RHIMemory : uint8_t
-{
-    CpuToGpu,
-    GpuOnly
-};
 
 // Sizes and offsets are 32-bit: a buffer is limited to 4 GiB. initial_data is only read during creation.
 struct RHIBufferDesc

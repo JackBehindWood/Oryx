@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderSet.h"
+#include "Oryx/Shaders/GraphicsShaderSet.h"
 
 #include "Oryx/Core/Error.h"
 #include "Oryx/Shaders/ShaderBindings.h"
@@ -24,7 +24,7 @@ const ShaderStageVariable* find_variable(const std::vector<ShaderStageVariable>&
 
 } // namespace
 
-void validate_shader_set(const ShaderSet& set)
+void validate_graphics_shader_set(const GraphicsShaderSet& set)
 {
     if (!set.vertex || !set.pixel)
     {
@@ -51,9 +51,9 @@ void validate_shader_set(const ShaderSet& set)
     (void)to_rhi_binding_layout(vertex, pixel);
 }
 
-Pipeline make_pipeline(IRHI& rhi, const ShaderSet& set, const PipelineState& state)
+GraphicsPipeline make_graphics_pipeline(IRHI& rhi, const GraphicsShaderSet& set, const GraphicsPipelineState& state)
 {
-    validate_shader_set(set);
+    validate_graphics_shader_set(set);
     for (const ShaderStageVariable& input : set.vertex->reflection().inputs)
     {
         const RHIVertexAttribute* attribute = nullptr;
@@ -94,7 +94,7 @@ Pipeline make_pipeline(IRHI& rhi, const ShaderSet& set, const PipelineState& sta
     desc.sample_count = state.sample_count;
     desc.bindings = layout.bindings.data();
     desc.binding_count = static_cast<uint32_t>(layout.bindings.size());
-    return Pipeline(rhi.create_graphics_pipeline(desc), layout.names);
+    return GraphicsPipeline(rhi.create_graphics_pipeline(desc), layout.names);
 }
 
 } // namespace oryx

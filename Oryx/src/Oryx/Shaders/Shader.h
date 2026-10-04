@@ -31,4 +31,6 @@ private:
     uint32_t m_permutation;
 };
 
+using ShaderPtr = Ref<Shader>;
+
 } // namespace oryx

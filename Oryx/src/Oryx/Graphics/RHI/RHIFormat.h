@@ -1,19 +1,10 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Core/Base.h"
 
 namespace oryx
 {
-
-enum class RHIFormat : uint8_t
-{
-    Undefined,
-    R8Unorm,
-    RGBA8Unorm,
-    BGRA8Unorm,
-    RGBA16Float,
-    Depth32Float
-};
 
 [[nodiscard]] constexpr size_t rhi_format_bytes(RHIFormat format)
 {
@@ -28,14 +19,6 @@ enum class RHIFormat : uint8_t
     }
     return 0;
 }
-
-enum class RHIDataType : uint8_t
-{
-    Float,
-    Int,
-    UInt,
-    Depth
-};
 
 [[nodiscard]] constexpr bool rhi_format_is_depth(RHIFormat format)
 {

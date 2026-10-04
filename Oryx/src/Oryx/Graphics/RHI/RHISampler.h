@@ -1,22 +1,10 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIResource.h"
 
 namespace oryx
 {
-
-enum class RHIFilter : uint8_t
-{
-    Nearest,
-    Linear
-};
-
-enum class RHIAddressMode : uint8_t
-{
-    Clamp,
-    Repeat,
-    Mirror
-};
 
 struct RHISamplerDesc
 {

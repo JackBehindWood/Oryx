@@ -2,6 +2,8 @@
 
 #include "MetalApi.h"
 #include "Oryx/Graphics/RHI/RHIBuffer.h"
+#include "Oryx/Graphics/RHI/RHIPipeline.h"
+#include "Oryx/Graphics/RHI/RHIShader.h"
 #include "Oryx/Graphics/RHI/RHIRenderTarget.h"
 #include "Oryx/Graphics/RHI/RHISampler.h"
 #include "Oryx/Graphics/RHI/RHITexture.h"
@@ -50,6 +52,66 @@ public:
 
 private:
     NS::SharedPtr<MTL::SamplerState> m_sampler;
+};
+
+class MetalVertexShader final : public RHIVertexShader
+{
+public:
+    MetalVertexShader(const RHIShaderDesc& desc, NS::SharedPtr<MTL::Function> function)
+        : RHIVertexShader(desc)
+        , m_function(std::move(function))
+    {
+    }
+
+    [[nodiscard]] MTL::Function* mtl() const { return m_function.get(); }
+
+private:
+    NS::SharedPtr<MTL::Function> m_function;
+};
+
+class MetalPixelShader final : public RHIPixelShader
+{
+public:
+    MetalPixelShader(const RHIShaderDesc& desc, NS::SharedPtr<MTL::Function> function)
+        : RHIPixelShader(desc)
+        , m_function(std::move(function))
+    {
+    }
+
+    [[nodiscard]] MTL::Function* mtl() const { return m_function.get(); }
+
+private:
+    NS::SharedPtr<MTL::Function> m_function;
+};
+
+// Fixed-function state the encoder sets outside the pipeline state object.
+struct MetalRasterState
+{
+    MTL::CullMode cull = MTL::CullModeNone;
+    MTL::Winding winding = MTL::WindingCounterClockwise;
+    MTL::TriangleFillMode fill = MTL::TriangleFillModeFill;
+    MTL::PrimitiveType primitive = MTL::PrimitiveTypeTriangle;
+};
+
+class MetalPipeline final : public RHIGraphicsPipeline
+{
+public:
+    MetalPipeline(const RHIGraphicsPipelineDesc& desc, NS::SharedPtr<MTL::RenderPipelineState> state, NS::SharedPtr<MTL::DepthStencilState> depth_stencil, const MetalRasterState& raster)
+        : RHIGraphicsPipeline(desc)
+        , m_state(std::move(state))
+        , m_depth_stencil(std::move(depth_stencil))
+        , m_raster(raster)
+    {
+    }
+
+    [[nodiscard]] MTL::RenderPipelineState* state() const { return m_state.get(); }
+    [[nodiscard]] MTL::DepthStencilState* depth_stencil() const { return m_depth_stencil.get(); }
+    [[nodiscard]] const MetalRasterState& raster() const { return m_raster; }
+
+private:
+    NS::SharedPtr<MTL::RenderPipelineState> m_state;
+    NS::SharedPtr<MTL::DepthStencilState> m_depth_stencil;
+    MetalRasterState m_raster;
 };
 
 // Offscreen targets expose their colour texture; viewport back buffers (offscreen or drawable-backed) do not.

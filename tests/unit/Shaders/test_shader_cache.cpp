@@ -75,10 +75,11 @@ TEST_CASE("ShaderCache counts hits and misses and returns stable entries")
     CHECK(cache.stats().misses == 2);
     CHECK(&cache.get_or_compile(vertex) == &first);
 
+    const ShaderHash first_hash = first.hash;
     cache.clear();
     CHECK(cache.stats().entries == 0);
     CHECK(cache.stats().hits == 0);
-    CHECK(cache.find(first.hash) == nullptr);
+    CHECK(cache.find(first_hash) == nullptr);
 }
 
 TEST_CASE("ShaderCache does not cache failed compiles")

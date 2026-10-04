@@ -33,9 +33,9 @@ public:
     void clear() { m_shaders.clear(); }
 
 private:
-    [[nodiscard]] const Ref<Shader>& find(std::type_index type, uint32_t permutation) const;
+    [[nodiscard]] const ShaderPtr& find(std::type_index type, uint32_t permutation) const;
 
-    std::map<std::pair<std::type_index, uint32_t>, Ref<Shader>> m_shaders;
+    std::map<std::pair<std::type_index, uint32_t>, ShaderPtr> m_shaders;
 };
 
 } // namespace oryx

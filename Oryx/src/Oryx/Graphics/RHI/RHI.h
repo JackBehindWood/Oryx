@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIBackend.h"
 #include "Oryx/Graphics/RHI/RHIFlags.h"
 #include "Oryx/Graphics/RHI/RHIFormat.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Shaders/BuiltinShader.h"
+#include "Oryx/Shaders/StaticShader.h"
 #include "Oryx/Shaders/PixelShader.h"
 #include "Oryx/Shaders/VertexShader.h"
 
@@ -19,7 +19,7 @@ struct ShaderType
     const char* entry_point = "main";
     ShaderStage stage = ShaderStage::Vertex;
     std::type_index type = typeid(void);
-    Ref<Shader> (*create)(IRHI&, const ShaderCompilerOutput&, uint32_t) = nullptr;
+    ShaderPtr (*create)(IRHI&, const ShaderCompilerOutput&, uint32_t) = nullptr;
     std::vector<ShaderDefine> (*defines_for)(uint32_t) = nullptr;
     bool (*should_compile)(uint32_t) = nullptr;
 };
@@ -37,7 +37,7 @@ struct ShaderTypeRegistrar
 #define OX_REGISTER_SHADER(Class, Source, Entry, Stage)                                                                                                      \
     namespace                                                                                                                                                \
     {                                                                                                                                                        \
-    ::oryx::Ref<::oryx::Shader> create_##Class(::oryx::IRHI& rhi, const ::oryx::ShaderCompilerOutput& output, uint32_t permutation)                          \
+    ::oryx::ShaderPtr create_##Class(::oryx::IRHI& rhi, const ::oryx::ShaderCompilerOutput& output, uint32_t permutation)                          \
     {                                                                                                                                                        \
         return ::oryx::make_ref<Class>(output, permutation, Class::create_rhi_shader(rhi, output, Entry));                                                    \
     }                                                                                                                                                        \

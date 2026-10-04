@@ -5,19 +5,19 @@
 namespace oasis
 {
 
-oryx::Colour playground_clear_colour(double time, oryx::Vec2f cursor, oryx::Vec2f size);
+struct PlaygroundScene;
 
-// Long-lived graphics sandbox: grows from a clear colour to Renderer demos without being renamed.
+// Long-lived graphics sandbox: owns its buffers and textures, takes shaders and pipelines from the Renderer (initialised by the application) and submits draws; GraphicsLayer owns the frame.
 class PlaygroundLayer : public oryx::Layer
 {
 public:
-    explicit PlaygroundLayer(oryx::RHIBackend backend = oryx::default_rhi_backend());
+    PlaygroundLayer();
+    ~PlaygroundLayer() override;
 
     void attach() override;
+    void detach() override;
     void update(double delta_time) override;
     void event(oryx::Event& event) override;
-
-    [[nodiscard]] const oryx::Colour& clear_colour() const { return m_clear; }
 
 private:
     bool on_window_resize(oryx::WindowResizeEvent& event);
@@ -32,8 +32,7 @@ private:
     bool on_mouse_scrolled(oryx::MouseScrolledEvent& event);
 
     oryx::Window* m_window = nullptr;
-    oryx::RHIBackend m_backend;
-    oryx::Colour m_clear;
+    oryx::UniquePtr<PlaygroundScene> m_scene;
     oryx::Vec2f m_size;
     double m_time = 0.0;
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIBinding.h"
 #include "Oryx/Graphics/RHI/RHIFormat.h"
 #include "Oryx/Graphics/RHI/RHIRenderState.h"
@@ -29,11 +30,6 @@ struct RHIGraphicsPipelineDesc
 
 // Throws Error on a malformed description; every backend calls it before building a pipeline.
 void rhi_validate_graphics_pipeline_desc(const RHIGraphicsPipelineDesc& desc);
-
-enum class RHIPipelineKind : uint8_t
-{
-    Graphics
-};
 
 // Common base of graphics and (later) compute pipelines; owns the binding table that commands are validated against.
 class RHIPipeline : public RHIResource

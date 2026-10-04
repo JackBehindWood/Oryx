@@ -1,24 +1,12 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIRenderState.h"
 #include "Oryx/Graphics/RHI/RHIRenderTarget.h"
 #include "Oryx/Math/Colour.h"
 
 namespace oryx
 {
-
-enum class RHILoadAction : uint8_t
-{
-    Load,
-    Clear,
-    DontCare
-};
-
-enum class RHIStoreAction : uint8_t
-{
-    Store,
-    DontCare
-};
 
 struct RHIClear
 {

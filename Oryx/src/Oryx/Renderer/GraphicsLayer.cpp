@@ -34,6 +34,7 @@ void GraphicsLayer::attach()
         desc.width = static_cast<uint32_t>(handle.framebuffer_width);
         desc.height = static_cast<uint32_t>(handle.framebuffer_height);
         desc.scale = handle.content_scale;
+        desc.format = Renderer::back_buffer_format();
         m_viewport = rhi.create_viewport(desc);
         Renderer::set_viewport(m_viewport);
     }
@@ -48,10 +49,16 @@ void GraphicsLayer::detach()
     m_viewport.reset();
 }
 
+void GraphicsLayer::set_clear_colour(const Colour& colour)
+{
+    m_clear = colour;
+}
+
 void GraphicsLayer::update(double)
 {
     if (m_viewport)
     {
+        Renderer::set_clear_colour(m_clear);
         Renderer::end_frame();
     }
     m_window->poll_events();

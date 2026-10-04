@@ -26,10 +26,10 @@ struct CommandListFixture
     RHISamplerPtr sampler = rhi.create_sampler({});
     RHITexturePtr array_texture = rhi.create_texture({ .width = 4, .height = 4, .dimension = RHITextureDimension::Tex2DArray, .array_layers = 2 });
     RHITexturePtr depth_sampled = rhi.create_texture({ .width = 4, .height = 4, .format = RHIFormat::Depth32Float, .usage = RHITextureUsage::Sampled | RHITextureUsage::DepthStencil });
-    RHIGraphicsPipelinePtr pipeline = make_pipeline(RHIFormat::RGBA8Unorm, RHIFormat::Undefined);
+    RHIGraphicsPipelinePtr pipeline = make_graphics_pipeline(RHIFormat::RGBA8Unorm, RHIFormat::Undefined);
     RHICommandList list;
 
-    RHIGraphicsPipelinePtr make_pipeline(RHIFormat colour, RHIFormat depth)
+    RHIGraphicsPipelinePtr make_graphics_pipeline(RHIFormat colour, RHIFormat depth)
     {
         const RHIShaderStageMask both = RHIShaderStageMask::Vertex | RHIShaderStageMask::Pixel;
         const RHIBindingDesc bindings[] = {
@@ -470,7 +470,7 @@ TEST_CASE("RHICommandList matches pipelines to pass attachments")
 {
     CommandListFixture f;
     RHITexturePtr depth = f.rhi.create_texture({ .width = 4, .height = 4, .format = RHIFormat::Depth32Float, .usage = RHITextureUsage::DepthStencil });
-    RHIGraphicsPipelinePtr with_depth = f.make_pipeline(RHIFormat::RGBA8Unorm, RHIFormat::Depth32Float);
+    RHIGraphicsPipelinePtr with_depth = f.make_graphics_pipeline(RHIFormat::RGBA8Unorm, RHIFormat::Depth32Float);
 
     RHIRenderPassDesc pass;
     pass.colour[0].target = f.target.get();

@@ -26,4 +26,6 @@ private:
     RHIVertexShaderPtr m_rhi;
 };
 
+using VertexShaderPtr = Ref<VertexShader>;
+
 } // namespace oryx

@@ -5,6 +5,7 @@
 #include "MetalCommandQueue.h"
 #include "MetalConvert.h"
 #include "MetalDevice.h"
+#include "MetalPipeline.h"
 #include "MetalResources.h"
 #include "MetalViewport.h"
 #include "Oryx/Core/Error.h"
@@ -63,19 +64,46 @@ RHISamplerPtr MetalRHI::create_sampler(const RHISamplerDesc& desc)
     return make_ref<MetalSampler>(desc, m_device.make_sampler(desc));
 }
 
-RHIVertexShaderPtr MetalRHI::create_vertex_shader(const RHIShaderDesc&)
+namespace
 {
-    throw Error("Metal shaders are not implemented until Step 5");
+
+NS::SharedPtr<MTL::Function> make_function(MetalDevice& device, const RHIShaderDesc& desc, RHIShaderStage expected, const char* what)
+{
+    if (desc.stage != expected)
+    {
+        throw Error(std::string(what) + " requires the matching RHIShaderStage");
+    }
+    if (desc.entry_point == nullptr)
+    {
+        throw Error("RHI shader has no entry point");
+    }
+    NS::SharedPtr<MTL::Library> library = device.make_library(desc.code, desc.code_size);
+    NS::SharedPtr<MTL::Function> function = NS::TransferPtr(library->newFunction(NS::String::string(desc.entry_point, NS::UTF8StringEncoding)));
+    if (!function)
+    {
+        throw Error(std::string("Metal shader has no entry point named '") + desc.entry_point + "'");
+    }
+    return function;
 }
 
-RHIPixelShaderPtr MetalRHI::create_pixel_shader(const RHIShaderDesc&)
+} // namespace
+
+RHIVertexShaderPtr MetalRHI::create_vertex_shader(const RHIShaderDesc& desc)
 {
-    throw Error("Metal shaders are not implemented until Step 5");
+    OX_METAL_AUTORELEASE_SCOPE;
+    return make_ref<MetalVertexShader>(desc, make_function(m_device, desc, RHIShaderStage::Vertex, "create_vertex_shader"));
 }
 
-RHIGraphicsPipelinePtr MetalRHI::create_graphics_pipeline(const RHIGraphicsPipelineDesc&)
+RHIPixelShaderPtr MetalRHI::create_pixel_shader(const RHIShaderDesc& desc)
 {
-    throw Error("Metal pipelines are not implemented until Step 5");
+    OX_METAL_AUTORELEASE_SCOPE;
+    return make_ref<MetalPixelShader>(desc, make_function(m_device, desc, RHIShaderStage::Pixel, "create_pixel_shader"));
+}
+
+RHIGraphicsPipelinePtr MetalRHI::create_graphics_pipeline(const RHIGraphicsPipelineDesc& desc)
+{
+    OX_METAL_AUTORELEASE_SCOPE;
+    return create_metal_pipeline(m_device, desc);
 }
 
 RHIRenderTargetPtr MetalRHI::create_render_target(const RHIRenderTargetDesc& desc)

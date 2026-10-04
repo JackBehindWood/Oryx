@@ -27,24 +27,24 @@ struct PipelineFixture
         library.compile(rhi, cache, shader_type_of<QuadPS>());
     }
 
-    Pipeline solid()
+    GraphicsPipeline solid()
     {
-        PipelineState state;
+        GraphicsPipelineState state;
         state.vertex_layout = solid_vertex_layout();
         state.colour_formats[0] = RHIFormat::RGBA8Unorm;
-        return make_pipeline(rhi, { library.get<SolidVS>(), library.get<SolidPS>() }, state);
+        return make_graphics_pipeline(rhi, { library.get<SolidVS>(), library.get<SolidPS>() }, state);
     }
 
-    Pipeline quad()
+    GraphicsPipeline quad()
     {
-        PipelineState state;
+        GraphicsPipelineState state;
         state.vertex_layout = quad_vertex_layout();
         state.colour_formats[0] = RHIFormat::RGBA8Unorm;
         state.blend[0] = rhi_blend_alpha();
-        return make_pipeline(rhi, { library.get<QuadVS>(), library.get<QuadPS>() }, state);
+        return make_graphics_pipeline(rhi, { library.get<QuadVS>(), library.get<QuadPS>() }, state);
     }
 
-    void begin(const Pipeline& pipeline)
+    void begin(const GraphicsPipeline& pipeline)
     {
         list.begin_pass(target.get());
         list.set_pipeline(&pipeline.rhi());
@@ -54,16 +54,16 @@ struct PipelineFixture
 
 } // namespace
 
-TEST_CASE("Pipeline resolves binding names to ids")
+TEST_CASE("GraphicsPipeline resolves binding names to ids")
 {
     PipelineFixture f;
-    const Pipeline solid = f.solid();
+    const GraphicsPipeline solid = f.solid();
     CHECK(solid.binding_count() == 1);
     CHECK(solid.binding("frame") == 0);
     CHECK(solid.rhi().binding(0).kind == RHIBindingKind::Constants);
     CHECK(solid.rhi().binding(0).size == 64);
 
-    const Pipeline quad = f.quad();
+    const GraphicsPipeline quad = f.quad();
     CHECK(quad.binding_count() == 3);
     CHECK(quad.binding("frame") == 0);
     CHECK(quad.binding("textures") == 1);
@@ -72,27 +72,27 @@ TEST_CASE("Pipeline resolves binding names to ids")
     CHECK(quad.rhi().binding(quad.binding("frame")).stage_mask == (RHIShaderStageMask::Vertex));
 }
 
-TEST_CASE("Pipeline reports unknown binding names")
+TEST_CASE("GraphicsPipeline reports unknown binding names")
 {
     PipelineFixture f;
-    const Pipeline solid = f.solid();
+    const GraphicsPipeline solid = f.solid();
     CHECK_THROWS_WITH_AS(solid.binding("textures"), doctest::Contains("no binding named 'textures'"), Error);
     CHECK(solid.try_binding("textures") == RHI_INVALID_BINDING);
     CHECK(solid.try_binding("frame") == 0);
 }
 
-TEST_CASE("Pipeline construction validates its inputs")
+TEST_CASE("GraphicsPipeline construction validates its inputs")
 {
     PipelineFixture f;
-    const Pipeline solid = f.solid();
-    CHECK_THROWS_AS(Pipeline(nullptr, {}), Error);
-    CHECK_THROWS_AS(Pipeline(solid.rhi_ptr(), {}), Error);
+    const GraphicsPipeline solid = f.solid();
+    CHECK_THROWS_AS(GraphicsPipeline(nullptr, {}), Error);
+    CHECK_THROWS_AS(GraphicsPipeline(solid.rhi_ptr(), {}), Error);
 }
 
 TEST_CASE("Command lists validate against a real pipeline")
 {
     PipelineFixture f;
-    const Pipeline quad = f.quad();
+    const GraphicsPipeline quad = f.quad();
     const RHIBindingId frame = quad.binding("frame");
     const RHIBindingId textures = quad.binding("textures");
     const RHIBindingId smp = quad.binding("smp");
@@ -116,8 +116,8 @@ TEST_CASE("Command lists validate against a real pipeline")
 TEST_CASE("A frame recorded with real pipelines is accepted by NullRHI")
 {
     PipelineFixture f;
-    const Pipeline solid = f.solid();
-    const Pipeline quad = f.quad();
+    const GraphicsPipeline solid = f.solid();
+    const GraphicsPipeline quad = f.quad();
     const std::array<float, 16> matrix = {};
 
     f.list.begin_pass(f.target.get(), { Colour{ 0.0f, 0.0f, 0.0f, 1.0f }, true });

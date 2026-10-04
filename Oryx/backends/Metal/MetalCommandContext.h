@@ -1,12 +1,13 @@
 #pragma once
 
 #include "MetalApi.h"
+#include "MetalResources.h"
 #include "Oryx/Graphics/RHI/RHICommandContext.h"
 
 namespace oryx::metal
 {
 
-// Encodes one RHICommandList into one command buffer. Pipelines and draws arrive with Step 5 and throw until then.
+// Encodes one RHICommandList into one command buffer. Holds only raw pointers and scalars: the list retains every resource, and nothing allocates per draw.
 class MetalCommandContext final : public IRHICommandContext
 {
 public:
@@ -35,6 +36,10 @@ public:
 private:
     MTL::CommandBuffer& m_commands;
     NS::SharedPtr<MTL::RenderCommandEncoder> m_encoder;
+    const MetalPipeline* m_pipeline = nullptr;
+    MTL::Buffer* m_index_buffer = nullptr;
+    uint32_t m_index_offset = 0;
+    MTL::IndexType m_index_type = MTL::IndexTypeUInt16;
 };
 
 } // namespace oryx::metal

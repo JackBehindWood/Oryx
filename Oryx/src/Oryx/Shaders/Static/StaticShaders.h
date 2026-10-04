@@ -7,34 +7,37 @@ namespace oryx
 {
 
 // Every built-in shares one frame constants binding: `constant Frame& frame [[buffer(0)]]`, a single float4x4 `view_projection` (64 bytes).
-inline constexpr const char* BUILTIN_FRAME_BINDING = "frame";
-inline constexpr uint32_t BUILTIN_FRAME_SIZE = 64;
+inline constexpr const char* SHADER_FRAME_BINDING = "frame";
+inline constexpr uint32_t SHADER_FRAME_SIZE = 64;
+// The quad pixel shader's texture array and sampler.
+inline constexpr const char* SHADER_TEXTURES_BINDING = "textures";
+inline constexpr const char* SHADER_SAMPLER_BINDING = "smp";
 
 // Vertex layout: float3 position, float4 colour.
-class SolidVS : public BuiltinShader<VertexShader>
+class SolidVS : public StaticShader<VertexShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 };
 
-class SolidPS : public BuiltinShader<PixelShader>
+class SolidPS : public StaticShader<PixelShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 };
 
 // Vertex layout: float3 position, float4 colour, float2 uv, float tex_index (40 bytes).
-class QuadVS : public BuiltinShader<VertexShader>
+class QuadVS : public StaticShader<VertexShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 };
 
 // Permutation 0 samples from 16 textures, permutation 1 from 32.
-class QuadPS : public BuiltinShader<PixelShader>
+class QuadPS : public StaticShader<PixelShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 
     static constexpr uint32_t DEFAULT_TEXTURES = 16;
     static constexpr uint32_t MAX_TEXTURES = 32;
@@ -44,16 +47,16 @@ public:
 };
 
 // Vertex layout: float3 position, float4 colour, float2 local_position, float thickness, float fade (44 bytes).
-class CircleVS : public BuiltinShader<VertexShader>
+class CircleVS : public StaticShader<VertexShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 };
 
-class CirclePS : public BuiltinShader<PixelShader>
+class CirclePS : public StaticShader<PixelShader>
 {
 public:
-    using BuiltinShader::BuiltinShader;
+    using StaticShader::StaticShader;
 };
 
 [[nodiscard]] VertexLayout solid_vertex_layout();

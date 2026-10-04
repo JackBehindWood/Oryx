@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIFlags.h"
 #include "Oryx/Graphics/RHI/RHIFormat.h"
 
@@ -8,14 +9,6 @@ namespace oryx
 
 inline constexpr uint32_t RHI_MAX_VERTEX_SLOTS = 4;
 inline constexpr uint32_t RHI_MAX_COLOUR_TARGETS = 8;
-
-enum class RHIVertexFormat : uint8_t
-{
-    Float,
-    Float2,
-    Float3,
-    Float4
-};
 
 [[nodiscard]] constexpr uint32_t rhi_vertex_format_bytes(RHIVertexFormat format)
 {
@@ -37,12 +30,6 @@ struct RHIVertexAttribute
     uint32_t slot = 0;
 };
 
-enum class RHIVertexStep : uint8_t
-{
-    PerVertex,
-    PerInstance
-};
-
 struct RHIVertexStream
 {
     uint32_t stride = 0;
@@ -58,75 +45,12 @@ struct RHIVertexInput
     RHIVertexStream streams[RHI_MAX_VERTEX_SLOTS];
 };
 
-enum class RHITopology : uint8_t
-{
-    Points,
-    Lines,
-    LineStrip,
-    Triangles,
-    TriangleStrip
-};
-
-enum class RHICullMode : uint8_t
-{
-    None,
-    Front,
-    Back
-};
-
-enum class RHIFrontFace : uint8_t
-{
-    CounterClockwise,
-    Clockwise
-};
-
-enum class RHIFillMode : uint8_t
-{
-    Solid,
-    Wireframe
-};
-
 struct RHIRasterizerState
 {
     RHICullMode cull = RHICullMode::None;
     RHIFrontFace front_face = RHIFrontFace::CounterClockwise;
     RHIFillMode fill = RHIFillMode::Solid;
 };
-
-enum class RHIBlendFactor : uint8_t
-{
-    Zero,
-    One,
-    SrcColour,
-    OneMinusSrcColour,
-    DstColour,
-    OneMinusDstColour,
-    SrcAlpha,
-    OneMinusSrcAlpha,
-    DstAlpha,
-    OneMinusDstAlpha
-};
-
-enum class RHIBlendOp : uint8_t
-{
-    Add,
-    Subtract,
-    ReverseSubtract,
-    Min,
-    Max
-};
-
-enum class RHIColourWriteMask : uint8_t
-{
-    Red = BIT(0),
-    Green = BIT(1),
-    Blue = BIT(2),
-    Alpha = BIT(3),
-    All = 0xF
-};
-
-template<>
-inline constexpr bool rhi_flags_enum<RHIColourWriteMask> = true;
 
 struct RHIBlendState
 {
@@ -154,30 +78,6 @@ struct RHIBlendState
 {
     return { true, RHIBlendFactor::SrcAlpha, RHIBlendFactor::One, RHIBlendOp::Add, RHIBlendFactor::One, RHIBlendFactor::One, RHIBlendOp::Add, RHIColourWriteMask::All };
 }
-
-enum class RHICompare : uint8_t
-{
-    Never,
-    Less,
-    Equal,
-    LessEqual,
-    Greater,
-    NotEqual,
-    GreaterEqual,
-    Always
-};
-
-enum class RHIStencilOp : uint8_t
-{
-    Keep,
-    Zero,
-    Replace,
-    IncrementClamp,
-    DecrementClamp,
-    Invert,
-    IncrementWrap,
-    DecrementWrap
-};
 
 struct RHIStencilFace
 {

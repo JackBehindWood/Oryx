@@ -27,7 +27,7 @@ struct SetFixture
     NullRHI rhi;
     ShaderCache cache;
 
-    ShaderSet make(const std::string& vertex, const std::string& pixel)
+    GraphicsShaderSet make(const std::string& vertex, const std::string& pixel)
     {
         return { make_vertex_shader(rhi, cache, vertex, "vs"), make_pixel_shader(rhi, cache, pixel, "ps") };
     }
@@ -35,47 +35,47 @@ struct SetFixture
 
 } // namespace
 
-TEST_CASE("validate_shader_set accepts matching interfaces")
+TEST_CASE("validate_graphics_shader_set accepts matching interfaces")
 {
     SetFixture f;
-    CHECK_NOTHROW(validate_shader_set(f.make(vertex_source("float4 colour; float2 uv;"), pixel_source("float4 colour;"))));
-    CHECK_NOTHROW(validate_shader_set(f.make(vertex_source("float4 colour;"), pixel_source(""))));
+    CHECK_NOTHROW(validate_graphics_shader_set(f.make(vertex_source("float4 colour; float2 uv;"), pixel_source("float4 colour;"))));
+    CHECK_NOTHROW(validate_graphics_shader_set(f.make(vertex_source("float4 colour;"), pixel_source(""))));
 }
 
-TEST_CASE("validate_shader_set rejects missing stages")
+TEST_CASE("validate_graphics_shader_set rejects missing stages")
 {
     SetFixture f;
-    ShaderSet set = f.make(vertex_source(""), pixel_source(""));
-    ShaderSet no_pixel{ set.vertex, nullptr };
-    ShaderSet no_vertex{ nullptr, set.pixel };
-    CHECK_THROWS_AS(validate_shader_set(no_pixel), Error);
-    CHECK_THROWS_AS(validate_shader_set(no_vertex), Error);
+    GraphicsShaderSet set = f.make(vertex_source(""), pixel_source(""));
+    GraphicsShaderSet no_pixel{ set.vertex, nullptr };
+    GraphicsShaderSet no_vertex{ nullptr, set.pixel };
+    CHECK_THROWS_AS(validate_graphics_shader_set(no_pixel), Error);
+    CHECK_THROWS_AS(validate_graphics_shader_set(no_vertex), Error);
 }
 
-TEST_CASE("validate_shader_set rejects interface mismatches")
+TEST_CASE("validate_graphics_shader_set rejects interface mismatches")
 {
     SetFixture f;
     SUBCASE("pixel input without a vertex output")
     {
-        const ShaderSet set = f.make(vertex_source("float4 colour;"), pixel_source("float2 uv;"));
-        CHECK_THROWS_WITH_AS(validate_shader_set(set), doctest::Contains("'uv' has no matching output"), Error);
+        const GraphicsShaderSet set = f.make(vertex_source("float4 colour;"), pixel_source("float2 uv;"));
+        CHECK_THROWS_WITH_AS(validate_graphics_shader_set(set), doctest::Contains("'uv' has no matching output"), Error);
     }
     SUBCASE("type mismatch")
     {
-        const ShaderSet set = f.make(vertex_source("float2 colour;"), pixel_source("float4 colour;"));
-        CHECK_THROWS_WITH_AS(validate_shader_set(set), doctest::Contains("float4 but the vertex shader outputs float2"), Error);
+        const GraphicsShaderSet set = f.make(vertex_source("float2 colour;"), pixel_source("float4 colour;"));
+        CHECK_THROWS_WITH_AS(validate_graphics_shader_set(set), doctest::Contains("float4 but the vertex shader outputs float2"), Error);
     }
     SUBCASE("conflicting binding between stages")
     {
-        const ShaderSet set = f.make(vertex_source(""), pixel_source("", "", "Small"));
-        CHECK_THROWS_WITH_AS(validate_shader_set(set), doctest::Contains("'frame' differs"), Error);
+        const GraphicsShaderSet set = f.make(vertex_source(""), pixel_source("", "", "Small"));
+        CHECK_THROWS_WITH_AS(validate_graphics_shader_set(set), doctest::Contains("'frame' differs"), Error);
     }
 }
 
 TEST_CASE("to_rhi_binding_layout merges stages by name")
 {
     SetFixture f;
-    const ShaderSet set = f.make(vertex_source(""), pixel_source("", ", array<texture2d<float>, 4> tex [[texture(0)]], sampler smp [[sampler(1)]]"));
+    const GraphicsShaderSet set = f.make(vertex_source(""), pixel_source("", ", array<texture2d<float>, 4> tex [[texture(0)]], sampler smp [[sampler(1)]]"));
     const ShaderBindingLayout layout = to_rhi_binding_layout(set.vertex->reflection(), set.pixel->reflection());
 
     REQUIRE(layout.names.size() == 3);
@@ -99,7 +99,7 @@ TEST_CASE("to_rhi_binding_layout merges stages by name")
 TEST_CASE("to_rhi_binding_layout requires a vertex and a pixel reflection")
 {
     SetFixture f;
-    const ShaderSet set = f.make(vertex_source(""), pixel_source(""));
+    const GraphicsShaderSet set = f.make(vertex_source(""), pixel_source(""));
     CHECK_THROWS_AS(to_rhi_binding_layout(set.pixel->reflection(), set.vertex->reflection()), Error);
 }
 
@@ -118,17 +118,17 @@ TEST_CASE("Shaders map to RHI enums")
     CHECK_THROWS_AS(to_rhi_vertex_format({ ShaderScalar::Float, 4, 4 }), Error);
 }
 
-TEST_CASE("make_pipeline checks the vertex layout against the shader inputs")
+TEST_CASE("make_graphics_pipeline checks the vertex layout against the shader inputs")
 {
     SetFixture f;
-    const ShaderSet set = f.make(vertex_source("float4 colour;"), pixel_source("float4 colour;"));
-    PipelineState state;
+    const GraphicsShaderSet set = f.make(vertex_source("float4 colour;"), pixel_source("float4 colour;"));
+    GraphicsPipelineState state;
     state.vertex_layout = { { { 0, RHIVertexFormat::Float3, 0, 0 } }, 12 };
-    CHECK_NOTHROW(make_pipeline(f.rhi, set, state));
+    CHECK_NOTHROW(make_graphics_pipeline(f.rhi, set, state));
 
     state.vertex_layout = { {}, 12 };
-    CHECK_THROWS_WITH_AS(make_pipeline(f.rhi, set, state), doctest::Contains("no attribute for shader input 'p'"), Error);
+    CHECK_THROWS_WITH_AS(make_graphics_pipeline(f.rhi, set, state), doctest::Contains("no attribute for shader input 'p'"), Error);
 
     state.vertex_layout = { { { 0, RHIVertexFormat::Float2, 0, 0 } }, 8 };
-    CHECK_THROWS_WITH_AS(make_pipeline(f.rhi, set, state), doctest::Contains("does not match shader input 'p'"), Error);
+    CHECK_THROWS_WITH_AS(make_graphics_pipeline(f.rhi, set, state), doctest::Contains("does not match shader input 'p'"), Error);
 }
