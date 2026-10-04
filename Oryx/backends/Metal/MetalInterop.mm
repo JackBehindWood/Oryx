@@ -141,22 +141,30 @@ MetalSurface::~MetalSurface()
 
 CA::MetalLayer* MetalSurface::layer() const
 {
-    return (__bridge CA::MetalLayer*)m_impl->layer();
+    CA::MetalLayer* layer = nullptr;
+    guarded("MetalSurface layer", [&] { layer = (__bridge CA::MetalLayer*)m_impl->layer(); });
+    return layer;
 }
 
 uint32_t MetalSurface::width_px() const
 {
-    return static_cast<uint32_t>(m_impl->layer().drawableSize.width);
+    uint32_t width = 0;
+    guarded("MetalSurface width", [&] { width = static_cast<uint32_t>(m_impl->layer().drawableSize.width); });
+    return width;
 }
 
 uint32_t MetalSurface::height_px() const
 {
-    return static_cast<uint32_t>(m_impl->layer().drawableSize.height);
+    uint32_t height = 0;
+    guarded("MetalSurface height", [&] { height = static_cast<uint32_t>(m_impl->layer().drawableSize.height); });
+    return height;
 }
 
 float MetalSurface::content_scale() const
 {
-    return static_cast<float>(m_impl->layer().contentsScale);
+    float scale = 1.0f;
+    guarded("MetalSurface content_scale", [&] { scale = static_cast<float>(m_impl->layer().contentsScale); });
+    return scale;
 }
 
 bool MetalSurface::is_visible() const

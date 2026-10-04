@@ -97,12 +97,26 @@ public:
     [[nodiscard]] uint32_t height() const override { return m_height; }
     [[nodiscard]] RHIFormat format() const override { return m_format; }
     [[nodiscard]] RHIRenderTargetPtr acquire_back_buffer() override;
+    void discard_back_buffer() override { m_back_buffer.reset(); }
 
 private:
     RHIFormat m_format;
     uint32_t m_width;
     uint32_t m_height;
     Ref<NullRenderTarget> m_back_buffer;
+};
+
+// What the context saw across all submissions; the test-visible record of draws, state and debug groups.
+struct NullStats
+{
+    uint32_t draw_calls = 0;
+    uint32_t indexed_draw_calls = 0;
+    uint32_t passes = 0;
+    RHIBindingId last_constants_binding = RHI_INVALID_BINDING;
+    std::vector<uint8_t> last_constants;
+    RHIViewportState last_viewport;
+    RHIScissorRect last_scissor;
+    std::vector<std::string> debug_events;
 };
 
 // Headless device: real CPU-side storage and clears, no GPU. Test-visible counters expose what was submitted.
@@ -127,12 +141,16 @@ public:
 
     void submit(RHICommandList& commands) override;
     void present(RHIViewport& viewport, RHITexture* source = nullptr) override;
+    void end_frame() override;
+    [[nodiscard]] uint32_t frame_slot() const override { return static_cast<uint32_t>(m_slot); }
     void read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size) override;
     void wait_idle() override;
 
     [[nodiscard]] size_t live_resources() const { return RHIResource::live_count(); }
     [[nodiscard]] size_t submit_count() const { return m_submit_count; }
     [[nodiscard]] const std::vector<RHICommandType>& last_submission() const { return m_last_submission; }
+    [[nodiscard]] size_t frame_count() const { return m_frame_count; }
+    [[nodiscard]] const NullStats& stats() const { return m_stats; }
 
 private:
     // Declared first so it is destroyed last: it drains retired resources once the device is gone.
@@ -143,6 +161,8 @@ private:
     size_t m_slot = 0;
     std::vector<RHICommandType> m_last_submission;
     size_t m_submit_count = 0;
+    size_t m_frame_count = 0;
+    NullStats m_stats;
 };
 
 } // namespace oryx

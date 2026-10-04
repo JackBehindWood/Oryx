@@ -65,26 +65,25 @@ void MetalViewport::resize(uint32_t width, uint32_t height, float scale)
 {
     if (m_surface)
     {
-        m_back_buffer.reset();
         m_surface->resize(width, height, scale);
         return;
     }
-    if (width != m_width || height != m_height)
-    {
-        m_width = width;
-        m_height = height;
-        m_back_buffer.reset();
-    }
+    m_width = width;
+    m_height = height;
 }
 
 RHIRenderTargetPtr MetalViewport::acquire_back_buffer()
 {
+    const uint32_t target_width = width();
+    const uint32_t target_height = height();
+    if (m_back_buffer && (m_back_buffer->width() != target_width || m_back_buffer->height() != target_height))
+    {
+        m_back_buffer.reset();
+    }
     if (m_back_buffer)
     {
         return m_back_buffer;
     }
-    const uint32_t target_width = width();
-    const uint32_t target_height = height();
     if (target_width == 0 || target_height == 0)
     {
         return {};
@@ -115,6 +114,11 @@ RHIRenderTargetPtr MetalViewport::acquire_back_buffer()
     NS::SharedPtr<MTL::Texture> texture = m_device.make_texture(texture_desc);
     m_back_buffer = make_ref<MetalRenderTarget>(std::move(texture), target_width, target_height, m_format, Ref<MetalTexture>(), NS::SharedPtr<CA::MetalDrawable>());
     return m_back_buffer;
+}
+
+void MetalViewport::discard_back_buffer()
+{
+    m_back_buffer.reset();
 }
 
 void MetalViewport::encode_present(MTL::CommandBuffer& commands)

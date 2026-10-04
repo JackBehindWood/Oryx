@@ -25,6 +25,8 @@ public:
     [[nodiscard]] virtual RHIFormat format() const = 0;
     // Null when the surface is zero-sized, hidden or has no drawable available.
     [[nodiscard]] virtual RHIRenderTargetPtr acquire_back_buffer() = 0;
+    // Releases an acquired back buffer that will not be presented (e.g. after a failed submit).
+    virtual void discard_back_buffer() = 0;
 
 protected:
     RHIViewport() = default;

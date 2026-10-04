@@ -28,6 +28,8 @@ public:
 
     void submit(RHICommandList& commands) override;
     void present(RHIViewport& viewport, RHITexture* source = nullptr) override;
+    void end_frame() override;
+    [[nodiscard]] uint32_t frame_slot() const override { return m_queue.current_frame(); }
     void read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size) override;
     void wait_idle() override;
 

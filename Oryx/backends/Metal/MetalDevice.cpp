@@ -84,6 +84,10 @@ NS::SharedPtr<MTL::Texture> MetalDevice::make_texture(const RHITextureDesc& desc
     {
         throw Error("RHI texture dimensions are out of range");
     }
+    if (desc.dimension != RHITextureDimension::Tex2D || desc.mip_levels != 1 || desc.array_layers != 1 || desc.sample_count != 1)
+    {
+        throw Error("Metal textures other than single-level 2D are not implemented until Step 5d");
+    }
     const size_t byte_count = static_cast<size_t>(desc.width) * desc.height * rhi_format_bytes(desc.format);
     if (desc.initial_data_size != 0 && desc.initial_data_size != byte_count)
     {

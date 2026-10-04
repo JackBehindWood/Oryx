@@ -19,6 +19,8 @@ public:
     void commit(NS::SharedPtr<MTL::CommandBuffer> commands);
     [[nodiscard]] std::vector<Ref<RHIResource>>& frame_refs() { return m_frames[m_current].refs; }
 
+    [[nodiscard]] uint32_t current_frame() const { return static_cast<uint32_t>(m_current); }
+
     // Ends the current frame; blocks while the oldest frame is still in flight so at most METAL_FRAMES_IN_FLIGHT overlap.
     void end_frame();
     // Retires every finished frame without blocking.
@@ -43,7 +45,6 @@ private:
     RHIDeviceLease& m_lease;
     std::vector<Frame> m_frames;
     size_t m_current = 0;
-    uint64_t m_completed = 0;
 };
 
 } // namespace oryx::metal

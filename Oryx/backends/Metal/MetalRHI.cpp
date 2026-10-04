@@ -122,6 +122,10 @@ void MetalRHI::submit(RHICommandList& commands)
     {
         throw Error("RHI submit received a command list with an unfinished pass");
     }
+    if (commands.debug_depth() != 0)
+    {
+        throw Error("RHI submit received a command list with an unbalanced debug group");
+    }
     if (commands.empty())
     {
         return;
@@ -180,6 +184,11 @@ void MetalRHI::present(RHIViewport& viewport, RHITexture* source)
     {
         m_queue.commit(std::move(commands));
     }
+}
+
+void MetalRHI::end_frame()
+{
+    OX_METAL_AUTORELEASE_SCOPE;
     m_queue.end_frame();
 }
 

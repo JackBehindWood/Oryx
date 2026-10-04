@@ -67,7 +67,7 @@ struct RHIRetireState
                 std::lock_guard<std::mutex> lock(mutex);
                 const uint64_t threshold = threshold_locked();
                 size_t end = head;
-                while (end < entries.size() && entries[end].serial <= threshold)
+                while (end < entries.size() && entries[end].serial < threshold)
                 {
                     ++end;
                 }
@@ -106,10 +106,11 @@ struct RHIRetireState
 namespace
 {
 
-// Function-local static: a static that still holds an RHI*Ptr at process exit would release into a destroyed queue.
+// Immortal (constructed in static storage, never destroyed): a static that still holds an RHI*Ptr at process exit must release into a live queue.
 RHIRetireState& state()
 {
-    static RHIRetireState instance;
+    alignas(RHIRetireState) static std::byte storage[sizeof(RHIRetireState)];
+    static RHIRetireState& instance = *new (storage) RHIRetireState();
     return instance;
 }
 
@@ -198,14 +199,29 @@ void RHIDeviceLease::complete(uint64_t serial)
     RHIRetireState& queue = state();
     {
         std::lock_guard<std::mutex> lock(queue.mutex);
-        m_completed = serial;
+        m_completed = serial + 1;
     }
     queue.collect();
 }
 
+void RHIDeviceLease::begin_work()
+{
+    RHIRetireState& queue = state();
+    std::lock_guard<std::mutex> lock(queue.mutex);
+    if (m_completed == RHI_IDLE)
+    {
+        m_completed = 0;
+    }
+}
+
 void RHIDeviceLease::set_idle()
 {
-    complete(RHI_IDLE);
+    RHIRetireState& queue = state();
+    {
+        std::lock_guard<std::mutex> lock(queue.mutex);
+        m_completed = RHI_IDLE;
+    }
+    queue.collect();
 }
 
 } // namespace oryx

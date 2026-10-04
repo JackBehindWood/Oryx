@@ -21,6 +21,7 @@ public:
     [[nodiscard]] uint32_t height() const override;
     [[nodiscard]] RHIFormat format() const override { return m_format; }
     [[nodiscard]] RHIRenderTargetPtr acquire_back_buffer() override;
+    void discard_back_buffer() override;
 
     [[nodiscard]] bool has_drawable() const { return m_back_buffer && m_back_buffer->drawable() != nullptr; }
     // Queues the acquired drawable for presentation and forgets it; offscreen viewports keep their texture.

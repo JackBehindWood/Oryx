@@ -161,6 +161,21 @@ TEST_CASE("A busy device holds back resources of another until it completes")
     CHECK(destroyed == 1);
 }
 
+TEST_CASE("A device that has begun work and completed nothing holds back the current frame")
+{
+    RHIDeviceLease busy;
+    RHIDeviceLease other;
+    std::atomic<int32_t> destroyed{ 0 };
+
+    busy.begin_work();
+    make_ref<Probe>(destroyed);
+    other.set_idle();
+    CHECK(destroyed == 0);
+
+    busy.complete(busy.end_frame());
+    CHECK(destroyed == 1);
+}
+
 TEST_CASE("An idle device does not block collection")
 {
     RHIDeviceLease busy;

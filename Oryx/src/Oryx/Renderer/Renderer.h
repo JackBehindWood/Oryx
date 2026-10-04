@@ -12,12 +12,10 @@ struct RendererDesc
     RHIBackend backend = default_rhi_backend();
 };
 
-// The only static renderer state: it forwards to one context that owns the device. Any layer queues work during its update(), in call
-
+// The only static renderer state: it forwards to one context that owns the device.
 class Renderer
 {
 public:
-
     static void init(const RendererDesc& desc = {});
     static void shutdown();
     [[nodiscard]] static bool initialised() { return context() != nullptr; }

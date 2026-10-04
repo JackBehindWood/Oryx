@@ -29,6 +29,24 @@ enum class RHIFormat : uint8_t
     return 0;
 }
 
+enum class RHIDataType : uint8_t
+{
+    Float,
+    Int,
+    UInt,
+    Depth
+};
+
+[[nodiscard]] constexpr bool rhi_format_is_depth(RHIFormat format)
+{
+    return format == RHIFormat::Depth32Float;
+}
+
+[[nodiscard]] constexpr RHIDataType rhi_format_data_type(RHIFormat format)
+{
+    return rhi_format_is_depth(format) ? RHIDataType::Depth : RHIDataType::Float;
+}
+
 [[nodiscard]] constexpr bool rhi_format_is_colour(RHIFormat format)
 {
     return format == RHIFormat::R8Unorm || format == RHIFormat::RGBA8Unorm || format == RHIFormat::BGRA8Unorm;

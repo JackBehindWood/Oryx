@@ -26,21 +26,26 @@ MetalCommandContext::~MetalCommandContext()
     }
 }
 
-void MetalCommandContext::begin_pass(RHIRenderTarget& target, const RHIClear& clear)
+void MetalCommandContext::begin_pass(const RHIRenderPassDesc& pass)
 {
-    MetalRenderTarget* metal_target = dynamic_cast<MetalRenderTarget*>(&target);
+    if (pass.colour_count != 1 || pass.depth.texture != nullptr)
+    {
+        not_yet("multiple render targets and depth attachments");
+    }
+    const RHIColourAttachment& colour = pass.colour[0];
+    MetalRenderTarget* metal_target = dynamic_cast<MetalRenderTarget*>(colour.target);
     if (metal_target == nullptr)
     {
         throw Error("RHI submit received a render target from a different backend");
     }
 
-    NS::SharedPtr<MTL::RenderPassDescriptor> pass = NS::RetainPtr(MTL::RenderPassDescriptor::renderPassDescriptor());
-    MTL::RenderPassColorAttachmentDescriptor* attachment = pass->colorAttachments()->object(0);
+    NS::SharedPtr<MTL::RenderPassDescriptor> descriptor = NS::RetainPtr(MTL::RenderPassDescriptor::renderPassDescriptor());
+    MTL::RenderPassColorAttachmentDescriptor* attachment = descriptor->colorAttachments()->object(0);
     attachment->setTexture(metal_target->mtl());
-    attachment->setLoadAction(clear.clear ? MTL::LoadActionClear : MTL::LoadActionLoad);
-    attachment->setStoreAction(MTL::StoreActionStore);
-    attachment->setClearColor(MTL::ClearColor(clear.colour.r, clear.colour.g, clear.colour.b, clear.colour.a));
-    m_encoder = require_object(NS::RetainPtr(m_commands.renderCommandEncoder(pass.get())), "a render encoder");
+    attachment->setLoadAction(colour.load == RHILoadAction::Clear ? MTL::LoadActionClear : colour.load == RHILoadAction::Load ? MTL::LoadActionLoad : MTL::LoadActionDontCare);
+    attachment->setStoreAction(colour.store == RHIStoreAction::Store ? MTL::StoreActionStore : MTL::StoreActionDontCare);
+    attachment->setClearColor(MTL::ClearColor(colour.clear_colour.r, colour.clear_colour.g, colour.clear_colour.b, colour.clear_colour.a));
+    m_encoder = require_object(NS::RetainPtr(m_commands.renderCommandEncoder(descriptor.get())), "a render encoder");
 }
 
 void MetalCommandContext::end_pass()
@@ -54,19 +59,23 @@ void MetalCommandContext::set_pipeline(RHIGraphicsPipeline&)
     not_yet("pipelines");
 }
 
-// The binding model arrives with shader reflection in Step 5; until then a bind is validated by the list and has no effect.
+void MetalCommandContext::set_viewport(const RHIViewportState&) {}
+void MetalCommandContext::set_scissor(const RHIScissorRect&) {}
 void MetalCommandContext::set_vertex_buffer(uint32_t, RHIBuffer&, uint32_t) {}
 void MetalCommandContext::set_index_buffer(RHIBuffer&, uint32_t, bool) {}
-void MetalCommandContext::bind_buffer(RHIBindingId, RHIBuffer&) {}
-void MetalCommandContext::bind_texture(RHIBindingId, RHITexture&) {}
-void MetalCommandContext::bind_sampler(RHIBindingId, RHISampler&) {}
+void MetalCommandContext::set_constants(RHIBindingId, const uint8_t*, uint32_t) {}
+void MetalCommandContext::bind_buffer(RHIBindingId, RHIBuffer&, uint32_t, uint32_t) {}
+void MetalCommandContext::bind_texture(RHIBindingId, RHITexture&, uint32_t) {}
+void MetalCommandContext::bind_sampler(RHIBindingId, RHISampler&, uint32_t) {}
+void MetalCommandContext::push_debug_group(const char*) {}
+void MetalCommandContext::pop_debug_group() {}
 
-void MetalCommandContext::draw(uint32_t, uint32_t, uint32_t)
+void MetalCommandContext::draw(uint32_t, uint32_t, uint32_t, uint32_t)
 {
     not_yet("draws");
 }
 
-void MetalCommandContext::draw_indexed(uint32_t, uint32_t, uint32_t)
+void MetalCommandContext::draw_indexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t)
 {
     not_yet("draws");
 }

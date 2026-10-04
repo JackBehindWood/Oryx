@@ -22,6 +22,7 @@ NS::SharedPtr<MTL::CommandBuffer> MetalCommandQueue::make_command_buffer()
 void MetalCommandQueue::commit(NS::SharedPtr<MTL::CommandBuffer> commands)
 {
     commands->commit();
+    m_lease.begin_work();
     m_frames[m_current].commands.push_back(std::move(commands));
 }
 
@@ -52,13 +53,15 @@ std::string MetalCommandQueue::retire(Frame& frame, bool wait)
             failure = command_buffer_failure(*commands.get());
         }
     }
-    if (frame.ended)
-    {
-        m_completed = frame.serial;
-    }
+    const bool completes_serial = frame.ended;
+    const uint64_t serial = frame.serial;
     frame.commands.clear();
     frame.refs.clear();
     frame.ended = false;
+    if (completes_serial)
+    {
+        m_lease.complete(serial);
+    }
     sync_lease();
     return failure;
 }
@@ -69,7 +72,6 @@ void MetalCommandQueue::sync_lease()
     {
         if (!frame.commands.empty())
         {
-            m_lease.complete(m_completed);
             return;
         }
     }

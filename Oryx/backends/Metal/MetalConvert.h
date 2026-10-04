@@ -46,7 +46,7 @@ namespace oryx::metal
     {
         result |= MTL::TextureUsageShaderRead;
     }
-    if (has_flag(usage, RHITextureUsage::RenderTarget))
+    if (has_flag(usage, RHITextureUsage::RenderTarget) || has_flag(usage, RHITextureUsage::DepthStencil))
     {
         result |= MTL::TextureUsageRenderTarget;
     }

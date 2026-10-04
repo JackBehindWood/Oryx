@@ -10,7 +10,8 @@ enum class RHIBufferUsage : uint8_t
 {
     Vertex = BIT(0),
     Index = BIT(1),
-    Uniform = BIT(2)
+    Uniform = BIT(2),
+    Storage = BIT(3)
 };
 
 template<>

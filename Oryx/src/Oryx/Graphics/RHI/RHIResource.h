@@ -23,7 +23,7 @@ private:
     void on_last_release() noexcept override;
 };
 
-// One per device. Retired resources are freed once their frame is complete on every live device; an idle device never blocks that.
+// One per device, constructed by IRHI implementations only. Retired resources are freed once their frame is complete on every live device; an idle device never blocks that.
 class RHIDeviceLease
 {
 public:
@@ -34,13 +34,16 @@ public:
 
     // Frame boundary: returns the serial of the frame that just ended.
     uint64_t end_frame();
-    // This device has finished every frame up to `serial`; collects what is now safe.
+    // This device has work in flight and has completed no frame yet; a no-op once busy.
+    void begin_work();
+    // This device has finished every frame up to and including `serial`; collects what is now safe.
     void complete(uint64_t serial);
     // Nothing in flight on this device; collects what is now safe.
     void set_idle();
 
 private:
     friend struct RHIRetireState;
+    // Exclusive bound: frames with a serial below it are complete on this device.
     uint64_t m_completed;
 };
 

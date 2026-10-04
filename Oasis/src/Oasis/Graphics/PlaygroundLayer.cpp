@@ -40,7 +40,7 @@ void PlaygroundLayer::attach()
     oryx::Renderer::init({ m_backend });
     oryx::IRHI& rhi = oryx::Renderer::rhi();
     OX_INFO("Playground RHI {} on '{}', {} frames in flight", oryx::to_string(m_backend), rhi.capabilities().name, rhi.capabilities().frames_in_flight);
-   
+
     // Created and dropped at once to exercise deferred retirement.
     const std::array<uint8_t, 64> pixels = {};
     rhi.create_buffer({ .size = 64, .initial_data = pixels.data(), .initial_data_size = 64 });
@@ -100,13 +100,13 @@ bool PlaygroundLayer::on_application_close(oryx::ApplicationCloseEvent& event)
 
 bool PlaygroundLayer::on_key_pressed(oryx::KeyPressedEvent& event)
 {
-    OX_INFO("Playground key pressed {}", static_cast<int32_t>(event.key()));
+    OX_TRACE("Playground key pressed {}", static_cast<int32_t>(event.key()));
     return false;
 }
 
 bool PlaygroundLayer::on_key_released(oryx::KeyReleasedEvent& event)
 {
-    OX_INFO("Playground key released {}", static_cast<int32_t>(event.key()));
+    OX_TRACE("Playground key released {}", static_cast<int32_t>(event.key()));
     return false;
 }
 
@@ -121,19 +121,19 @@ bool PlaygroundLayer::on_mouse_moved(oryx::MouseMovedEvent& event)
 
 bool PlaygroundLayer::on_mouse_button_pressed(oryx::MouseButtonPressedEvent& event)
 {
-    OX_INFO("Playground mouse button pressed {}", static_cast<int32_t>(event.button()));
+    OX_TRACE("Playground mouse button pressed {}", static_cast<int32_t>(event.button()));
     return false;
 }
 
 bool PlaygroundLayer::on_mouse_button_released(oryx::MouseButtonReleasedEvent& event)
 {
-    OX_INFO("Playground mouse button released {}", static_cast<int32_t>(event.button()));
+    OX_TRACE("Playground mouse button released {}", static_cast<int32_t>(event.button()));
     return false;
 }
 
 bool PlaygroundLayer::on_mouse_scrolled(oryx::MouseScrolledEvent& event)
 {
-    OX_INFO("Playground mouse scrolled {}, {}", event.dx(), event.dy());
+    OX_TRACE("Playground mouse scrolled {}, {}", event.dx(), event.dy());
     return false;
 }
 

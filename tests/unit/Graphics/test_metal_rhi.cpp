@@ -100,6 +100,7 @@ TEST_CASE("Metal RHI: frames in flight with mid-flight drops leak nothing")
             list.end_pass();
             rhi->submit(list);
             rhi->present(*viewport);
+            rhi->end_frame();
         }
         rhi->wait_idle();
     }
@@ -137,6 +138,7 @@ TEST_CASE("Metal RHI: present copies a source texture into the viewport")
     list.end_pass();
     rhi->submit(list);
     CHECK_NOTHROW(rhi->present(*viewport, source.get()));
+    rhi->end_frame();
     rhi->wait_idle();
 }
 

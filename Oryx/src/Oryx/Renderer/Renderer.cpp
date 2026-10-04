@@ -6,6 +6,37 @@
 namespace oryx
 {
 
+namespace
+{
+
+class BackBufferGuard
+{
+public:
+    explicit BackBufferGuard(RHIViewport& viewport)
+        : m_viewport(viewport)
+    {
+    }
+
+    ~BackBufferGuard()
+    {
+        if (!m_dismissed)
+        {
+            m_viewport.discard_back_buffer();
+        }
+    }
+
+    BackBufferGuard(const BackBufferGuard&) = delete;
+    BackBufferGuard& operator=(const BackBufferGuard&) = delete;
+
+    void dismiss() { m_dismissed = true; }
+
+private:
+    RHIViewport& m_viewport;
+    bool m_dismissed = false;
+};
+
+} // namespace
+
 void Renderer::shutdown_context(UniquePtr<Context>& context)
 {
     if (!context)
@@ -40,24 +71,26 @@ void Renderer::end_frame()
     Context& renderer = require_context();
     std::vector<Colour> clears = std::move(renderer.clears);
     renderer.clears.clear();
-    if (clears.empty() || !renderer.viewport)
-    {
-        return;
-    }
 
-    RHIRenderTargetPtr back_buffer = renderer.viewport->acquire_back_buffer();
-    if (!back_buffer)
+    RHIRenderTargetPtr back_buffer;
+    if (!clears.empty() && renderer.viewport)
     {
-        return;
+        back_buffer = renderer.viewport->acquire_back_buffer();
     }
-    renderer.commands.clear();
-    for (const Colour& colour : clears)
+    if (back_buffer)
     {
-        renderer.commands.begin_pass(back_buffer.get(), { colour, true });
-        renderer.commands.end_pass();
+        BackBufferGuard guard(*renderer.viewport);
+        renderer.commands.clear();
+        for (const Colour& colour : clears)
+        {
+            renderer.commands.begin_pass(back_buffer.get(), { colour, true });
+            renderer.commands.end_pass();
+        }
+        renderer.rhi->submit(renderer.commands);
+        guard.dismiss();
+        renderer.rhi->present(*renderer.viewport);
     }
-    renderer.rhi->submit(renderer.commands);
-    renderer.rhi->present(*renderer.viewport);
+    renderer.rhi->end_frame();
 }
 
 } // namespace oryx

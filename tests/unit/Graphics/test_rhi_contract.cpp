@@ -158,10 +158,11 @@ void run_rhi_contract(IRHI& rhi)
             list.end_pass();
             rhi.submit(list);
             rhi.present(*viewport);
+            rhi.end_frame();
         }
         rhi.wait_idle();
         viewport.reset();
-        rhi.present(*rhi.create_viewport(viewport_desc(1, 1)));
+        rhi.end_frame();
         rhi.wait_idle();
     }
 
@@ -183,7 +184,64 @@ void run_rhi_contract(IRHI& rhi)
         CHECK(raw_texture->width() == 2);
 
         rhi.present(*viewport);
+        rhi.end_frame();
         rhi.wait_idle();
+    }
+
+    SUBCASE("present alone does not end the frame; end_frame rotates the slot")
+    {
+        RHIViewportPtr viewport = rhi.create_viewport(viewport_desc(4, 4));
+        rhi.wait_idle();
+        const uint32_t slot = rhi.frame_slot();
+        const uint64_t serial = RHIResource::frame_serial();
+        REQUIRE(slot < caps.frames_in_flight);
+
+        rhi.present(*viewport);
+        CHECK(rhi.frame_slot() == slot);
+        CHECK(RHIResource::frame_serial() == serial);
+
+        rhi.end_frame();
+        CHECK(rhi.frame_slot() == (slot + 1) % caps.frames_in_flight);
+        CHECK(RHIResource::frame_serial() == serial + 1);
+
+        for (uint32_t i = 1; i < caps.frames_in_flight; ++i)
+        {
+            rhi.end_frame();
+        }
+        CHECK(rhi.frame_slot() == slot);
+        CHECK(RHIResource::frame_serial() == serial + caps.frames_in_flight);
+        rhi.wait_idle();
+    }
+
+    SUBCASE("resize without a zero step gives the next acquire the new size")
+    {
+        RHIViewportPtr viewport = rhi.create_viewport(viewport_desc(64, 32));
+        RHIRenderTargetPtr before = viewport->acquire_back_buffer();
+        REQUIRE(before);
+        rhi.resize_viewport(*viewport, 32, 16, 1.0f);
+        RHIRenderTargetPtr after = viewport->acquire_back_buffer();
+        REQUIRE(after);
+        CHECK(after->width() == 32);
+        CHECK(after->height() == 16);
+        CHECK(before->width() == 64);
+    }
+
+    SUBCASE("discard_back_buffer drops the cached buffer")
+    {
+        RHIViewportPtr viewport = rhi.create_viewport(viewport_desc(8, 8));
+        RHIRenderTargetPtr first = viewport->acquire_back_buffer();
+        viewport->discard_back_buffer();
+        RHIRenderTargetPtr second = viewport->acquire_back_buffer();
+        REQUIRE(second);
+        CHECK(second.get() != first.get());
+    }
+
+    SUBCASE("invalid texture shapes are rejected")
+    {
+        CHECK_THROWS_AS(rhi.create_texture({ .width = 4, .height = 4, .mip_levels = 0 }), Error);
+        CHECK_THROWS_AS(rhi.create_texture({ .width = 4, .height = 4, .array_layers = 0 }), Error);
+        CHECK_THROWS_AS(rhi.create_texture({ .width = 4, .height = 4, .sample_count = 0 }), Error);
+        CHECK_THROWS_AS(rhi.create_texture({ .width = 4, .height = 4, .sample_count = 4 }), Error);
     }
 }
 
