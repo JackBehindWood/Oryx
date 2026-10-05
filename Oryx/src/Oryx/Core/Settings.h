@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Base.h"
+#include "Oryx/Core/CommandLine.h"
 #include "Oryx/Core/Error.h"
 
 namespace oryx
@@ -47,9 +48,11 @@ private:
     UniquePtr<Impl> m_impl;
 };
 
-// Reads --settings=<file>, else the first default file an application registered that exists, else <working directory>/oryx.yaml
+// Reads --settings=<file> (declared by Settings' own command-line contributor), else the first default file an application registered that exists, else <working directory>/oryx.yaml
 // (a missing default file means every section keeps its defaults).
 // Throws SettingsError for an unreadable or malformed file or a wrong value, leaving the previous values in place.
+void load_settings(const ParsedArgs& args);
+// Parses `args` against every registered contributor first; throws Error for an unknown option.
 void load_settings(const ApplicationCommandLineArgs& args);
 
 // An application's own settings file, relative to the working directory, tried before oryx.yaml.

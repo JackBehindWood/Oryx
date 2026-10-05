@@ -276,3 +276,73 @@ TEST_CASE("unregister_scripted drops only the entries of one language")
     CHECK(scripted_game_origin("test-fake-game") == nullptr);
     CHECK(GameRegistry::has("test-lua-game"));
 }
+
+namespace
+{
+
+class LabelledBoard : public IConsoleBoard
+{
+public:
+    explicit LabelledBoard(bool shows)
+        : m_shows(shows)
+    {
+    }
+
+    void on_turn(const IState&) override {}
+    ActionId poll_action(const IState&) override { return PENDING_ACTION; }
+    bool shows_moves() const override { return m_shows; }
+
+private:
+    bool m_shows;
+};
+
+ConsoleBoardRegistry::Factory board_showing(bool shows)
+{
+    return [shows](const Params&) -> UniquePtr<IConsoleBoard> { return create_unique<LabelledBoard>(shows); };
+}
+
+bool shows_moves_of(const std::string& game)
+{
+    UniquePtr<IConsoleBoard> board = ConsoleBoardRegistry::create(game);
+    REQUIRE(board != nullptr);
+    return board->shows_moves();
+}
+
+} // namespace
+
+TEST_CASE("register_scripted_console_board adds a board for a game and remembers its origin")
+{
+    ScriptRegistryCleanup cleanup;
+
+    register_scripted_console_board("test-board", kNim, board_showing(true), {});
+    CHECK(shows_moves_of("test-board"));
+    REQUIRE(scripted_console_board_origin("test-board") != nullptr);
+    CHECK(*scripted_console_board_origin("test-board") == kNim);
+
+    register_scripted_console_board("test-board", kNim, board_showing(false), {});
+    CHECK_FALSE(shows_moves_of("test-board"));
+
+    unregister_scripted("fake");
+    CHECK_FALSE(ConsoleBoardRegistry::has("test-board"));
+    CHECK(scripted_console_board_origin("test-board") == nullptr);
+}
+
+TEST_CASE("a console board from another origin needs overwrite=True, and unregistering restores the board it replaced")
+{
+    ScriptRegistryCleanup cleanup;
+
+    ConsoleBoardRegistry::register_factory("test-board-cpp", board_showing(true));
+    CHECK_THROWS_AS(register_scripted_console_board("test-board-cpp", kNim, board_showing(false), {}), ScriptError);
+    CHECK(shows_moves_of("test-board-cpp"));
+
+    register_scripted_console_board("test-board-cpp", kNim, board_showing(false), {}, true);
+    CHECK_FALSE(shows_moves_of("test-board-cpp"));
+
+    CHECK_THROWS_AS(register_scripted_console_board("test-board-cpp", kOther, board_showing(true), {}), ScriptError);
+
+    unregister_scripted("fake");
+    CHECK(shows_moves_of("test-board-cpp"));
+    CHECK(scripted_console_board_origin("test-board-cpp") == nullptr);
+
+    ConsoleBoardRegistry::unregister_factory("test-board-cpp");
+}

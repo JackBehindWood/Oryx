@@ -16,6 +16,9 @@ constexpr ActionId INVALID_ACTION = static_cast<ActionId>(-1);
 
 constexpr ActionId UNDO_ACTION = INVALID_ACTION - 1;
 
+// A strategy that needs more frames (e.g. waiting on a click or on stdin) returns this; SimulationLayer retries the decision next update.
+constexpr ActionId PENDING_ACTION = INVALID_ACTION - 2;
+
 constexpr bool is_valid(ActionId action)
 { 
     return action != INVALID_ACTION; 

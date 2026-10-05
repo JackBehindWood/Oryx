@@ -7,6 +7,14 @@
 namespace oryx
 {
 
+// Which part of the text sits at the draw position horizontally.
+enum class TextAlign
+{
+    Left,
+    Centre,
+    Right
+};
+
 struct TextStyle
 {
     // The size the glyphs are baked at; crisp when drawn at scale 1 through a pixel-unit camera.
@@ -14,6 +22,7 @@ struct TextStyle
     Colour colour = { 1.0f, 1.0f, 1.0f, 1.0f };
     // A world-space multiplier applied after baking.
     float scale = 1.0f;
+    TextAlign align = TextAlign::Left;
 };
 
 struct TextExtent

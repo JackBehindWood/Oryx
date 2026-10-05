@@ -84,6 +84,30 @@ TEST_CASE("draw_text: glyph quads carry the atlas uvs, colour and positions")
     CHECK(v[0].tex_index == v[3].tex_index);
 }
 
+TEST_CASE("draw_text: Centre and Right alignment shift the text left by half and all of its width")
+{
+    TextFixture f;
+    TextStyle left;
+    TextStyle centre;
+    centre.align = TextAlign::Centre;
+    TextStyle right;
+    right.align = TextAlign::Right;
+    const float width = f.font.measure("AB", left.pixel_height).width;
+
+    auto first_x = [&](const TextStyle& style)
+    {
+        BatchRenderer2D batcher(f.desc());
+        batcher.begin(f.camera);
+        batcher.draw_text({ 100.0f, 0.0f }, "AB", f.font, style);
+        batcher.end();
+        return f.vertices(f.sink.back())[0].base.position[0];
+    };
+
+    float left_x = first_x(left);
+    CHECK(first_x(centre) == doctest::Approx(left_x - 0.5f * width));
+    CHECK(first_x(right) == doctest::Approx(left_x - width));
+}
+
 TEST_CASE("draw_text: newlines, kerning and UTF-8 offset the pen")
 {
     TextFixture f;

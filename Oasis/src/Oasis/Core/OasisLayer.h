@@ -1,31 +1,27 @@
 #pragma once
 
-#include "Oryx.h"
-
-#include "Oasis/Game/TicTacToeBoard.h"
+#include "Options.h"
 
 namespace oasis
 {
 
+// Everything specific to Oasis: decides how it starts (simulation, windowed or terminal play) and reports simulation results.
 class OasisLayer : public oryx::Layer
 {
 public:
-    explicit OasisLayer(std::string game_arg = "", std::string opponent_arg = "", std::string simulate_arg = "", bool benchmark_arg = false);
+    explicit OasisLayer(Options options);
 
     void attach() override;
     void event(oryx::Event& event) override;
 
 private:
-    bool choose_game(std::string& out_name) const;
-    void attach_simulate(const std::string& game_name, oryx::UniquePtr<oryx::IGame> game);
-    void attach_interactive(const std::string& game_name, oryx::UniquePtr<oryx::IGame> game);
-    bool on_simulation_complete(const oryx::SimulationCompleteEvent& event);
+    void start_simulation();
+    void start_play(const LaunchPlan& plan);
+    // False leaves the application without a window or renderer so the caller can fall back to the terminal.
+    bool start_graphics(const LaunchPlan& plan);
+    bool on_simulation_complete(oryx::SimulationCompleteEvent& event);
 
-    std::string m_game_arg;
-    std::string m_opponent_arg;
-    std::string m_simulate_arg;
-    bool m_benchmark_arg;
-    TicTacToeBoard m_board;
+    Options m_options;
 };
 
 } // namespace oasis

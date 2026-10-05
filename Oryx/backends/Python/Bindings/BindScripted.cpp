@@ -13,6 +13,7 @@
 #include "Support/PySchema.h"
 #include "Support/PyTypeHints.h"
 #include "Support/PyUtil.h"
+#include "Oryx/Board/ConsoleGame.h"
 #include "Oryx/Scripting/Registry/ScriptRegistry.h"
 
 namespace py = pybind11;
@@ -26,20 +27,43 @@ namespace
 enum class Kind
 {
     Game,
-    Strategy
+    Strategy,
+    Board
 };
 
 const char* kind_name(Kind kind)
 {
-    return kind == Kind::Game ? "game" : "strategy";
+    switch (kind)
+    {
+        case Kind::Game: return "game";
+        case Kind::Strategy: return "strategy";
+        default: return "console board";
+    }
 }
 
-const char* required_method(Kind kind)
+const char* requirement(Kind kind)
 {
-    return kind == Kind::Game ? "new_initial_state" : "decide";
+    switch (kind)
+    {
+        case Kind::Game: return "new_initial_state()";
+        case Kind::Strategy: return "decide()";
+        default: return "on_turn() or poll_action()";
+    }
 }
 
 // A base class's placeholder does not count; an instance may also carry the method as an attribute.
+bool defines(const py::handle& source, const char* method);
+
+bool provides_required(Kind kind, const py::handle& source)
+{
+    switch (kind)
+    {
+        case Kind::Game: return defines(source, "new_initial_state");
+        case Kind::Strategy: return defines(source, "decide");
+        default: return defines(source, "on_turn") || defines(source, "poll_action");
+    }
+}
+
 bool defines(const py::handle& source, const char* method)
 {
     py::object owner = PyType_Check(source.ptr()) ? py::reinterpret_borrow<py::object>(source) : py::reinterpret_borrow<py::object>(py::type::of(source));
@@ -106,9 +130,9 @@ py::object construct(const py::object& source, bool is_class, Kind kind, const s
         throw to_script_error(error, "could not create the " + std::string(kind_name(kind)) + " '" + id + "'");
     }
 
-    if (!defines(instance, required_method(kind)))
+    if (!provides_required(kind, instance))
     {
-        throw ScriptError("the " + std::string(kind_name(kind)) + " '" + id + "' must define " + required_method(kind) + "()");
+        throw ScriptError("the " + std::string(kind_name(kind)) + " '" + id + "' must define " + requirement(kind));
     }
     return instance;
 }
@@ -119,9 +143,9 @@ void register_from(Kind kind, const std::string& id, const py::object& source, b
     {
         throw ScriptError(std::string("the factory for the ") + kind_name(kind) + " '" + id + "' must be callable, got '" + type_name_of(source) + "'");
     }
-    if (is_class && !defines(source, required_method(kind)))
+    if (is_class && !provides_required(kind, source))
     {
-        throw ScriptError(source.attr("__name__").cast<std::string>() + " must define " + required_method(kind) + "() to be registered as the " + kind_name(kind) + " '" + id + "'");
+        throw ScriptError(source.attr("__name__").cast<std::string>() + " must define " + requirement(kind) + " to be registered as the " + kind_name(kind) + " '" + id + "'");
     }
 
     SharedPtr<PyScriptObject> holder = create_shared<PyScriptObject>(PyRef::borrow(source.ptr()));
@@ -135,6 +159,15 @@ void register_from(Kind kind, const std::string& id, const py::object& source, b
             PyGil gil;
             py::object source_object = py::reinterpret_borrow<py::object>(holder->get());
             return create_unique<PyScriptedGame>(PyRef::borrow(construct(source_object, is_class, kind, id, params).ptr()), shared_origin, schema);
+        }, std::move(info), overwrite);
+    }
+    else if (kind == Kind::Board)
+    {
+        register_scripted_console_board(id, origin, [=](const Params& params) -> UniquePtr<IConsoleBoard>
+        {
+            PyGil gil;
+            py::object source_object = py::reinterpret_borrow<py::object>(holder->get());
+            return create_unique<PyScriptedConsoleBoard>(PyRef::borrow(construct(source_object, is_class, kind, id, params).ptr()), shared_origin);
         }, std::move(info), overwrite);
     }
     else
@@ -152,9 +185,10 @@ void register_from(Kind kind, const std::string& id, const py::object& source, b
 void register_class(Kind kind, const py::object& cls, const py::object& id, bool overwrite, const py::kwargs& kwargs)
 {
     std::string owner = cls.attr("__name__").cast<std::string>();
+    const char* key = kind == Kind::Board ? "game" : "id";
     for (const auto& item : kwargs)
     {
-        throw ScriptError("class " + owner + ": unknown class keyword '" + std::string(py::str(item.first)) + "' (expected id and overwrite)");
+        throw ScriptError("class " + owner + ": unknown class keyword '" + std::string(py::str(item.first)) + "' (expected " + key + " and overwrite)");
     }
 
     if (id.is_none())
@@ -164,7 +198,7 @@ void register_class(Kind kind, const py::object& cls, const py::object& id, bool
     std::string name = id.cast<std::string>();
     if (name.empty())
     {
-        throw ScriptError("class " + owner + ": id cannot be empty");
+        throw ScriptError("class " + owner + ": " + key + " cannot be empty");
     }
     register_from(kind, name, cls, true, schema_of_class(cls), description_of(cls), origin_of_class(cls), overwrite);
     cls.attr(kRegisteredIdAttribute) = name;
@@ -174,7 +208,7 @@ py::object init_subclass_for(Kind kind)
 {
     py::cpp_function hook(
         [kind](const py::object& cls, const hints::typing::Optional<py::str>& id, bool overwrite, const py::kwargs& kwargs) { register_class(kind, cls, id, overwrite, kwargs); },
-        py::name("__init_subclass__"), py::arg("cls"), py::kw_only(), py::arg("id") = py::none(), py::arg("overwrite") = false);
+        py::name("__init_subclass__"), py::arg("cls"), py::kw_only(), py::arg(kind == Kind::Board ? "game" : "id") = py::none(), py::arg("overwrite") = false);
     return py::module_::import("builtins").attr("classmethod")(hook);
 }
 
@@ -241,6 +275,11 @@ void register_game(const std::string& id, const hints::Factory& factory, const h
     register_from(Kind::Game, id, factory, false, schema_from_dict(id, params), description, origin_of_caller(), overwrite);
 }
 
+void register_console_board(const std::string& game, const hints::Factory& factory, const std::string& description, bool overwrite)
+{
+    register_from(Kind::Board, game, factory, false, {}, description, origin_of_caller(), overwrite);
+}
+
 void register_strategy(const std::string& id, const hints::Factory& factory, const hints::OptionalAnyDict& params, const std::string& description, bool overwrite)
 {
     register_from(Kind::Strategy, id, factory, false, schema_from_dict(id, params), description, origin_of_caller(), overwrite);
@@ -249,7 +288,7 @@ void register_strategy(const std::string& id, const hints::Factory& factory, con
 py::object make_base(py::module_& module, const char* name, const char* doc)
 {
     py::dict members;
-    members["__module__"] = std::string(kModuleName) + ".game";
+    members["__module__"] = module.attr("__name__");
     members["__doc__"] = doc;
     py::object cls = py::module_::import("builtins").attr("type")(name, py::tuple(), members);
     module.attr(name) = cls;
@@ -290,9 +329,28 @@ void bind_scripted(py::module_& module)
     add_placeholder(state, "outcome", [](const py::object& self) -> std::vector<double> { throw_not_implemented(self, "outcome"); }, "One reward per player.");
     state.attr("action_to_string") = py::cpp_function([](const py::object&, ActionId action) { return to_string(action); }, py::name("action_to_string"), py::is_method(state), py::arg("action"));
 
+    py::module_ board_module = module.def_submodule("board", "Console boards: how a game is shown to and played by a human at the terminal.");
+    board_module.attr("PENDING_ACTION") = PENDING_ACTION;
+    board_module.attr("UNDO_ACTION") = UNDO_ACTION;
+    board_module.def("read_move", [](const PyState& lent)
+    {
+        const IState& checked = lent.get();
+        py::gil_scoped_release release;
+        return read_console_move(checked);
+    }, py::arg("state"), "Lists the legal moves and reads one from stdin; returns PENDING_ACTION once stdin is exhausted.");
+
+    py::object board = make_base(board_module, "ConsoleBoard", "Base class of console boards defined in Python: `class NimBoard(oryx.ConsoleBoard, game=\"nim\")` registers on import. Methods left out use the generic board.");
+    board.attr("__init_subclass__") = init_subclass_for(Kind::Board);
+    board.attr("shows_moves") = false;
+    add_placeholder(board, "on_turn", [](const py::object& self, const PyState&) { throw_not_implemented(self, "on_turn"); },
+        py::arg("state"), "Called every update, including on the finished state; `state` is only valid during the call.");
+    add_placeholder(board, "poll_action", [](const py::object& self, const PyState&) -> ActionId { throw_not_implemented(self, "poll_action"); },
+        py::arg("state"), "Returns the human's move, UNDO_ACTION, or PENDING_ACTION while none is chosen; `state` is only valid during the call.");
 
     registry.def("register_game", &register_game, py::arg("id"), py::arg("factory"), py::arg("params") = py::none(), py::arg("description") = "", py::arg("overwrite") = false,
                "Registers a factory function returning a game; `params` maps names to defaults (or to bool/int/float/str for required ones).");
+    registry.def("register_console_board", &register_console_board, py::arg("game"), py::arg("factory"), py::arg("description") = "", py::arg("overwrite") = false,
+               "Registers a factory function returning the console board for a game.");
     registry.def("register_strategy", &register_strategy, py::arg("id"), py::arg("factory"), py::arg("params") = py::none(), py::arg("description") = "", py::arg("overwrite") = false,
                "Registers a factory function returning a strategy.");
 }

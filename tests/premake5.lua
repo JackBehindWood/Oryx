@@ -19,6 +19,8 @@ project "Tests"
     -- Oasis's game/strategy sources are compiled in (not the Oasis executable's app/UI code) so their rules are unit-testable.
     files {
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToeGame.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToeBoardModel.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/Options.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Strategy/TicTacToeHeuristicStrategy.cpp",
     }
 

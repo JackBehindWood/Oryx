@@ -7,32 +7,22 @@ namespace oryx
 namespace
 {
 
-constexpr std::string_view kScriptFlag = "--script";
-constexpr std::string_view kModuleFlag = "--module";
-constexpr std::string_view kRootFlag = "--script-root";
+constexpr const char* kScriptOption = "script";
+constexpr const char* kModuleOption = "module";
+constexpr const char* kRootOption = "script-root";
 
-void collect_flag_values(const ApplicationCommandLineArgs& args, std::string_view flag, std::vector<std::string>& out)
+class ScriptingCommandLine : public ICommandLineContributor
 {
-    for (int32_t i = 1; i < args.count; ++i)
+public:
+    void declare(CommandLine& command_line) const override
     {
-        std::string_view arg = args[i];
-        if (arg == flag)
-        {
-            if (i + 1 < args.count)
-            {
-                out.emplace_back(args[++i]);
-            }
-            else
-            {
-                OX_CORE_WARN("ScriptDiscovery: {} needs a value - ignoring it.", flag);
-            }
-        }
-        else if (arg.size() > flag.size() && arg.substr(0, flag.size()) == flag && arg[flag.size()] == '=')
-        {
-            out.emplace_back(arg.substr(flag.size() + 1));
-        }
+        command_line.option(kScriptOption, "FILE", "Script to load (repeatable)")
+            .option(kModuleOption, "NAME", "Module to import (repeatable)")
+            .option(kRootOption, "DIR", "Directory searched for scripts (repeatable)");
     }
-}
+};
+
+OX_REGISTER_COMMAND_LINE(ScriptingCommandLine, "scripting")
 
 std::string language_for(const std::filesystem::path& file, const std::vector<ScriptFileExtension>& extensions)
 {
@@ -113,12 +103,12 @@ void add_file(std::vector<ScriptSource>& sources, const std::filesystem::path& f
 
 } // namespace
 
-ScriptDiscoveryOptions script_options(const ApplicationCommandLineArgs& args)
+ScriptDiscoveryOptions script_options(const ParsedArgs& args)
 {
     ScriptDiscoveryOptions options;
-    collect_flag_values(args, kScriptFlag, options.script_files);
-    collect_flag_values(args, kModuleFlag, options.modules);
-    collect_flag_values(args, kRootFlag, options.roots);
+    options.script_files = args.values(kScriptOption);
+    options.modules = args.values(kModuleOption);
+    options.roots = args.values(kRootOption);
 
     std::error_code error;
     options.root = std::filesystem::current_path(error);

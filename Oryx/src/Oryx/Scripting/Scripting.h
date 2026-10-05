@@ -8,6 +8,7 @@
 #include "Oryx/Scripting/Support/ScriptUtil.h"
 
 #include "Oryx/Scripting/Interfaces/IScriptRuntime.h"
+#include "Oryx/Scripting/Interfaces/IScriptedConsoleBoard.h"
 #include "Oryx/Scripting/Interfaces/IScriptedGame.h"
 #include "Oryx/Scripting/Interfaces/IScriptedState.h"
 #include "Oryx/Scripting/Interfaces/IScriptedStrategy.h"

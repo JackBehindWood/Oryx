@@ -1,7 +1,7 @@
 #include "oxpch.h"
 #include "Oryx/Core/Settings.h"
 
-#include "Oryx/Core/Application.h"
+#include "Oryx/Core/CommandLine.h"
 
 #include <yaml-cpp/yaml.h>
 
@@ -174,7 +174,7 @@ std::vector<std::filesystem::path> SettingsNode::paths(std::string_view key) con
 namespace
 {
 
-constexpr std::string_view kSettingsFlag = "--settings=";
+constexpr const char* kSettingsOption = "settings";
 constexpr const char* kDefaultFileName = "oryx.yaml";
 
 struct Section
@@ -305,14 +305,15 @@ const void* settings_value(std::type_index type)
 
 void load_settings(const ApplicationCommandLineArgs& args)
 {
-    for (int32_t i = 0; i < args.count; ++i)
+    load_settings(CommandLine::global().parse(args));
+}
+
+void load_settings(const ParsedArgs& args)
+{
+    if (args.has(kSettingsOption))
     {
-        std::string_view arg = args[i];
-        if (arg.substr(0, kSettingsFlag.size()) == kSettingsFlag)
-        {
-            apply(std::filesystem::absolute(std::string(arg.substr(kSettingsFlag.size()))), true);
-            return;
-        }
+        apply(std::filesystem::absolute(args.value(kSettingsOption)), true);
+        return;
     }
 
     for (const std::filesystem::path& candidate : state().default_files)
@@ -354,5 +355,21 @@ void reset_settings()
     current.file_required = false;
     current.default_files.clear();
 }
+
+namespace
+{
+
+class SettingsCommandLine : public ICommandLineContributor
+{
+public:
+    void declare(CommandLine& command_line) const override
+    {
+        command_line.option(kSettingsOption, "FILE", "Settings file to load instead of the default oryx.yaml");
+    }
+};
+
+OX_REGISTER_COMMAND_LINE(SettingsCommandLine, "settings")
+
+} // namespace
 
 } // namespace oryx

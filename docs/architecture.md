@@ -627,16 +627,9 @@ It is explicitly **not** intended to become a general-purpose engine comparable 
 
 The graphics modules are layered `Graphics/` (RHI and GPU resources) → `Shaders/` → `Renderer/`, all behind the `graphics` build option and never included by `Game/`, `Strategy/`, `Simulation/` or `Core/`. `Window`/`Input` abstractions and window, key and mouse events live in Core and Events and are always compiled; `Application` will own the window (null when headless) and a single `GraphicsLayer` overlay will drive each frame (§3.6). See [Graphics and Assets](design/graphics.md).
 
-### Board (Phase 3)
+### Board (Phase 3, interfaces in Phase 10)
 
-The `Renderer / UI` role above starts, in Phase 3, as a concrete
-`TicTacToeBoard` class in `Oasis` — responsible for both rendering the board
-to stdout and reading a move from stdin. It is deliberately **not** behind a
-shared `IBoard` interface yet: with only one game and one renderer, an
-interface has no second implementation to justify it (the same reasoning as
-the `Registry<T>` timing decision, §10). `IBoard` should be extracted once
-Phase 10 Graphics actually needs to swap in a graphical renderer
-polymorphically — not before. Phase 10 keeps `TicTacToeBoard` console-only: the graphical view is a separate Oasis class, and there is still no shared `IBoard` until a second consumer needs one.
+Phase 3 started with a concrete `TicTacToeBoard`; Phase 10 extracted the interface once a second front-end existed. `Oryx/Board/` holds `IBoard` (`on_turn`, `poll_action`, `shows_moves`) and two subtypes: `IConsoleBoard` (may block on stdin, returns `PENDING_ACTION` once stdin is exhausted, one game per run) and `IGraphicsBoard` (`render` once per frame, never blocks, restarts after each game). Boards self-register per game name (`OX_REGISTER_CONSOLE_BOARD`/`OX_REGISTER_GRAPHICS_BOARD`). The generic `BoardLayer` knows no game and owns what every board shares: it is told the front-end (`selection::choose_front_end` decides it once: graphical only with graphics built, not `--headless`, and a graphics board for the game), announces the outcome of a console game, quits when stdin runs out and, in a window, restarts a finished game on `R` or a click after a short delay. A `BoardSession` (an `ITurnObserver` and `IActionSource`) ties the board to the simulation: `SimulationLayer` calls it every update and a human seat is an `ExternalStrategy` that asks it for moves (`PENDING_ACTION` until one exists). A windowed simulation `linger`s: it keeps a finished match until a `RestartSimulationEvent`. A game with both a console and a graphics board shares one plain per-game model class between them (e.g. `TicTacToeBoardModel`); each board keeps only how it shows the state and reads moves. Python scripts register console boards for their games (`class NimBoard(oryx.ConsoleBoard, game="nim")`, see [Python API](design/python-api.md)). `Board/` is headless and never includes `Graphics/`, `Shaders/` or `Renderer/`; graphics boards live in the application. Oasis' own start-up (simulate, windowed or terminal play, result reporting) lives in `OasisLayer`; `OasisApp` only parses the command line and pushes layers.
 
 ---
 

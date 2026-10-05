@@ -38,7 +38,8 @@ void bind_oryx(py::module_& module)
 
     reexport(module, "errors", { "OryxError", "ParamError", "ScriptError", "OryxAssertionError", "SettingsError", "IllegalActionError", "NotInitialisedError" });
     reexport(module, "game", { "GameHandle", "StateHandle", "StrategyHandle", "Context", "ActionFeatures", "Game", "Strategy", "State" });
-    reexport(module, "registry", { "make_game", "make_strategy", "list_games", "list_strategies", "describe_game", "describe_strategy", "register_game", "register_strategy" });
+    reexport(module, "board", { "ConsoleBoard" });
+    reexport(module, "registry", { "make_game", "make_strategy", "list_games", "list_strategies", "describe_game", "describe_strategy", "register_game", "register_strategy", "register_console_board" });
     reexport(module, "observability", { "Decision", "Observer" });
     reexport(module, "results", { "BatchResult" });
     reexport(module, "simulation", { "Match", "BatchRunner", "simulate" });

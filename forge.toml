@@ -56,7 +56,7 @@ rules = [
 
 [boundaries.sets]
 graphics = ["Graphics", "Shaders", "Renderer"]
-headless = ["Game", "Strategy", "Simulation", "Core", "Text"]
+headless = ["Game", "Strategy", "Simulation", "Core", "Text", "Board"]
 backends = ["**/backends/**"]
 backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']
 

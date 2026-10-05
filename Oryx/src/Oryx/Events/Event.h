@@ -11,6 +11,7 @@ enum class EventType
     AppTick,
     ApplicationClose,
     StartSimulation,
+    RestartSimulation,
     SimulationComplete,
     ReloadScripts,
     WindowClose,

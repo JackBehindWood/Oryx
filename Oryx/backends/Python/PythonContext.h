@@ -32,13 +32,15 @@ public:
     [[nodiscard]] bool is_base_class(PyObject* cls) const;
 
 private:
+    // The first `count` methods of the set are the ones the base defines as NotImplementedError placeholders.
     template<typename Methods>
-    void collect_placeholders(PyObject* base);
+    void collect_placeholders(PyObject* base, size_t count = Methods::required);
 
     PyRef m_object;
     PyRef m_game;
     PyRef m_strategy;
     PyRef m_state;
+    PyRef m_board;
     std::vector<PyRef> m_placeholders;
 };
 

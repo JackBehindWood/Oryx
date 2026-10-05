@@ -130,12 +130,18 @@ void BatchRenderer2D::draw_text(const Vec2f& position, std::string_view text, Fo
     }
     GlyphAtlas& atlas = font.atlas(style.pixel_height);
     const Texture2D& atlas_texture = atlas.texture(rhi());
+    float align_offset = 0.0f;
+    if (style.align != TextAlign::Left)
+    {
+        TextExtent extent = layout_text(atlas.data(), text, style.scale, [](const Glyph&, const Vec2f&) {});
+        align_offset = style.align == TextAlign::Centre ? -0.5f * extent.width : -extent.width;
+    }
     layout_text(atlas.data(), text, style.scale, [&](const Glyph& glyph, const Vec2f& pen) {
         if (glyph.size[0] <= 0.0f || glyph.size[1] <= 0.0f)
         {
             return;
         }
-        const float x0 = position[0] + pen[0] + glyph.bearing[0] * style.scale;
+        const float x0 = position[0] + align_offset + pen[0] + glyph.bearing[0] * style.scale;
         const float y0 = position[1] + pen[1] + glyph.bearing[1] * style.scale;
         const float x1 = x0 + glyph.size[0] * style.scale;
         const float y1 = y0 + glyph.size[1] * style.scale;
