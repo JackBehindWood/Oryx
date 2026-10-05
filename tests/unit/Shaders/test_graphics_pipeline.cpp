@@ -30,7 +30,7 @@ struct PipelineFixture
     GraphicsPipeline solid()
     {
         GraphicsPipelineState state;
-        state.vertex_layout = solid_vertex_layout();
+        state.vertex_declaration = vertex_declaration<Vertex2DLine>();
         state.colour_formats[0] = RHIFormat::RGBA8Unorm;
         return make_graphics_pipeline(rhi, { library.get<SolidVS>(), library.get<SolidPS>() }, state);
     }
@@ -38,7 +38,7 @@ struct PipelineFixture
     GraphicsPipeline quad()
     {
         GraphicsPipelineState state;
-        state.vertex_layout = quad_vertex_layout();
+        state.vertex_declaration = vertex_declaration<Vertex2DQuad>();
         state.colour_formats[0] = RHIFormat::RGBA8Unorm;
         state.blend[0] = rhi_blend_alpha();
         return make_graphics_pipeline(rhi, { library.get<QuadVS>(), library.get<QuadPS>() }, state);
@@ -138,4 +138,34 @@ TEST_CASE("A frame recorded with real pipelines is accepted by NullRHI")
     f.rhi.end_frame();
     CHECK(f.rhi.submit_count() == 1);
     CHECK(f.rhi.last_submission().size() == commands);
+}
+
+TEST_CASE("A pipeline with two vertex streams records both buffers")
+{
+    PipelineFixture f;
+    GraphicsPipelineState state;
+    state.vertex_declaration = RHIVertexDeclarationBuilder()
+                                   .stream(0, 12)
+                                   .stream(1, 16, RHIVertexStep::PerInstance)
+                                   .attribute(0, RHIVertexFormat::Float3, 0, 0)
+                                   .attribute(1, RHIVertexFormat::Float4, 0, 1)
+                                   .build();
+    state.colour_formats[0] = RHIFormat::RGBA8Unorm;
+    const GraphicsPipeline split = make_graphics_pipeline(f.rhi, { f.library.get<SolidVS>(), f.library.get<SolidPS>() }, state);
+    RHIBufferPtr colours = f.rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
+
+    f.begin(split);
+    f.list.set_vertex_buffer(1, colours.get(), 16);
+    const std::array<float, 16> matrix = {};
+    f.list.set_constants(split.binding("frame"), matrix.data(), sizeof(matrix));
+    f.list.draw(3, 4);
+    f.list.end_pass();
+    f.rhi.submit(f.list);
+
+    uint32_t vertex_binds = 0;
+    for (const RHICommandType type : f.rhi.last_submission())
+    {
+        vertex_binds += type == RHICommandType::SetVertexBuffer ? 1 : 0;
+    }
+    CHECK(vertex_binds == 2);
 }

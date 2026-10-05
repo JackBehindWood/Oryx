@@ -41,7 +41,7 @@ TEST_CASE("GpuAssetCache uploads a ready image once and returns the same texture
     CHECK(f.cache.size() == 1);
 
     uint8_t pixels[3 * 2 * 4] = {};
-    f.rhi.read_texture(first.rhi(), pixels, sizeof(pixels));
+    f.rhi.read_texture(&first.rhi(), pixels, sizeof(pixels));
     CHECK(pixels[0] == 90);
 }
 

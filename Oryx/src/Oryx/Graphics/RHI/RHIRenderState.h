@@ -20,8 +20,59 @@ inline constexpr uint32_t RHI_MAX_COLOUR_TARGETS = 8;
     case RHIVertexFormat::Float2: return 8;
     case RHIVertexFormat::Float3: return 12;
     case RHIVertexFormat::Float4: return 16;
+    case RHIVertexFormat::Half2: return 4;
+    case RHIVertexFormat::Half4: return 8;
+    case RHIVertexFormat::UByte4Norm: return 4;
+    case RHIVertexFormat::UInt:
+    case RHIVertexFormat::Int: return 4;
+    case RHIVertexFormat::UInt2:
+    case RHIVertexFormat::Int2: return 8;
+    case RHIVertexFormat::UInt3:
+    case RHIVertexFormat::Int3: return 12;
+    case RHIVertexFormat::UInt4:
+    case RHIVertexFormat::Int4: return 16;
     }
     return 0;
+}
+
+[[nodiscard]] constexpr uint32_t rhi_vertex_format_components(RHIVertexFormat format)
+{
+    switch (format)
+    {
+    case RHIVertexFormat::Float:
+    case RHIVertexFormat::UInt:
+    case RHIVertexFormat::Int: return 1;
+    case RHIVertexFormat::Float2:
+    case RHIVertexFormat::Half2:
+    case RHIVertexFormat::UInt2:
+    case RHIVertexFormat::Int2: return 2;
+    case RHIVertexFormat::Float3:
+    case RHIVertexFormat::UInt3:
+    case RHIVertexFormat::Int3: return 3;
+    case RHIVertexFormat::Float4:
+    case RHIVertexFormat::Half4:
+    case RHIVertexFormat::UByte4Norm:
+    case RHIVertexFormat::UInt4:
+    case RHIVertexFormat::Int4: return 4;
+    }
+    return 0;
+}
+
+// True when a shader reads the format as floats (float formats, halves and normalised bytes), false for the integer formats.
+[[nodiscard]] constexpr bool rhi_vertex_format_is_float(RHIVertexFormat format)
+{
+    switch (format)
+    {
+    case RHIVertexFormat::UInt:
+    case RHIVertexFormat::UInt2:
+    case RHIVertexFormat::UInt3:
+    case RHIVertexFormat::UInt4:
+    case RHIVertexFormat::Int:
+    case RHIVertexFormat::Int2:
+    case RHIVertexFormat::Int3:
+    case RHIVertexFormat::Int4: return false;
+    default: return true;
+    }
 }
 
 struct RHIVertexAttribute

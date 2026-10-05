@@ -28,14 +28,14 @@ struct DrawFixture
 
     ~DrawFixture() { Renderer::set_viewport({}); }
 
-    GraphicsPipelineHandle solid() { return Renderer::pipeline(solid_triangles_desc(Renderer::shaders(), Renderer::back_buffer_format())); }
-    GraphicsPipelineHandle quad() { return Renderer::pipeline(quad_desc(Renderer::shaders(), Renderer::back_buffer_format())); }
+    GraphicsPipelineHandle solid() { return Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), Renderer::back_buffer_format())); }
+    GraphicsPipelineHandle quad() { return Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format())); }
 
     DrawItem solid_item(GraphicsPipelineHandle pipeline)
     {
         DrawItem item;
         item.pipeline = pipeline;
-        item.vertex_buffer = rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
+        item.vertex_buffers[0] = rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
         item.vertex_count = 3;
         const float matrix[16] = {};
         draw_item_set_constants(item, matrix);
@@ -132,7 +132,7 @@ TEST_CASE("Renderer: indexed and textured items record their binds")
 
     DrawItem item;
     item.pipeline = quad;
-    item.vertex_buffer = fixture.rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
+    item.vertex_buffers[0] = fixture.rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
     item.index_buffer = fixture.rhi.create_buffer({ .size = 64, .usage = RHIBufferUsage::Index });
     item.index_count = 6;
     const float matrix[16] = {};
@@ -237,7 +237,7 @@ struct RecordFixture
     {
         DrawItem result;
         result.pipeline = cache.get_or_create(rhi, desc);
-        result.vertex_buffer = rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
+        result.vertex_buffers[0] = rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
         result.vertex_count = 3;
         return result;
     }
@@ -273,7 +273,7 @@ TEST_CASE("record_draw_item fills unset texture slots with the white default")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    const GraphicsPipelineDesc quad = quad_desc(Renderer::shaders(), Renderer::back_buffer_format());
+    const GraphicsPipelineDesc quad = builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format());
 
     DrawItem item = fixture.item(quad);
     RHITexturePtr own = fixture.rhi.create_texture({ .width = 2, .height = 2 });
@@ -296,7 +296,7 @@ TEST_CASE("record_draw_item fills every slot when the item has no textures")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    record_draw_item(fixture.commands, fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
+    record_draw_item(fixture.commands, fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
     CHECK(fixture.texture_binds().size() == 16);
 }
 
@@ -305,7 +305,7 @@ TEST_CASE("record_draw_item sizes the fill from the pipeline's texture array")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    record_draw_item(fixture.commands, fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format(), 1)), fixture.cache, fixture.defaults);
+    record_draw_item(fixture.commands, fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format(), 1)), fixture.cache, fixture.defaults);
     CHECK(fixture.texture_binds().size() == 32);
 }
 
@@ -314,11 +314,11 @@ TEST_CASE("record_draw_item leaves pipelines without texture bindings alone")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    record_draw_item(fixture.commands, fixture.item(solid_triangles_desc(Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
+    record_draw_item(fixture.commands, fixture.item(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
     CHECK(fixture.count(RHICommandType::BindTexture) == 0);
     CHECK(fixture.count(RHICommandType::BindSampler) == 0);
 
-    DrawItem textured = fixture.item(solid_triangles_desc(Renderer::shaders(), Renderer::back_buffer_format()));
+    DrawItem textured = fixture.item(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), Renderer::back_buffer_format()));
     draw_item_add_texture(textured, fixture.defaults.white_texture);
     CHECK_THROWS_AS(record_draw_item(fixture.commands, textured, fixture.cache, fixture.defaults), Error);
 }
@@ -328,7 +328,7 @@ TEST_CASE("record_draw_item binds the default sampler only when the item has non
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    const GraphicsPipelineDesc quad = quad_desc(Renderer::shaders(), Renderer::back_buffer_format());
+    const GraphicsPipelineDesc quad = builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format());
 
     record_draw_item(fixture.commands, fixture.item(quad), fixture.cache, fixture.defaults);
     RHISamplerPtr own = fixture.rhi.create_sampler({});
@@ -354,7 +354,7 @@ TEST_CASE("record_draw_item rejects more textures than the pipeline has slots")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    DrawItem item = fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format(), 1));
+    DrawItem item = fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format(), 1));
     item.texture_count = DRAW_ITEM_MAX_TEXTURES;
     for (uint32_t i = 0; i < DRAW_ITEM_MAX_TEXTURES; ++i)
     {
@@ -362,11 +362,11 @@ TEST_CASE("record_draw_item rejects more textures than the pipeline has slots")
     }
     CHECK_NOTHROW(record_draw_item(fixture.commands, item, fixture.cache, fixture.defaults));
 
-    DrawItem narrow = fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format()));
+    DrawItem narrow = fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format()));
     narrow.texture_count = QuadPS::DEFAULT_TEXTURES + 1;
     CHECK_THROWS_AS(record_draw_item(fixture.commands, narrow, fixture.cache, fixture.defaults), Error);
 
-    DrawItem circle = fixture.item(circle_desc(Renderer::shaders(), Renderer::back_buffer_format()));
+    DrawItem circle = fixture.item(builtin_pipeline_desc(BuiltinPipeline::Circle, Renderer::shaders(), Renderer::back_buffer_format()));
     draw_item_add_texture(circle, fixture.defaults.white_texture);
     CHECK_THROWS_AS(record_draw_item(fixture.commands, circle, fixture.cache, fixture.defaults), Error);
 }
@@ -433,4 +433,29 @@ TEST_CASE("Renderer: trim keeps the renderer usable")
 
     Renderer::release_shader_cache();
     CHECK(Renderer::shaders().contains<QuadPS>(1));
+}
+
+TEST_CASE("Renderer: a draw item binds every vertex stream it fills")
+{
+    RendererGuard guard;
+    Renderer::init({ RHIBackend::Null });
+    DrawFixture fixture;
+
+    DrawItem item = fixture.solid_item(fixture.solid());
+    item.vertex_buffers[2] = fixture.rhi.create_buffer({ .size = 256, .usage = RHIBufferUsage::Vertex });
+    item.vertex_offsets[2] = 16;
+    Renderer::submit(item);
+    Renderer::end_frame();
+
+    uint32_t vertex_binds = 0;
+    for (const RHICommandType type : fixture.rhi.last_submission())
+    {
+        vertex_binds += type == RHICommandType::SetVertexBuffer ? 1 : 0;
+    }
+    CHECK(vertex_binds == 2);
+
+    VertexBuffer buffer = Renderer::create_vertex_buffer(vertex_declaration<Vertex2DLine>(), 4, BufferMode::Static);
+    DrawItem staged;
+    CHECK_NOTHROW(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS - 1));
+    CHECK_THROWS_AS(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS), Error);
 }

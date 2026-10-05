@@ -20,9 +20,9 @@ struct Vertex3
     float z;
 };
 
-VertexLayout layout_for_vertex2()
+RHIVertexDeclaration layout_for_vertex2()
 {
-    return { { { 0, RHIVertexFormat::Float2, 0, 0 } }, sizeof(Vertex2) };
+    return RHIVertexDeclarationBuilder().stream(0, sizeof(Vertex2)).attribute(0, RHIVertexFormat::Float2, 0).build();
 }
 
 void run_resource_checks(IRHI& rhi)
@@ -103,8 +103,8 @@ void run_resource_checks(IRHI& rhi)
         CHECK(staging->map() == mapped);
         std::memcpy(mapped + 4, data, sizeof(data));
 
-        rhi.upload_buffer(*device, 0, data, 4);
-        CHECK_THROWS_AS(rhi.upload_buffer(*device, 14, data, 4), Error);
+        rhi.upload_buffer(device.get(), 0, data, 4);
+        CHECK_THROWS_AS(rhi.upload_buffer(device.get(), 14, data, 4), Error);
 
         RHICommandList list;
         list.copy_buffer(staging.get(), 4, device.get(), 4, 4);
@@ -134,7 +134,7 @@ void run_resource_checks(IRHI& rhi)
         CHECK(texture.width() == 2);
         CHECK(texture.sampler()->min_filter() == RHIFilter::Nearest);
         uint8_t readback[sizeof(pixels)] = {};
-        rhi.read_texture(texture.rhi(), readback, sizeof(readback));
+        rhi.read_texture(&texture.rhi(), readback, sizeof(readback));
         CHECK(std::memcmp(pixels, readback, sizeof(pixels)) == 0);
         CHECK_THROWS_AS(Texture2D::create(rhi, { .width = 2, .height = 2, .pixels = pixels, .pixel_bytes = 3 }), Error);
     }
@@ -149,7 +149,7 @@ void run_resource_checks(IRHI& rhi)
         list.end_pass();
         rhi.submit(list);
         uint8_t readback[3 * 2 * 4] = {};
-        rhi.read_texture(target.colour().rhi(), readback, sizeof(readback));
+        rhi.read_texture(&target.colour().rhi(), readback, sizeof(readback));
         for (uint32_t pixel = 0; pixel < 6; ++pixel)
         {
             CHECK(readback[pixel * 4 + 0] == 255);

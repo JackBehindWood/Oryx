@@ -33,7 +33,7 @@ TEST_CASE("NullRHI exposes the last submission and submit count")
     list.set_vertex_buffer(0, buffer.get());
     list.end_pass();
     rhi.submit(list);
-    rhi.present(*viewport);
+    rhi.present(viewport.get());
     rhi.end_frame();
 
     CHECK(rhi.submit_count() == 1);
@@ -82,7 +82,7 @@ TEST_CASE("NullRHI retains submitted resources until end_frame")
     buffer.reset();
     CHECK(rhi.live_resources() == live_before);
 
-    rhi.present(*viewport);
+    rhi.present(viewport.get());
     CHECK(rhi.live_resources() == live_before);
     rhi.end_frame();
     CHECK(rhi.live_resources() == live_before - 1);
@@ -107,7 +107,7 @@ TEST_CASE("NullRHI buffers store updates and clears write the colour")
     rhi.submit(list);
 
     std::array<uint8_t, 4> pixel{};
-    rhi.read_texture(*texture, pixel.data(), static_cast<uint32_t>(pixel.size()));
+    rhi.read_texture(texture.get(), pixel.data(), static_cast<uint32_t>(pixel.size()));
     CHECK(pixel[0] == uint8_t{ 0 });
     CHECK(pixel[2] == uint8_t{ 255 });
     CHECK(pixel[3] == uint8_t{ 255 });
@@ -170,7 +170,7 @@ TEST_CASE("NullRHI frame slots do not grow over many frames")
         list.set_vertex_buffer(0, buffer.get());
         list.end_pass();
         rhi.submit(list);
-        rhi.present(*viewport);
+        rhi.present(viewport.get());
         rhi.end_frame();
         CHECK(RHIResource::retired_pending() <= 1);
     }
@@ -183,7 +183,7 @@ TEST_CASE("NullRHI present without a back buffer does not advance the frame, end
     NullRHI rhi;
     RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
     const uint64_t frame = RHIResource::frame_serial();
-    CHECK_NOTHROW(rhi.present(*viewport));
+    CHECK_NOTHROW(rhi.present(viewport.get()));
     CHECK(RHIResource::frame_serial() == frame);
     CHECK(rhi.frame_count() == 0);
     rhi.end_frame();
@@ -218,7 +218,7 @@ TEST_CASE("NullRHI present copies a source texture into the back buffer")
     const std::array<uint8_t, 8> pixels = { 1, 2, 3, 4, 5, 6, 7, 8 };
     RHITexturePtr source = rhi.create_texture({ .width = 2, .height = 1, .format = RHIFormat::RGBA8Unorm, .initial_data = pixels.data(), .initial_data_size = static_cast<uint32_t>(pixels.size()) });
 
-    rhi.present(*viewport, source.get());
+    rhi.present(viewport.get(), source.get());
 
     RHIRenderTargetPtr back_buffer = viewport->acquire_back_buffer();
     const NullRenderTarget& target = static_cast<NullRenderTarget&>(*back_buffer);
@@ -232,9 +232,9 @@ TEST_CASE("NullRHI present rejects a mismatched or unsampled source")
     RHITexturePtr wrong_size = rhi.create_texture({ .width = 3, .height = 2, .format = RHIFormat::RGBA8Unorm });
     RHITexturePtr wrong_format = rhi.create_texture({ .width = 2, .height = 2, .format = RHIFormat::BGRA8Unorm });
     RHITexturePtr unsampled = rhi.create_texture({ .width = 2, .height = 2, .format = RHIFormat::RGBA8Unorm, .usage = RHITextureUsage::RenderTarget });
-    CHECK_THROWS_AS(rhi.present(*viewport, wrong_size.get()), Error);
-    CHECK_THROWS_AS(rhi.present(*viewport, wrong_format.get()), Error);
-    CHECK_THROWS_AS(rhi.present(*viewport, unsampled.get()), Error);
+    CHECK_THROWS_AS(rhi.present(viewport.get(), wrong_size.get()), Error);
+    CHECK_THROWS_AS(rhi.present(viewport.get(), wrong_format.get()), Error);
+    CHECK_THROWS_AS(rhi.present(viewport.get(), unsampled.get()), Error);
 }
 
 TEST_CASE("Two NullRHI devices can be alive at once")
@@ -389,7 +389,7 @@ TEST_CASE("NullRHI textures support arrays, cubes and multisample but not mips o
     CHECK(array->dimension() == RHITextureDimension::Tex2DArray);
     CHECK(array->array_layers() == 3);
     std::vector<uint8_t> bytes(2 * 2 * 4 * 3);
-    CHECK_NOTHROW(rhi.read_texture(*array, bytes.data(), static_cast<uint32_t>(bytes.size())));
+    CHECK_NOTHROW(rhi.read_texture(array.get(), bytes.data(), static_cast<uint32_t>(bytes.size())));
 
     CHECK_NOTHROW(rhi.create_texture({ .width = 2, .height = 2, .dimension = RHITextureDimension::Cube, .array_layers = 6 }));
     CHECK_THROWS_AS(rhi.create_texture({ .width = 2, .height = 3, .dimension = RHITextureDimension::Cube, .array_layers = 6 }), Error);
@@ -448,15 +448,15 @@ TEST_CASE("NullRHI executes MRT and depth passes, state commands and debug group
     rhi.submit(list);
 
     std::array<uint8_t, 8> pixels{};
-    rhi.read_texture(*first_texture, pixels.data(), static_cast<uint32_t>(pixels.size()));
+    rhi.read_texture(first_texture.get(), pixels.data(), static_cast<uint32_t>(pixels.size()));
     CHECK(pixels[0] == 255);
     CHECK(pixels[2] == 0);
-    rhi.read_texture(*second_texture, pixels.data(), static_cast<uint32_t>(pixels.size()));
+    rhi.read_texture(second_texture.get(), pixels.data(), static_cast<uint32_t>(pixels.size()));
     CHECK(pixels[0] == 0);
     CHECK(pixels[2] == 255);
 
     std::array<float, 2> depths{};
-    rhi.read_texture(*depth, reinterpret_cast<uint8_t*>(depths.data()), sizeof(depths));
+    rhi.read_texture(depth.get(), reinterpret_cast<uint8_t*>(depths.data()), sizeof(depths));
     CHECK(depths[0] == 0.5f);
     CHECK(depths[1] == 0.5f);
 

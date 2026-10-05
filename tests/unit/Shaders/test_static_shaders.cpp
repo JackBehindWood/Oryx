@@ -8,10 +8,10 @@ using namespace oryx::test;
 namespace
 {
 
-uint32_t layout_extent(const VertexLayout& layout)
+uint32_t layout_extent(const RHIVertexDeclaration& layout)
 {
     uint32_t extent = 0;
-    for (const RHIVertexAttribute& attribute : layout.attributes)
+    for (const RHIVertexAttribute& attribute : layout.attributes())
     {
         extent = std::max(extent, attribute.offset + rhi_vertex_format_bytes(attribute.format));
     }
@@ -70,15 +70,15 @@ TEST_CASE("Built-in vertex shaders share the frame constants and match their lay
     check_frame_binding(*f.library.get<QuadVS>());
     check_frame_binding(*f.library.get<CircleVS>());
 
-    CHECK(f.library.get<SolidVS>()->reflection().inputs.size() == solid_vertex_layout().attributes.size());
-    CHECK(f.library.get<QuadVS>()->reflection().inputs.size() == quad_vertex_layout().attributes.size());
-    CHECK(f.library.get<CircleVS>()->reflection().inputs.size() == circle_vertex_layout().attributes.size());
-    CHECK(solid_vertex_layout().stride == 28);
-    CHECK(quad_vertex_layout().stride == 40);
-    CHECK(circle_vertex_layout().stride == 44);
-    CHECK(layout_extent(solid_vertex_layout()) == solid_vertex_layout().stride);
-    CHECK(layout_extent(quad_vertex_layout()) == quad_vertex_layout().stride);
-    CHECK(layout_extent(circle_vertex_layout()) == circle_vertex_layout().stride);
+    CHECK(f.library.get<SolidVS>()->reflection().inputs.size() == vertex_declaration<Vertex2DLine>().attributes().size());
+    CHECK(f.library.get<QuadVS>()->reflection().inputs.size() == vertex_declaration<Vertex2DQuad>().attributes().size());
+    CHECK(f.library.get<CircleVS>()->reflection().inputs.size() == vertex_declaration<Vertex2DCircle>().attributes().size());
+    CHECK(vertex_declaration<Vertex2DLine>().stride() == 28);
+    CHECK(vertex_declaration<Vertex2DQuad>().stride() == 40);
+    CHECK(vertex_declaration<Vertex2DCircle>().stride() == 44);
+    CHECK(layout_extent(vertex_declaration<Vertex2DLine>()) == vertex_declaration<Vertex2DLine>().stride());
+    CHECK(layout_extent(vertex_declaration<Vertex2DQuad>()) == vertex_declaration<Vertex2DQuad>().stride());
+    CHECK(layout_extent(vertex_declaration<Vertex2DCircle>()) == vertex_declaration<Vertex2DCircle>().stride());
 }
 
 TEST_CASE("Quad vertex and pixel shaders reflect the texture array")
@@ -121,22 +121,22 @@ TEST_CASE("Built-in sets validate and create pipelines")
     StaticFixture f;
     GraphicsPipelineState state;
 
-    state.vertex_layout = solid_vertex_layout();
+    state.vertex_declaration = vertex_declaration<Vertex2DLine>();
     GraphicsShaderSet solid{ f.library.get<SolidVS>(), f.library.get<SolidPS>() };
     CHECK_NOTHROW(validate_graphics_shader_set(solid));
     GraphicsPipeline solid_pipeline = make_graphics_pipeline(f.rhi, solid, state);
     CHECK(solid_pipeline.binding_count() == 1);
 
-    state.vertex_layout = quad_vertex_layout();
+    state.vertex_declaration = vertex_declaration<Vertex2DQuad>();
     GraphicsShaderSet quad{ f.library.get<QuadVS>(), f.library.get<QuadPS>() };
     GraphicsPipeline quad_pipeline = make_graphics_pipeline(f.rhi, quad, state);
     CHECK(quad_pipeline.binding_count() == 3);
 
-    state.vertex_layout = circle_vertex_layout();
+    state.vertex_declaration = vertex_declaration<Vertex2DCircle>();
     GraphicsShaderSet circle{ f.library.get<CircleVS>(), f.library.get<CirclePS>() };
     CHECK_NOTHROW(make_graphics_pipeline(f.rhi, circle, state));
 
-    state.vertex_layout = solid_vertex_layout();
+    state.vertex_declaration = vertex_declaration<Vertex2DLine>();
     CHECK_THROWS_AS(make_graphics_pipeline(f.rhi, quad, state), Error);
 }
 

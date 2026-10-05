@@ -83,7 +83,7 @@ void GraphicsLayer::event(Event& event)
         if (m_viewport)
         {
             NativeWindowHandle handle = m_window->native_handle();
-            Renderer::rhi().resize_viewport(*m_viewport, static_cast<uint32_t>(handle.framebuffer_width), static_cast<uint32_t>(handle.framebuffer_height), handle.content_scale);
+            Renderer::rhi().resize_viewport(m_viewport.get(), static_cast<uint32_t>(handle.framebuffer_width), static_cast<uint32_t>(handle.framebuffer_height), handle.content_scale);
         }
         return false;
     });

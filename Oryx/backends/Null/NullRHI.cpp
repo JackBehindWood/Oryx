@@ -398,9 +398,10 @@ RHIViewportPtr NullRHI::create_viewport(const RHIViewportDesc& desc)
     return make_ref<NullViewport>(desc);
 }
 
-void NullRHI::resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float)
+void NullRHI::resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t height, float)
 {
-    NullViewport* null_viewport = dynamic_cast<NullViewport*>(&viewport);
+    rhi_require_non_null(viewport, "resize_viewport");
+    NullViewport* null_viewport = dynamic_cast<NullViewport*>(viewport);
     if (null_viewport == nullptr)
     {
         throw Error("RHI resize_viewport received a viewport from a different backend");
@@ -433,13 +434,14 @@ void NullRHI::submit(RHICommandList& commands)
     commands.drain_into(m_frame_slots[m_slot]);
 }
 
-void NullRHI::present(RHIViewport& viewport, RHITexture* source)
+void NullRHI::present(RHIViewport* viewport, RHITexture* source)
 {
+    rhi_require_non_null(viewport, "present");
     if (source != nullptr)
     {
-        rhi_validate_present_source(viewport, *source);
+        rhi_validate_present_source(*viewport, *source);
         NullTexture* source_texture = dynamic_cast<NullTexture*>(source);
-        RHIRenderTargetPtr back_buffer = viewport.acquire_back_buffer();
+        RHIRenderTargetPtr back_buffer = viewport->acquire_back_buffer();
         NullRenderTarget* target = dynamic_cast<NullRenderTarget*>(back_buffer.get());
         if (source_texture == nullptr || target == nullptr)
         {
@@ -468,9 +470,10 @@ void NullRHI::wait_idle()
     m_lease.set_idle();
 }
 
-void NullRHI::upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size)
+void NullRHI::upload_buffer(RHIBuffer* buffer, uint32_t offset, const uint8_t* data, uint32_t data_size)
 {
-    NullBuffer* null_buffer = dynamic_cast<NullBuffer*>(&buffer);
+    rhi_require_non_null(buffer, "upload_buffer");
+    NullBuffer* null_buffer = dynamic_cast<NullBuffer*>(buffer);
     if (null_buffer == nullptr)
     {
         throw Error("RHI upload_buffer received a buffer from a different backend");
@@ -478,9 +481,10 @@ void NullRHI::upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* d
     null_buffer->write(offset, data, data_size);
 }
 
-void NullRHI::read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size)
+void NullRHI::read_texture(RHITexture* texture, uint8_t* out, uint32_t out_size)
 {
-    NullTexture* null_texture = dynamic_cast<NullTexture*>(&texture);
+    rhi_require_non_null(texture, "read_texture");
+    NullTexture* null_texture = dynamic_cast<NullTexture*>(texture);
     if (null_texture == nullptr)
     {
         throw Error("RHI read_texture received a texture from a different backend");

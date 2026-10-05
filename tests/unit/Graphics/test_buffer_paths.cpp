@@ -15,9 +15,9 @@ struct Vertex2
     float y;
 };
 
-VertexLayout layout_for_vertex2()
+RHIVertexDeclaration layout_for_vertex2()
 {
-    return { { { 0, RHIVertexFormat::Float2, 0, 0 } }, sizeof(Vertex2) };
+    return RHIVertexDeclarationBuilder().stream(0, sizeof(Vertex2)).attribute(0, RHIVertexFormat::Float2, 0).build();
 }
 
 const std::vector<uint8_t>& bytes_of(const RHIBufferPtr& buffer)
@@ -105,11 +105,11 @@ TEST_CASE("IRHI::upload_buffer writes both memory kinds and validates the range"
     for (RHIMemory memory : { RHIMemory::CpuToGpu, RHIMemory::GpuOnly })
     {
         RHIBufferPtr buffer = rhi.create_buffer({ .size = 8, .memory = memory });
-        rhi.upload_buffer(*buffer, 2, data, sizeof(data));
+        rhi.upload_buffer(buffer.get(), 2, data, sizeof(data));
         CHECK(bytes_of(buffer)[2] == 1);
         CHECK(bytes_of(buffer)[5] == 4);
-        CHECK_THROWS_AS(rhi.upload_buffer(*buffer, 5, data, sizeof(data)), Error);
-        CHECK_THROWS_AS(rhi.upload_buffer(*buffer, 9, data, 0), Error);
+        CHECK_THROWS_AS(rhi.upload_buffer(buffer.get(), 5, data, sizeof(data)), Error);
+        CHECK_THROWS_AS(rhi.upload_buffer(buffer.get(), 9, data, 0), Error);
     }
 }
 

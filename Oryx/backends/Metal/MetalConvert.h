@@ -65,6 +65,17 @@ inline constexpr uint32_t METAL_VERTEX_STREAM_BASE = 16;
     case RHIVertexFormat::Float2: return MTL::VertexFormatFloat2;
     case RHIVertexFormat::Float3: return MTL::VertexFormatFloat3;
     case RHIVertexFormat::Float4: return MTL::VertexFormatFloat4;
+    case RHIVertexFormat::Half2: return MTL::VertexFormatHalf2;
+    case RHIVertexFormat::Half4: return MTL::VertexFormatHalf4;
+    case RHIVertexFormat::UByte4Norm: return MTL::VertexFormatUChar4Normalized;
+    case RHIVertexFormat::UInt: return MTL::VertexFormatUInt;
+    case RHIVertexFormat::UInt2: return MTL::VertexFormatUInt2;
+    case RHIVertexFormat::UInt3: return MTL::VertexFormatUInt3;
+    case RHIVertexFormat::UInt4: return MTL::VertexFormatUInt4;
+    case RHIVertexFormat::Int: return MTL::VertexFormatInt;
+    case RHIVertexFormat::Int2: return MTL::VertexFormatInt2;
+    case RHIVertexFormat::Int3: return MTL::VertexFormatInt3;
+    case RHIVertexFormat::Int4: return MTL::VertexFormatInt4;
     }
     throw Error("RHI vertex format is invalid");
 }

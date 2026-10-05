@@ -139,14 +139,14 @@ public:
     RHIGraphicsPipelinePtr create_graphics_pipeline(const RHIGraphicsPipelineDesc& desc) override;
     RHIRenderTargetPtr create_render_target(const RHIRenderTargetDesc& desc) override;
     RHIViewportPtr create_viewport(const RHIViewportDesc& desc) override;
-    void resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float scale) override;
+    void resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t height, float scale) override;
 
     void submit(RHICommandList& commands) override;
-    void present(RHIViewport& viewport, RHITexture* source = nullptr) override;
+    void present(RHIViewport* viewport, RHITexture* source = nullptr) override;
     void end_frame() override;
     [[nodiscard]] uint32_t frame_slot() const override { return static_cast<uint32_t>(m_slot); }
-    void upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size) override;
-    void read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size) override;
+    void upload_buffer(RHIBuffer* buffer, uint32_t offset, const uint8_t* data, uint32_t data_size) override;
+    void read_texture(RHITexture* texture, uint8_t* out, uint32_t out_size) override;
     void wait_idle() override;
 
     [[nodiscard]] size_t live_resources() const { return RHIResource::live_count(); }

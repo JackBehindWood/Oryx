@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Graphics/Resources/VertexLayout.h"
+#include "Oryx/Shaders/BuiltinShader.h"
 #include "Oryx/Shaders/ShaderType.h"
 
 namespace oryx
@@ -14,30 +14,30 @@ inline constexpr const char* SHADER_TEXTURES_BINDING = "textures";
 inline constexpr const char* SHADER_SAMPLER_BINDING = "smp";
 
 // Vertex layout: float3 position, float4 colour.
-class SolidVS : public StaticShader<VertexShader>
+class SolidVS : public BuiltinShader<VertexShader>
 {
 public:
-    using StaticShader::StaticShader;
+    using BuiltinShader::BuiltinShader;
 };
 
-class SolidPS : public StaticShader<PixelShader>
+class SolidPS : public BuiltinShader<PixelShader>
 {
 public:
-    using StaticShader::StaticShader;
+    using BuiltinShader::BuiltinShader;
 };
 
 // Vertex layout: float3 position, float4 colour, float2 uv, float tex_index (40 bytes).
-class QuadVS : public StaticShader<VertexShader>
+class QuadVS : public BuiltinShader<VertexShader>
 {
 public:
-    using StaticShader::StaticShader;
+    using BuiltinShader::BuiltinShader;
 };
 
 // Permutation 0 samples from 16 textures, permutation 1 from 32.
-class QuadPS : public StaticShader<PixelShader>
+class QuadPS : public BuiltinShader<PixelShader>
 {
 public:
-    using StaticShader::StaticShader;
+    using BuiltinShader::BuiltinShader;
 
     static constexpr uint32_t DEFAULT_TEXTURES = 16;
     static constexpr uint32_t MAX_TEXTURES = RHI_MAX_TEXTURE_BINDINGS;
@@ -47,20 +47,40 @@ public:
 };
 
 // Vertex layout: float3 position, float4 colour, float2 local_position, float thickness, float fade (44 bytes).
-class CircleVS : public StaticShader<VertexShader>
+class CircleVS : public BuiltinShader<VertexShader>
 {
 public:
-    using StaticShader::StaticShader;
+    using BuiltinShader::BuiltinShader;
 };
 
-class CirclePS : public StaticShader<PixelShader>
+class CirclePS : public BuiltinShader<PixelShader>
 {
 public:
-    using StaticShader::StaticShader;
+    using BuiltinShader::BuiltinShader;
 };
 
-[[nodiscard]] VertexLayout solid_vertex_layout();
-[[nodiscard]] VertexLayout quad_vertex_layout();
-[[nodiscard]] VertexLayout circle_vertex_layout();
+struct SolidTrianglesEffect : BuiltinEffect<SolidVS, SolidPS>
+{
+    static constexpr RHITopology TOPOLOGY = RHITopology::Triangles;
+    static constexpr bool BLEND = false;
+};
+
+struct LineEffect : BuiltinEffect<SolidVS, SolidPS>
+{
+    static constexpr RHITopology TOPOLOGY = RHITopology::Lines;
+    static constexpr bool BLEND = false;
+};
+
+struct QuadEffect : BuiltinEffect<QuadVS, QuadPS>
+{
+    static constexpr RHITopology TOPOLOGY = RHITopology::Triangles;
+    static constexpr bool BLEND = true;
+};
+
+struct CircleEffect : BuiltinEffect<CircleVS, CirclePS>
+{
+    static constexpr RHITopology TOPOLOGY = RHITopology::Triangles;
+    static constexpr bool BLEND = true;
+};
 
 } // namespace oryx

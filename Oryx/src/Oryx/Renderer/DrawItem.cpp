@@ -6,10 +6,19 @@
 namespace oryx
 {
 
-void draw_item_set_vertices(DrawItem& item, const VertexBuffer& buffer, uint32_t frame_slot, uint32_t vertex_count)
+void draw_item_set_vertex_stream(DrawItem& item, const VertexBuffer& buffer, uint32_t frame_slot, uint32_t slot)
 {
-    item.vertex_buffer = buffer.rhi_ptr();
-    item.vertex_offset = buffer.offset(frame_slot);
+    if (slot >= RHI_MAX_VERTEX_SLOTS)
+    {
+        throw Error("DrawItem vertex slot is out of range", std::to_string(slot) + " >= " + std::to_string(RHI_MAX_VERTEX_SLOTS));
+    }
+    item.vertex_buffers[slot] = buffer.rhi_ptr();
+    item.vertex_offsets[slot] = buffer.offset(frame_slot);
+}
+
+void draw_item_set_vertices(DrawItem& item, const VertexBuffer& buffer, uint32_t frame_slot, uint32_t vertex_count, uint32_t slot)
+{
+    draw_item_set_vertex_stream(item, buffer, frame_slot, slot);
     item.vertex_count = vertex_count;
 }
 

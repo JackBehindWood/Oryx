@@ -57,7 +57,7 @@ GraphicsPipeline make_graphics_pipeline(IRHI& rhi, const GraphicsShaderSet& set,
     for (const ShaderStageVariable& input : set.vertex->reflection().inputs)
     {
         const RHIVertexAttribute* attribute = nullptr;
-        for (const RHIVertexAttribute& candidate : state.vertex_layout.attributes)
+        for (const RHIVertexAttribute& candidate : state.vertex_declaration.attributes())
         {
             if (candidate.location == input.location)
             {
@@ -66,11 +66,11 @@ GraphicsPipeline make_graphics_pipeline(IRHI& rhi, const GraphicsShaderSet& set,
         }
         if (attribute == nullptr)
         {
-            throw Error("vertex layout has no attribute for shader input '" + input.name + "' at location " + std::to_string(input.location));
+            throw Error("vertex declaration has no attribute for shader input '" + input.name + "' at location " + std::to_string(input.location));
         }
-        if (attribute->format != to_rhi_vertex_format(input.type))
+        if (!rhi_vertex_format_feeds(attribute->format, input.type))
         {
-            throw Error("vertex layout attribute " + std::to_string(input.location) + " does not match shader input '" + input.name + "' (" + shader_type_name(input.type) + ")");
+            throw Error("vertex declaration attribute " + std::to_string(input.location) + " does not match shader input '" + input.name + "' (" + shader_type_name(input.type) + ")");
         }
     }
 
@@ -78,9 +78,7 @@ GraphicsPipeline make_graphics_pipeline(IRHI& rhi, const GraphicsShaderSet& set,
     RHIGraphicsPipelineDesc desc;
     desc.vertex = set.vertex->rhi();
     desc.pixel = set.pixel->rhi();
-    desc.vertex_input.attributes = state.vertex_layout.attributes.data();
-    desc.vertex_input.attribute_count = static_cast<uint32_t>(state.vertex_layout.attributes.size());
-    desc.vertex_input.streams[0].stride = state.vertex_layout.stride;
+    desc.vertex_input = state.vertex_declaration.input();
     desc.topology = state.topology;
     desc.rasterizer = state.rasterizer;
     desc.depth_stencil = state.depth_stencil;

@@ -7,9 +7,10 @@
 namespace oryx
 {
 
-VertexBuffer::VertexBuffer(RHIBufferPtr buffer, VertexLayout layout, uint32_t capacity, BufferMode mode, uint32_t region_count)
+VertexBuffer::VertexBuffer(RHIBufferPtr buffer, RHIVertexDeclaration declaration, uint32_t capacity, BufferMode mode, uint32_t region_count)
     : m_buffer(std::move(buffer))
-    , m_layout(std::move(layout))
+    , m_declaration(std::move(declaration))
+    , m_stride(m_declaration.stride())
     , m_capacity(capacity)
     , m_region_count(region_count)
     , m_cursors(region_count, 0)
@@ -19,21 +20,21 @@ VertexBuffer::VertexBuffer(RHIBufferPtr buffer, VertexLayout layout, uint32_t ca
     {
         throw Error("VertexBuffer requires an RHI buffer");
     }
-    if (m_layout.stride == 0 || m_capacity == 0 || m_region_count == 0)
+    if (m_stride == 0 || m_capacity == 0 || m_region_count == 0)
     {
         throw Error("VertexBuffer stride, capacity and region count must be non-zero");
     }
-    if (static_cast<uint64_t>(m_capacity) * m_layout.stride * m_region_count > m_buffer->size())
+    if (static_cast<uint64_t>(m_capacity) * m_stride * m_region_count > m_buffer->size())
     {
         throw Error("VertexBuffer RHI buffer is too small for its regions");
     }
 }
 
-VertexBuffer VertexBuffer::create(IRHI& rhi, const VertexLayout& layout, uint32_t capacity, BufferMode mode)
+VertexBuffer VertexBuffer::create(IRHI& rhi, const RHIVertexDeclaration& declaration, uint32_t capacity, BufferMode mode)
 {
     const uint32_t region_count = mode == BufferMode::Dynamic ? rhi.capabilities().frames_in_flight : 1;
-    RHIBufferPtr buffer = rhi.create_buffer({ .size = capacity * layout.stride * region_count, .usage = RHIBufferUsage::Vertex, .memory = RHIMemory::CpuToGpu });
-    return VertexBuffer(std::move(buffer), layout, capacity, mode, region_count);
+    RHIBufferPtr buffer = rhi.create_buffer({ .size = capacity * declaration.stride() * region_count, .usage = RHIBufferUsage::Vertex, .memory = RHIMemory::CpuToGpu });
+    return VertexBuffer(std::move(buffer), declaration, capacity, mode, region_count);
 }
 
 uint32_t VertexBuffer::offset(uint32_t frame_slot) const
@@ -46,14 +47,14 @@ uint32_t VertexBuffer::offset(uint32_t frame_slot) const
     {
         throw Error("VertexBuffer frame slot is out of range");
     }
-    return frame_slot * m_capacity * m_layout.stride;
+    return frame_slot * m_capacity * m_stride;
 }
 
 void VertexBuffer::write(uint32_t frame_slot, const uint8_t* data, uint32_t count, size_t element_size)
 {
-    if (element_size != m_layout.stride)
+    if (element_size != m_stride)
     {
-        throw Error("VertexBuffer data type size does not match the layout stride");
+        throw Error("VertexBuffer data type size does not match the declaration stride");
     }
     if (count > m_capacity)
     {
@@ -63,16 +64,16 @@ void VertexBuffer::write(uint32_t frame_slot, const uint8_t* data, uint32_t coun
     {
         throw Error("A static VertexBuffer can only be written once");
     }
-    m_buffer->update(offset(frame_slot), data, count * m_layout.stride);
+    m_buffer->update(offset(frame_slot), data, count * m_stride);
     m_vertex_count = count;
     m_written = true;
 }
 
 uint32_t VertexBuffer::append_bytes(uint32_t frame_slot, const uint8_t* data, uint32_t count, size_t element_size)
 {
-    if (element_size != m_layout.stride)
+    if (element_size != m_stride)
     {
-        throw Error("VertexBuffer data type size does not match the layout stride");
+        throw Error("VertexBuffer data type size does not match the declaration stride");
     }
     if (m_mode != BufferMode::Dynamic)
     {
@@ -87,7 +88,7 @@ uint32_t VertexBuffer::append_bytes(uint32_t frame_slot, const uint8_t* data, ui
     {
         throw Error("VertexBuffer append exceeds the capacity", "capacity is " + std::to_string(m_capacity) + " vertices, " + std::to_string(base) + " already appended");
     }
-    m_buffer->update(offset(frame_slot) + base * m_layout.stride, data, count * m_layout.stride);
+    m_buffer->update(offset(frame_slot) + base * m_stride, data, count * m_stride);
     m_cursors[frame_slot] = base + count;
     m_vertex_count = base + count;
     return base;

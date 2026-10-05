@@ -37,4 +37,7 @@ using RHIViewportPtr = Ref<RHIViewport>;
 // The shared contract for IRHI::present's source: sampled, and exactly the viewport's size and format. Throws Error.
 void rhi_validate_present_source(const RHIViewport& viewport, const RHITexture& source);
 
+// The null check every public IRHI entry runs on its resource arguments before touching the backend. Throws Error.
+void rhi_require_non_null(const void* resource, const char* entry);
+
 } // namespace oryx

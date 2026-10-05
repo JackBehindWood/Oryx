@@ -8,6 +8,7 @@
 #include "Oryx/Graphics/Resources/UniformBuffer.h"
 #include "Oryx/Graphics/Resources/VertexBuffer.h"
 #include "Oryx/Math/Colour.h"
+#include "Oryx/Renderer/BuiltinPipelines.h"
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
@@ -40,6 +41,8 @@ public:
     [[nodiscard]] static const ShaderLibrary& shaders();
     // Returns the cached pipeline for the description, creating it on first use. The handle stays valid until release_pipelines or trim.
     [[nodiscard]] static GraphicsPipelineHandle pipeline(const GraphicsPipelineDesc& desc);
+    // The engine's own pipeline for the back-buffer format; same lifetime as pipeline().
+    [[nodiscard]] static GraphicsPipelineHandle builtin(BuiltinPipeline pipeline, uint32_t permutation = 0);
     // Throws Error for an invalid or stale handle.
     [[nodiscard]] static const GraphicsPipeline& resolve_pipeline(GraphicsPipelineHandle handle);
     [[nodiscard]] static GraphicsPipelineCacheStats pipeline_cache_stats();
@@ -47,7 +50,7 @@ public:
     [[nodiscard]] static const RHITexturePtr& white_texture();
     [[nodiscard]] static const RHISamplerPtr& default_sampler();
 
-    [[nodiscard]] static VertexBuffer create_vertex_buffer(const VertexLayout& layout, uint32_t capacity, BufferMode mode) { return VertexBuffer::create(rhi(), layout, capacity, mode); }
+    [[nodiscard]] static VertexBuffer create_vertex_buffer(const RHIVertexDeclaration& declaration, uint32_t capacity, BufferMode mode) { return VertexBuffer::create(rhi(), declaration, capacity, mode); }
     [[nodiscard]] static IndexBuffer create_index_buffer(IndexType type, uint32_t capacity, BufferMode mode) { return IndexBuffer::create(rhi(), type, capacity, mode); }
     [[nodiscard]] static UniformBuffer create_uniform_buffer(uint32_t size) { return UniformBuffer::create(rhi(), size); }
     [[nodiscard]] static Texture2D create_texture_2d(const Texture2DDesc& desc) { return Texture2D::create(rhi(), desc); }

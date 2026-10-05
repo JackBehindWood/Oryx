@@ -55,15 +55,7 @@ uint64_t hash_graphics_pipeline_desc(const GraphicsPipelineDesc& desc)
     mix_shader(hash, *desc.shaders.vertex);
     mix_shader(hash, *desc.shaders.pixel);
 
-    hash.mix_value(state.vertex_layout.stride);
-    hash.mix_value(state.vertex_layout.attributes.size());
-    for (const RHIVertexAttribute& attribute : state.vertex_layout.attributes)
-    {
-        hash.mix_value(attribute.location);
-        mix_enum(hash, attribute.format);
-        hash.mix_value(attribute.offset);
-        hash.mix_value(attribute.slot);
-    }
+    hash.mix_value(state.vertex_declaration.hash());
     mix_enum(hash, state.topology);
     mix_enum(hash, state.rasterizer.cull);
     mix_enum(hash, state.rasterizer.front_face);

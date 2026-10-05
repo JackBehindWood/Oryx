@@ -31,7 +31,7 @@ void clear_offscreen(IRHI& rhi, RHIFormat format, const Colour& colour, std::vec
     list.end_pass();
     rhi.submit(list);
     pixels.assign(5 * 3 * 4, 0);
-    rhi.read_texture(*texture, pixels.data(), static_cast<uint32_t>(pixels.size()));
+    rhi.read_texture(texture.get(), pixels.data(), static_cast<uint32_t>(pixels.size()));
 }
 
 } // namespace
@@ -99,7 +99,7 @@ TEST_CASE("Metal RHI: frames in flight with mid-flight drops leak nothing")
             list.set_vertex_buffer(0, buffer.get());
             list.end_pass();
             rhi->submit(list);
-            rhi->present(*viewport);
+            rhi->present(viewport.get());
             rhi->end_frame();
         }
         rhi->wait_idle();
@@ -255,7 +255,7 @@ OffscreenTarget make_target(IRHI& rhi)
 std::vector<uint8_t> read_pixels(IRHI& rhi, RHITexture& texture)
 {
     std::vector<uint8_t> pixels(TARGET_SIZE * TARGET_SIZE * 4);
-    rhi.read_texture(texture, pixels.data(), static_cast<uint32_t>(pixels.size()));
+    rhi.read_texture(&texture, pixels.data(), static_cast<uint32_t>(pixels.size()));
     return pixels;
 }
 
@@ -443,7 +443,7 @@ TEST_CASE("Metal RHI: dynamic vertex regions are not overwritten while in flight
         return;
     }
     RHIGraphicsPipelinePtr pipeline = make_test_pipeline(*rhi, {});
-    VertexLayout layout = { { { 0, RHIVertexFormat::Float3, 0, 0 }, { 1, RHIVertexFormat::Float4, 12, 0 }, { 2, RHIVertexFormat::Float, 28, 0 } }, VERTEX_STRIDE };
+    RHIVertexDeclaration layout = RHIVertexDeclarationBuilder().stream(0, VERTEX_STRIDE).attribute(0, RHIVertexFormat::Float3, 0).attribute(1, RHIVertexFormat::Float4, 12).attribute(2, RHIVertexFormat::Float, 28).build();
     VertexBuffer vertices = VertexBuffer::create(*rhi, layout, 3, BufferMode::Dynamic);
 
     constexpr uint32_t FRAMES = 8;
@@ -501,7 +501,7 @@ TEST_CASE("Metal RHI: ten frames of pipelines and draws leak nothing")
             list.draw(3);
             list.end_pass();
             rhi->submit(list);
-            rhi->present(*viewport);
+            rhi->present(viewport.get());
             rhi->end_frame();
         }
         rhi->wait_idle();
@@ -560,14 +560,14 @@ TEST_CASE("Metal RHI: present copies a source texture into the viewport")
     RHIViewportPtr viewport = rhi->create_viewport({ .width = 4, .height = 4 });
     RHITexturePtr source = rhi->create_texture({ .width = 4, .height = 4, .format = RHIFormat::BGRA8Unorm, .usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled });
     RHITexturePtr wrong_size = rhi->create_texture({ .width = 2, .height = 2, .format = RHIFormat::BGRA8Unorm });
-    CHECK_THROWS_AS(rhi->present(*viewport, wrong_size.get()), Error);
+    CHECK_THROWS_AS(rhi->present(viewport.get(), wrong_size.get()), Error);
 
     RHIRenderTargetPtr target = rhi->create_render_target({ .colour = source });
     RHICommandList list;
     list.begin_pass(target.get(), { Colour{ 0.0f, 1.0f, 0.0f, 1.0f }, true });
     list.end_pass();
     rhi->submit(list);
-    CHECK_NOTHROW(rhi->present(*viewport, source.get()));
+    CHECK_NOTHROW(rhi->present(viewport.get(), source.get()));
     rhi->end_frame();
     rhi->wait_idle();
 }

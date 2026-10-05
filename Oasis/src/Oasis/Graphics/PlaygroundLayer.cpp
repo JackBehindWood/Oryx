@@ -8,31 +8,6 @@ namespace oasis
 namespace
 {
 
-struct SolidVertex
-{
-    float position[3];
-    float colour[4];
-};
-
-struct QuadVertex
-{
-    float position[3];
-    float colour[4];
-    float uv[2];
-    float tex_index;
-};
-
-struct CircleVertex
-{
-    float position[3];
-    float colour[4];
-    float local_position[2];
-    float thickness;
-    float fade;
-};
-
-static_assert(sizeof(SolidVertex) == 28 && sizeof(QuadVertex) == 40 && sizeof(CircleVertex) == 44, "vertex structs must match the built-in layouts");
-
 constexpr uint32_t LINE_COUNT = 12;
 constexpr uint32_t TEXTURE_CHECKER = 0;
 // The renderer fills every texture slot the item leaves unset with its white default.
@@ -73,14 +48,14 @@ void playground_view_projection(float aspect, float time, float (&matrix)[16])
 struct PlaygroundScene
 {
     PlaygroundScene()
-        : triangle_pipeline(oryx::builtin_solid_triangles())
-        , line_pipeline(oryx::builtin_solid_lines())
-        , quad_pipeline(oryx::builtin_quad())
-        , circle_pipeline(oryx::builtin_circle())
-        , triangle_vertices(oryx::Renderer::create_vertex_buffer(oryx::solid_vertex_layout(), 3, oryx::BufferMode::Dynamic))
-        , line_vertices(oryx::Renderer::create_vertex_buffer(oryx::solid_vertex_layout(), LINE_COUNT * 2, oryx::BufferMode::Dynamic))
-        , quad_vertices(oryx::Renderer::create_vertex_buffer(oryx::quad_vertex_layout(), 8, oryx::BufferMode::Dynamic))
-        , circle_vertices(oryx::Renderer::create_vertex_buffer(oryx::circle_vertex_layout(), 4, oryx::BufferMode::Dynamic))
+        : triangle_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::SolidTriangles))
+        , line_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::SolidLines))
+        , quad_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::Quad))
+        , circle_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::Circle))
+        , triangle_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DLine>(), 3, oryx::BufferMode::Dynamic))
+        , line_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DLine>(), LINE_COUNT * 2, oryx::BufferMode::Dynamic))
+        , quad_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DQuad>(), 8, oryx::BufferMode::Dynamic))
+        , circle_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DCircle>(), 4, oryx::BufferMode::Dynamic))
         , indices(oryx::Renderer::create_index_buffer(oryx::IndexType::U16, 12, oryx::BufferMode::Static))
         , checker(make_checker_texture())
     {
@@ -146,45 +121,45 @@ void PlaygroundLayer::update(double delta_time)
     playground_view_projection(aspect, t, view_projection);
 
     const float spin = t * 1.2f;
-    const SolidVertex triangle[3] = {
-        { { -0.55f + 0.35f * oryx::math::cos(spin), 0.4f + 0.35f * oryx::math::sin(spin), 0.0f }, { 1.0f, 0.2f, 0.2f, 1.0f } },
-        { { -0.55f + 0.35f * oryx::math::cos(spin + 2.094f), 0.4f + 0.35f * oryx::math::sin(spin + 2.094f), 0.0f }, { 0.2f, 1.0f, 0.2f, 1.0f } },
-        { { -0.55f + 0.35f * oryx::math::cos(spin + 4.189f), 0.4f + 0.35f * oryx::math::sin(spin + 4.189f), 0.0f }, { 0.2f, 0.4f, 1.0f, 1.0f } },
+    const oryx::Vertex2DLine triangle[3] = {
+        { { { -0.55f + 0.35f * oryx::math::cos(spin), 0.4f + 0.35f * oryx::math::sin(spin), 0.0f }, { 1.0f, 0.2f, 0.2f, 1.0f } } },
+        { { { -0.55f + 0.35f * oryx::math::cos(spin + 2.094f), 0.4f + 0.35f * oryx::math::sin(spin + 2.094f), 0.0f }, { 0.2f, 1.0f, 0.2f, 1.0f } } },
+        { { { -0.55f + 0.35f * oryx::math::cos(spin + 4.189f), 0.4f + 0.35f * oryx::math::sin(spin + 4.189f), 0.0f }, { 0.2f, 0.4f, 1.0f, 1.0f } } },
     };
     scene.triangle_vertices.set_data(slot, triangle);
 
-    SolidVertex lines[LINE_COUNT * 2];
+    oryx::Vertex2DLine lines[LINE_COUNT * 2];
     for (uint32_t i = 0; i < LINE_COUNT; ++i)
     {
         const float angle = -t * 0.8f + static_cast<float>(i) * (6.2832f / static_cast<float>(LINE_COUNT));
         const float shade = static_cast<float>(i) / static_cast<float>(LINE_COUNT);
-        lines[i * 2] = { { -0.55f, -0.45f, 0.0f }, { 1.0f, shade, 0.3f, 1.0f } };
-        lines[i * 2 + 1] = { { -0.55f + 0.35f * oryx::math::cos(angle), -0.45f + 0.35f * oryx::math::sin(angle), 0.0f }, { 0.3f, shade, 1.0f, 1.0f } };
+        lines[i * 2] = { { { -0.55f, -0.45f, 0.0f }, { 1.0f, shade, 0.3f, 1.0f } } };
+        lines[i * 2 + 1] = { { { -0.55f + 0.35f * oryx::math::cos(angle), -0.45f + 0.35f * oryx::math::sin(angle), 0.0f }, { 0.3f, shade, 1.0f, 1.0f } } };
     }
     scene.line_vertices.set_data(slot, lines);
 
     const float tex_checker = static_cast<float>(TEXTURE_CHECKER);
     const float tex_white = static_cast<float>(TEXTURE_WHITE);
     const float pulse = 0.5f + 0.5f * oryx::math::sin(t * 1.5f);
-    const QuadVertex quads[8] = {
-        { { 0.25f, 0.2f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f }, tex_checker },
-        { { 0.75f, 0.2f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 2.0f, 0.0f }, tex_checker },
-        { { 0.75f, 0.7f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 2.0f, 2.0f }, tex_checker },
-        { { 0.25f, 0.7f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 0.0f, 2.0f }, tex_checker },
-        { { 0.25f, -0.05f, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f }, { 0.0f, 0.0f }, tex_white },
-        { { 0.75f, -0.05f, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f }, { 1.0f, 0.0f }, tex_white },
-        { { 0.75f, 0.1f + 0.1f * pulse, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f }, { 1.0f, 1.0f }, tex_white },
-        { { 0.25f, 0.1f + 0.1f * pulse, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f }, { 0.0f, 1.0f }, tex_white },
+    const oryx::Vertex2DQuad quads[8] = {
+        { { { 0.25f, 0.2f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 0.0f, 0.0f }, tex_checker },
+        { { { 0.75f, 0.2f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 2.0f, 0.0f }, tex_checker },
+        { { { 0.75f, 0.7f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 2.0f, 2.0f }, tex_checker },
+        { { { 0.25f, 0.7f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 0.0f, 2.0f }, tex_checker },
+        { { { 0.25f, -0.05f, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 0.0f, 0.0f }, tex_white },
+        { { { 0.75f, -0.05f, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 1.0f, 0.0f }, tex_white },
+        { { { 0.75f, 0.1f + 0.1f * pulse, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 1.0f, 1.0f }, tex_white },
+        { { { 0.25f, 0.1f + 0.1f * pulse, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 0.0f, 1.0f }, tex_white },
     };
     scene.quad_vertices.set_data(slot, quads);
 
     const float thickness = 0.05f + 0.45f * pulse;
     const float fade = 0.02f + 0.08f * (1.0f - pulse);
-    const CircleVertex circle[4] = {
-        { { 0.25f, -0.9f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f }, { -1.0f, -1.0f }, thickness, fade },
-        { { 0.75f, -0.9f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f }, { 1.0f, -1.0f }, thickness, fade },
-        { { 0.75f, -0.4f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f }, { 1.0f, 1.0f }, thickness, fade },
-        { { 0.25f, -0.4f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f }, { -1.0f, 1.0f }, thickness, fade },
+    const oryx::Vertex2DCircle circle[4] = {
+        { { { 0.25f, -0.9f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { -1.0f, -1.0f }, thickness, fade },
+        { { { 0.75f, -0.9f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { 1.0f, -1.0f }, thickness, fade },
+        { { { 0.75f, -0.4f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { 1.0f, 1.0f }, thickness, fade },
+        { { { 0.25f, -0.4f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { -1.0f, 1.0f }, thickness, fade },
     };
     scene.circle_vertices.set_data(slot, circle);
 

@@ -45,6 +45,20 @@ void run_rhi_contract(IRHI& rhi)
     REQUIRE(caps.frames_in_flight >= 1);
     REQUIRE(caps.max_texture_size >= 64);
 
+    SUBCASE("null resource arguments throw Error")
+    {
+        const uint8_t byte = 0;
+        uint8_t out[4] = {};
+        RHITexturePtr texture = rhi.create_texture({ .width = 1, .height = 1 });
+        RHIViewportPtr viewport = rhi.create_viewport(viewport_desc(8, 8));
+        CHECK_THROWS_AS(rhi.upload_buffer(nullptr, 0, &byte, 1), Error);
+        CHECK_THROWS_AS(rhi.read_texture(nullptr, out, sizeof(out)), Error);
+        CHECK_THROWS_AS(rhi.resize_viewport(nullptr, 8, 8, 1.0f), Error);
+        CHECK_THROWS_AS(rhi.present(nullptr), Error);
+        CHECK_THROWS_AS(rhi.present(nullptr, texture.get()), Error);
+        CHECK_NOTHROW(rhi.present(viewport.get(), nullptr));
+    }
+
     SUBCASE("buffer create and update")
     {
         const std::vector<uint8_t> initial = make_bytes(16, 1);
@@ -72,11 +86,11 @@ void run_rhi_contract(IRHI& rhi)
         CHECK(texture->format() == RHIFormat::RGBA8Unorm);
 
         std::vector<uint8_t> readback(pixels.size());
-        rhi.read_texture(*texture, readback.data(), static_cast<uint32_t>(readback.size()));
+        rhi.read_texture(texture.get(), readback.data(), static_cast<uint32_t>(readback.size()));
         CHECK(readback == pixels);
 
         std::vector<uint8_t> wrong_size(pixels.size() - 1);
-        CHECK_THROWS_AS(rhi.read_texture(*texture, wrong_size.data(), static_cast<uint32_t>(wrong_size.size())), Error);
+        CHECK_THROWS_AS(rhi.read_texture(texture.get(), wrong_size.data(), static_cast<uint32_t>(wrong_size.size())), Error);
         CHECK_THROWS_AS(rhi.create_texture({ .width = 0, .height = 3 }), Error);
         CHECK_THROWS_AS(rhi.create_texture({ .width = 4, .height = 3, .initial_data = pixels.data(), .initial_data_size = 4 }), Error);
     }
@@ -101,7 +115,7 @@ void run_rhi_contract(IRHI& rhi)
 
         clear_and_submit(rhi, *target, Colour{ 1.0f, 0.0f, 51.0f / 255.0f, 128.0f / 255.0f });
         std::vector<uint8_t> readback(4 * 2 * 4);
-        rhi.read_texture(*texture, readback.data(), static_cast<uint32_t>(readback.size()));
+        rhi.read_texture(texture.get(), readback.data(), static_cast<uint32_t>(readback.size()));
         for (size_t pixel = 0; pixel < 8; ++pixel)
         {
             CHECK(readback[pixel * 4 + 0] == uint8_t{ 255 });
@@ -128,11 +142,11 @@ void run_rhi_contract(IRHI& rhi)
         CHECK(back_buffer->height() == 32);
         CHECK(viewport->acquire_back_buffer().get() == back_buffer.get());
 
-        rhi.resize_viewport(*viewport, 0, 0, 1.0f);
+        rhi.resize_viewport(viewport.get(), 0, 0, 1.0f);
         CHECK(viewport->width() == 0);
         CHECK_FALSE(viewport->acquire_back_buffer());
 
-        rhi.resize_viewport(*viewport, 16, 8, 2.0f);
+        rhi.resize_viewport(viewport.get(), 16, 8, 2.0f);
         RHIRenderTargetPtr resized = viewport->acquire_back_buffer();
         REQUIRE(resized);
         CHECK(resized->width() == 16);
@@ -157,7 +171,7 @@ void run_rhi_contract(IRHI& rhi)
             list.set_vertex_buffer(0, buffer.get());
             list.end_pass();
             rhi.submit(list);
-            rhi.present(*viewport);
+            rhi.present(viewport.get());
             rhi.end_frame();
         }
         rhi.wait_idle();
@@ -183,7 +197,7 @@ void run_rhi_contract(IRHI& rhi)
         CHECK(raw_texture->ref_count() >= 1);
         CHECK(raw_texture->width() == 2);
 
-        rhi.present(*viewport);
+        rhi.present(viewport.get());
         rhi.end_frame();
         rhi.wait_idle();
     }
@@ -196,7 +210,7 @@ void run_rhi_contract(IRHI& rhi)
         const uint64_t serial = RHIResource::frame_serial();
         REQUIRE(slot < caps.frames_in_flight);
 
-        rhi.present(*viewport);
+        rhi.present(viewport.get());
         CHECK(rhi.frame_slot() == slot);
         CHECK(RHIResource::frame_serial() == serial);
 
@@ -218,7 +232,7 @@ void run_rhi_contract(IRHI& rhi)
         RHIViewportPtr viewport = rhi.create_viewport(viewport_desc(64, 32));
         RHIRenderTargetPtr before = viewport->acquire_back_buffer();
         REQUIRE(before);
-        rhi.resize_viewport(*viewport, 32, 16, 1.0f);
+        rhi.resize_viewport(viewport.get(), 32, 16, 1.0f);
         RHIRenderTargetPtr after = viewport->acquire_back_buffer();
         REQUIRE(after);
         CHECK(after->width() == 32);

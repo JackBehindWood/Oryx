@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/Static/StaticShaders.h"
+#include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
 namespace oryx
 {
@@ -40,10 +40,5 @@ fragment float4 solid_ps(SolidOut in [[stage_in]])
 
 OX_REGISTER_SHADER(SolidVS, SOURCE, "solid_vs", ShaderStage::Vertex)
 OX_REGISTER_SHADER(SolidPS, SOURCE, "solid_ps", ShaderStage::Pixel)
-
-VertexLayout solid_vertex_layout()
-{
-    return { { { 0, RHIVertexFormat::Float3, 0, 0 }, { 1, RHIVertexFormat::Float4, 12, 0 } }, 28 };
-}
 
 } // namespace oryx

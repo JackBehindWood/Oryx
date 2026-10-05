@@ -118,17 +118,17 @@ TEST_CASE("Shaders map to RHI enums")
     CHECK_THROWS_AS(to_rhi_vertex_format({ ShaderScalar::Float, 4, 4 }), Error);
 }
 
-TEST_CASE("make_graphics_pipeline checks the vertex layout against the shader inputs")
+TEST_CASE("make_graphics_pipeline checks the vertex declaration against the shader inputs")
 {
     SetFixture f;
     const GraphicsShaderSet set = f.make(vertex_source("float4 colour;"), pixel_source("float4 colour;"));
     GraphicsPipelineState state;
-    state.vertex_layout = { { { 0, RHIVertexFormat::Float3, 0, 0 } }, 12 };
+    state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 12).attribute(0, RHIVertexFormat::Float3, 0).build();
     CHECK_NOTHROW(make_graphics_pipeline(f.rhi, set, state));
 
-    state.vertex_layout = { {}, 12 };
+    state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 12).build();
     CHECK_THROWS_WITH_AS(make_graphics_pipeline(f.rhi, set, state), doctest::Contains("no attribute for shader input 'p'"), Error);
 
-    state.vertex_layout = { { { 0, RHIVertexFormat::Float2, 0, 0 } }, 8 };
+    state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 8).attribute(0, RHIVertexFormat::Float2, 0).build();
     CHECK_THROWS_WITH_AS(make_graphics_pipeline(f.rhi, set, state), doctest::Contains("does not match shader input 'p'"), Error);
 }

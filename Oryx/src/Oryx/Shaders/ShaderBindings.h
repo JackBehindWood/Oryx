@@ -17,6 +17,8 @@ namespace oryx
 [[nodiscard]] RHITextureDimension to_rhi_texture_dimension(ShaderTextureDimension dimension);
 // Throws Error for anything but float scalars and float2-4.
 [[nodiscard]] RHIVertexFormat to_rhi_vertex_format(const ShaderDataType& type);
+// True when a vertex attribute of `format` can feed a shader input of `type`: same component count, float-read formats only.
+[[nodiscard]] bool rhi_vertex_format_feeds(RHIVertexFormat format, const ShaderDataType& type);
 
 // `names[i]` is the shader-side name of `bindings[i]`.
 struct ShaderBindingLayout

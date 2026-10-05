@@ -2,6 +2,7 @@
 #include "Oryx/Graphics/RHI/RHICommandList.h"
 
 #include "Oryx/Core/Error.h"
+#include "Oryx/Graphics/RHI/RHIViewport.h"
 
 namespace oryx
 {
@@ -14,14 +15,6 @@ constexpr size_t RETAIN_SCAN_WINDOW = 16;
 void fail(const char* message, const char* what)
 {
     throw Error(std::string("RHICommandList: ") + message + " in " + what);
-}
-
-void require_non_null(const void* resource, const char* what)
-{
-    if (resource == nullptr)
-    {
-        throw Error(std::string("RHICommandList: null resource passed to ") + what);
-    }
 }
 
 void require_range(uint32_t offset, uint32_t size, const char* what)
@@ -173,7 +166,7 @@ void RHICommandList::begin_pass(const RHIRenderPassDesc& pass)
     for (uint32_t i = 0; i < pass.colour_count; ++i)
     {
         const RHIRenderTarget* target = pass.colour[i].target;
-        require_non_null(target, "begin_pass");
+        rhi_require_non_null(target, "begin_pass");
         if (!rhi_format_is_colour(target->format()))
         {
             throw Error("RHICommandList: begin_pass target is not a colour format");
@@ -227,7 +220,7 @@ void RHICommandList::begin_pass(const RHIRenderPassDesc& pass)
 
 void RHICommandList::begin_pass(RHIRenderTarget* target, const RHIClear& clear)
 {
-    require_non_null(target, "begin_pass");
+    rhi_require_non_null(target, "begin_pass");
     RHIRenderPassDesc pass;
     pass.colour[0].target = target;
     pass.colour[0].load = clear.clear ? RHILoadAction::Clear : RHILoadAction::Load;
@@ -239,7 +232,7 @@ void RHICommandList::begin_pass(RHIRenderTarget* target, const RHIClear& clear)
 void RHICommandList::set_pipeline(RHIGraphicsPipeline* pipeline)
 {
     require_pass("set_pipeline");
-    require_non_null(pipeline, "set_pipeline");
+    rhi_require_non_null(pipeline, "set_pipeline");
     bool compatible = pipeline->colour_format_count() == m_state.pass_colour_count && pipeline->depth_format() == m_state.pass_depth;
     for (uint32_t i = 0; compatible && i < m_state.pass_colour_count; ++i)
     {
@@ -287,7 +280,7 @@ void RHICommandList::set_scissor(const RHIScissorRect& scissor)
 void RHICommandList::set_vertex_buffer(uint32_t slot, RHIBuffer* buffer, uint32_t offset)
 {
     require_pass("set_vertex_buffer");
-    require_non_null(buffer, "set_vertex_buffer");
+    rhi_require_non_null(buffer, "set_vertex_buffer");
     if (slot >= RHI_MAX_VERTEX_SLOTS)
     {
         throw Error("RHICommandList: vertex buffer slot out of range");
@@ -301,7 +294,7 @@ void RHICommandList::set_vertex_buffer(uint32_t slot, RHIBuffer* buffer, uint32_
 void RHICommandList::set_index_buffer(RHIBuffer* buffer, uint32_t offset, bool index32)
 {
     require_pass("set_index_buffer");
-    require_non_null(buffer, "set_index_buffer");
+    rhi_require_non_null(buffer, "set_index_buffer");
     require_usage(buffer->usage(), RHIBufferUsage::Index, "set_index_buffer");
     require_range(offset, buffer->size(), "set_index_buffer");
     emplace<RHISetIndexBufferCommand>(*buffer, offset, index32);
@@ -332,7 +325,7 @@ void RHICommandList::set_constants(RHIBindingId binding, const void* data, uint3
 void RHICommandList::bind_buffer(RHIBindingId binding, RHIBuffer* buffer, uint32_t offset, uint32_t size)
 {
     const RHIBindingDesc& desc = require_binding(binding, "bind_buffer");
-    require_non_null(buffer, "bind_buffer");
+    rhi_require_non_null(buffer, "bind_buffer");
     if (!rhi_binding_is_buffer(desc.kind))
     {
         fail("binding is not a buffer binding", "bind_buffer");
@@ -353,7 +346,7 @@ void RHICommandList::bind_buffer(RHIBindingId binding, RHIBuffer* buffer, uint32
 void RHICommandList::bind_texture(RHIBindingId binding, RHITexture* texture, uint32_t array_index)
 {
     const RHIBindingDesc& desc = require_binding(binding, "bind_texture");
-    require_non_null(texture, "bind_texture");
+    rhi_require_non_null(texture, "bind_texture");
     if (desc.kind != RHIBindingKind::SampledTexture)
     {
         fail("binding is not a sampled texture binding", "bind_texture");
@@ -381,7 +374,7 @@ void RHICommandList::bind_texture(RHIBindingId binding, RHITexture* texture, uin
 void RHICommandList::bind_sampler(RHIBindingId binding, RHISampler* sampler, uint32_t array_index)
 {
     const RHIBindingDesc& desc = require_binding(binding, "bind_sampler");
-    require_non_null(sampler, "bind_sampler");
+    rhi_require_non_null(sampler, "bind_sampler");
     if (desc.kind != RHIBindingKind::Sampler)
     {
         fail("binding is not a sampler binding", "bind_sampler");
@@ -412,7 +405,7 @@ void RHICommandList::draw_indexed(uint32_t index_count, uint32_t instance_count,
 
 void RHICommandList::push_debug_group(const char* name)
 {
-    require_non_null(name, "push_debug_group");
+    rhi_require_non_null(name, "push_debug_group");
     const size_t length = std::strlen(name) + 1;
     char* copy = static_cast<char*>(allocate_payload(length, 1));
     std::memcpy(copy, name, length);
@@ -448,8 +441,8 @@ void RHICommandList::copy_buffer(RHIBuffer* source, uint32_t source_offset, RHIB
     {
         fail("a copy is not allowed inside a pass", "copy_buffer");
     }
-    require_non_null(source, "copy_buffer");
-    require_non_null(destination, "copy_buffer");
+    rhi_require_non_null(source, "copy_buffer");
+    rhi_require_non_null(destination, "copy_buffer");
     if (source == destination)
     {
         fail("source and destination are the same buffer", "copy_buffer");

@@ -3,6 +3,7 @@
 #include "Oryx/Graphics/RHI/RHICommandList.h"
 #include "Oryx/Graphics/RHI/RHIViewport.h"
 #include "Oryx/Math/Colour.h"
+#include "Oryx/Renderer/BuiltinPipelines.h"
 #include "Oryx/Renderer/DefaultResources.h"
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
@@ -23,6 +24,7 @@ struct RendererContext
     std::vector<DrawItem> items;
     RHICommandList commands;
     GraphicsPipelineCache pipelines;
+    BuiltinPipelines builtin_pipelines;
     ShaderLibrary shaders;
     ShaderCache shader_cache;
     DefaultResources defaults;

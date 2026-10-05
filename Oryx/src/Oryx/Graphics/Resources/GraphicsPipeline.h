@@ -1,14 +1,14 @@
 #pragma once
 
 #include "Oryx/Graphics/RHI/RHIPipeline.h"
-#include "Oryx/Graphics/Resources/VertexLayout.h"
+#include "Oryx/Graphics/RHI/RHIVertexDeclaration.h"
 
 namespace oryx
 {
 
 struct GraphicsPipelineState
 {
-    VertexLayout vertex_layout;
+    RHIVertexDeclaration vertex_declaration;
     RHITopology topology = RHITopology::Triangles;
     RHIRasterizerState rasterizer;
     RHIBlendState blend[RHI_MAX_COLOUR_TARGETS];

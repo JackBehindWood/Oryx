@@ -3,7 +3,7 @@
 
 #include "Oryx/Core/Error.h"
 #include "Oryx/Renderer/RendererContext.h"
-#include "Oryx/Shaders/Static/StaticShaders.h"
+#include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
 namespace oryx
 {
@@ -81,14 +81,25 @@ void bind_textures(RHICommandList& commands, const GraphicsPipeline& pipeline, c
 
 void record_draw_item(RHICommandList& commands, const DrawItem& item, const GraphicsPipelineCache& pipelines, const DefaultResources& defaults)
 {
-    if (!item.vertex_buffer)
+    bool has_vertices = false;
+    for (const RHIBufferPtr& buffer : item.vertex_buffers)
+    {
+        has_vertices = has_vertices || static_cast<bool>(buffer);
+    }
+    if (!has_vertices)
     {
         throw Error("DrawItem needs a vertex buffer");
     }
     const GraphicsPipeline& pipeline = pipelines.resolve(item.pipeline);
 
     commands.set_pipeline(pipeline.rhi_ptr().get());
-    commands.set_vertex_buffer(0, item.vertex_buffer.get(), item.vertex_offset);
+    for (uint32_t slot = 0; slot < RHI_MAX_VERTEX_SLOTS; ++slot)
+    {
+        if (item.vertex_buffers[slot])
+        {
+            commands.set_vertex_buffer(slot, item.vertex_buffers[slot].get(), item.vertex_offsets[slot]);
+        }
+    }
     if (item.index_buffer)
     {
         commands.set_index_buffer(item.index_buffer.get(), item.index_offset, item.index_type == IndexType::U32);
@@ -142,7 +153,7 @@ void record_frame(RendererContext& context)
         context.commands.end_pass();
         context.rhi->submit(context.commands);
         guard.dismiss();
-        context.rhi->present(*context.viewport);
+        context.rhi->present(context.viewport.get());
     }
     context.rhi->end_frame();
 }

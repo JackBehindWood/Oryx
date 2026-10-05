@@ -39,6 +39,7 @@ void release_pipelines(RendererContext& context)
 {
     context.rhi->wait_idle();
     context.pipelines.clear();
+    context.builtin_pipelines.reset();
 }
 
 void release_shader_cache(RendererContext& context)

@@ -130,7 +130,18 @@ enum class RHIVertexFormat : uint8_t
     Float,
     Float2,
     Float3,
-    Float4
+    Float4,
+    Half2,
+    Half4,
+    UByte4Norm,
+    UInt,
+    UInt2,
+    UInt3,
+    UInt4,
+    Int,
+    Int2,
+    Int3,
+    Int4
 };
 
 enum class RHIVertexStep : uint8_t

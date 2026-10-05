@@ -133,9 +133,10 @@ RHIViewportPtr MetalRHI::create_viewport(const RHIViewportDesc& desc)
     return make_ref<MetalViewport>(m_device, desc);
 }
 
-void MetalRHI::resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float scale)
+void MetalRHI::resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t height, float scale)
 {
-    MetalViewport* metal_viewport = dynamic_cast<MetalViewport*>(&viewport);
+    rhi_require_non_null(viewport, "resize_viewport");
+    MetalViewport* metal_viewport = dynamic_cast<MetalViewport*>(viewport);
     if (metal_viewport == nullptr)
     {
         throw Error("RHI resize_viewport received a viewport from a different backend");
@@ -170,9 +171,10 @@ void MetalRHI::submit(RHICommandList& commands)
     commands.drain_into(m_queue.frame_refs());
 }
 
-void MetalRHI::present(RHIViewport& viewport, RHITexture* source)
+void MetalRHI::present(RHIViewport* viewport, RHITexture* source)
 {
-    MetalViewport* metal_viewport = dynamic_cast<MetalViewport*>(&viewport);
+    rhi_require_non_null(viewport, "present");
+    MetalViewport* metal_viewport = dynamic_cast<MetalViewport*>(viewport);
     if (metal_viewport == nullptr)
     {
         throw Error("RHI present received a viewport from a different backend");
@@ -182,8 +184,8 @@ void MetalRHI::present(RHIViewport& viewport, RHITexture* source)
     NS::SharedPtr<MTL::CommandBuffer> commands;
     if (source != nullptr)
     {
-        rhi_validate_present_source(viewport, *source);
-        RHIRenderTargetPtr back_buffer = viewport.acquire_back_buffer();
+        rhi_validate_present_source(*viewport, *source);
+        RHIRenderTargetPtr back_buffer = viewport->acquire_back_buffer();
         if (back_buffer)
         {
             MetalTexture* source_texture = dynamic_cast<MetalTexture*>(source);
@@ -220,14 +222,15 @@ void MetalRHI::end_frame()
     m_queue.end_frame();
 }
 
-void MetalRHI::upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size)
+void MetalRHI::upload_buffer(RHIBuffer* buffer, uint32_t offset, const uint8_t* data, uint32_t data_size)
 {
-    MetalBuffer* metal_buffer = dynamic_cast<MetalBuffer*>(&buffer);
+    rhi_require_non_null(buffer, "upload_buffer");
+    MetalBuffer* metal_buffer = dynamic_cast<MetalBuffer*>(buffer);
     if (metal_buffer == nullptr)
     {
         throw Error("RHI upload_buffer received a buffer from a different backend");
     }
-    if (offset > buffer.size() || data_size > buffer.size() - offset)
+    if (offset > buffer->size() || data_size > buffer->size() - offset)
     {
         throw Error("RHI buffer upload is out of range");
     }
@@ -235,24 +238,25 @@ void MetalRHI::upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* 
     {
         return;
     }
-    if (buffer.memory() == RHIMemory::CpuToGpu)
+    if (buffer->memory() == RHIMemory::CpuToGpu)
     {
-        buffer.update(offset, data, data_size);
+        buffer->update(offset, data, data_size);
         return;
     }
     OX_METAL_AUTORELEASE_SCOPE;
     m_device.upload_buffer(*metal_buffer->mtl(), offset, data, data_size);
 }
 
-void MetalRHI::read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size)
+void MetalRHI::read_texture(RHITexture* texture, uint8_t* out, uint32_t out_size)
 {
-    MetalTexture* metal_texture = dynamic_cast<MetalTexture*>(&texture);
+    rhi_require_non_null(texture, "read_texture");
+    MetalTexture* metal_texture = dynamic_cast<MetalTexture*>(texture);
     if (metal_texture == nullptr)
     {
         throw Error("RHI read_texture received a texture from a different backend");
     }
-    const uint32_t bytes_per_row = texture.width() * static_cast<uint32_t>(rhi_format_bytes(texture.format()));
-    const uint32_t byte_count = bytes_per_row * texture.height();
+    const uint32_t bytes_per_row = texture->width() * static_cast<uint32_t>(rhi_format_bytes(texture->format()));
+    const uint32_t byte_count = bytes_per_row * texture->height();
     if (out_size != byte_count)
     {
         throw Error("RHI read_texture output size does not match the texture size");
@@ -262,8 +266,8 @@ void MetalRHI::read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size
     NS::SharedPtr<MTL::Buffer> staging = require_object(NS::TransferPtr(m_device.device()->newBuffer(byte_count, MTL::ResourceStorageModeShared)), "a readback buffer");
     NS::SharedPtr<MTL::CommandBuffer> commands = m_queue.make_command_buffer();
     MTL::BlitCommandEncoder* blit = commands->blitCommandEncoder();
-    const MTL::BlitOption options = texture.format() == RHIFormat::Depth32Float ? MTL::BlitOptionDepthFromDepthStencil : MTL::BlitOptionNone;
-    blit->copyFromTexture(metal_texture->mtl(), 0, 0, MTL::Origin(0, 0, 0), MTL::Size(texture.width(), texture.height(), 1), staging.get(), 0, bytes_per_row, byte_count, options);
+    const MTL::BlitOption options = texture->format() == RHIFormat::Depth32Float ? MTL::BlitOptionDepthFromDepthStencil : MTL::BlitOptionNone;
+    blit->copyFromTexture(metal_texture->mtl(), 0, 0, MTL::Origin(0, 0, 0), MTL::Size(texture->width(), texture->height(), 1), staging.get(), 0, bytes_per_row, byte_count, options);
     blit->endEncoding();
     commands->commit();
     commands->waitUntilCompleted();

@@ -11,6 +11,7 @@
 #include "Oryx/Graphics/RHI/RHISampler.h"
 #include "Oryx/Graphics/RHI/RHIBinding.h"
 #include "Oryx/Graphics/RHI/RHIRenderState.h"
+#include "Oryx/Graphics/RHI/RHIVertexDeclaration.h"
 #include "Oryx/Graphics/RHI/RHIRenderPass.h"
 #include "Oryx/Graphics/RHI/RHIShader.h"
 #include "Oryx/Graphics/RHI/RHIPipeline.h"

@@ -88,6 +88,11 @@ RHIVertexFormat to_rhi_vertex_format(const ShaderDataType& type)
     throw Error("vertex input type '" + shader_type_name(type) + "' is not supported; use float, float2, float3 or float4");
 }
 
+bool rhi_vertex_format_feeds(RHIVertexFormat format, const ShaderDataType& type)
+{
+    return type.scalar == ShaderScalar::Float && type.columns == 1 && rhi_vertex_format_is_float(format) && rhi_vertex_format_components(format) == type.rows;
+}
+
 namespace
 {
 

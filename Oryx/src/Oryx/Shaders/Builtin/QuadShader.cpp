@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/Static/StaticShaders.h"
+#include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
 namespace oryx
 {
@@ -56,10 +56,5 @@ std::vector<ShaderDefine> QuadPS::defines_for(uint32_t permutation)
 
 OX_REGISTER_SHADER(QuadVS, SOURCE, "quad_vs", ShaderStage::Vertex)
 OX_REGISTER_SHADER(QuadPS, SOURCE, "quad_ps", ShaderStage::Pixel)
-
-VertexLayout quad_vertex_layout()
-{
-    return { { { 0, RHIVertexFormat::Float3, 0, 0 }, { 1, RHIVertexFormat::Float4, 12, 0 }, { 2, RHIVertexFormat::Float2, 28, 0 }, { 3, RHIVertexFormat::Float, 36, 0 } }, 40 };
-}
 
 } // namespace oryx

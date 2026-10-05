@@ -15,7 +15,7 @@ struct RendererGuard
 
 GraphicsPipelineDesc base_desc()
 {
-    return solid_triangles_desc(Renderer::shaders(), RHIFormat::BGRA8Unorm);
+    return builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), RHIFormat::BGRA8Unorm);
 }
 
 } // namespace
@@ -50,14 +50,16 @@ TEST_CASE("GraphicsPipelineCache: any differing field makes a different pipeline
         variants.emplace_back(name, std::move(desc));
     };
 
-    vary("pixel shader", [](GraphicsPipelineDesc& d) { d.shaders = quad_desc(Renderer::shaders(), RHIFormat::BGRA8Unorm).shaders; });
-    vary("permutation", [](GraphicsPipelineDesc& d) { d = quad_desc(Renderer::shaders(), RHIFormat::BGRA8Unorm, 1); });
-    vary("stride", [](GraphicsPipelineDesc& d) { d.state.vertex_layout.stride += 4; });
-    vary("attribute location", [](GraphicsPipelineDesc& d) { d.state.vertex_layout.attributes[0].location += 1; });
-    vary("attribute format", [](GraphicsPipelineDesc& d) { d.state.vertex_layout.attributes[0].format = RHIVertexFormat::Float4; });
-    vary("attribute offset", [](GraphicsPipelineDesc& d) { d.state.vertex_layout.attributes[0].offset += 4; });
-    vary("attribute slot", [](GraphicsPipelineDesc& d) { d.state.vertex_layout.attributes[0].slot += 1; });
-    vary("attribute count", [](GraphicsPipelineDesc& d) { d.state.vertex_layout.attributes.pop_back(); });
+    vary("pixel shader", [](GraphicsPipelineDesc& d) { d.shaders = builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), RHIFormat::BGRA8Unorm).shaders; });
+    vary("permutation", [](GraphicsPipelineDesc& d) { d = builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), RHIFormat::BGRA8Unorm, 1); });
+    vary("stride", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 32).attribute(0, RHIVertexFormat::Float3, 0).attribute(1, RHIVertexFormat::Float4, 12).build(); });
+    vary("attribute location", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28).attribute(5, RHIVertexFormat::Float3, 0).attribute(1, RHIVertexFormat::Float4, 12).build(); });
+    vary("attribute format", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28).attribute(0, RHIVertexFormat::Float4, 0).attribute(1, RHIVertexFormat::Float4, 12).build(); });
+    vary("attribute offset", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28).attribute(0, RHIVertexFormat::Float3, 4).attribute(1, RHIVertexFormat::Float4, 12).build(); });
+    vary("attribute slot", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28).stream(1, 28).attribute(0, RHIVertexFormat::Float3, 0, 1).attribute(1, RHIVertexFormat::Float4, 12).build(); });
+    vary("attribute count", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28).attribute(0, RHIVertexFormat::Float3, 0).build(); });
+    vary("stream step function", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28, RHIVertexStep::PerInstance).attribute(0, RHIVertexFormat::Float3, 0).attribute(1, RHIVertexFormat::Float4, 12).build(); });
+    vary("stream step rate", [](GraphicsPipelineDesc& d) { d.state.vertex_declaration = RHIVertexDeclarationBuilder().stream(0, 28, RHIVertexStep::PerVertex, 2).attribute(0, RHIVertexFormat::Float3, 0).attribute(1, RHIVertexFormat::Float4, 12).build(); });
     vary("topology", [](GraphicsPipelineDesc& d) { d.state.topology = RHITopology::Lines; });
     vary("cull", [](GraphicsPipelineDesc& d) { d.state.rasterizer.cull = RHICullMode::Back; });
     vary("front face", [](GraphicsPipelineDesc& d) { d.state.rasterizer.front_face = RHIFrontFace::Clockwise; });
@@ -107,18 +109,18 @@ TEST_CASE("GraphicsPipelineCache: built-in descriptions are distinct and stable"
     const ShaderLibrary& shaders = Renderer::shaders();
     const RHIFormat format = Renderer::back_buffer_format();
 
-    const GraphicsPipelineHandle triangles = Renderer::pipeline(solid_triangles_desc(shaders, format));
-    const GraphicsPipelineHandle lines = Renderer::pipeline(solid_lines_desc(shaders, format));
-    const GraphicsPipelineHandle quad = Renderer::pipeline(quad_desc(shaders, format));
-    const GraphicsPipelineHandle circle = Renderer::pipeline(circle_desc(shaders, format));
+    const GraphicsPipelineHandle triangles = Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, shaders, format));
+    const GraphicsPipelineHandle lines = Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::SolidLines, shaders, format));
+    const GraphicsPipelineHandle quad = Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Quad, shaders, format));
+    const GraphicsPipelineHandle circle = Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Circle, shaders, format));
     CHECK(Renderer::pipeline_cache_stats().entries == 4);
     CHECK(triangles != lines);
     CHECK(quad != circle);
     CHECK(triangles != quad);
 
-    CHECK(Renderer::pipeline(quad_desc(shaders, format)) == quad);
-    CHECK(Renderer::pipeline(quad_desc(shaders, RHIFormat::RGBA8Unorm)) != quad);
-    CHECK(Renderer::pipeline(quad_desc(shaders, format, 1)) != quad);
+    CHECK(Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Quad, shaders, format)) == quad);
+    CHECK(Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Quad, shaders, RHIFormat::RGBA8Unorm)) != quad);
+    CHECK(Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Quad, shaders, format, 1)) != quad);
 }
 
 TEST_CASE("GraphicsPipelineCache: addresses stay stable while more pipelines are added")
@@ -126,13 +128,13 @@ TEST_CASE("GraphicsPipelineCache: addresses stay stable while more pipelines are
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     const ShaderLibrary& shaders = Renderer::shaders();
-    const GraphicsPipelineHandle first = Renderer::pipeline(solid_triangles_desc(shaders, RHIFormat::BGRA8Unorm));
+    const GraphicsPipelineHandle first = Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, shaders, RHIFormat::BGRA8Unorm));
     const GraphicsPipeline* address = &Renderer::resolve_pipeline(first);
     for (const RHICullMode cull : { RHICullMode::Front, RHICullMode::Back })
     {
         for (const RHIFrontFace face : { RHIFrontFace::Clockwise, RHIFrontFace::CounterClockwise })
         {
-            GraphicsPipelineDesc desc = solid_triangles_desc(shaders, RHIFormat::BGRA8Unorm);
+            GraphicsPipelineDesc desc = builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, shaders, RHIFormat::BGRA8Unorm);
             desc.state.rasterizer.cull = cull;
             desc.state.rasterizer.front_face = face;
             (void)Renderer::pipeline(desc);

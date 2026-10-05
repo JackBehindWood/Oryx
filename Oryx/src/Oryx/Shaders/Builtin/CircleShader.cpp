@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/Static/StaticShaders.h"
+#include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
 namespace oryx
 {
@@ -51,10 +51,5 @@ fragment float4 circle_ps(CircleOut in [[stage_in]])
 
 OX_REGISTER_SHADER(CircleVS, SOURCE, "circle_vs", ShaderStage::Vertex)
 OX_REGISTER_SHADER(CirclePS, SOURCE, "circle_ps", ShaderStage::Pixel)
-
-VertexLayout circle_vertex_layout()
-{
-    return { { { 0, RHIVertexFormat::Float3, 0, 0 }, { 1, RHIVertexFormat::Float4, 12, 0 }, { 2, RHIVertexFormat::Float2, 28, 0 }, { 3, RHIVertexFormat::Float, 36, 0 }, { 4, RHIVertexFormat::Float, 40, 0 } }, 44 };
-}
 
 } // namespace oryx

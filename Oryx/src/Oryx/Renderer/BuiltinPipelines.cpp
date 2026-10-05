@@ -1,69 +1,58 @@
 #include "oxpch.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
 
-#include "Oryx/Renderer/Renderer.h"
-#include "Oryx/Shaders/Static/StaticShaders.h"
+#include "Oryx/Core/Error.h"
+#include "Oryx/Renderer/Vertex2D.h"
+#include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
 namespace oryx
 {
 
-namespace
+GraphicsPipelineDesc builtin_pipeline_desc(BuiltinPipeline pipeline, const ShaderLibrary& shaders, RHIFormat colour_format, uint32_t permutation)
 {
-
-GraphicsPipelineDesc make_desc(GraphicsShaderSet shaders, VertexLayout layout, RHITopology topology, bool blend, RHIFormat colour_format)
-{
-    GraphicsPipelineDesc desc;
-    desc.shaders = std::move(shaders);
-    desc.state.vertex_layout = std::move(layout);
-    desc.state.topology = topology;
-    desc.state.colour_formats[0] = colour_format;
-    if (blend)
+    if (permutation != 0 && pipeline != BuiltinPipeline::Quad)
     {
-        desc.state.blend[0] = rhi_blend_alpha();
+        throw Error("BuiltinPipeline has no such permutation", std::to_string(permutation));
     }
-    return desc;
+    switch (pipeline)
+    {
+    case BuiltinPipeline::SolidTriangles: return builtin_desc<SolidTrianglesEffect>(shaders, vertex_declaration<Vertex2DLine>(), colour_format);
+    case BuiltinPipeline::SolidLines: return builtin_desc<LineEffect>(shaders, vertex_declaration<Vertex2DLine>(), colour_format);
+    case BuiltinPipeline::Quad: return builtin_desc<QuadEffect>(shaders, vertex_declaration<Vertex2DQuad>(), colour_format, permutation);
+    case BuiltinPipeline::Circle: return builtin_desc<CircleEffect>(shaders, vertex_declaration<Vertex2DCircle>(), colour_format);
+    }
+    throw Error("BuiltinPipeline is invalid");
 }
 
-} // namespace
-
-GraphicsPipelineDesc solid_triangles_desc(const ShaderLibrary& shaders, RHIFormat colour_format)
+GraphicsPipelineHandle BuiltinPipelines::get(IRHI& rhi, GraphicsPipelineCache& cache, const ShaderLibrary& shaders, RHIFormat colour_format, BuiltinPipeline pipeline, uint32_t permutation)
 {
-    return make_desc({ shaders.get<SolidVS>(), shaders.get<SolidPS>() }, solid_vertex_layout(), RHITopology::Triangles, false, colour_format);
+    if (static_cast<uint32_t>(pipeline) >= BUILTIN_PIPELINE_COUNT || permutation >= BUILTIN_MAX_PERMUTATIONS)
+    {
+        throw Error("BuiltinPipelines::get received an unknown pipeline or permutation");
+    }
+    if (m_generation != cache.generation() || m_format != colour_format)
+    {
+        reset();
+        m_generation = cache.generation();
+        m_format = colour_format;
+    }
+    GraphicsPipelineHandle& handle = m_handles[static_cast<uint32_t>(pipeline)][permutation];
+    if (!graphics_pipeline_handle_valid(handle))
+    {
+        handle = cache.get_or_create(rhi, builtin_pipeline_desc(pipeline, shaders, colour_format, permutation));
+    }
+    return handle;
 }
 
-GraphicsPipelineDesc solid_lines_desc(const ShaderLibrary& shaders, RHIFormat colour_format)
+void BuiltinPipelines::reset()
 {
-    return make_desc({ shaders.get<SolidVS>(), shaders.get<SolidPS>() }, solid_vertex_layout(), RHITopology::Lines, false, colour_format);
-}
-
-GraphicsPipelineDesc quad_desc(const ShaderLibrary& shaders, RHIFormat colour_format, uint32_t permutation)
-{
-    return make_desc({ shaders.get<QuadVS>(), shaders.get<QuadPS>(permutation) }, quad_vertex_layout(), RHITopology::Triangles, true, colour_format);
-}
-
-GraphicsPipelineDesc circle_desc(const ShaderLibrary& shaders, RHIFormat colour_format)
-{
-    return make_desc({ shaders.get<CircleVS>(), shaders.get<CirclePS>() }, circle_vertex_layout(), RHITopology::Triangles, true, colour_format);
-}
-
-GraphicsPipelineHandle builtin_solid_triangles()
-{
-    return Renderer::pipeline(solid_triangles_desc(Renderer::shaders(), Renderer::back_buffer_format()));
-}
-
-GraphicsPipelineHandle builtin_solid_lines()
-{
-    return Renderer::pipeline(solid_lines_desc(Renderer::shaders(), Renderer::back_buffer_format()));
-}
-
-GraphicsPipelineHandle builtin_quad(uint32_t permutation)
-{
-    return Renderer::pipeline(quad_desc(Renderer::shaders(), Renderer::back_buffer_format(), permutation));
-}
-
-GraphicsPipelineHandle builtin_circle()
-{
-    return Renderer::pipeline(circle_desc(Renderer::shaders(), Renderer::back_buffer_format()));
+    for (GraphicsPipelineHandle (&row)[BUILTIN_MAX_PERMUTATIONS] : m_handles)
+    {
+        for (GraphicsPipelineHandle& handle : row)
+        {
+            handle = {};
+        }
+    }
 }
 
 } // namespace oryx

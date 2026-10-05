@@ -73,6 +73,12 @@ GraphicsPipelineHandle Renderer::pipeline(const GraphicsPipelineDesc& desc)
     return context.pipelines.get_or_create(*context.rhi, desc);
 }
 
+GraphicsPipelineHandle Renderer::builtin(BuiltinPipeline pipeline, uint32_t permutation)
+{
+    RendererContext& context = require_context();
+    return context.builtin_pipelines.get(*context.rhi, context.pipelines, context.shaders, context.back_buffer_format, pipeline, permutation);
+}
+
 const GraphicsPipeline& Renderer::resolve_pipeline(GraphicsPipelineHandle handle)
 {
     return require_context().pipelines.resolve(handle);

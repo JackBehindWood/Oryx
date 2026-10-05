@@ -73,6 +73,14 @@ void rhi_validate_present_source(const RHIViewport& viewport, const RHITexture& 
     }
 }
 
+void rhi_require_non_null(const void* resource, const char* entry)
+{
+    if (resource == nullptr)
+    {
+        throw Error(std::string("RHI ") + entry + " received a null resource");
+    }
+}
+
 UniquePtr<IRHI> create_rhi(RHIBackend backend)
 {
     switch (backend)

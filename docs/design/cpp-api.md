@@ -61,6 +61,17 @@ predates it and is not being retrofitted (e.g. `Application::Get()` is a
 static accessor, `create_application()` a free function — both fine as
 historical exceptions, not examples to copy for new pure interfaces).
 
+### RHI Resource Arguments
+
+* Public RHI entry points (`IRHI`, `RHICommandList`) take resources as raw
+  pointers (`RHIBuffer*`, `RHITexture*`, `RHIViewport*`, ...) and reject null
+  at the boundary with `rhi_require_non_null`, which throws `Error`.
+* `IRHICommandContext` (implemented by backends) takes references: it only
+  sees resources a recording already validated, so non-null is guaranteed.
+* A pointer that may legitimately be null (`IRHI::present`'s `source`) is
+  documented as optional; nothing else is. `Ref<T>` is not taken by value
+  where nothing retains the resource.
+
 ### Math Module
 
 A header-only `oryx::Math` module (`Oryx/src/Oryx/Math/`), widened during
