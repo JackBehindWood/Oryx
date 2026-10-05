@@ -67,3 +67,19 @@ def test_backend_factories_may_include_backend_headers_but_nothing_else(tmp_path
         "Renderer/R.cpp": '#include "MetalRHI.h"\n',
     })
     assert len(boundaries.check_includes(src)) == 2
+
+
+def test_renderer_and_text_may_not_include_assets(tmp_path):
+    src = _tree(tmp_path, {
+        "Renderer/Font.h": '#include "Oryx/Assets/AssetManager.h"\n',
+        "Graphics/G.h": '#include "Oryx/Assets/AssetHandle.h"\n',
+        "Text/T.h": '#include "Oryx/Assets/AssetHandle.h"\n',
+        "Text/Ok.h": '#include "Oryx/Core/Utf8.h"\n',
+        "Assets/AssetFontSource.h": '#include "Oryx/Text/IFontSource.h"\n',
+    })
+    assert len(boundaries.check_includes(src)) == 3
+
+
+def test_text_is_headless(tmp_path):
+    src = _tree(tmp_path, {"Text/T.h": '#include "Oryx/Renderer/Font.h"\n'})
+    assert len(boundaries.check_includes(src)) == 1

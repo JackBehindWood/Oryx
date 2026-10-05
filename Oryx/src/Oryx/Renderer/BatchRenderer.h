@@ -28,6 +28,9 @@ struct BatchStats
     uint32_t draws = 0;
     uint32_t primitives = 0;
     uint32_t vertices = 0;
+    uint32_t triangles = 0;
+    // The most texture slots any one draw of the frame bound.
+    uint32_t texture_slots_used = 0;
     uint32_t bytes = 0;
     uint32_t pages = 0;
     uint32_t flushes[FLUSH_REASON_COUNT] = {};
@@ -47,6 +50,7 @@ struct BatchStreamDesc
     uint32_t indices_per_primitive = 0;
     bool textured = false;
     BuiltinPipeline pipeline = BuiltinPipeline::Quad;
+    uint32_t triangles_per_primitive = 0;
 };
 
 using BatchStreamId = uint8_t;
@@ -100,11 +104,13 @@ protected:
     [[nodiscard]] uint8_t* append();
 
     [[nodiscard]] const DefaultResources& defaults() const { return m_defaults; }
+    [[nodiscard]] IRHI& rhi() const { return m_rhi; }
+    // Throws Error outside a scene.
+    void require_open() const;
 
 private:
     void flush_batch(FlushReason reason);
     [[nodiscard]] TransientAllocation allocate(uint32_t bytes);
-    void require_open() const;
 
     IRHI& m_rhi;
     GraphicsPipelineCache& m_pipelines;

@@ -22,6 +22,13 @@ TEST_CASE("vertex_declaration: built-in 2D vertex formats match their structs")
     REQUIRE(circle.attributes().size() == 5);
     CHECK(circle.attributes()[4].offset == offsetof(Vertex2DCircle, fade));
 
+    const RHIVertexDeclaration& text = vertex_declaration<Vertex2DText>();
+    CHECK(text.stride() == sizeof(Vertex2DText));
+    REQUIRE(text.attributes().size() == 5);
+    CHECK(text.attributes()[3].offset == offsetof(Vertex2DText, tex_index));
+    CHECK(text.attributes()[4].offset == offsetof(Vertex2DText, px_range));
+    CHECK(text.hash() != quad.hash());
+
     CHECK(line.hash() != quad.hash());
     CHECK(quad.hash() != circle.hash());
     CHECK(&vertex_declaration<Vertex2DQuad>() == &quad);
@@ -33,6 +40,10 @@ TEST_CASE("primitive_traits: agree with the vertex formats and effects")
     CHECK(primitive_traits(Primitive2D::Circle).vertex_size == vertex_declaration<Vertex2DCircle>().stride());
     CHECK(primitive_traits(Primitive2D::Line).vertex_size == vertex_declaration<Vertex2DLine>().stride());
     CHECK(primitive_traits(Primitive2D::Triangle).vertex_size == vertex_declaration<Vertex2DLine>().stride());
+
+    CHECK(primitive_traits(Primitive2D::Text).vertex_size == vertex_declaration<Vertex2DText>().stride());
+    CHECK(primitive_traits(Primitive2D::Text).pipeline == BuiltinPipeline::Text);
+    CHECK(primitive_traits(Primitive2D::Text).indices_per_primitive == 6);
 
     CHECK(primitive_traits(Primitive2D::Quad).indexed);
     CHECK(primitive_traits(Primitive2D::Quad).indices_per_primitive == 6);

@@ -11,7 +11,9 @@
 #include "Oryx/Renderer/BatchRenderer.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
 #include "Oryx/Math/Vector2.h"
+#include "Oryx/Renderer/DebugRenderer.h"
 #include "Oryx/Renderer/DrawItem.h"
+#include "Oryx/Renderer/Font.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
 
@@ -84,6 +86,10 @@ public:
     static void draw_rect(const Vec2f& position, const Vec2f& size, const Colour& colour, float rotation = 0.0f);
     static void draw_sprite(const Vec2f& position, const Vec2f& size, const Texture2D& texture, const Colour& tint = { 1.0f, 1.0f, 1.0f, 1.0f }, float rotation = 0.0f, const Vec2f& uv_min = { 0.0f, 0.0f }, const Vec2f& uv_max = { 1.0f, 1.0f });
     static void draw_circle(const Vec2f& centre, float radius, const Colour& colour, float thickness = 1.0f, float fade = 0.005f);
+    static void draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style = {});
+    // Records shapes from anywhere, between scenes too; draw_debug replays them into the open scene and record_frame ages them.
+    [[nodiscard]] static DebugRenderer& debug();
+    static void draw_debug();
     // Counters of the frame being recorded; reset when the frame ring advances.
     [[nodiscard]] static const BatchStats& batch_stats();
 

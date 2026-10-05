@@ -59,6 +59,23 @@ public:
     using BuiltinShader::BuiltinShader;
 };
 
+// Vertex layout: float3 position, float4 colour, float2 uv, float tex_index, float px_range (44 bytes); samples the atlas `.r` as coverage, or as a signed distance when px_range > 0.
+class TextVS : public BuiltinShader<VertexShader>
+{
+public:
+    using BuiltinShader::BuiltinShader;
+};
+
+// Same texture permutations as QuadPS.
+class TextPS : public BuiltinShader<PixelShader>
+{
+public:
+    using BuiltinShader::BuiltinShader;
+
+    static std::vector<ShaderDefine> defines_for(uint32_t permutation);
+    static bool should_compile(uint32_t permutation) { return QuadPS::should_compile(permutation); }
+};
+
 struct SolidTrianglesEffect : BuiltinEffect<SolidVS, SolidPS>
 {
     static constexpr RHITopology TOPOLOGY = RHITopology::Triangles;
@@ -78,6 +95,12 @@ struct QuadEffect : BuiltinEffect<QuadVS, QuadPS>
 };
 
 struct CircleEffect : BuiltinEffect<CircleVS, CirclePS>
+{
+    static constexpr RHITopology TOPOLOGY = RHITopology::Triangles;
+    static constexpr bool BLEND = true;
+};
+
+struct TextEffect : BuiltinEffect<TextVS, TextPS>
 {
     static constexpr RHITopology TOPOLOGY = RHITopology::Triangles;
     static constexpr bool BLEND = true;

@@ -61,11 +61,29 @@ TEST_CASE("FontAsset::metrics scale with pixel height")
 
 TEST_CASE("AssetManager loads fonts from disk")
 {
-    oryx::AssetManager manager;
-    oryx::AssetHandle<oryx::FontAsset> font = manager.load<oryx::FontAsset>(font_path());
+    oryx::AssetManager manager(oryx::test::uncached_settings());
+    oryx::AssetHandle<oryx::FontAsset> font = oryx::test::load_now<oryx::FontAsset>(manager, font_path());
     REQUIRE(manager.state(font) == oryx::AssetState::Ready);
     CHECK(manager.get(font).has_glyph('A'));
 
-    oryx::AssetHandle<oryx::FontAsset> missing = manager.load<oryx::FontAsset>("no/such/font.ttf");
+    oryx::AssetHandle<oryx::FontAsset> missing = oryx::test::load_now<oryx::FontAsset>(manager, "no/such/font.ttf");
     CHECK(manager.state(missing) == oryx::AssetState::Failed);
+}
+
+TEST_CASE("FontAsset::kerning scales linearly and is zero for an unkerned pair")
+{
+    oryx::FontAsset font = oryx::FontAsset::from_bytes(oryx::read_binary_file(font_path()));
+    CHECK(font.kerning('A', 'A', 16.0f) == doctest::Approx(0.0f));
+    CHECK(font.kerning('A', 'V', 32.0f) == doctest::Approx(font.kerning('A', 'V', 16.0f) * 2.0f));
+}
+
+TEST_CASE("FontAsset::content_hash is stable and depends on the bytes")
+{
+    std::vector<uint8_t> bytes = oryx::read_binary_file(font_path());
+    oryx::FontAsset first = oryx::FontAsset::from_bytes(bytes);
+    oryx::FontAsset second = oryx::FontAsset::from_bytes(bytes);
+    CHECK(first.content_hash() == second.content_hash());
+    bytes.back() ^= 0xFF;
+    oryx::FontAsset changed = oryx::FontAsset::from_bytes(bytes);
+    CHECK(changed.content_hash() != first.content_hash());
 }

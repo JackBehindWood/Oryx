@@ -14,11 +14,12 @@ enum class BuiltinPipeline : uint8_t
     SolidTriangles,
     SolidLines,
     Quad,
-    Circle
+    Circle,
+    Text
 };
 
-inline constexpr uint32_t BUILTIN_PIPELINE_COUNT = 4;
-// QuadPS is the only effect with permutations (see QuadPS::should_compile).
+inline constexpr uint32_t BUILTIN_PIPELINE_COUNT = 5;
+// QuadPS and TextPS are the only effects with permutations (see QuadPS::should_compile).
 inline constexpr uint32_t BUILTIN_MAX_PERMUTATIONS = 2;
 
 // Throws Error for a permutation the pipeline's pixel shader does not compile.

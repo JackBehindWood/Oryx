@@ -1,5 +1,6 @@
 #include "oxpch.h"
 #include "Oryx/Core/Application.h"
+#include "Oryx/Assets/Assets.h"
 #include "Oryx/Core/Error.h"
 #include "Oryx/Events/WindowEvent.h"
 
@@ -71,8 +72,10 @@ Application::~Application()
 
 void Application::run()
 {
+    m_timer.start();
     while (m_running)
     {
+        Assets::update();
         m_layer_stack.update(m_timer.tick());
     }
 }

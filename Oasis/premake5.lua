@@ -24,6 +24,7 @@ project "Oasis"
         "src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
         forge.include("spdlog"),
+        forge.include("stb"),
     }
 
     defines {

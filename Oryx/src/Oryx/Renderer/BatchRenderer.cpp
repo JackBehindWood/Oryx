@@ -203,6 +203,11 @@ void BatchRenderer::flush_batch(FlushReason reason)
         ++m_stats.draws;
         m_stats.primitives += primitives;
         m_stats.vertices += primitives * stream.vertices_per_primitive;
+        m_stats.triangles += primitives * stream.triangles_per_primitive;
+        if (stream.textured)
+        {
+            m_stats.texture_slots_used = std::max(m_stats.texture_slots_used, m_slots.count());
+        }
         m_stats.bytes += bytes;
         ++m_stats.flushes[static_cast<uint32_t>(reason)];
     }

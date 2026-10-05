@@ -25,6 +25,11 @@ TEST_CASE("BuiltinPipelines: each pipeline has its effect's topology, blend and 
     const GraphicsPipelineDesc lines = builtin_pipeline_desc(BuiltinPipeline::SolidLines, shaders, format);
     const GraphicsPipelineDesc quad = builtin_pipeline_desc(BuiltinPipeline::Quad, shaders, format);
     const GraphicsPipelineDesc circle = builtin_pipeline_desc(BuiltinPipeline::Circle, shaders, format);
+    const GraphicsPipelineDesc text = builtin_pipeline_desc(BuiltinPipeline::Text, shaders, format);
+    CHECK(text.state.blend[0].enabled);
+    CHECK(text.state.vertex_declaration == vertex_declaration<Vertex2DText>());
+    CHECK_NOTHROW(builtin_pipeline_desc(BuiltinPipeline::Text, shaders, format, 1));
+    CHECK_THROWS_AS(builtin_pipeline_desc(BuiltinPipeline::Text, shaders, format, 2), Error);
     CHECK(triangles.state.topology == RHITopology::Triangles);
     CHECK(lines.state.topology == RHITopology::Lines);
     CHECK_FALSE(triangles.state.blend[0].enabled);
@@ -58,10 +63,13 @@ TEST_CASE("BuiltinPipelines: get caches handles, separates permutations and rebu
     CHECK(Renderer::builtin(BuiltinPipeline::Quad) == quad);
     CHECK(Renderer::builtin(BuiltinPipeline::Quad, 1) != quad);
     CHECK(Renderer::builtin(BuiltinPipeline::Circle) != quad);
-    const uint32_t entries = Renderer::pipeline_cache_stats().entries;
-    CHECK(entries == 3);
+    CHECK(Renderer::pipeline_cache_stats().entries == 3);
+    CHECK(Renderer::builtin(BuiltinPipeline::Text) != quad);
+    CHECK(Renderer::builtin(BuiltinPipeline::Text, 1) != Renderer::builtin(BuiltinPipeline::Text));
+    const uint32_t with_text = Renderer::pipeline_cache_stats().entries;
+    CHECK(with_text == 5);
     (void)Renderer::builtin(BuiltinPipeline::Quad);
-    CHECK(Renderer::pipeline_cache_stats().entries == entries);
+    CHECK(Renderer::pipeline_cache_stats().entries == with_text);
 
     Renderer::release_pipelines();
     CHECK_THROWS_AS(Renderer::resolve_pipeline(quad), Error);

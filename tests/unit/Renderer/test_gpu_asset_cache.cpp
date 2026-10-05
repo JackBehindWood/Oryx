@@ -12,14 +12,14 @@ namespace
 struct CacheFixture
 {
     NullRHI rhi;
-    AssetManager assets;
+    AssetManager assets{ test::uncached_settings() }; 
     GpuAssetCache cache;
     test::AssetTempDir dir;
 
     AssetHandle<ImageAsset> load(const char* name, int32_t width, int32_t height)
     {
         test::write_png(dir.path() / name, width, height, 4, std::vector<uint8_t>(static_cast<size_t>(width * height * 4), 90));
-        return assets.load<ImageAsset>(dir.path() / name);
+        return test::load_now<ImageAsset>(assets, dir.path() / name);
     }
 };
 
@@ -65,14 +65,40 @@ TEST_CASE("GpuAssetCache rebuilds when the slot's generation changes")
     CHECK_THROWS_AS((void)f.cache.get(f.rhi, f.assets, old_image), Error);
 }
 
-TEST_CASE("GpuAssetCache::get throws for a Failed or stale asset and caches nothing")
+TEST_CASE("GpuAssetCache::get serves a placeholder while Loading or Failed and throws for a stale handle")
 {
     CacheFixture f;
-    AssetHandle<ImageAsset> missing = f.assets.load<ImageAsset>(f.dir.path() / "missing.png");
-    REQUIRE(f.assets.state(missing) == AssetState::Failed);
-    CHECK_THROWS_AS((void)f.cache.get(f.rhi, f.assets, missing), Error);
-    CHECK_THROWS_AS((void)f.cache.get(f.rhi, f.assets, AssetHandle<ImageAsset>{}), Error);
+    test::write_png(f.dir.path() / "late.png", 5, 5, 4, std::vector<uint8_t>(5 * 5 * 4, 1));
+    AssetHandle<ImageAsset> late = f.assets.load<ImageAsset>(f.dir.path() / "late.png");
+    const Texture2D& placeholder = f.cache.get(f.rhi, f.assets, late);
+    CHECK(placeholder.width() == 1);
     CHECK(f.cache.size() == 0);
+    f.assets.wait(late);
+    CHECK(f.cache.get(f.rhi, f.assets, late).width() == 5);
+    CHECK(f.cache.size() == 1);
+
+    AssetHandle<ImageAsset> missing = test::load_now<ImageAsset>(f.assets, f.dir.path() / "missing.png");
+    REQUIRE(f.assets.state(missing) == AssetState::Failed);
+    CHECK(f.cache.get(f.rhi, f.assets, missing).width() == 1);
+    CHECK_THROWS_AS((void)f.cache.get(f.rhi, f.assets, AssetHandle<ImageAsset>{}), Error);
+    CHECK(f.cache.size() == 1);
+}
+
+TEST_CASE("GpuAssetCache rebuilds the texture when the asset's revision changes")
+{
+    CacheFixture f;
+    AssetHandle<ImageAsset> image = f.load("a.png", 2, 2);
+    RHITexturePtr first = f.cache.get(f.rhi, f.assets, image).texture();
+
+    test::write_png(f.dir.path() / "a.png", 6, 3, 4, std::vector<uint8_t>(6 * 3 * 4, 9));
+    f.assets.reload(image);
+    f.assets.update();
+    REQUIRE(f.assets.revision(image) == 2);
+
+    const Texture2D& rebuilt = f.cache.get(f.rhi, f.assets, image);
+    CHECK(rebuilt.width() == 6);
+    CHECK(rebuilt.texture() != first);
+    CHECK(f.cache.size() == 1);
 }
 
 TEST_CASE("GpuAssetCache release, trim and clear drop textures")

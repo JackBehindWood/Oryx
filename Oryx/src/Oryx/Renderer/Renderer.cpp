@@ -189,6 +189,22 @@ void Renderer::draw_circle(const Vec2f& centre, float radius, const Colour& colo
     require_context().batcher->draw_circle(centre, radius, colour, thickness, fade);
 }
 
+void Renderer::draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style)
+{
+    require_context().batcher->draw_text(position, text, font, style);
+}
+
+DebugRenderer& Renderer::debug()
+{
+    return require_context().debug;
+}
+
+void Renderer::draw_debug()
+{
+    RendererContext& context = require_context();
+    context.debug.render(*context.batcher);
+}
+
 const BatchStats& Renderer::batch_stats()
 {
     return require_context().batcher->stats();

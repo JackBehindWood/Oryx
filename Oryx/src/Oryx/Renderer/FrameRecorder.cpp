@@ -167,6 +167,7 @@ void record_frame(RendererContext& context)
     {
         batcher->recycle(context.rhi->frame_slot());
     }
+    context.debug.end_frame();
 }
 
 } // namespace oryx

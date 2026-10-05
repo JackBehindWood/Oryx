@@ -191,6 +191,9 @@ TEST_CASE("Renderer: shaders are compiled by init")
     CHECK(shaders.contains<QuadPS>(1));
     CHECK(shaders.contains<CircleVS>());
     CHECK(shaders.contains<CirclePS>());
+    CHECK(shaders.contains<TextVS>());
+    CHECK(shaders.contains<TextPS>(0));
+    CHECK(shaders.contains<TextPS>(1));
 }
 
 TEST_CASE("Renderer: default resources")

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Assets/AssetHandle.h"
+#include "Oryx/Assets/Execution/AssetRequest.h"
 #include "Oryx/Containers/FlatHashMap.h"
 #include "Oryx/Core/Error.h"
 
@@ -21,6 +22,8 @@ class AssetTableBase
 {
 public:
     virtual ~AssetTableBase() = default;
+
+    [[nodiscard]] virtual size_t live_count() const = 0;
 };
 
 template<typename T>
@@ -31,10 +34,13 @@ public:
     {
         UniquePtr<T> asset;
         uint32_t generation = 1;
+        uint32_t revision = 1;
         uint32_t ref_count = 0;
         AssetState state = AssetState::Loading;
         std::string path;
         std::string error;
+        AssetRequest* pending = nullptr;
+        std::vector<std::function<void(AssetHandle<T>)>> on_ready;
     };
 
     [[nodiscard]] AssetHandle<T> find(const std::string& key) const
@@ -63,6 +69,8 @@ public:
         Slot& slot = m_slots[index];
         slot.ref_count = 1;
         slot.state = AssetState::Loading;
+        slot.revision = 1;
+        slot.pending = nullptr;
         slot.path = key;
         m_by_path.insert_or_assign(key, index);
         return handle_at(index);
@@ -76,6 +84,8 @@ public:
         slot.asset = nullptr;
         slot.path.clear();
         slot.error.clear();
+        slot.pending = nullptr;
+        slot.on_ready.clear();
         slot.ref_count = 0;
         ++slot.generation;
         m_free.push_back(index);
@@ -109,7 +119,7 @@ public:
         return m_slots[handle.id.value - 1];
     }
 
-    [[nodiscard]] size_t live_count() const { return m_slots.size() - m_free.size(); }
+    [[nodiscard]] size_t live_count() const override { return m_slots.size() - m_free.size(); }
 
 private:
     [[nodiscard]] AssetHandle<T> handle_at(uint32_t index) const

@@ -5,6 +5,7 @@
 #include "Oryx/Math/Colour.h"
 #include "Oryx/Renderer/BatchRenderer2D.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Renderer/DebugRenderer.h"
 #include "Oryx/Renderer/DefaultResources.h"
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
@@ -33,6 +34,8 @@ struct RendererContext
     // Batchers recycled once per frame by record_frame; the first is the facade's own.
     std::vector<BatchRenderer*> batchers;
     UniquePtr<BatchRenderer2D> batcher;
+    // Holds no reference into the context, so it is a plain member; it may point at a Font the application owns.
+    DebugRenderer debug;
 };
 
 // Creates the device, compiles every registered shader and builds the default resources; throws Error on failure.

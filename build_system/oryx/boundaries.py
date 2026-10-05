@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 GRAPHICS_MODULES = ("Graphics", "Shaders", "Renderer")
-HEADLESS_MODULES = ("Game", "Strategy", "Simulation", "Core")
+HEADLESS_MODULES = ("Game", "Strategy", "Simulation", "Core", "Text")
 RANK = {"Graphics": 0, "Shaders": 1, "Renderer": 2}
 GPU_ASSET_CACHE = "GpuAssetCache"
 BACKEND_FACTORIES = frozenset({"Graphics/RHI/RHI.cpp", "Core/Window.cpp"})
@@ -49,6 +49,8 @@ def check_includes(oryx_src: Path) -> list[str]:
                 violations.append(f"{where} ({module} must not include {target})")
             elif target in GRAPHICS_MODULES and module == "Assets" and GPU_ASSET_CACHE not in path.name:
                 violations.append(f"{where} (only {GPU_ASSET_CACHE} may include {target})")
+            elif target == "Assets" and (module in GRAPHICS_MODULES or module == "Text"):
+                violations.append(f"{where} ({module} must not include Assets; fonts reach the renderer through Text/IFontSource)")
             elif target in RANK and module in RANK and RANK[target] > RANK[module]:
                 violations.append(f"{where} ({module} must not include the higher layer {target})")
     return violations

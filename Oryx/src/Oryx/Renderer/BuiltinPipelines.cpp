@@ -10,7 +10,7 @@ namespace oryx
 
 GraphicsPipelineDesc builtin_pipeline_desc(BuiltinPipeline pipeline, const ShaderLibrary& shaders, RHIFormat colour_format, uint32_t permutation)
 {
-    if (permutation != 0 && pipeline != BuiltinPipeline::Quad)
+    if (permutation != 0 && pipeline != BuiltinPipeline::Quad && pipeline != BuiltinPipeline::Text)
     {
         throw Error("BuiltinPipeline has no such permutation", std::to_string(permutation));
     }
@@ -20,6 +20,7 @@ GraphicsPipelineDesc builtin_pipeline_desc(BuiltinPipeline pipeline, const Shade
     case BuiltinPipeline::SolidLines: return builtin_desc<LineEffect>(shaders, vertex_declaration<Vertex2DLine>(), colour_format);
     case BuiltinPipeline::Quad: return builtin_desc<QuadEffect>(shaders, vertex_declaration<Vertex2DQuad>(), colour_format, permutation);
     case BuiltinPipeline::Circle: return builtin_desc<CircleEffect>(shaders, vertex_declaration<Vertex2DCircle>(), colour_format);
+    case BuiltinPipeline::Text: return builtin_desc<TextEffect>(shaders, vertex_declaration<Vertex2DText>(), colour_format, permutation);
     }
     throw Error("BuiltinPipeline is invalid");
 }

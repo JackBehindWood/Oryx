@@ -15,6 +15,7 @@
 #include <cstring>
 #include <cstdio>
 #include <functional>
+#include <deque>
 
 #include <typeindex>
 

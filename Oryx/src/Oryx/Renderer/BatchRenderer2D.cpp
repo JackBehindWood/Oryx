@@ -32,6 +32,14 @@ void rect_corners(const Vec2f& position, const Vec2f& size, float rotation, Vec2
     }
 }
 
+void quad_uvs(const Vec2f& uv_min, const Vec2f& uv_max, Vec2f (&uvs)[4])
+{
+    uvs[0] = { uv_min[0], uv_max[1] };
+    uvs[1] = { uv_max[0], uv_max[1] };
+    uvs[2] = { uv_max[0], uv_min[1] };
+    uvs[3] = { uv_min[0], uv_min[1] };
+}
+
 template<typename T, size_t N>
 void write(uint8_t* destination, const T (&vertices)[N])
 {
@@ -46,7 +54,13 @@ BatchRenderer2D::BatchRenderer2D(const BatchRendererDesc& desc)
     for (uint32_t i = 0; i < PRIMITIVE_2D_COUNT; ++i)
     {
         const PrimitiveTraits traits = primitive_traits(static_cast<Primitive2D>(i));
-        m_streams[i] = register_stream({ traits.vertex_size, traits.vertices_per_primitive, traits.indices_per_primitive, traits.pipeline == BuiltinPipeline::Quad, traits.pipeline });
+        const bool textured = traits.pipeline == BuiltinPipeline::Quad || traits.pipeline == BuiltinPipeline::Text;
+        uint32_t triangles = 0;
+        if (traits.topology == RHITopology::Triangles)
+        {
+            triangles = (traits.indexed ? traits.indices_per_primitive : traits.vertices_per_primitive) / 3;
+        }
+        m_streams[i] = register_stream({ traits.vertex_size, traits.vertices_per_primitive, traits.indices_per_primitive, textured, traits.pipeline, triangles });
     }
 }
 
@@ -107,11 +121,49 @@ void BatchRenderer2D::draw_circle(const Vec2f& centre, float radius, const Colou
     write(append(), vertices);
 }
 
+void BatchRenderer2D::draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style)
+{
+    require_open();
+    if (!font.ready())
+    {
+        return;
+    }
+    GlyphAtlas& atlas = font.atlas(style.pixel_height);
+    const Texture2D& atlas_texture = atlas.texture(rhi());
+    layout_text(atlas.data(), text, style.scale, [&](const Glyph& glyph, const Vec2f& pen) {
+        if (glyph.size[0] <= 0.0f || glyph.size[1] <= 0.0f)
+        {
+            return;
+        }
+        const float x0 = position[0] + pen[0] + glyph.bearing[0] * style.scale;
+        const float y0 = position[1] + pen[1] + glyph.bearing[1] * style.scale;
+        const float x1 = x0 + glyph.size[0] * style.scale;
+        const float y1 = y0 + glyph.size[1] * style.scale;
+        const Vec2f corners[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } };
+        write_glyph(corners, atlas_texture, atlas.data().px_range(), style.colour, glyph);
+    });
+}
+
+void BatchRenderer2D::write_glyph(const Vec2f (&corners)[4], const Texture2D& atlas_texture, float px_range, const Colour& colour, const Glyph& glyph)
+{
+    select(m_streams[static_cast<uint32_t>(Primitive2D::Text)], atlas_texture.sampler());
+    const float slot = static_cast<float>(acquire_texture(atlas_texture.texture()));
+    Vec2f uvs[4];
+    quad_uvs(glyph.uv_min, glyph.uv_max, uvs);
+    Vertex2DText vertices[4];
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        vertices[i] = { base_vertex(corners[i], colour), uvs[i], slot, px_range };
+    }
+    write(append(), vertices);
+}
+
 void BatchRenderer2D::write_quad(const Vec2f (&corners)[4], const RHITexturePtr& texture, const RHISamplerPtr& sampler, const Colour& colour, const Vec2f& uv_min, const Vec2f& uv_max)
 {
     select(m_streams[static_cast<uint32_t>(Primitive2D::Quad)], sampler);
     const float slot = static_cast<float>(acquire_texture(texture));
-    const Vec2f uvs[4] = { { uv_min[0], uv_max[1] }, { uv_max[0], uv_max[1] }, { uv_max[0], uv_min[1] }, { uv_min[0], uv_min[1] } };
+    Vec2f uvs[4];
+    quad_uvs(uv_min, uv_max, uvs);
     Vertex2DQuad vertices[4];
     for (uint32_t i = 0; i < 4; ++i)
     {
