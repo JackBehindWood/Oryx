@@ -134,6 +134,66 @@ void Renderer::submit(DrawItem item)
     require_context().items.push_back(std::move(item));
 }
 
+void Renderer::begin_scene(const Camera& camera)
+{
+    require_context().batcher->begin(camera);
+}
+
+void Renderer::end_scene()
+{
+    require_context().batcher->end();
+}
+
+void Renderer::flush()
+{
+    require_context().batcher->flush();
+}
+
+void Renderer::draw_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour)
+{
+    require_context().batcher->draw_triangle(a, b, c, colour);
+}
+
+void Renderer::draw_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour_a, const Colour& colour_b, const Colour& colour_c)
+{
+    require_context().batcher->draw_triangle(a, b, c, colour_a, colour_b, colour_c);
+}
+
+void Renderer::draw_line(const Vec2f& a, const Vec2f& b, const Colour& colour)
+{
+    require_context().batcher->draw_line(a, b, colour);
+}
+
+void Renderer::draw_line(const Vec2f& a, const Vec2f& b, const Colour& colour_a, const Colour& colour_b)
+{
+    require_context().batcher->draw_line(a, b, colour_a, colour_b);
+}
+
+void Renderer::draw_quad(const Vec2f (&corners)[4], const Colour& colour)
+{
+    require_context().batcher->draw_quad(corners, colour);
+}
+
+void Renderer::draw_rect(const Vec2f& position, const Vec2f& size, const Colour& colour, float rotation)
+{
+    require_context().batcher->draw_rect(position, size, colour, rotation);
+}
+
+void Renderer::draw_sprite(const Vec2f& position, const Vec2f& size, const Texture2D& texture, const Colour& tint, float rotation, const Vec2f& uv_min, const Vec2f& uv_max)
+{
+    require_context().batcher->draw_sprite(position, size, texture, tint, rotation, uv_min, uv_max);
+}
+
+void Renderer::draw_circle(const Vec2f& centre, float radius, const Colour& colour, float thickness, float fade)
+{
+    require_context().batcher->draw_circle(centre, radius, colour, thickness, fade);
+}
+
+const BatchStats& Renderer::batch_stats()
+{
+    return require_context().batcher->stats();
+}
+
 void Renderer::end_frame()
 {
     record_frame(require_context());

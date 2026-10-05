@@ -134,6 +134,13 @@ void record_draw_item(RHICommandList& commands, const DrawItem& item, const Grap
 
 void record_frame(RendererContext& context)
 {
+    for (const BatchRenderer* batcher : context.batchers)
+    {
+        if (batcher->open())
+        {
+            throw Error("A batcher scene is still open at the end of the frame", "call end_scene before the frame is recorded");
+        }
+    }
     ClearOnExit clear_items(context.items);
 
     RHIRenderTargetPtr back_buffer;
@@ -156,6 +163,10 @@ void record_frame(RendererContext& context)
         context.rhi->present(context.viewport.get());
     }
     context.rhi->end_frame();
+    for (BatchRenderer* batcher : context.batchers)
+    {
+        batcher->recycle(context.rhi->frame_slot());
+    }
 }
 
 } // namespace oryx

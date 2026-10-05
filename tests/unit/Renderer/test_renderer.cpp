@@ -459,3 +459,41 @@ TEST_CASE("Renderer: a draw item binds every vertex stream it fills")
     CHECK_NOTHROW(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS - 1));
     CHECK_THROWS_AS(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS), Error);
 }
+
+TEST_CASE("Renderer: begin_scene, draw and end_scene record one pass of batched draws")
+{
+    RendererGuard guard;
+    CHECK_THROWS_AS(Renderer::begin_scene(Camera2D(2.0f, 2.0f)), Error);
+    Renderer::init({ RHIBackend::Null });
+    DrawFixture fixture;
+    const Colour red = { 1.0f, 0.0f, 0.0f, 1.0f };
+
+    CHECK_THROWS_AS(Renderer::draw_rect({}, { 1.0f, 1.0f }, red), Error);
+    CHECK_THROWS_AS(Renderer::end_scene(), Error);
+
+    Renderer::begin_scene(Camera2D(2.0f, 2.0f));
+    CHECK_THROWS_AS(Renderer::begin_scene(Camera2D(2.0f, 2.0f)), Error);
+    Renderer::draw_rect({ 0.0f, 0.0f }, { 1.0f, 1.0f }, red);
+    Renderer::draw_rect({ 0.5f, 0.0f }, { 1.0f, 1.0f }, red);
+    Renderer::draw_circle({ 0.0f, 0.0f }, 0.5f, red);
+    Renderer::draw_line({ -1.0f, 0.0f }, { 1.0f, 0.0f }, red);
+    Renderer::draw_triangle({ 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f }, red);
+    Renderer::end_scene();
+    CHECK(Renderer::batch_stats().draws == 4);
+
+    Renderer::end_frame();
+    const std::vector<RHICommandType> submission = fixture.rhi.last_submission();
+    CHECK(submission.front() == RHICommandType::BeginPass);
+    CHECK(submission.back() == RHICommandType::EndPass);
+    CHECK(std::count(submission.begin(), submission.end(), RHICommandType::DrawIndexed) == 2);
+    CHECK(std::count(submission.begin(), submission.end(), RHICommandType::Draw) == 2);
+    CHECK(Renderer::batch_stats().draws == 0);
+
+    Renderer::begin_scene(Camera2D(2.0f, 2.0f));
+    Renderer::draw_rect({}, { 1.0f, 1.0f }, red);
+    Renderer::flush();
+    CHECK(Renderer::batch_stats().draws == 1);
+    CHECK_THROWS_AS(Renderer::end_frame(), Error);
+    Renderer::end_scene();
+    Renderer::end_frame();
+}

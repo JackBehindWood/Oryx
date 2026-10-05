@@ -8,7 +8,9 @@
 #include "Oryx/Graphics/Resources/UniformBuffer.h"
 #include "Oryx/Graphics/Resources/VertexBuffer.h"
 #include "Oryx/Math/Colour.h"
+#include "Oryx/Renderer/BatchRenderer.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Math/Vector2.h"
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
@@ -68,6 +70,22 @@ public:
 
     // Queues a draw for this frame; GraphicsLayer's end_frame records every queued item into the back-buffer pass, in submission order.
     static void submit(DrawItem item);
+
+    // Immediate-mode 2D drawing: primitives between begin_scene and end_scene are batched into DrawItems and submitted in call order.
+    // draw_* outside a scene, a nested begin_scene and end_frame with a scene still open all throw Error. See BatchRenderer2D for the coordinate conventions.
+    static void begin_scene(const Camera& camera);
+    static void end_scene();
+    static void flush();
+    static void draw_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour);
+    static void draw_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour_a, const Colour& colour_b, const Colour& colour_c);
+    static void draw_line(const Vec2f& a, const Vec2f& b, const Colour& colour);
+    static void draw_line(const Vec2f& a, const Vec2f& b, const Colour& colour_a, const Colour& colour_b);
+    static void draw_quad(const Vec2f (&corners)[4], const Colour& colour);
+    static void draw_rect(const Vec2f& position, const Vec2f& size, const Colour& colour, float rotation = 0.0f);
+    static void draw_sprite(const Vec2f& position, const Vec2f& size, const Texture2D& texture, const Colour& tint = { 1.0f, 1.0f, 1.0f, 1.0f }, float rotation = 0.0f, const Vec2f& uv_min = { 0.0f, 0.0f }, const Vec2f& uv_max = { 1.0f, 1.0f });
+    static void draw_circle(const Vec2f& centre, float radius, const Colour& colour, float thickness = 1.0f, float fade = 0.005f);
+    // Counters of the frame being recorded; reset when the frame ring advances.
+    [[nodiscard]] static const BatchStats& batch_stats();
 
     // Called only by GraphicsLayer: records, submits and presents the frame, then advances the frame ring.
     static void end_frame();

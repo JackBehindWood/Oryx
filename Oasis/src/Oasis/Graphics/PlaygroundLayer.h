@@ -5,9 +5,7 @@
 namespace oasis
 {
 
-struct PlaygroundScene;
-
-// Long-lived graphics sandbox: owns its buffers and textures, takes shaders and pipelines from the Renderer (initialised by the application) and submits draws; GraphicsLayer owns the frame.
+// Long-lived graphics sandbox: owns a texture and draws through Renderer::begin_scene/draw_*/end_scene; GraphicsLayer owns the frame.
 class PlaygroundLayer : public oryx::Layer
 {
 public:
@@ -32,7 +30,7 @@ private:
     bool on_mouse_scrolled(oryx::MouseScrolledEvent& event);
 
     oryx::Window* m_window = nullptr;
-    oryx::UniquePtr<PlaygroundScene> m_scene;
+    oryx::UniquePtr<oryx::Texture2D> m_checker;
     oryx::Vec2f m_size;
     double m_time = 0.0;
 };

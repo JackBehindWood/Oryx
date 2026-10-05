@@ -62,43 +62,43 @@ TEST_CASE("Mat4f inverse round-trips and determinant matches")
 TEST_CASE("Mat4f orthographic maps the box to clip space with depth in [0, 1]")
 {
     const Mat4f ortho = orthographic(-4.0f, 4.0f, -2.0f, 2.0f, 1.0f, 11.0f);
-    check_near(ortho * Vec4f(-4.0f, -2.0f, -1.0f, 1.0f), -1.0f, -1.0f, 0.0f);
-    check_near(ortho * Vec4f(4.0f, 2.0f, -11.0f, 1.0f), 1.0f, 1.0f, 1.0f);
+    check_near(ortho * Vec4f(-4.0f, -2.0f, 1.0f, 1.0f), -1.0f, -1.0f, 0.0f);
+    check_near(ortho * Vec4f(4.0f, 2.0f, 11.0f, 1.0f), 1.0f, 1.0f, 1.0f);
 
     const Mat4f reverse = orthographic(-4.0f, 4.0f, -2.0f, 2.0f, 1.0f, 11.0f, DepthConvention::ReverseZ);
-    check_near(reverse * Vec4f(0.0f, 0.0f, -1.0f, 1.0f), 0.0f, 0.0f, 1.0f);
-    check_near(reverse * Vec4f(0.0f, 0.0f, -11.0f, 1.0f), 0.0f, 0.0f, 0.0f);
+    check_near(reverse * Vec4f(0.0f, 0.0f, 1.0f, 1.0f), 0.0f, 0.0f, 1.0f);
+    check_near(reverse * Vec4f(0.0f, 0.0f, 11.0f, 1.0f), 0.0f, 0.0f, 0.0f);
 }
 
 TEST_CASE("Mat4f perspective maps near and far to depth 0 and 1 (or 1 and 0 reversed)")
 {
     const Mat4f projection = perspective(math::HALF_PI<float>, 2.0f, 0.5f, 50.0f);
-    Vec4f near_point = projection * Vec4f(0.0f, 0.0f, -0.5f, 1.0f);
-    Vec4f far_point = projection * Vec4f(0.0f, 0.0f, -50.0f, 1.0f);
+    Vec4f near_point = projection * Vec4f(0.0f, 0.0f, 0.5f, 1.0f);
+    Vec4f far_point = projection * Vec4f(0.0f, 0.0f, 50.0f, 1.0f);
     CHECK(near_point[2] / near_point[3] == doctest::Approx(0.0f).epsilon(1e-4));
     CHECK(far_point[2] / far_point[3] == doctest::Approx(1.0f).epsilon(1e-4));
 
-    Vec4f edge = projection * Vec4f(1.0f, 1.0f, -1.0f, 1.0f);
+    Vec4f edge = projection * Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
     CHECK(edge[0] / edge[3] == doctest::Approx(0.5f).epsilon(1e-4));
     CHECK(edge[1] / edge[3] == doctest::Approx(1.0f).epsilon(1e-4));
 
     const Mat4f reverse = perspective(math::HALF_PI<float>, 2.0f, 0.5f, 50.0f, DepthConvention::ReverseZ);
-    near_point = reverse * Vec4f(0.0f, 0.0f, -0.5f, 1.0f);
-    far_point = reverse * Vec4f(0.0f, 0.0f, -50.0f, 1.0f);
+    near_point = reverse * Vec4f(0.0f, 0.0f, 0.5f, 1.0f);
+    far_point = reverse * Vec4f(0.0f, 0.0f, 50.0f, 1.0f);
     CHECK(near_point[2] / near_point[3] == doctest::Approx(1.0f).epsilon(1e-4));
     CHECK(far_point[2] / far_point[3] == doctest::Approx(0.0f).epsilon(1e-4));
 }
 
-TEST_CASE("Mat4f look_at moves the eye to the origin looking down -Z")
+TEST_CASE("Mat4f look_at is left-handed: the eye moves to the origin looking down +Z")
 {
-    const Mat4f view = look_at(Vec3f(0.0f, 0.0f, 5.0f), Vec3f(0.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f));
-    check_near(view * Vec4f(0.0f, 0.0f, 5.0f, 1.0f), 0.0f, 0.0f, 0.0f);
-    check_near(view * Vec4f(0.0f, 0.0f, 0.0f, 1.0f), 0.0f, 0.0f, -5.0f);
-    check_near(view * Vec4f(1.0f, 2.0f, 5.0f, 1.0f), 1.0f, 2.0f, 0.0f);
+    const Mat4f view = look_at(Vec3f(0.0f, 0.0f, -5.0f), Vec3f(0.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f));
+    check_near(view * Vec4f(0.0f, 0.0f, -5.0f, 1.0f), 0.0f, 0.0f, 0.0f);
+    check_near(view * Vec4f(0.0f, 0.0f, 0.0f, 1.0f), 0.0f, 0.0f, 5.0f);
+    check_near(view * Vec4f(1.0f, 2.0f, -5.0f, 1.0f), 1.0f, 2.0f, 0.0f);
 
     const Mat4f side = look_at(Vec3f(5.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f));
-    check_near(side * Vec4f(0.0f, 0.0f, 0.0f, 1.0f), 0.0f, 0.0f, -5.0f);
-    check_near(side * Vec4f(0.0f, 0.0f, -1.0f, 1.0f), 1.0f, 0.0f, -5.0f);
+    check_near(side * Vec4f(0.0f, 0.0f, 0.0f, 1.0f), 0.0f, 0.0f, 5.0f);
+    check_near(side * Vec4f(0.0f, 0.0f, 1.0f, 1.0f), 1.0f, 0.0f, 5.0f);
 }
 
 TEST_CASE("to_column_major packs columns contiguously")

@@ -19,7 +19,14 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->items.reserve(INITIAL_ITEM_CAPACITY);
     context->shaders.compile_all(*context->rhi, context->shader_cache);
     context->defaults = create_default_resources(*context->rhi);
+    context->batcher = create_unique<BatchRenderer2D>(batch_renderer_desc(*context, context->items));
+    context->batchers.push_back(context->batcher.get());
     return context;
+}
+
+BatchRendererDesc batch_renderer_desc(RendererContext& context, std::vector<DrawItem>& sink)
+{
+    return { *context.rhi, context.pipelines, context.builtin_pipelines, context.shaders, context.defaults, sink, context.back_buffer_format };
 }
 
 void shutdown_renderer_context(UniquePtr<RendererContext>& context)

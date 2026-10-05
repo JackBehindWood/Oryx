@@ -99,6 +99,9 @@
 #include "Oryx/Renderer/GraphicsPipelineHandle.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Renderer/TextureSlotTable.h"
+#include "Oryx/Renderer/BatchRenderer.h"
+#include "Oryx/Renderer/BatchRenderer2D.h"
 #include "Oryx/Renderer/GraphicsLayer.h"
 #include "Oryx/Renderer/Renderer.h"
 #endif

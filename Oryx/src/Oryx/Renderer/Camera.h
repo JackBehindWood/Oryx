@@ -28,7 +28,7 @@ protected:
     Mat4f m_view = Mat4f::identity();
 };
 
-// Orthographic, y up, centred on `position`; the visible world is viewport size / zoom. Screen space is pixels with the origin top left, y down.
+// Orthographic, left-handed (x right, y up, z into the screen), centred on `position`; the visible world is viewport size / zoom. Screen space is pixels with the origin top left, y down.
 class Camera2D : public Camera
 {
 public:

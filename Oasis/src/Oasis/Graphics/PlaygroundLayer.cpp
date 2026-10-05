@@ -9,9 +9,6 @@ namespace
 {
 
 constexpr uint32_t LINE_COUNT = 12;
-constexpr uint32_t TEXTURE_CHECKER = 0;
-// The renderer fills every texture slot the item leaves unset with its white default.
-constexpr uint32_t TEXTURE_WHITE = 1;
 
 oryx::Texture2D make_checker_texture()
 {
@@ -31,49 +28,12 @@ oryx::Texture2D make_checker_texture()
     return oryx::Renderer::create_texture_2d({ .width = 4, .height = 4, .pixels = pixels, .pixel_bytes = sizeof(pixels), .filter = oryx::RHIFilter::Nearest, .address = oryx::RHIAddressMode::Repeat });
 }
 
-// Column-major, as MSL expects: aspect-correct, with a slow wobble so the constants visibly change per frame.
-void playground_view_projection(float aspect, float time, float (&matrix)[16])
+oryx::Vec2f on_circle(const oryx::Vec2f& centre, float radius, float angle)
 {
-    const float angle = 0.12f * oryx::math::sin(time * 0.5f);
-    const float c = oryx::math::cos(angle);
-    const float s = oryx::math::sin(angle);
-    const float sx = aspect > 1.0f ? 1.0f / aspect : 1.0f;
-    const float sy = aspect > 1.0f ? 1.0f : aspect;
-    const float values[16] = { c * sx, s * sy, 0.0f, 0.0f, -s * sx, c * sy, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
-    std::memcpy(matrix, values, sizeof(values));
+    return { centre[0] + radius * oryx::math::cos(angle), centre[1] + radius * oryx::math::sin(angle) };
 }
 
 } // namespace
-
-struct PlaygroundScene
-{
-    PlaygroundScene()
-        : triangle_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::SolidTriangles))
-        , line_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::SolidLines))
-        , quad_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::Quad))
-        , circle_pipeline(oryx::Renderer::builtin(oryx::BuiltinPipeline::Circle))
-        , triangle_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DLine>(), 3, oryx::BufferMode::Dynamic))
-        , line_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DLine>(), LINE_COUNT * 2, oryx::BufferMode::Dynamic))
-        , quad_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DQuad>(), 8, oryx::BufferMode::Dynamic))
-        , circle_vertices(oryx::Renderer::create_vertex_buffer(oryx::vertex_declaration<oryx::Vertex2DCircle>(), 4, oryx::BufferMode::Dynamic))
-        , indices(oryx::Renderer::create_index_buffer(oryx::IndexType::U16, 12, oryx::BufferMode::Static))
-        , checker(make_checker_texture())
-    {
-        const uint16_t quad_indices[12] = { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 };
-        indices.set_data(0, quad_indices);
-    }
-
-    oryx::GraphicsPipelineHandle triangle_pipeline;
-    oryx::GraphicsPipelineHandle line_pipeline;
-    oryx::GraphicsPipelineHandle quad_pipeline;
-    oryx::GraphicsPipelineHandle circle_pipeline;
-    oryx::VertexBuffer triangle_vertices;
-    oryx::VertexBuffer line_vertices;
-    oryx::VertexBuffer quad_vertices;
-    oryx::VertexBuffer circle_vertices;
-    oryx::IndexBuffer indices;
-    oryx::Texture2D checker;
-};
 
 PlaygroundLayer::PlaygroundLayer()
     : Layer("PlaygroundLayer")
@@ -97,99 +57,50 @@ void PlaygroundLayer::attach()
     oryx::IRHI& rhi = oryx::Renderer::rhi();
     OX_INFO("Playground RHI {} on '{}', {} frames in flight", oryx::to_string(rhi.backend()), rhi.capabilities().name, rhi.capabilities().frames_in_flight);
 
-    m_scene = oryx::create_unique<PlaygroundScene>();
+    m_checker = oryx::create_unique<oryx::Texture2D>(make_checker_texture());
 }
 
 void PlaygroundLayer::detach()
 {
-    m_scene.reset();
+    m_checker.reset();
 }
 
 void PlaygroundLayer::update(double delta_time)
 {
     m_time += delta_time;
-    if (!m_scene)
+    if (!m_checker || m_size[0] <= 0.0f || m_size[1] <= 0.0f)
     {
         return;
     }
 
-    PlaygroundScene& scene = *m_scene;
     const float t = static_cast<float>(m_time);
-    const uint32_t slot = oryx::Renderer::frame_slot();
-    const float aspect = m_size[1] > 0.0f ? m_size[0] / m_size[1] : 1.0f;
-    float view_projection[16];
-    playground_view_projection(aspect, t, view_projection);
+    const float pulse = 0.5f + 0.5f * oryx::math::sin(t * 1.5f);
+    oryx::Camera2D camera(2.0f * m_size[0] / m_size[1], 2.0f);
+    camera.set_rotation(0.12f * oryx::math::sin(t * 0.5f));
 
+    oryx::Renderer::begin_scene(camera);
+
+    const oryx::Vec2f triangle_centre(-0.55f, 0.4f);
     const float spin = t * 1.2f;
-    const oryx::Vertex2DLine triangle[3] = {
-        { { { -0.55f + 0.35f * oryx::math::cos(spin), 0.4f + 0.35f * oryx::math::sin(spin), 0.0f }, { 1.0f, 0.2f, 0.2f, 1.0f } } },
-        { { { -0.55f + 0.35f * oryx::math::cos(spin + 2.094f), 0.4f + 0.35f * oryx::math::sin(spin + 2.094f), 0.0f }, { 0.2f, 1.0f, 0.2f, 1.0f } } },
-        { { { -0.55f + 0.35f * oryx::math::cos(spin + 4.189f), 0.4f + 0.35f * oryx::math::sin(spin + 4.189f), 0.0f }, { 0.2f, 0.4f, 1.0f, 1.0f } } },
-    };
-    scene.triangle_vertices.set_data(slot, triangle);
+    oryx::Renderer::draw_triangle(on_circle(triangle_centre, 0.35f, spin), on_circle(triangle_centre, 0.35f, spin + 2.094f), on_circle(triangle_centre, 0.35f, spin + 4.189f),
+        { 1.0f, 0.2f, 0.2f, 1.0f }, { 0.2f, 1.0f, 0.2f, 1.0f }, { 0.2f, 0.4f, 1.0f, 1.0f });
 
-    oryx::Vertex2DLine lines[LINE_COUNT * 2];
+    const oryx::Vec2f line_origin(-0.55f, -0.45f);
     for (uint32_t i = 0; i < LINE_COUNT; ++i)
     {
         const float angle = -t * 0.8f + static_cast<float>(i) * (6.2832f / static_cast<float>(LINE_COUNT));
         const float shade = static_cast<float>(i) / static_cast<float>(LINE_COUNT);
-        lines[i * 2] = { { { -0.55f, -0.45f, 0.0f }, { 1.0f, shade, 0.3f, 1.0f } } };
-        lines[i * 2 + 1] = { { { -0.55f + 0.35f * oryx::math::cos(angle), -0.45f + 0.35f * oryx::math::sin(angle), 0.0f }, { 0.3f, shade, 1.0f, 1.0f } } };
+        oryx::Renderer::draw_line(line_origin, on_circle(line_origin, 0.35f, angle), { 1.0f, shade, 0.3f, 1.0f }, { 0.3f, shade, 1.0f, 1.0f });
     }
-    scene.line_vertices.set_data(slot, lines);
 
-    const float tex_checker = static_cast<float>(TEXTURE_CHECKER);
-    const float tex_white = static_cast<float>(TEXTURE_WHITE);
-    const float pulse = 0.5f + 0.5f * oryx::math::sin(t * 1.5f);
-    const oryx::Vertex2DQuad quads[8] = {
-        { { { 0.25f, 0.2f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 0.0f, 0.0f }, tex_checker },
-        { { { 0.75f, 0.2f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 2.0f, 0.0f }, tex_checker },
-        { { { 0.75f, 0.7f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 2.0f, 2.0f }, tex_checker },
-        { { { 0.25f, 0.7f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }, { 0.0f, 2.0f }, tex_checker },
-        { { { 0.25f, -0.05f, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 0.0f, 0.0f }, tex_white },
-        { { { 0.75f, -0.05f, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 1.0f, 0.0f }, tex_white },
-        { { { 0.75f, 0.1f + 0.1f * pulse, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 1.0f, 1.0f }, tex_white },
-        { { { 0.25f, 0.1f + 0.1f * pulse, 0.0f }, { 0.95f, 0.6f, 0.1f, 1.0f } }, { 0.0f, 1.0f }, tex_white },
-    };
-    scene.quad_vertices.set_data(slot, quads);
+    oryx::Renderer::draw_sprite({ 0.5f, 0.45f }, { 0.5f, 0.5f }, *m_checker, { 1.0f, 1.0f, 1.0f, 1.0f }, 0.0f, { 0.0f, 0.0f }, { 2.0f, 2.0f });
 
-    const float thickness = 0.05f + 0.45f * pulse;
-    const float fade = 0.02f + 0.08f * (1.0f - pulse);
-    const oryx::Vertex2DCircle circle[4] = {
-        { { { 0.25f, -0.9f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { -1.0f, -1.0f }, thickness, fade },
-        { { { 0.75f, -0.9f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { 1.0f, -1.0f }, thickness, fade },
-        { { { 0.75f, -0.4f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { 1.0f, 1.0f }, thickness, fade },
-        { { { 0.25f, -0.4f, 0.0f }, { 0.3f, 0.9f, 0.8f, 1.0f } }, { -1.0f, 1.0f }, thickness, fade },
-    };
-    scene.circle_vertices.set_data(slot, circle);
+    const float rect_top = 0.1f + 0.1f * pulse;
+    oryx::Renderer::draw_rect({ 0.5f, (rect_top - 0.05f) * 0.5f }, { 0.5f, rect_top + 0.05f }, { 0.95f, 0.6f, 0.1f, 1.0f });
 
-    oryx::DrawItem triangle_item;
-    triangle_item.pipeline = scene.triangle_pipeline;
-    oryx::draw_item_set_vertices(triangle_item, scene.triangle_vertices, slot, 3);
-    oryx::draw_item_set_constants(triangle_item, view_projection);
-    oryx::Renderer::submit(triangle_item);
+    oryx::Renderer::draw_circle({ 0.5f, -0.65f }, 0.25f, { 0.3f, 0.9f, 0.8f, 1.0f }, 0.05f + 0.45f * pulse, 0.02f + 0.08f * (1.0f - pulse));
 
-    oryx::DrawItem line_item;
-    line_item.pipeline = scene.line_pipeline;
-    oryx::draw_item_set_vertices(line_item, scene.line_vertices, slot, LINE_COUNT * 2);
-    oryx::draw_item_set_constants(line_item, view_projection);
-    oryx::Renderer::submit(line_item);
-
-    oryx::DrawItem quad_item;
-    quad_item.pipeline = scene.quad_pipeline;
-    oryx::draw_item_set_vertices(quad_item, scene.quad_vertices, slot, 8);
-    oryx::draw_item_set_indices(quad_item, scene.indices, slot, 12);
-    oryx::draw_item_set_constants(quad_item, view_projection);
-    oryx::draw_item_add_texture(quad_item, scene.checker.texture());
-    quad_item.sampler = scene.checker.sampler();
-    oryx::Renderer::submit(quad_item);
-
-    oryx::DrawItem circle_item;
-    circle_item.pipeline = scene.circle_pipeline;
-    oryx::draw_item_set_vertices(circle_item, scene.circle_vertices, slot, 4);
-    oryx::draw_item_set_indices(circle_item, scene.indices, slot, 6);
-    oryx::draw_item_set_constants(circle_item, view_projection);
-    oryx::Renderer::submit(circle_item);
+    oryx::Renderer::end_scene();
 }
 
 void PlaygroundLayer::event(oryx::Event& event)
