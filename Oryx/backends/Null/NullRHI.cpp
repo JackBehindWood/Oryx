@@ -163,6 +163,12 @@ public:
     void pop_debug_group() override { m_stats.debug_events.push_back("pop"); }
     void end_pass() override {}
 
+    void copy_buffer(RHIBuffer& source, uint32_t source_offset, RHIBuffer& destination, uint32_t destination_offset, uint32_t size) override
+    {
+        const NullBuffer& from = require_null<NullBuffer>(source);
+        require_null<NullBuffer>(destination).write(destination_offset, from.bytes().data() + source_offset, size);
+    }
+
     void apply_clears() const
     {
         for (const std::pair<NullRenderTarget*, Colour>& clear : m_clears)
@@ -203,6 +209,20 @@ void NullBuffer::update(uint32_t offset, const uint8_t* data, uint32_t data_size
     {
         throw Error("RHI buffer update requires CpuToGpu memory");
     }
+    write(offset, data, data_size);
+}
+
+uint8_t* NullBuffer::map()
+{
+    if (memory() != RHIMemory::CpuToGpu)
+    {
+        throw Error("RHI buffer map requires CpuToGpu memory");
+    }
+    return m_bytes.data();
+}
+
+void NullBuffer::write(uint32_t offset, const uint8_t* data, uint32_t data_size)
+{
     if (offset > size() || data_size > size() - offset)
     {
         throw Error("RHI buffer update is out of range");
@@ -268,6 +288,7 @@ NullRHI::NullRHI()
     m_capabilities.name = "Null";
     m_capabilities.max_texture_size = NULL_MAX_TEXTURE_SIZE;
     m_capabilities.frames_in_flight = NULL_FRAMES_IN_FLIGHT;
+    m_capabilities.max_texture_bindings = RHI_MAX_TEXTURE_BINDINGS;
     m_frame_slots.resize(NULL_FRAMES_IN_FLIGHT);
 }
 
@@ -445,6 +466,16 @@ void NullRHI::wait_idle()
     }
     m_lease.end_frame();
     m_lease.set_idle();
+}
+
+void NullRHI::upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size)
+{
+    NullBuffer* null_buffer = dynamic_cast<NullBuffer*>(&buffer);
+    if (null_buffer == nullptr)
+    {
+        throw Error("RHI upload_buffer received a buffer from a different backend");
+    }
+    null_buffer->write(offset, data, data_size);
 }
 
 void NullRHI::read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size)

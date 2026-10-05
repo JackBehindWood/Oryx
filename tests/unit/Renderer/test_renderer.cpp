@@ -111,6 +111,18 @@ TEST_CASE("Renderer: submitted draws are recorded in order inside one pass")
     CHECK(fixture.rhi.last_submission().size() == 2);
 }
 
+TEST_CASE("draw_item_add_texture throws past DRAW_ITEM_MAX_TEXTURES")
+{
+    NullRHI rhi;
+    DrawItem item;
+    RHITexturePtr texture = rhi.create_texture({ .width = 1, .height = 1 });
+    for (uint32_t i = 0; i < DRAW_ITEM_MAX_TEXTURES; ++i)
+    {
+        CHECK_NOTHROW(draw_item_add_texture(item, texture));
+    }
+    CHECK_THROWS_AS(draw_item_add_texture(item, texture), Error);
+}
+
 TEST_CASE("Renderer: indexed and textured items record their binds")
 {
     RendererGuard guard;
@@ -125,11 +137,10 @@ TEST_CASE("Renderer: indexed and textured items record their binds")
     item.index_count = 6;
     const float matrix[16] = {};
     draw_item_set_constants(item, matrix);
-    for (uint32_t i = 0; i < 16; ++i)
+    for (uint32_t i = 0; i < QuadPS::DEFAULT_TEXTURES; ++i)
     {
         draw_item_add_texture(item, fixture.rhi.create_texture({ .width = 1, .height = 1 }));
     }
-    CHECK_THROWS_AS(draw_item_add_texture(item, item.textures[0]), Error);
     item.sampler = fixture.rhi.create_sampler({});
 
     Renderer::submit(item);
@@ -343,13 +354,17 @@ TEST_CASE("record_draw_item rejects more textures than the pipeline has slots")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    DrawItem item = fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format()));
+    DrawItem item = fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format(), 1));
     item.texture_count = DRAW_ITEM_MAX_TEXTURES;
     for (uint32_t i = 0; i < DRAW_ITEM_MAX_TEXTURES; ++i)
     {
         item.textures[i] = fixture.defaults.white_texture;
     }
     CHECK_NOTHROW(record_draw_item(fixture.commands, item, fixture.cache, fixture.defaults));
+
+    DrawItem narrow = fixture.item(quad_desc(Renderer::shaders(), Renderer::back_buffer_format()));
+    narrow.texture_count = QuadPS::DEFAULT_TEXTURES + 1;
+    CHECK_THROWS_AS(record_draw_item(fixture.commands, narrow, fixture.cache, fixture.defaults), Error);
 
     DrawItem circle = fixture.item(circle_desc(Renderer::shaders(), Renderer::back_buffer_format()));
     draw_item_add_texture(circle, fixture.defaults.white_texture);

@@ -32,6 +32,8 @@ public:
     virtual RHIGraphicsPipelinePtr create_graphics_pipeline(const RHIGraphicsPipelineDesc& desc) = 0;
     virtual RHIRenderTargetPtr create_render_target(const RHIRenderTargetDesc& desc) = 0;
     virtual RHIViewportPtr create_viewport(const RHIViewportDesc& desc) = 0;
+    // Copies into a buffer of either memory kind (GpuOnly goes through a staging copy); throws Error when the range exceeds the buffer. Blocks until the copy completes.
+    virtual void upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size) = 0;
     // Size is in pixels; zero is allowed (the viewport then has no back buffer). The next acquire_back_buffer returns a buffer of the new size; frames in flight keep theirs.
     virtual void resize_viewport(RHIViewport& viewport, uint32_t width, uint32_t height, float scale) = 0;
 

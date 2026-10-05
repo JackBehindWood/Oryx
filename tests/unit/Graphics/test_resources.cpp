@@ -90,6 +90,33 @@ void run_resource_checks(IRHI& rhi)
         CHECK_THROWS_AS(wide.set_data(0, indices16, 3), Error);
     }
 
+    SUBCASE("map, upload_buffer and copy_buffer round trip through a GpuOnly buffer")
+    {
+        const uint8_t data[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        RHIBufferPtr device = rhi.create_buffer({ .size = 16, .usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopySource | RHIBufferUsage::CopyDest, .memory = RHIMemory::GpuOnly });
+        RHIBufferPtr readback = rhi.create_buffer({ .size = 16, .usage = RHIBufferUsage::CopyDest });
+        RHIBufferPtr staging = rhi.create_buffer({ .size = 16, .usage = RHIBufferUsage::CopySource });
+
+        CHECK_THROWS_AS(device->map(), Error);
+        uint8_t* mapped = staging->map();
+        REQUIRE(mapped != nullptr);
+        CHECK(staging->map() == mapped);
+        std::memcpy(mapped + 4, data, sizeof(data));
+
+        rhi.upload_buffer(*device, 0, data, 4);
+        CHECK_THROWS_AS(rhi.upload_buffer(*device, 14, data, 4), Error);
+
+        RHICommandList list;
+        list.copy_buffer(staging.get(), 4, device.get(), 4, 4);
+        list.copy_buffer(device.get(), 0, readback.get(), 8, 8);
+        rhi.submit(list);
+        rhi.wait_idle();
+
+        const uint8_t expected[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        CHECK(std::memcmp(readback->map() + 8, expected, 4) == 0);
+        CHECK(std::memcmp(readback->map() + 12, expected, 4) == 0);
+    }
+
     SUBCASE("uniform buffer rejects oversized data")
     {
         UniformBuffer buffer = UniformBuffer::create(rhi, 16);

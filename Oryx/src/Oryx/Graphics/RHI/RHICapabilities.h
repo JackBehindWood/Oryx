@@ -10,6 +10,7 @@ struct RHICapabilities
     std::string name;
     uint32_t max_texture_size = 0;
     uint32_t frames_in_flight = 1;
+    uint32_t max_texture_bindings = 0;
 };
 
 } // namespace oryx

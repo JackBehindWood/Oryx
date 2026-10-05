@@ -8,6 +8,8 @@ namespace oryx
 {
 
 inline constexpr uint32_t RHI_MAX_VERTEX_SLOTS = 4;
+// Compile-time ceiling for texture-array sizes; the device's own limit is RHICapabilities::max_texture_bindings.
+inline constexpr uint32_t RHI_MAX_TEXTURE_BINDINGS = 32;
 inline constexpr uint32_t RHI_MAX_COLOUR_TARGETS = 8;
 
 [[nodiscard]] constexpr uint32_t rhi_vertex_format_bytes(RHIVertexFormat format)

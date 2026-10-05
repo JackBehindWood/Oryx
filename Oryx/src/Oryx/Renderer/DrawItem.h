@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Graphics/RHI/RHIBuffer.h"
+#include "Oryx/Graphics/RHI/RHIRenderState.h"
 #include "Oryx/Graphics/RHI/RHISampler.h"
 #include "Oryx/Graphics/RHI/RHITexture.h"
 #include "Oryx/Graphics/Resources/IndexBuffer.h"
@@ -11,7 +12,7 @@ namespace oryx
 {
 
 inline constexpr uint32_t DRAW_ITEM_MAX_CONSTANTS = 256;
-inline constexpr uint32_t DRAW_ITEM_MAX_TEXTURES = 16;
+inline constexpr uint32_t DRAW_ITEM_MAX_TEXTURES = RHI_MAX_TEXTURE_BINDINGS;
 
 // One draw, submitted to the Renderer as data. Fields run from largest alignment to smallest so the struct carries no padding.
 struct DrawItem
@@ -35,7 +36,7 @@ struct DrawItem
     uint8_t constants[DRAW_ITEM_MAX_CONSTANTS] = {};
 };
 
-static_assert(sizeof(DrawItem) <= 456, "DrawItem grew; keep the fields ordered by alignment");
+static_assert(sizeof(DrawItem) <= 584, "DrawItem grew; keep the fields ordered by alignment");
 
 void draw_item_set_vertices(DrawItem& item, const VertexBuffer& buffer, uint32_t frame_slot, uint32_t vertex_count);
 void draw_item_set_indices(DrawItem& item, const IndexBuffer& buffer, uint32_t frame_slot, uint32_t index_count);

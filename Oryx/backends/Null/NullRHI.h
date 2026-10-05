@@ -11,6 +11,8 @@ public:
     explicit NullBuffer(const RHIBufferDesc& desc);
 
     void update(uint32_t offset, const uint8_t* data, uint32_t data_size) override;
+    [[nodiscard]] uint8_t* map() override;
+    void write(uint32_t offset, const uint8_t* data, uint32_t data_size);
 
     [[nodiscard]] const std::vector<uint8_t>& bytes() const { return m_bytes; }
 
@@ -143,6 +145,7 @@ public:
     void present(RHIViewport& viewport, RHITexture* source = nullptr) override;
     void end_frame() override;
     [[nodiscard]] uint32_t frame_slot() const override { return static_cast<uint32_t>(m_slot); }
+    void upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size) override;
     void read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size) override;
     void wait_idle() override;
 

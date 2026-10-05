@@ -29,6 +29,23 @@ public:
         set_data(frame_slot, data, static_cast<uint32_t>(N));
     }
 
+    // Writes after the vertices already appended to the frame slot's region and returns the index of the first one (the draw's base_vertex).
+    // Throws Error unless sizeof(T) == layout.stride, the region has room for `count` more and the buffer is Dynamic; reset(frame_slot) starts the region over.
+    template<typename T>
+    uint32_t append(uint32_t frame_slot, const T* data, uint32_t count)
+    {
+        return append_bytes(frame_slot, reinterpret_cast<const uint8_t*>(data), count, sizeof(T));
+    }
+
+    template<typename T, size_t N>
+    uint32_t append(uint32_t frame_slot, const T (&data)[N])
+    {
+        return append(frame_slot, data, static_cast<uint32_t>(N));
+    }
+
+    void reset(uint32_t frame_slot);
+    [[nodiscard]] uint32_t appended(uint32_t frame_slot) const;
+
     [[nodiscard]] RHIBuffer& rhi() const { return *m_buffer; }
     [[nodiscard]] const RHIBufferPtr& rhi_ptr() const { return m_buffer; }
     [[nodiscard]] const VertexLayout& layout() const { return m_layout; }
@@ -40,12 +57,14 @@ public:
 
 private:
     void write(uint32_t frame_slot, const uint8_t* data, uint32_t count, size_t element_size);
+    uint32_t append_bytes(uint32_t frame_slot, const uint8_t* data, uint32_t count, size_t element_size);
 
     RHIBufferPtr m_buffer;
     VertexLayout m_layout;
     uint32_t m_capacity;
     uint32_t m_region_count;
     uint32_t m_vertex_count = 0;
+    std::vector<uint32_t> m_cursors;
     BufferMode m_mode;
     bool m_written = false;
 };

@@ -30,8 +30,8 @@ public:
     const T& at(size_t row, size_t col) const { return m_data[row * C + col]; }
 
     constexpr Matrix<C, R, T> transpose() const;
-    T determinant() const requires ((R == 2 && C == 2) || (R == 3 && C == 3));
-    Matrix<R, C, T> inverse() const requires ((R == 2 && C == 2) || (R == 3 && C == 3));
+    T determinant() const requires ((R == 2 && C == 2) || (R == 3 && C == 3) || (R == 4 && C == 4));
+    Matrix<R, C, T> inverse() const requires ((R == 2 && C == 2) || (R == 3 && C == 3) || (R == 4 && C == 4));
 
 private:
     T m_data[R * C]{};
@@ -149,7 +149,7 @@ constexpr Matrix<C, R, T> transpose(const Matrix<R, C, T>& m)
     return result;
 }
 
-// determinant()/inverse() are deliberately bounded to 2x2 and 3x3 via fully-specialized
+// determinant()/inverse() are deliberately bounded to 2x2, 3x3 and 4x4 via fully-specialized
 // overloads — this makes calling them on any other size a compile error, rather than a
 // general N x N implementation (out of scope; see docs/architecture.md §3.4).
 template<typename T>
@@ -210,6 +210,71 @@ Matrix<3, 3, T> inverse(const Matrix<3, 3, T>& m)
     return result;
 }
 
+template<typename T>
+constexpr T determinant(const Matrix<4, 4, T>& m)
+{
+    T s0 = m.at(0, 0) * m.at(1, 1) - m.at(1, 0) * m.at(0, 1);
+    T s1 = m.at(0, 0) * m.at(1, 2) - m.at(1, 0) * m.at(0, 2);
+    T s2 = m.at(0, 0) * m.at(1, 3) - m.at(1, 0) * m.at(0, 3);
+    T s3 = m.at(0, 1) * m.at(1, 2) - m.at(1, 1) * m.at(0, 2);
+    T s4 = m.at(0, 1) * m.at(1, 3) - m.at(1, 1) * m.at(0, 3);
+    T s5 = m.at(0, 2) * m.at(1, 3) - m.at(1, 2) * m.at(0, 3);
+    T c5 = m.at(2, 2) * m.at(3, 3) - m.at(3, 2) * m.at(2, 3);
+    T c4 = m.at(2, 1) * m.at(3, 3) - m.at(3, 1) * m.at(2, 3);
+    T c3 = m.at(2, 1) * m.at(3, 2) - m.at(3, 1) * m.at(2, 2);
+    T c2 = m.at(2, 0) * m.at(3, 3) - m.at(3, 0) * m.at(2, 3);
+    T c1 = m.at(2, 0) * m.at(3, 2) - m.at(3, 0) * m.at(2, 2);
+    T c0 = m.at(2, 0) * m.at(3, 1) - m.at(3, 0) * m.at(2, 1);
+    return s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+}
+
+// Cofactor expansion over 2x2 sub-determinants. Only an exactly zero determinant counts as singular: projection matrices legitimately have tiny
+// determinants (a 4x4 orthographic matrix for a pixel-sized viewport is ~1e-6), so the absolute EPSILON test of the 2x2 and 3x3 overloads would reject them.
+template<typename T>
+Matrix<4, 4, T> inverse(const Matrix<4, 4, T>& m)
+{
+    T a00 = m.at(0, 0), a01 = m.at(0, 1), a02 = m.at(0, 2), a03 = m.at(0, 3);
+    T a10 = m.at(1, 0), a11 = m.at(1, 1), a12 = m.at(1, 2), a13 = m.at(1, 3);
+    T a20 = m.at(2, 0), a21 = m.at(2, 1), a22 = m.at(2, 2), a23 = m.at(2, 3);
+    T a30 = m.at(3, 0), a31 = m.at(3, 1), a32 = m.at(3, 2), a33 = m.at(3, 3);
+
+    T s0 = a00 * a11 - a10 * a01;
+    T s1 = a00 * a12 - a10 * a02;
+    T s2 = a00 * a13 - a10 * a03;
+    T s3 = a01 * a12 - a11 * a02;
+    T s4 = a01 * a13 - a11 * a03;
+    T s5 = a02 * a13 - a12 * a03;
+    T c5 = a22 * a33 - a32 * a23;
+    T c4 = a21 * a33 - a31 * a23;
+    T c3 = a21 * a32 - a31 * a22;
+    T c2 = a20 * a33 - a30 * a23;
+    T c1 = a20 * a32 - a30 * a22;
+    T c0 = a20 * a31 - a30 * a21;
+
+    T det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+    OX_CORE_ASSERT(det != T{ 0 }, "Matrix::inverse() called on a singular matrix");
+    T inv_det = T{ 1 } / det;
+
+    Matrix<4, 4, T> result;
+    result.at(0, 0) = (a11 * c5 - a12 * c4 + a13 * c3) * inv_det;
+    result.at(0, 1) = (-a01 * c5 + a02 * c4 - a03 * c3) * inv_det;
+    result.at(0, 2) = (a31 * s5 - a32 * s4 + a33 * s3) * inv_det;
+    result.at(0, 3) = (-a21 * s5 + a22 * s4 - a23 * s3) * inv_det;
+    result.at(1, 0) = (-a10 * c5 + a12 * c2 - a13 * c1) * inv_det;
+    result.at(1, 1) = (a00 * c5 - a02 * c2 + a03 * c1) * inv_det;
+    result.at(1, 2) = (-a30 * s5 + a32 * s2 - a33 * s1) * inv_det;
+    result.at(1, 3) = (a20 * s5 - a22 * s2 + a23 * s1) * inv_det;
+    result.at(2, 0) = (a10 * c4 - a11 * c2 + a13 * c0) * inv_det;
+    result.at(2, 1) = (-a00 * c4 + a01 * c2 - a03 * c0) * inv_det;
+    result.at(2, 2) = (a30 * s4 - a31 * s2 + a33 * s0) * inv_det;
+    result.at(2, 3) = (-a20 * s4 + a21 * s2 - a23 * s0) * inv_det;
+    result.at(3, 0) = (-a10 * c3 + a11 * c1 - a12 * c0) * inv_det;
+    result.at(3, 1) = (a00 * c3 - a01 * c1 + a02 * c0) * inv_det;
+    result.at(3, 2) = (-a30 * s3 + a31 * s1 - a32 * s0) * inv_det;
+    result.at(3, 3) = (a20 * s3 - a21 * s1 + a22 * s0) * inv_det;
+    return result;
+}
+
 template<size_t R, size_t C, typename T>
 std::string to_string(const Matrix<R, C, T>& m)
 {
@@ -238,9 +303,9 @@ template<size_t R, size_t C, typename T>
 constexpr Matrix<C, R, T> Matrix<R, C, T>::transpose() const { return oryx::transpose(*this); }
 
 template<size_t R, size_t C, typename T>
-T Matrix<R, C, T>::determinant() const requires ((R == 2 && C == 2) || (R == 3 && C == 3)) { return oryx::determinant(*this); }
+T Matrix<R, C, T>::determinant() const requires ((R == 2 && C == 2) || (R == 3 && C == 3) || (R == 4 && C == 4)) { return oryx::determinant(*this); }
 
 template<size_t R, size_t C, typename T>
-Matrix<R, C, T> Matrix<R, C, T>::inverse() const requires ((R == 2 && C == 2) || (R == 3 && C == 3)) { return oryx::inverse(*this); }
+Matrix<R, C, T> Matrix<R, C, T>::inverse() const requires ((R == 2 && C == 2) || (R == 3 && C == 3) || (R == 4 && C == 4)) { return oryx::inverse(*this); }
 
 } // namespace oryx

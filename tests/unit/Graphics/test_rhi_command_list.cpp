@@ -241,6 +241,7 @@ public:
     void push_debug_group(const char*) override { calls.push_back("push"); }
     void pop_debug_group() override { calls.push_back("pop"); }
     void end_pass() override { calls.push_back("end"); }
+    void copy_buffer(RHIBuffer&, uint32_t, RHIBuffer&, uint32_t, uint32_t) override { calls.push_back("copy"); }
 
     std::vector<std::string> calls;
 };
@@ -297,6 +298,7 @@ TEST_CASE("RHICommand sizes stay within the deliberate ceiling")
     static_assert(sizeof(RHISetScissorCommand) <= CEILING);
     static_assert(sizeof(RHISetVertexBufferCommand) <= CEILING);
     static_assert(sizeof(RHISetIndexBufferCommand) <= CEILING);
+    static_assert(sizeof(RHICopyBufferCommand) <= CEILING);
     static_assert(sizeof(RHISetConstantsCommand) <= CEILING);
     static_assert(sizeof(RHIBindBufferCommand) <= CEILING);
     static_assert(sizeof(RHIBindTextureCommand) <= CEILING);

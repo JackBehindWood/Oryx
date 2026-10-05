@@ -31,6 +31,7 @@ public:
     virtual void push_debug_group(const char* name) = 0;
     virtual void pop_debug_group() = 0;
     virtual void end_pass() = 0;
+    virtual void copy_buffer(RHIBuffer& source, uint32_t source_offset, RHIBuffer& destination, uint32_t destination_offset, uint32_t size) = 0;
 };
 
 } // namespace oryx

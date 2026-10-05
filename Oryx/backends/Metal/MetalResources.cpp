@@ -28,4 +28,13 @@ void MetalBuffer::update(uint32_t offset, const uint8_t* data, uint32_t data_siz
     }
 }
 
+uint8_t* MetalBuffer::map()
+{
+    if (memory() != RHIMemory::CpuToGpu)
+    {
+        throw Error("RHI buffer map requires CpuToGpu memory");
+    }
+    return static_cast<uint8_t*>(m_buffer->contents());
+}
+
 } // namespace oryx::metal

@@ -40,7 +40,7 @@ public:
     using StaticShader::StaticShader;
 
     static constexpr uint32_t DEFAULT_TEXTURES = 16;
-    static constexpr uint32_t MAX_TEXTURES = 32;
+    static constexpr uint32_t MAX_TEXTURES = RHI_MAX_TEXTURE_BINDINGS;
     [[nodiscard]] static uint32_t texture_count(uint32_t permutation) { return permutation == 0 ? DEFAULT_TEXTURES : MAX_TEXTURES; }
     static std::vector<ShaderDefine> defines_for(uint32_t permutation);
     static bool should_compile(uint32_t permutation) { return permutation < 2; }

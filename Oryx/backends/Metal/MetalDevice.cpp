@@ -12,12 +12,12 @@ namespace
 
 constexpr uint32_t METAL_MAX_TEXTURE_SIZE = 16384;
 
-void upload_to_private(const MetalDevice& device, MTL::Buffer& destination, const uint8_t* data, uint32_t size)
+void upload_to_private(const MetalDevice& device, MTL::Buffer& destination, uint32_t offset, const uint8_t* data, uint32_t size)
 {
     NS::SharedPtr<MTL::Buffer> staging = require_object(NS::TransferPtr(device.device()->newBuffer(data, size, MTL::ResourceStorageModeShared)), "an upload buffer");
     MTL::CommandBuffer* commands = device.command_queue()->commandBuffer();
     MTL::BlitCommandEncoder* blit = commands->blitCommandEncoder();
-    blit->copyFromBuffer(staging.get(), 0, &destination, 0, size);
+    blit->copyFromBuffer(staging.get(), 0, &destination, offset, size);
     blit->endEncoding();
     commands->commit();
     commands->waitUntilCompleted();
@@ -52,6 +52,13 @@ MetalDevice::MetalDevice()
     m_capabilities.name = to_string(m_device->name());
     m_capabilities.max_texture_size = METAL_MAX_TEXTURE_SIZE;
     m_capabilities.frames_in_flight = METAL_FRAMES_IN_FLIGHT;
+    const bool large_argument_table = m_device->supportsFamily(MTL::GPUFamilyApple4) || m_device->supportsFamily(MTL::GPUFamilyMac2);
+    m_capabilities.max_texture_bindings = std::min(RHI_MAX_TEXTURE_BINDINGS, large_argument_table ? 128u : 31u);
+}
+
+void MetalDevice::upload_buffer(MTL::Buffer& destination, uint32_t offset, const uint8_t* data, uint32_t size) const
+{
+    upload_to_private(*this, destination, offset, data, size);
 }
 
 NS::SharedPtr<MTL::Buffer> MetalDevice::make_buffer(const RHIBufferDesc& desc) const
@@ -82,7 +89,7 @@ NS::SharedPtr<MTL::Buffer> MetalDevice::make_buffer(const RHIBufferDesc& desc) c
         }
         else
         {
-            upload_to_private(*this, *buffer.get(), desc.initial_data, desc.initial_data_size);
+            upload_to_private(*this, *buffer.get(), 0, desc.initial_data, desc.initial_data_size);
         }
     }
     return buffer;

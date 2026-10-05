@@ -28,6 +28,10 @@ public:
     // CpuToGpu buffers only; throws Error when the range exceeds the buffer.
     virtual void update(uint32_t offset, const uint8_t* data, uint32_t data_size) = 0;
 
+    // CpuToGpu buffers only (throws Error otherwise): a pointer to the whole buffer that stays valid for its lifetime, so writers fill ranges in place.
+    // The memory is write-combined on discrete GPUs: write sequentially, never read back, and keep ranges the GPU is still reading untouched.
+    [[nodiscard]] virtual uint8_t* map() = 0;
+
 protected:
     explicit RHIBuffer(const RHIBufferDesc& desc)
         : RHIResource()

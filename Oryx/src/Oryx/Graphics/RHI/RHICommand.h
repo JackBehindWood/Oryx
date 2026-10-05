@@ -21,7 +21,8 @@ enum class RHICommandType : uint8_t
     DrawIndexed,
     PushDebugGroup,
     PopDebugGroup,
-    EndPass
+    EndPass,
+    CopyBuffer
 };
 
 class RHICommandList;
@@ -389,6 +390,37 @@ public:
     }
 
     void execute(IRHICommandContext& context) const override { context.end_pass(); }
+};
+
+class RHICopyBufferCommand final : public RHICommand
+{
+public:
+    static constexpr RHICommandType TYPE = RHICommandType::CopyBuffer;
+
+    RHICopyBufferCommand(RHIBuffer& source, uint32_t source_offset, RHIBuffer& destination, uint32_t destination_offset, uint32_t size)
+        : RHICommand(TYPE)
+        , m_source(&source)
+        , m_destination(&destination)
+        , m_source_offset(source_offset)
+        , m_destination_offset(destination_offset)
+        , m_size(size)
+    {
+    }
+
+    [[nodiscard]] RHIBuffer& source() const { return *m_source; }
+    [[nodiscard]] RHIBuffer& destination() const { return *m_destination; }
+    [[nodiscard]] uint32_t source_offset() const { return m_source_offset; }
+    [[nodiscard]] uint32_t destination_offset() const { return m_destination_offset; }
+    [[nodiscard]] uint32_t size() const { return m_size; }
+
+    void execute(IRHICommandContext& context) const override { context.copy_buffer(*m_source, m_source_offset, *m_destination, m_destination_offset, m_size); }
+
+private:
+    RHIBuffer* m_source;
+    RHIBuffer* m_destination;
+    uint32_t m_source_offset;
+    uint32_t m_destination_offset;
+    uint32_t m_size;
 };
 
 // The command as T when its type matches, else null.

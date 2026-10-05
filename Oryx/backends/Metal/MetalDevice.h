@@ -22,6 +22,8 @@ public:
     [[nodiscard]] MTL::CommandQueue* command_queue() const { return m_queue.get(); }
     [[nodiscard]] const RHICapabilities& capabilities() const { return m_capabilities; }
 
+    // Blocking staging copy into a private buffer.
+    void upload_buffer(MTL::Buffer& destination, uint32_t offset, const uint8_t* data, uint32_t size) const;
     [[nodiscard]] NS::SharedPtr<MTL::Buffer> make_buffer(const RHIBufferDesc& desc) const;
     [[nodiscard]] NS::SharedPtr<MTL::Texture> make_texture(const RHITextureDesc& desc) const;
     [[nodiscard]] NS::SharedPtr<MTL::SamplerState> make_sampler(const RHISamplerDesc& desc) const;

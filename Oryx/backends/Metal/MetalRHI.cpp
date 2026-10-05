@@ -220,6 +220,30 @@ void MetalRHI::end_frame()
     m_queue.end_frame();
 }
 
+void MetalRHI::upload_buffer(RHIBuffer& buffer, uint32_t offset, const uint8_t* data, uint32_t data_size)
+{
+    MetalBuffer* metal_buffer = dynamic_cast<MetalBuffer*>(&buffer);
+    if (metal_buffer == nullptr)
+    {
+        throw Error("RHI upload_buffer received a buffer from a different backend");
+    }
+    if (offset > buffer.size() || data_size > buffer.size() - offset)
+    {
+        throw Error("RHI buffer upload is out of range");
+    }
+    if (data_size == 0)
+    {
+        return;
+    }
+    if (buffer.memory() == RHIMemory::CpuToGpu)
+    {
+        buffer.update(offset, data, data_size);
+        return;
+    }
+    OX_METAL_AUTORELEASE_SCOPE;
+    m_device.upload_buffer(*metal_buffer->mtl(), offset, data, data_size);
+}
+
 void MetalRHI::read_texture(RHITexture& texture, uint8_t* out, uint32_t out_size)
 {
     MetalTexture* metal_texture = dynamic_cast<MetalTexture*>(&texture);

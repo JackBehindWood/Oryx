@@ -67,6 +67,9 @@ public:
     void push_debug_group(const char* name);
     void pop_debug_group();
     void end_pass();
+    // Outside passes only. Copies on the GPU in recording order, so a CpuToGpu staging range written before submit can feed a GpuOnly buffer without blocking;
+    // source needs CopySource, destination needs CopyDest, the buffers must differ and both ranges must fit.
+    void copy_buffer(RHIBuffer* source, uint32_t source_offset, RHIBuffer* destination, uint32_t destination_offset, uint32_t size);
 
     // Replays every command into the backend's context, in recording order.
     void execute(IRHICommandContext& context) const;

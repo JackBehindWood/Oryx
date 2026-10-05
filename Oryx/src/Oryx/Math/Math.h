@@ -7,4 +7,5 @@
 #include "Oryx/Math/Vector4.h"
 #include "Oryx/Math/Matrix.h"
 #include "Oryx/Math/Matrix3.h"
+#include "Oryx/Math/Matrix4.h"
 #include "Oryx/Math/Colour.h"

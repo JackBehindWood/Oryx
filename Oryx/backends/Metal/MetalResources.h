@@ -17,6 +17,7 @@ public:
     MetalBuffer(const RHIBufferDesc& desc, NS::SharedPtr<MTL::Buffer> buffer);
 
     void update(uint32_t offset, const uint8_t* data, uint32_t data_size) override;
+    [[nodiscard]] uint8_t* map() override;
 
     [[nodiscard]] MTL::Buffer* mtl() const { return m_buffer.get(); }
 

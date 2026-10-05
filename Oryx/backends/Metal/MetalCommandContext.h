@@ -32,6 +32,7 @@ public:
     void push_debug_group(const char* name) override;
     void pop_debug_group() override;
     void end_pass() override;
+    void copy_buffer(RHIBuffer& source, uint32_t source_offset, RHIBuffer& destination, uint32_t destination_offset, uint32_t size) override;
 
 private:
     MTL::CommandBuffer& m_commands;

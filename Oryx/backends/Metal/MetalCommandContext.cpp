@@ -65,6 +65,15 @@ void MetalCommandContext::end_pass()
     m_index_buffer = nullptr;
 }
 
+void MetalCommandContext::copy_buffer(RHIBuffer& source, uint32_t source_offset, RHIBuffer& destination, uint32_t destination_offset, uint32_t size)
+{
+    MetalBuffer& from = require_backend<MetalBuffer>(source, "a buffer");
+    MetalBuffer& to = require_backend<MetalBuffer>(destination, "a buffer");
+    MTL::BlitCommandEncoder* blit = m_commands.blitCommandEncoder();
+    blit->copyFromBuffer(from.mtl(), source_offset, to.mtl(), destination_offset, size);
+    blit->endEncoding();
+}
+
 void MetalCommandContext::set_pipeline(RHIGraphicsPipeline& pipeline)
 {
     m_pipeline = &require_backend<MetalPipeline>(pipeline, "a pipeline");

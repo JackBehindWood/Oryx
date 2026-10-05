@@ -442,6 +442,29 @@ void RHICommandList::end_pass()
     m_state.in_pass = false;
 }
 
+void RHICommandList::copy_buffer(RHIBuffer* source, uint32_t source_offset, RHIBuffer* destination, uint32_t destination_offset, uint32_t size)
+{
+    if (m_state.in_pass)
+    {
+        fail("a copy is not allowed inside a pass", "copy_buffer");
+    }
+    require_non_null(source, "copy_buffer");
+    require_non_null(destination, "copy_buffer");
+    if (source == destination)
+    {
+        fail("source and destination are the same buffer", "copy_buffer");
+    }
+    require_usage(source->usage(), RHIBufferUsage::CopySource, "copy_buffer source");
+    require_usage(destination->usage(), RHIBufferUsage::CopyDest, "copy_buffer destination");
+    if (size == 0 || source_offset > source->size() || size > source->size() - source_offset || destination_offset > destination->size() || size > destination->size() - destination_offset)
+    {
+        fail("range out of bounds", "copy_buffer");
+    }
+    emplace<RHICopyBufferCommand>(*source, source_offset, *destination, destination_offset, size);
+    retain(*source);
+    retain(*destination);
+}
+
 void RHICommandList::execute(IRHICommandContext& context) const
 {
     for (const RHICommand* command = m_state.head; command != nullptr; command = command->next())
