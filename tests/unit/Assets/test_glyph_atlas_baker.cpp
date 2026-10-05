@@ -16,13 +16,13 @@ std::filesystem::path font_path()
 struct BakeFixture
 {
     test::AssetTempDir dir;
-    AssetManager assets{ settings() };
+    AssetManager assets{ AssetSettings{}, resources() };
     AssetHandle<FontAsset> font = test::load_now<FontAsset>(assets, font_path());
 
-    AssetSettings settings() const
+    ResourceSettings resources() const
     {
-        AssetSettings result;
-        result.cache_dir = dir.path() / "cache";
+        ResourceSettings result;
+        result.root = dir.path();
         return result;
     }
 
@@ -33,13 +33,13 @@ struct BakeFixture
         return result;
     }
 
-    GlyphAtlasBake bake(const GlyphAtlasDesc& atlas_desc) { return bake_glyph_atlas(assets.get(font), atlas_desc, assets.cache()); }
+    GlyphAtlasBake bake(const GlyphAtlasDesc& atlas_desc) { return bake_glyph_atlas(assets.get(font), atlas_desc, assets.compiled()); }
 
     void truncate_cache_entries() const
     {
-        for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(dir.path() / "cache"))
+        for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(dir.path() / "compiled"))
         {
-            if (entry.is_regular_file() && entry.path().string().find("glyph-atlas") != std::string::npos)
+            if (entry.is_regular_file() && entry.path().string().find(".oxatlas") != std::string::npos)
             {
                 std::filesystem::resize_file(entry.path(), entry.file_size() / 2);
             }
@@ -234,7 +234,7 @@ TEST_CASE("bake_glyph_atlas: pixel height, ranges, padding and font bytes change
     bytes.back() ^= 0xFF;
     test::write_bytes(f.dir.path() / "changed.ttf", bytes);
     AssetHandle<FontAsset> changed = test::load_now<FontAsset>(f.assets, f.dir.path() / "changed.ttf");
-    const GlyphAtlasBake other = bake_glyph_atlas(f.assets.get(changed), f.desc(16.0f), f.assets.cache());
+    const GlyphAtlasBake other = bake_glyph_atlas(f.assets.get(changed), f.desc(16.0f), f.assets.compiled());
     CHECK_FALSE(other.cache_hit);
     CHECK(other.rasterised > 0);
 }

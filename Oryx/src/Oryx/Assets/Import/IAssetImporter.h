@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Assets/Import/CompiledAssetStore.h"
 #include "Oryx/Core/Registry.h"
 
 namespace oryx
@@ -33,4 +34,8 @@ public:
 } // namespace oryx
 
 #define OX_REGISTER_ASSET_IMPORTER(AssetType, ImporterType, extension) \
-    OX_REGISTER_FACTORY(::oryx::IAssetImporter<AssetType>, ImporterType, extension)
+    OX_REGISTER_FACTORY(::oryx::IAssetImporter<AssetType>, ImporterType, extension) \
+    namespace                                                                       \
+    {                                                                               \
+    [[maybe_unused]] const int OX_CONCAT(g_ox_register_compiled_importer_, __LINE__) = (::oryx::register_compiled_type(ImporterType{}.id(), [] { return ImporterType{}.version(); }), 0); \
+    }

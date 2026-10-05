@@ -51,6 +51,8 @@ LAUNCHERS = Choices("ccache")
 DEPENDENCY_SOURCES = Choices("submodule", "local", "archive", "file", "git", "system")
 EDITORS = Choices("vscode", "visual_studio", "none")
 DOCS_TOOLS = Choices("mkdocs")
+BOUNDARY_SCANNERS = Choices("cpp")
+ARTIFACT_TOOLS = Choices("nm")
 
 
 def _open(choices: Choices, default: str | None):
@@ -144,6 +146,31 @@ class DocsTable:
 
 
 @dataclass(frozen=True)
+class BoundaryRule:
+    rule: str
+    why: str = ""
+
+
+@dataclass(frozen=True)
+class BoundaryArtifact:
+    path: str
+    deny: str
+    tool: str = _open(ARTIFACT_TOOLS, "nm")
+    why: str = ""
+    requires: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BoundariesTable:
+    root: str = "."
+    base: str = ""
+    scan: str = _open(BOUNDARY_SCANNERS, "cpp")
+    sets: dict[str, list[str]] = field(default_factory=dict)
+    rules: list[BoundaryRule] = field(default_factory=list)
+    artifacts: list[BoundaryArtifact] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ForgeConfig:
     project: ProjectTable
     premake: PremakeTable = field(default_factory=PremakeTable)
@@ -153,6 +180,7 @@ class ForgeConfig:
     tests: TestsTable | None = None
     dependencies: dict[str, Dependency] = field(default_factory=dict)
     docs: DocsTable | None = None
+    boundaries: BoundariesTable | None = None
     plugins: PluginsTable = field(default_factory=PluginsTable)
     tool: dict[str, dict] = field(default_factory=dict)
 

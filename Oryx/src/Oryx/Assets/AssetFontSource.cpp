@@ -13,7 +13,7 @@ GlyphAtlasData AssetFontSource::bake(const GlyphAtlasDesc& desc)
     {
         throw Error("cannot bake glyphs: the font is not ready");
     }
-    GlyphAtlasBake bake = bake_glyph_atlas(*font, desc, m_assets.cache());
+    GlyphAtlasBake bake = bake_glyph_atlas(*font, desc, m_assets.compiled());
     ++m_stats.bakes;
     m_stats.rasterised += bake.rasterised;
     m_stats.cache_hits += bake.cache_hit ? 1 : 0;

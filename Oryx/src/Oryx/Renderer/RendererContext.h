@@ -34,7 +34,8 @@ struct RendererContext
     // Batchers recycled once per frame by record_frame; the first is the facade's own.
     std::vector<BatchRenderer*> batchers;
     UniquePtr<BatchRenderer2D> batcher;
-    // Holds no reference into the context, so it is a plain member; it may point at a Font the application owns.
+    // Declared before `debug`, which points at it until an application sets its own font.
+    UniquePtr<Font> default_font;
     DebugRenderer debug;
 };
 

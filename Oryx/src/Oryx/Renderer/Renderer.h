@@ -89,6 +89,8 @@ public:
     static void draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style = {});
     // Records shapes from anywhere, between scenes too; draw_debug replays them into the open scene and record_frame ages them.
     [[nodiscard]] static DebugRenderer& debug();
+    // The built-in 8x8 bitmap font (see BuiltinFontSource); the debug renderer draws text with it until set_font replaces it.
+    [[nodiscard]] static Font& default_font();
     static void draw_debug();
     // Counters of the frame being recorded; reset when the frame ring advances.
     [[nodiscard]] static const BatchStats& batch_stats();

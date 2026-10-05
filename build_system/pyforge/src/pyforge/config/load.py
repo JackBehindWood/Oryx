@@ -56,6 +56,12 @@ def validate(cfg: ForgeConfig) -> ForgeConfig:
     if cfg.tests:
         for name, suite in cfg.tests.suites.items():
             _check_requires(f"tests.suites.{name}", suite.requires, options)
+    if cfg.boundaries:
+        from ..boundaries import parse_rules
+
+        parse_rules(cfg.boundaries)
+        for index, artifact in enumerate(cfg.boundaries.artifacts):
+            _check_requires(f"boundaries.artifacts[{index}]", artifact.requires, options)
     default_target = cfg.project.default_target
     if default_target and default_target not in cfg.targets:
         raise SchemaError(
@@ -73,8 +79,17 @@ def _normalize_tests(data: dict) -> dict:
     return {**data, "tests": {**tests, "suites": suites}}
 
 
+def _normalize_boundaries(data: dict) -> dict:
+    """A rule may be a bare string ('headless !-> graphics') shorthand for {rule = "headless !-> graphics"}."""
+    boundaries = data.get("boundaries")
+    if not isinstance(boundaries, dict) or not isinstance(boundaries.get("rules"), list):
+        return data
+    rules = [{"rule": rule} if isinstance(rule, str) else rule for rule in boundaries["rules"]]
+    return {**data, "boundaries": {**boundaries, "rules": rules}}
+
+
 def parse_config(data: dict) -> ForgeConfig:
-    return validate(from_dict(ForgeConfig, _normalize_tests(data)))
+    return validate(from_dict(ForgeConfig, _normalize_boundaries(_normalize_tests(data))))
 
 
 def load_config(path: Path, installed_version: str) -> ForgeConfig:

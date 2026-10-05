@@ -1,6 +1,8 @@
 #include "oxpch.h"
 #include "Oryx/Renderer/RendererContext.h"
 
+#include "Oryx/Text/BuiltinFontSource.h"
+
 namespace oryx
 {
 
@@ -21,6 +23,8 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->defaults = create_default_resources(*context->rhi);
     context->batcher = create_unique<BatchRenderer2D>(batch_renderer_desc(*context, context->items));
     context->batchers.push_back(context->batcher.get());
+    context->default_font = create_unique<Font>(Font::create(create_unique<BuiltinFontSource>()));
+    context->debug.set_font(context->default_font.get());
     return context;
 }
 
@@ -38,6 +42,9 @@ void shutdown_renderer_context(UniquePtr<RendererContext>& context)
     context->commands.clear();
     context->items.clear();
     context->viewport.reset();
+    context->debug.clear();
+    context->debug.set_font(nullptr);
+    context->default_font.reset();
     context->rhi->wait_idle();
     context.reset();
 }

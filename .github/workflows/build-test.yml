@@ -84,12 +84,8 @@ jobs:
     - name: Configure and compile
       run: uv run forge $BUILD_FLAGS compile
 
-    - name: Check graphics layering (includes)
-      run: uv run python build_system/oryx/boundaries.py
-
-    - name: Check graphics-off library has no graphics symbols
-      if: matrix.graphics == 'off'
-      run: uv run python build_system/oryx/boundaries.py --symbols "$(find build/bin -name libOryx.a | head -n1)"
+    - name: Check boundaries (includes, and graphics-off symbols)
+      run: uv run forge $BUILD_FLAGS boundaries check --artifacts
 
     - name: ccache statistics
       run: ccache -s

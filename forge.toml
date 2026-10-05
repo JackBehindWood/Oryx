@@ -41,6 +41,31 @@ stb = { include = "." }
 metal-cpp = { include = ".", requires = ["graphics"] }
 doctest = { include = "doctest", path = "tests/vendor/doctest" }
 
+[boundaries]
+root = "Oryx/src"
+base = "Oryx"
+rules = [
+  { rule = "** !-> backends", why = "public headers must not include backends/" },
+  { rule = "backend-header <-only- Core/Window.cpp Graphics/RHI/RHI.cpp", why = "only the backend factories Core/Window.cpp, Graphics/RHI/RHI.cpp may include a backend header" },
+  { rule = "Assets !-> Core/Window.h Core/Input.h Events/WindowEvent.h except Assets/**/GpuAssetCache*", why = "CPU assets must stay headless" },
+  "headless !-> graphics",
+  { rule = "Assets !-> graphics except Assets/**/GpuAssetCache*", why = "only GpuAssetCache may include {target}" },
+  { rule = "graphics Text !-> Assets", why = "{module} must not include Assets; fonts reach the renderer through Text/IFontSource" },
+  "Graphics < Shaders < Renderer",
+]
+
+[boundaries.sets]
+graphics = ["Graphics", "Shaders", "Renderer"]
+headless = ["Game", "Strategy", "Simulation", "Core", "Text"]
+backends = ["**/backends/**"]
+backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']
+
+[[boundaries.artifacts]]
+path = "build/bin/**/libOryx.a"
+deny = '\boryx::(?:Graphics|Shaders|Renderer)::'
+requires = ["!graphics"]
+why = "graphics-off library must not export graphics symbols"
+
 [docs]
 tool = "mkdocs"
 

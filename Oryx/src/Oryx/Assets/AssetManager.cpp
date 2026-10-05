@@ -6,11 +6,13 @@
 namespace oryx
 {
 
-AssetManager::AssetManager(const AssetSettings& settings, UniquePtr<IAssetExecutor> executor)
+AssetManager::AssetManager(const AssetSettings& settings, const ResourceSettings& resources, UniquePtr<IAssetExecutor> executor)
     : m_settings(settings)
-    , m_cache(settings.cache_dir, settings.cache_enabled)
+    , m_resources(resources)
+    , m_compiled(compiled_directory(resources), settings.compiled_enabled && resources.compiled_enabled)
     , m_executor(executor != nullptr ? std::move(executor) : UniquePtr<IAssetExecutor>(create_unique<DeferredExecutor>()))
 {
+    m_compiled.prune();
 }
 
 AssetManager::~AssetManager() = default;
@@ -31,7 +33,8 @@ std::filesystem::path AssetManager::resolve_path(const std::filesystem::path& pa
     {
         return path;
     }
-    for (const std::filesystem::path& root : m_settings.roots)
+    const std::vector<std::filesystem::path> default_roots = { m_resources.root };
+    for (const std::filesystem::path& root : m_settings.roots.empty() ? default_roots : m_settings.roots)
     {
         std::error_code error;
         if (std::filesystem::exists(root / path, error))

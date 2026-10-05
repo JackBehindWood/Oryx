@@ -2,3 +2,9 @@ scripting:
   enabled: true
   roots:
     - scripts
+resources:
+  root: resources
+  compiled_enabled: true
+assets:
+  compiled_enabled: true
+  worker_threads: 0

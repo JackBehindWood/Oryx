@@ -34,7 +34,7 @@ private:
 inline AssetSettings uncached_settings()
 {
     AssetSettings settings;
-    settings.cache_enabled = false;
+    settings.compiled_enabled = false;
     return settings;
 }
 

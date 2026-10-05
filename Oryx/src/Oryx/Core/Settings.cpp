@@ -152,12 +152,11 @@ std::vector<std::string> SettingsNode::strings(std::string_view key) const
 std::filesystem::path SettingsNode::path(std::string_view key, std::filesystem::path fallback) const
 {
     std::string text = string(key);
-    if (text.empty())
+    std::filesystem::path result(text.empty() ? fallback : std::filesystem::path(text));
+    if (result.empty())
     {
-        return fallback;
+        return result;
     }
-
-    std::filesystem::path result(text);
     return result.is_absolute() ? result : (SettingsAccess::file_of(*this).parent_path() / result).lexically_normal();
 }
 

@@ -7,8 +7,7 @@ namespace oryx
 void read_settings(AssetSettings& settings, const SettingsNode& node)
 {
     settings.roots = node.paths("roots");
-    settings.cache_dir = node.path("cache_dir", settings.cache_dir);
-    settings.cache_enabled = node.boolean("cache_enabled", settings.cache_enabled);
+    settings.compiled_enabled = node.boolean("compiled_enabled", settings.compiled_enabled);
     int64_t threads = node.integer("worker_threads", 0);
     if (threads < 0)
     {

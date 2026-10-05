@@ -199,6 +199,11 @@ DebugRenderer& Renderer::debug()
     return require_context().debug;
 }
 
+Font& Renderer::default_font()
+{
+    return *require_context().default_font;
+}
+
 void Renderer::draw_debug()
 {
     RendererContext& context = require_context();

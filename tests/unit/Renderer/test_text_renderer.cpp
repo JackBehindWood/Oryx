@@ -181,3 +181,34 @@ TEST_CASE("BatchStats: triangles follow each primitive and texture slots the bus
     CHECK(batcher.stats().triangles == 0);
     CHECK(batcher.stats().texture_slots_used == 0);
 }
+
+TEST_CASE("Renderer::default_font: draws text with no setup")
+{
+    TextFixture f;
+    BatchRenderer2D batcher(f.desc());
+    Font& font = *f.context->default_font;
+    CHECK(font.ready());
+    CHECK(font.measure("Hi", 16.0f).width > 8.0f);
+    CHECK(font.measure("", 16.0f).width == 0.0f);
+
+    batcher.begin(f.camera);
+    batcher.draw_text({ 0.0f, 0.0f }, "Hi", font, {});
+    batcher.draw_text({ 0.0f, 0.0f }, "", font, {});
+    batcher.draw_text({ 0.0f, 0.0f }, "\xE4\xB8\xAD", font, {});
+    batcher.end();
+    REQUIRE(f.sink.size() == 1);
+    CHECK(f.sink[0].vertex_count == 12);
+}
+
+TEST_CASE("DebugRenderer: text works out of the box through the renderer's default font")
+{
+    TextFixture f;
+    CHECK(f.context->debug.font() == f.context->default_font.get());
+    BatchRenderer2D batcher(f.desc());
+    f.context->debug.text({ 4.0f, 4.0f }, "debug");
+    batcher.begin(f.camera);
+    f.context->debug.render(batcher);
+    batcher.end();
+    REQUIRE(f.sink.size() == 1);
+    CHECK(f.sink[0].vertex_count == 20);
+}

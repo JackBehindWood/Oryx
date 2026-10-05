@@ -11,6 +11,7 @@ namespace
 {
 
 constexpr uint32_t ATLAS_FORMAT_VERSION = 1;
+constexpr const char* ATLAS_TYPE = "atlas";
 constexpr uint32_t MIN_ATLAS_SIDE = 64;
 constexpr uint32_t MAX_ATLAS_SIDE = 8192;
 
@@ -150,11 +151,13 @@ bool deserialise_atlas(const std::vector<uint8_t>& payload, uint32_t& side, floa
 
 } // namespace
 
-GlyphAtlasBake bake_glyph_atlas(const FontAsset& font, const GlyphAtlasDesc& desc, const AssetCache& cache)
+OX_REGISTER_COMPILED_TYPE(ATLAS_TYPE, ATLAS_FORMAT_VERSION)
+
+GlyphAtlasBake bake_glyph_atlas(const FontAsset& font, const GlyphAtlasDesc& desc, const CompiledAssetStore& store)
 {
     validate_glyph_atlas_desc(desc);
     const uint64_t content = font.content_hash();
-    const AssetCacheKey key = make_asset_cache_key("glyph-atlas", ATLAS_FORMAT_VERSION, settings_hash(desc), reinterpret_cast<const uint8_t*>(&content), sizeof(content));
+    const CompiledAssetKey key = make_compiled_asset_key(ATLAS_TYPE, ATLAS_FORMAT_VERSION, settings_hash(desc), reinterpret_cast<const uint8_t*>(&content), sizeof(content));
 
     uint32_t side = 0;
     float ascent = 0.0f;
@@ -166,7 +169,7 @@ GlyphAtlasBake bake_glyph_atlas(const FontAsset& font, const GlyphAtlasDesc& des
     bool cache_hit = false;
 
     std::vector<uint8_t> payload;
-    if (cache.read(key, payload) && deserialise_atlas(payload, side, ascent, line_height, glyphs, kerning, pixels))
+    if (store.read(key, payload) && deserialise_atlas(payload, side, ascent, line_height, glyphs, kerning, pixels))
     {
         cache_hit = true;
     }
@@ -240,7 +243,7 @@ GlyphAtlasBake bake_glyph_atlas(const FontAsset& font, const GlyphAtlasDesc& des
         ascent = metrics.ascent;
         line_height = metrics.ascent - metrics.descent + metrics.line_gap;
         const std::vector<uint8_t> bytes = serialise(side, ascent, line_height, glyphs, kerning, pixels);
-        cache.write(key, bytes.data(), bytes.size());
+        store.write(key, bytes.data(), bytes.size());
     }
 
     return { GlyphAtlasData(desc, side, std::move(pixels), std::move(glyphs), std::move(kerning), ascent, line_height), rasterised_count, cache_hit };

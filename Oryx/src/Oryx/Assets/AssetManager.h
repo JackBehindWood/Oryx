@@ -4,9 +4,10 @@
 #include "Oryx/Assets/AssetSettings.h"
 #include "Oryx/Assets/AssetTable.h"
 #include "Oryx/Assets/Execution/IAssetExecutor.h"
-#include "Oryx/Assets/Import/AssetCache.h"
+#include "Oryx/Assets/Import/CompiledAssetStore.h"
 #include "Oryx/Assets/Import/IAssetImporter.h"
 #include "Oryx/Assets/AssetFile.h"
+#include "Oryx/Core/ResourceSettings.h"
 
 namespace oryx
 {
@@ -19,7 +20,7 @@ class ImportRequest;
 class AssetManager
 {
 public:
-    explicit AssetManager(const AssetSettings& settings = settings_of<AssetSettings>(), UniquePtr<IAssetExecutor> executor = nullptr);
+    explicit AssetManager(const AssetSettings& settings = settings_of<AssetSettings>(), const ResourceSettings& resources = settings_of<ResourceSettings>(), UniquePtr<IAssetExecutor> executor = nullptr);
     virtual ~AssetManager();
 
     AssetManager(const AssetManager&) = delete;
@@ -186,8 +187,8 @@ public:
     }
 
     [[nodiscard]] size_t live_assets() const;
-    // The derived-data store, shared with consumers that cache their own baked output (the glyph atlas).
-    [[nodiscard]] const AssetCache& cache() const { return m_cache; }
+    // The compiled-asset store, shared with consumers that compile their own output (the glyph atlas).
+    [[nodiscard]] const CompiledAssetStore& compiled() const { return m_compiled; }
 
 protected:
     // Maps a requested path to the file to read: roots are searched in order, then the path is used as given.
@@ -312,7 +313,8 @@ private:
     }
 
     AssetSettings m_settings;
-    AssetCache m_cache;
+    ResourceSettings m_resources;
+    CompiledAssetStore m_compiled;
     UniquePtr<IAssetExecutor> m_executor;
     AssetBudget m_budget;
     std::unordered_map<std::type_index, UniquePtr<detail::AssetTableBase>> m_tables;
@@ -344,11 +346,11 @@ public:
                 return;
             }
             std::vector<uint8_t> bytes = read_binary_file(m_source);
-            AssetCacheKey key = make_asset_cache_key(importer->id(), importer->version(), importer->settings_hash(), bytes.data(), bytes.size());
-            if (!m_manager.m_cache.read(key, payload))
+            CompiledAssetKey key = make_compiled_asset_key(importer->id(), importer->version(), importer->settings_hash(), bytes.data(), bytes.size());
+            if (!m_manager.m_compiled.read(key, payload))
             {
                 payload = importer->import_source(ImportInput{ m_source, bytes.data(), bytes.size() });
-                m_manager.m_cache.write(key, payload.data(), payload.size());
+                m_manager.m_compiled.write(key, payload.data(), payload.size());
             }
         }
         catch (const Error& e)
