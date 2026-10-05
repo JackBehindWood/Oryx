@@ -70,6 +70,13 @@
 #include "Oryx/Board/Selection.h"
 #include "Oryx/Board/BoardLayer.h"
 #include "Oryx/Board/IGraphicsBoard.h"
+#include "Oryx/Board/BoardInput.h"
+#include "Oryx/Board/BoardView.h"
+#include "Oryx/Board/IBoardPresenter.h"
+#include "Oryx/Board/MoveBuilder.h"
+#include "Oryx/Board/BoardScene.h"
+#include "Oryx/Board/BoardPresentation.h"
+#include "Oryx/Board/PresentedConsoleBoard.h"
 
 #include "Oryx/Strategy/IStrategy.h"
 #include "Oryx/Strategy/RandomStrategy.h"
@@ -132,4 +139,8 @@
 #include "Oryx/Renderer/DebugRenderer.h"
 #include "Oryx/Renderer/GraphicsLayer.h"
 #include "Oryx/Renderer/Renderer.h"
+#include "Oryx/BoardGraphics/BoardLayout2D.h"
+#include "Oryx/BoardGraphics/BoardRenderer2D.h"
+#include "Oryx/BoardGraphics/PresentedGraphicsBoard.h"
+#include "Oryx/BoardGraphics/GraphicsBoards.h"
 #endif

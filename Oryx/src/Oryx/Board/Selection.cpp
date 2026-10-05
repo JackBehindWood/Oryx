@@ -1,6 +1,7 @@
 #include "Selection.h"
 
 #include "Oryx/Board/ConsoleGame.h"
+#include "Oryx/Board/IBoardPresenter.h"
 #include "Oryx/Board/IGraphicsBoard.h"
 #include "Oryx/Core/Log.h"
 #include <iostream>
@@ -260,13 +261,13 @@ bool choose_front_end(const std::string& requested_game, bool headless, bool gra
     }
 
     out_game = game;
-    if (GraphicsBoardRegistry::has(game))
+    if (GraphicsBoardRegistry::has(game) || BoardPresenterRegistry::has(game))
     {
         out_front_end = FrontEnd::Graphical;
     }
     else
     {
-        OX_INFO("No graphics board for '{}' - playing in the terminal.", game);
+        OX_INFO("No graphics board or presenter for '{}' - playing in the terminal.", game);
     }
     return true;
 }

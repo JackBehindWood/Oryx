@@ -1,0 +1,65 @@
+#include "BoardPresentation.h"
+
+#include "Oryx/Core/Error.h"
+
+namespace oryx
+{
+
+namespace
+{
+
+bool same_view(const BoardView& a, const BoardView& b)
+{
+    return a.spaces.size() == b.spaces.size() && a.pieces == b.pieces && a.status == b.status;
+}
+
+} // namespace
+
+BoardPresentation::BoardPresentation(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat)
+    : m_presenter(std::move(presenter))
+    , m_game(std::move(game))
+    , m_seat(seat)
+{
+    if (m_presenter == nullptr)
+    {
+        throw Error("BoardPresentation for '" + m_game + "' needs a presenter");
+    }
+}
+
+bool BoardPresentation::update(const IState& state)
+{
+    PlayerId to_move = state.current_player();
+    bool terminal = state.is_terminal();
+    ActionList legal = terminal ? ActionList{} : state.legal_actions();
+
+    m_next = BoardView{};
+    m_presenter->describe(state, m_seat == kAllSeats ? to_move : m_seat, m_next);
+
+    if (m_described && same_view(m_view, m_next) && to_move == m_to_move && terminal == m_terminal && legal == m_legal)
+    {
+        return false;
+    }
+
+    validate_view(m_next, m_game);
+    m_changed = m_described ? changed_spaces(m_view, m_next) : std::vector<SpaceId>{};
+    std::swap(m_view, m_next);
+    m_to_move = to_move;
+    m_terminal = terminal;
+    m_legal = std::move(legal);
+    m_described = true;
+
+    m_builder.reset(accepts_moves() ? collect_candidates(*m_presenter, state) : std::vector<MoveCandidate>{});
+    return true;
+}
+
+bool BoardPresentation::accepts_moves() const
+{
+    return m_described && !m_terminal && (m_seat == kAllSeats || m_seat == m_to_move);
+}
+
+void BoardPresentation::build_scene(SpaceId hovered, BoardScene& out) const
+{
+    build_board_scene(m_view, *m_presenter, m_builder, { m_changed, hovered }, out);
+}
+
+} // namespace oryx

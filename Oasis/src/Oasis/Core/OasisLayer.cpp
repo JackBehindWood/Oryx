@@ -93,7 +93,7 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
     }
 
     app.push_layer<oryx::SimulationLayer>();
-    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ oryx::selection::FrontEnd::Graphical, plan.game, m_options.opponent });
+    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ oryx::selection::FrontEnd::Graphical, plan.game, m_options.opponent, oryx::create_graphics_board });
     app.push_overlay<oryx::GraphicsLayer>();
     return true;
 #else

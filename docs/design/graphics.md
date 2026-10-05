@@ -18,6 +18,7 @@ Graphics/    **new, lowest graphics layer**: RHI/ (IRHI, RHIBackend enum + creat
 Shaders/     **middle layer (graphics option)**: ShaderStage, ShaderSource, ShaderBinary, ShaderReflection (Shaders'
              own), Shader/VertexShader/PixelShader (one stage each), ShaderLibrary, ShaderCache, ShaderSet, IShaderCompiler + compilers (MSL, Slang later), built-in sources
 Renderer/    **top layer**: Renderer (facade), BatchRenderer + BatchRenderer2D, TextureSlotTable, Camera/Camera2D, DebugRenderer, Font and GlyphAtlas (Step 7), GraphicsLayer
+BoardGraphics/ **above Renderer (graphics option)**: the windowed front end for presented boards: BoardLayout2D, draw_board_2d, PresentedGraphicsBoard, create_graphics_board
 Text/        **headless**: GlyphAtlasData, layout_text, TextStyle, IFontSource (no Assets, no graphics)
 Events/      **WindowEvent.h, KeyEvent.h, MouseEvent.h** (added one event per real need)
 Assets/      AssetHandle<T>, AssetManager, Assets (global), importers, CompiledAssetStore, CPU assets (ImageAsset, FontAsset, ShaderAsset)
@@ -30,11 +31,11 @@ MacOS/   all macOS-specific code: now Window/Input (GLFW + Cocoa glue exposing t
 Null/    NullRHI + NullWindow (records, no GPU, no display) - always built with graphics
 IOS/, Windows/, Linux/, OpenGL/, Vulkan/   not created until each is actually built
 ```
-GLFW lives in `Oryx/vendor/glfw`, used by the desktop platform backends. Vendors: `glfw`, `stb`. Oasis: `Oasis/src/Oasis/Graphics/` holds the Tic-Tac-Toe view layer.
+GLFW lives in `Oryx/vendor/glfw`, used by the desktop platform backends. Vendors: `glfw`, `stb`. Oasis has no graphics code: its games register presenters (`Oasis/src/Oasis/Game/*Presenter`), drawn by `BoardGraphics/`.
 
 **Dependency rules (reviewed, plus grep/link checks in CI):**
 - `Core/Window.h`, `Core/Input.h`, window/input events and `Assets` (CPU) are always compiled and depend on nothing graphical; they work headless (a `Window` request with no backend resolves to NullWindow or throws a clear `Error`).
-- **Strictly linear layering, enforced by include checks:** `Graphics/` -> `Shaders/` -> `Renderer/`. Each layer may include only itself, the layers below it, `Core`, `Math` and CPU `Assets`; none may include a layer above. This replaces the earlier "Renderer sandwiched around Shaders" arrangement. RHI types appear in `Renderer/` only via `Renderer::rhi()` and the resource wrappers' `rhi()` accessors.
+- **Strictly linear layering, enforced by include checks:** `Graphics/` -> `Shaders/` -> `Renderer/` -> `BoardGraphics/`. Each layer may include only itself, the layers below it, `Core`, `Math` and CPU `Assets`; none may include a layer above. This replaces the earlier "Renderer sandwiched around Shaders" arrangement. RHI types appear in `Renderer/` only via `Renderer::rhi()` and the resource wrappers' `rhi()` accessors.
 - **Hard rule: Graphics/, Shaders/ and Renderer/ never include, name or depend on Assets/.** They are standalone and take plain data or their own interfaces. The only Assets -> Graphics edge is `Assets/GpuAssetCache`, which produces `Texture2D` wrappers; CPU asset headers never include it. `ShaderAsset` is raw shader text + stage only. Fonts follow the same shape: the headless `Text/` module owns the glyph data (`GlyphAtlasData`), layout (`layout_text`) and the `IFontSource` interface; `Assets/AssetFontSource` implements it from a `FontAsset` (baking and caching live in `Assets/GlyphAtlasBaker`); `Renderer/Font` and `GlyphAtlas` see only `IFontSource`/`GlyphAtlasData`. `forge boundaries check` fails the build on any Graphics/Shaders/Renderer/Text include of Assets.
 - `Graphics/`, `Shaders/` and `Renderer/` are graphics-option only. Compilers shell out to `xcrun metal`/`slangc` and throw a clear `Error` when absent.
 - `backends/Metal` and `backends/MacOS` do not include each other; they meet only through `NativeWindowHandle` (Core).
@@ -88,6 +89,7 @@ Each milestone builds on its own, is tested headless where possible, and keeps `
 - [x] Step 7. **Text + assets:** global async `Assets` with revision-based reload and a content-hash `CompiledAssetStore`, headless `Text/` module (`GlyphAtlasData`, `layout_text`, `IFontSource`), `Font`/`GlyphAtlas`, `draw_text` on a dedicated text pipeline, recorder `DebugRenderer`, built-in Inter `Renderer::default_font()`, `BatchStats` triangles/slots; `PlaygroundLayer` loads a font and PNG through `Assets` and draws a stats overlay, `R` reloads both.
 - [x] Step 7b. **Compiled assets:** `AssetCache` became `CompiledAssetStore` with typed, versioned entries (`<resources>/compiled/<type>/<hash>.ox<type>`), a compiled-type registry with `prune()`, and the `resources:` settings section (one folder for sources and compiled output); see [Resources and compiled assets](#resources-and-compiled-assets-step-7b).
 - [x] Step 8. **Vertical slice:** graphical Tic-Tac-Toe in Oasis, the default run mode when built with `graphics` (`--headless`/`--console`/`--no-window` keep the terminal path, so headless CI/bench are unchanged). `IBoard` (Oryx `Board/`) with `IConsoleBoard`/`IGraphicsBoard` subtypes self-register per game; the game-independent `BoardLayer` picks the board, feeds clicks to a human `ExternalStrategy` and posts the match to `SimulationLayer`. No change to `IGame`/`IState`/rules. `PlaygroundLayer` retired.
+- [x] Step 8b. **Presented boards:** `BoardInput` per frame, `IBoardPresenter` + `BoardView`, `MoveBuilder` multi-pick moves, `BoardScene` render list, generic `PresentedConsoleBoard` and `BoardGraphics/PresentedGraphicsBoard`; Tic-Tac-Toe's two hand-written boards replaced by `TicTacToePresenter`, and Hexapawn added as the first from-to game. See [Presented boards (Step 8b)](#presented-boards-step-8b).
 - [ ] Step 9. **Slang:** fetch prebuilt `slangc` (see build), compile offline to MSL, emit `ShaderReflection` (a new `IShaderCompiler` in `Shaders/`), switch, built-in shaders over.
 - [ ] Step 10. **Hardening/audit** as in earlier phases (docs, error paths, allocation-census leak checks, resize/minimise).
 
@@ -141,7 +143,7 @@ Out of scope: ECS, scene graph, PBR, physics, audio, render graph, GUI toolkit, 
 - **Metal argument-table conventions.** Vertex streams bind at `METAL_VERTEX_STREAM_BASE + slot` (base 16) so they never collide with buffer bindings `0..15`. Each binding maps to a per-stage Metal index (`slot` plus `array_index` for texture arrays); an `array<texture2d<float>, N>` needs every element bound, so batches fill unused elements with a 1x1 white texture.
 - **Who owns the frame.** `GraphicsLayer` (pushed last) owns the viewport and the clear colour and calls `Renderer::end_frame`; other layers never touch the pass. Layers hand the renderer data: `Renderer::submit(const DrawItem&)` queues one draw (pipeline, vertex/index buffers, inline constants, textures and sampler; the Unreal `FMeshBatch` analogue). `end_frame` acquires the back buffer, records `begin_pass`, `record_draw_item` for each item in order, `end_pass`, then `submit`, `present`, `end_frame`. `BatchRenderer2D` (Step 6) will batch into `DrawItem`s, and sorting by state or extra passes can be added inside `end_frame` without changing layers. Items submitted after `GraphicsLayer` ran land in the next frame.
 - **Corrections (F8).** The Metal queue polls and retires finished frames and waits with `waitUntilCompleted`; it uses no semaphore or completion handlers, and the layer sets `framebufferOnly = false`.
-- **Oasis front-end.** With graphics built in, `Oasis` opens a window and plays through `BoardLayer` + `TicTacToeGraphicsBoard`: queued `Renderer::draw_*` calls in a pixel-unit `Camera2D`, hover shape through `Renderer::debug()`, clicks mapped to `ActionId` and checked against `legal_actions()`. `--rhi=null` runs the same path and draws nothing. `BoardLayer` restarts a finished game (`R` or a click after a short delay); the hit-testing maths lives in `TicTacToeLayout`, unit-tested for any window size, which assumes `NativeWindowHandle` width/height and `Input::cursor_position` share units (logical points). Still to verify by hand on a Retina display: click each cell's corners and centre and compare with the hover highlight, resize the window, then run once with the real Metal backend. Step 6/7 history below refers to the retired playground.
+- **Oasis front-end.** With graphics built in, `Oasis` opens a window and plays through `BoardLayer` + `PresentedGraphicsBoard` (Step 8b): queued `Renderer::draw_*` calls in a pixel-unit `Camera2D`, clicks hit-tested back to spaces through `BoardLayout2D` and turned into moves by `MoveBuilder`. `--rhi=null` runs the same path and draws nothing. `BoardLayer` restarts a finished game (`R` or a click after a short delay). The layout maths is unit-tested for any window size and assumes `NativeWindowHandle` width/height and `Input::cursor_position` share units (logical points). Still to verify by hand on a Retina display: click each cell's corners and centre and compare with the hover highlight, resize the window, then run once with the real Metal backend. Step 6/7 history below refers to the retired playground.
 
 ## Batching and the scene facade (Step 6)
 
@@ -178,6 +180,24 @@ Out of scope: ECS, scene graph, PBR, physics, audio, render graph, GUI toolkit, 
 | Step 9 Slang | none: streams name `BuiltinPipeline`s, not shaders |
 | Meshes | sibling emitter writing `DrawItem`s, no batcher involved |
 
+
+## Presented boards (Step 8b)
+
+A game library cannot afford a hand-written console board and graphics board per game, so presentation became data. The industry shapes this follows: model-view-presenter (the game stays the model; a stateless presenter describes it), a render list between presentation and rendering (Unreal's proxies, Bevy's extract step), and input as intents captured once per frame.
+
+```
+IState --IBoardPresenter::describe--> BoardView (board units, one seat's view)
+       --BoardPresentation (change detection, last-move diff, MoveBuilder)--> BoardScene (styles + highlights)
+BoardScene --board_text--> terminal          BoardScene --BoardLayout2D + draw_board_2d--> Renderer
+picks (typed labels | clicks via space_at/option_at) --MoveBuilder--> ActionId --poll_action--> SimulationLayer
+```
+
+- **Input.** `BoardLayer` builds one `BoardInput` per frame from the window (`read_board_input`: select, back, undo, restart, quit, cursor, viewport) and passes it to `IGraphicsBoard::update` and `render`. Boards never touch `Input` or the window, so they run in tests without one, and the key map and `kRestartHint` live in one place.
+- **Moves as picks.** A move is the sequence of picks a person makes: spaces, then optional menu options (promotion, which card). `MoveBuilder` keeps the legal moves whose picks start with what was picked, completes a move when its sequence is whole, starts again from a pick that begins another move (clicking another piece re-selects) and rejects ambiguous candidate sets (equal or prefix sequences) with an `Error`. Highlights, undo and back are therefore written once for every game.
+- **Board units, not pixels.** `BoardSpace::position` is a `Vec3f` on the table (z up, 0 for flat boards) with a footprint and shape, so the same view serves the terminal (rows and columns of distinct positions), a 2D window (`fit_board_2d`) and, later, a 3D table. Hit-testing is `space_at(view, board_point)`: 2D inverts the layout; 3D will intersect the cursor ray with the table plane and call the same function.
+- **Styles name no technique.** `PieceStyle` carries a glyph, a colour and a `PieceShape` drawn from primitives. A 3D front end adds a model reference to it; sprites are deferred until a game ships images (`BoardGraphics/` may not include `Assets/`, so they would arrive as a `Texture2D` resolved by the application).
+- **3D seam without a scene graph.** `BoardScene` is the render list: flat, rebuilt from data, no hierarchy (a piece is placed by its space). A `BoardRenderer3D` would read the same scene with a `Camera3D`, meshes per piece kind and a depth pass, and emit `DrawItem`s; the engine-level `SceneRenderer` (above) stays unbuilt until that consumer exists, and would take over sorting and passes for it. Nothing in `Board/`, the presenters or the games changes for 3D.
+- **Not yet:** move animation (the front end owns it, from `changed()` and the frame's `delta_time`), Python presenters, sprites and themes per game, undo that skips the opponent's reply (undo takes back one ply, as in the terminal).
 
 ## Resources and compiled assets (Step 7b)
 
@@ -216,4 +236,4 @@ Comparison that shaped this (Unity `Library/`, Godot `.godot/imported`, Bevy `im
 - **Default font.** `Renderer::default_font()` is a `Font` over `BuiltinFontSource`: Inter (SIL OFL, licence in `Text/Builtin/`) embedded as a 16 KB subset (Basic Latin, Latin-1, U+FFFD; weight 450, no hinting or layout tables) and rasterised with stb_truetype on bake, so it is smooth at any pixel height. Always ready; no kerning. `DebugRenderer` uses it until `set_font` replaces it, so debug text needs no assets.
 - **Stats.** `BatchStats::triangles` and `texture_slots_used` feed the overlay.
 - **Hot reload.** `Assets::reload(handle)` keeps the handle and old asset alive, swaps on `Assets::update()` and bumps the revision; `GpuAssetCache` and `Font` poll `(id, revision)` and rebuild lazily. The playground's `R` key reloads its font and PNG this way.
-- **Playground overlay (retired in Step 8).** Was a second `begin_scene` pass with a pixel-unit `Camera2D` (positioned at half the viewport so the origin is bottom-left); `TicTacToeGraphicsBoard` reuses that camera convention.
+- **Playground overlay (retired in Step 8).** Was a second `begin_scene` pass with a pixel-unit `Camera2D` (positioned at half the viewport so the origin is bottom-left); `PresentedGraphicsBoard` reuses that camera convention.

@@ -51,18 +51,18 @@ rules = [
   "headless !-> graphics",
   { rule = "Assets !-> graphics except Assets/**/GpuAssetCache*", why = "only GpuAssetCache may include {target}" },
   { rule = "graphics Text !-> Assets", why = "{module} must not include Assets; fonts reach the renderer through Text/IFontSource" },
-  "Graphics < Shaders < Renderer",
+  "Graphics < Shaders < Renderer < BoardGraphics",
 ]
 
 [boundaries.sets]
-graphics = ["Graphics", "Shaders", "Renderer"]
+graphics = ["Graphics", "Shaders", "Renderer", "BoardGraphics"]
 headless = ["Game", "Strategy", "Simulation", "Core", "Text", "Board"]
 backends = ["**/backends/**"]
 backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']
 
 [[boundaries.artifacts]]
 path = "build/bin/**/libOryx.a"
-deny = '\boryx::(?:Graphics|Shaders|Renderer)::'
+deny = '\boryx::(?:Graphics|Shaders|Renderer|PresentedGraphicsBoard)::'
 requires = ["!graphics"]
 why = "graphics-off library must not export graphics symbols"
 

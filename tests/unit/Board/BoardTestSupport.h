@@ -52,8 +52,30 @@ class FakeGraphicsBoard : public IGraphicsBoard
 public:
     void on_turn(const IState&) override {}
     ActionId poll_action(const IState&) override { return PENDING_ACTION; }
-    void render(double) override {}
+    void update(const BoardInput&, double) override {}
+    void render(const BoardInput&) override {}
     bool shows_moves() const override { return true; }
+};
+
+// Shows DummyGame as a single pile whose moves are menu options ("take1".."take3"), and remembers whose view it last described.
+class FakePresenter : public IBoardPresenter
+{
+public:
+    void describe(const IState& state, PlayerId viewer, BoardView& out) const override
+    {
+        last_viewer = viewer;
+        out.spaces.push_back({ { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f }, SpaceShape::Square, 0, "pile" });
+        out.status = state.is_terminal() ? "over" : "player " + std::to_string(state.current_player() + 1);
+    }
+
+    void action_picks(const IState&, ActionId action, PickList& out) const override
+    {
+        out.push_back({ PickKind::Option, action, "take" + std::to_string(action) });
+    }
+
+    PieceStyle piece_style(PieceKind, PlayerId) const override { return { "o", {}, PieceShape::Disc }; }
+
+    mutable PlayerId last_viewer = -2;
 };
 
 inline UniquePtr<IState> finished_dummy_state()

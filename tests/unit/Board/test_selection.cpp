@@ -101,18 +101,28 @@ TEST_CASE("choose_front_end is Console when headless or graphics are not built")
     CHECK(front_end == FrontEnd::Console);
 }
 
-TEST_CASE("choose_front_end is Graphical only for a game with a graphics board, and resolves the game")
+TEST_CASE("choose_front_end is Graphical only for a game with a graphics board or a presenter, and resolves the game")
 {
-    FrontEnd front_end = FrontEnd::Console;
+    ExtraGame extra;
+    FrontEnd front_end = FrontEnd::Graphical;
     std::string game;
+
+    CHECK(choose_front_end("zz-extra", false, true, front_end, game));
+    CHECK(front_end == FrontEnd::Console);
+    CHECK(game == "zz-extra");
+
     {
-        FakeGraphicsBoardRegistration board("tictactoe");
-        CHECK(choose_front_end("", false, true, front_end, game));
+        FakeGraphicsBoardRegistration board("zz-extra");
+        CHECK(choose_front_end("zz-extra", false, true, front_end, game));
         CHECK(front_end == FrontEnd::Graphical);
-        CHECK(game == "tictactoe");
     }
 
+    BoardPresenterRegistry::register_factory("zz-extra", [](const Params&) -> UniquePtr<IBoardPresenter> { return create_unique<FakePresenter>(); });
+    CHECK(choose_front_end("zz-extra", false, true, front_end, game));
+    CHECK(front_end == FrontEnd::Graphical);
+    BoardPresenterRegistry::unregister_factory("zz-extra");
+
     CHECK(choose_front_end("", false, true, front_end, game));
-    CHECK(front_end == FrontEnd::Console);
+    CHECK(game == "tictactoe");
     CHECK_FALSE(choose_front_end("no-such-game", false, true, front_end, game));
 }

@@ -40,7 +40,7 @@ TEST_CASE("read_console_move returns PENDING_ACTION, never INVALID_ACTION, once 
 
 TEST_CASE("create_console_board falls back to the generic ConsoleBoard for a game without one")
 {
-    UniquePtr<IConsoleBoard> board = create_console_board("no-such-game");
+    UniquePtr<IConsoleBoard> board = create_console_board("no-such-game", kAllSeats);
     REQUIRE(board != nullptr);
     CHECK_FALSE(board->shows_moves());
 }

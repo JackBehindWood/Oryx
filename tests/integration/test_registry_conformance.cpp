@@ -82,7 +82,7 @@ TEST_CASE("Every registered game plays to a terminal state through legal moves, 
     }
 }
 
-TEST_CASE("Every registered strategy returns a legal action in every registered game's initial state")
+TEST_CASE("Every registered strategy returns a legal action in the initial state of every registered game it plays")
 {
     for (const std::string& game_name : GameRegistry::names())
     {
@@ -91,7 +91,7 @@ TEST_CASE("Every registered strategy returns a legal action in every registered 
         {
             continue;
         }
-        for (const std::string& strategy_name : StrategyRegistry::names())
+        for (const std::string& strategy_name : selection::strategies_for(game_name))
         {
             CAPTURE(game_name);
             CAPTURE(strategy_name);
@@ -108,6 +108,48 @@ TEST_CASE("Every registered strategy returns a legal action in every registered 
             Context context(*state);
 
             CHECK(is_legal(*state, strategy->decide(context)));
+        }
+    }
+}
+
+TEST_CASE("Every registered presenter describes its game's states validly, and the picks of each legal action play exactly that action")
+{
+    for (const std::string& name : BoardPresenterRegistry::names())
+    {
+        CAPTURE(name);
+        UniquePtr<IGame> game = try_create_game(name);
+        REQUIRE(game != nullptr);
+        UniquePtr<IBoardPresenter> presenter = BoardPresenterRegistry::create(name);
+        UniquePtr<IState> state = game->new_initial_state();
+
+        for (size_t ply = 0;; ++ply)
+        {
+            BoardView view;
+            presenter->describe(*state, state->current_player(), view);
+            CHECK_NOTHROW(validate_view(view, name));
+            CHECK_FALSE(view.status.empty());
+            if (state->is_terminal())
+            {
+                break;
+            }
+
+            std::vector<MoveCandidate> candidates = collect_candidates(*presenter, *state);
+            MoveBuilder builder;
+            REQUIRE_NOTHROW(builder.reset(candidates));
+            for (const MoveCandidate& candidate : candidates)
+            {
+                ActionId played = INVALID_ACTION;
+                for (const Pick& pick : candidate.picks)
+                {
+                    CHECK((pick.kind != PickKind::Space || pick.value < view.spaces.size()));
+                    CHECK((pick.kind != PickKind::Option || !pick.label.empty()));
+                    played = builder.pick(pick);
+                }
+                CHECK(played == candidate.action);
+            }
+
+            ActionList legal = state->legal_actions();
+            state->apply(legal[ply % legal.size()]);
         }
     }
 }

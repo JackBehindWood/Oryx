@@ -16,10 +16,6 @@ project "Oasis"
         "src/**.cpp"
     }
 
-    if not graphicsEnabled() then
-        removefiles { "src/Oasis/Graphics/**" }
-    end
-
     includedirs {
         "src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",

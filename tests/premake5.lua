@@ -19,7 +19,9 @@ project "Tests"
     -- Oasis's game/strategy sources are compiled in (not the Oasis executable's app/UI code) so their rules are unit-testable.
     files {
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToeGame.cpp",
-        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToeBoardModel.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToePresenter.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/HexapawnGame.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/HexapawnPresenter.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/Options.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Strategy/TicTacToeHeuristicStrategy.cpp",
     }
@@ -46,7 +48,7 @@ project "Tests"
     useOryxPython()
     useOryxGraphics()
     if not graphicsEnabled() then
-        removefiles { "unit/Renderer/**", "unit/Graphics/**", "unit/Shaders/**" }
+        removefiles { "unit/Renderer/**", "unit/Graphics/**", "unit/Shaders/**", "unit/BoardGraphics/**" }
     end
 
     useOryxWholeArchive()
