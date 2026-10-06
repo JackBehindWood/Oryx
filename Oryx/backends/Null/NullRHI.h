@@ -151,7 +151,7 @@ public:
 
     [[nodiscard]] size_t live_resources() const { return RHIResource::live_count(); }
     [[nodiscard]] size_t submit_count() const { return m_submit_count; }
-    [[nodiscard]] const std::vector<RHICommandType>& last_submission() const { return m_last_submission; }
+    [[nodiscard]] const std::vector<std::string_view>& last_submission() const { return m_last_submission; }
     [[nodiscard]] size_t frame_count() const { return m_frame_count; }
     [[nodiscard]] const NullStats& stats() const { return m_stats; }
 
@@ -162,7 +162,7 @@ private:
     // One reusable slot per frame in flight; the slot's capacity survives present.
     std::vector<std::vector<Ref<RHIResource>>> m_frame_slots;
     size_t m_slot = 0;
-    std::vector<RHICommandType> m_last_submission;
+    std::vector<std::string_view> m_last_submission;
     size_t m_submit_count = 0;
     size_t m_frame_count = 0;
     NullStats m_stats;

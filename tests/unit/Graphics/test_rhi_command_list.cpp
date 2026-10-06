@@ -55,6 +55,28 @@ struct CommandListFixture
         list.begin_pass(target.get());
         list.set_pipeline(pipeline.get());
     }
+
+    static constexpr size_t BIND_ALL_COMMANDS = 9;
+
+    void bind_all()
+    {
+        const std::array<float, 16> constants = {};
+        list.set_constants(CONSTANTS, constants.data(), sizeof(constants));
+        list.bind_buffer(UNIFORMS, vertices.get(), 0, 32);
+        for (uint32_t i = 0; i < 4; ++i)
+        {
+            list.bind_texture(TEXTURES, texture.get(), i);
+        }
+        list.bind_sampler(SAMPLER, sampler.get());
+        list.bind_texture(ARRAY_TEXTURE, array_texture.get());
+        list.bind_texture(DEPTH_TEXTURE, depth_sampled.get());
+    }
+
+    void begin_ready()
+    {
+        begin_with_pipeline();
+        bind_all();
+    }
 };
 
 } // namespace
@@ -73,6 +95,12 @@ TEST_CASE("RHICommandList records a full pass in order")
     f.list.bind_buffer(UNIFORMS, f.vertices.get(), 8, 32);
     f.list.bind_texture(TEXTURES, f.texture.get(), 3);
     f.list.bind_sampler(SAMPLER, f.sampler.get());
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        f.list.bind_texture(TEXTURES, f.texture.get(), i);
+    }
+    f.list.bind_texture(ARRAY_TEXTURE, f.array_texture.get());
+    f.list.bind_texture(DEPTH_TEXTURE, f.depth_sampled.get());
     f.list.push_debug_group("group");
     f.list.draw(3, 2, 1, 5);
     f.list.draw_indexed(6, 2, 1, -4, 7);
@@ -84,8 +112,8 @@ TEST_CASE("RHICommandList records a full pass in order")
     {
         commands.push_back(&command);
     }
-    REQUIRE(commands.size() == 15);
-    CHECK(f.list.size() == 15);
+    REQUIRE(commands.size() == 20);
+    CHECK(f.list.size() == 20);
 
     const RHIBeginPassCommand* begin = command_cast<RHIBeginPassCommand>(*commands[0]);
     REQUIRE(begin != nullptr);
@@ -93,7 +121,7 @@ TEST_CASE("RHICommandList records a full pass in order")
     CHECK(begin->pass().colour[0].target == f.target.get());
     CHECK(begin->pass().colour[0].load == RHILoadAction::Clear);
     CHECK(begin->pass().colour[0].clear_colour.r == 1.0f);
-    CHECK(commands[1]->type() == RHICommandType::SetPipeline);
+    CHECK(std::string_view(commands[1]->command_name()) == "SetPipeline");
     CHECK(command_cast<RHISetViewportCommand>(*commands[2])->viewport().width == 4.0f);
     CHECK(command_cast<RHISetScissorCommand>(*commands[3])->scissor().x == 1);
     CHECK(command_cast<RHISetVertexBufferCommand>(*commands[4])->offset() == 8);
@@ -109,19 +137,19 @@ TEST_CASE("RHICommandList records a full pass in order")
     CHECK(&bind_texture->texture() == f.texture.get());
     CHECK(bind_texture->array_index() == 3);
     CHECK(&command_cast<RHIBindSamplerCommand>(*commands[9])->sampler() == f.sampler.get());
-    CHECK(std::string(command_cast<RHIPushDebugGroupCommand>(*commands[10])->name()) == "group");
-    const RHIDrawCommand* draw = command_cast<RHIDrawCommand>(*commands[11]);
+    CHECK(std::string(command_cast<RHIPushDebugGroupCommand>(*commands[15])->name()) == "group");
+    const RHIDrawCommand* draw = command_cast<RHIDrawCommand>(*commands[16]);
     CHECK(draw->vertex_count() == 3);
     CHECK(draw->instance_count() == 2);
     CHECK(draw->first_vertex() == 1);
     CHECK(draw->first_instance() == 5);
-    const RHIDrawIndexedCommand* indexed = command_cast<RHIDrawIndexedCommand>(*commands[12]);
+    const RHIDrawIndexedCommand* indexed = command_cast<RHIDrawIndexedCommand>(*commands[17]);
     CHECK(indexed->instance_count() == 2);
     CHECK(indexed->base_vertex() == -4);
     CHECK(indexed->first_instance() == 7);
-    CHECK(commands[13]->type() == RHICommandType::PopDebugGroup);
-    CHECK(commands[14]->type() == RHICommandType::EndPass);
-    CHECK(command_cast<RHIDrawCommand>(*commands[14]) == nullptr);
+    CHECK(std::string_view(commands[18]->command_name()) == "PopDebugGroup");
+    CHECK(std::string_view(commands[19]->command_name()) == "EndPass");
+    CHECK(command_cast<RHIDrawCommand>(*commands[19]) == nullptr);
     CHECK_FALSE(f.list.in_pass());
 }
 
@@ -159,6 +187,8 @@ TEST_CASE("RHICommandList requires a pipeline to draw or bind")
     f.list.set_pipeline(f.pipeline.get());
     CHECK_THROWS_AS(f.list.draw_indexed(3), Error);
     f.list.set_index_buffer(f.indices.get());
+    CHECK_THROWS_AS(f.list.draw_indexed(3), Error);
+    f.bind_all();
     CHECK_NOTHROW(f.list.draw_indexed(3));
 }
 
@@ -203,20 +233,21 @@ TEST_CASE("RHICommandList clear resets commands and state for reuse")
 TEST_CASE("RHICommandList moves with its commands and state")
 {
     CommandListFixture f;
-    f.begin_with_pipeline();
+    f.begin_ready();
+    const size_t ready = 2 + CommandListFixture::BIND_ALL_COMMANDS;
     RHICommandList moved = std::move(f.list);
-    CHECK(moved.size() == 2);
+    CHECK(moved.size() == ready);
     CHECK(moved.in_pass());
     CHECK_NOTHROW(moved.draw(3));
     moved.end_pass();
-    CHECK(moved.size() == 4);
+    CHECK(moved.size() == ready + 2);
 
     CHECK(f.list.empty());
     CHECK_FALSE(f.list.in_pass());
 
     RHICommandList assigned;
     assigned = std::move(moved);
-    CHECK(assigned.size() == 4);
+    CHECK(assigned.size() == ready + 2);
     CHECK(moved.empty());
 }
 
@@ -251,8 +282,7 @@ public:
 TEST_CASE("RHICommandList execute replays commands into the context in order")
 {
     CommandListFixture f;
-    f.begin_with_pipeline();
-    f.list.bind_sampler(SAMPLER, f.sampler.get());
+    f.begin_ready();
     f.list.push_debug_group("g");
     f.list.draw(3);
     f.list.pop_debug_group();
@@ -260,7 +290,7 @@ TEST_CASE("RHICommandList execute replays commands into the context in order")
 
     RecordingContext context;
     f.list.execute(context);
-    CHECK(context.calls == std::vector<std::string>{ "begin", "pipeline", "bind_sampler", "push", "draw", "pop", "end" });
+    CHECK(context.calls == std::vector<std::string>{ "begin", "pipeline", "constants", "bind_buffer", "bind_texture", "bind_texture", "bind_texture", "bind_texture", "bind_sampler", "bind_texture", "bind_texture", "push", "draw", "pop", "end" });
 }
 
 TEST_CASE("RHICommandList grows past one arena block and is reusable after clear")
@@ -268,13 +298,13 @@ TEST_CASE("RHICommandList grows past one arena block and is reusable after clear
     CommandListFixture f;
     for (int32_t round = 0; round < 2; ++round)
     {
-        f.begin_with_pipeline();
+        f.begin_ready();
         for (int32_t i = 0; i < 5000; ++i)
         {
             f.list.draw(static_cast<uint32_t>(i));
         }
         f.list.end_pass();
-        CHECK(f.list.size() == 5003);
+        CHECK(f.list.size() == 5003 + CommandListFixture::BIND_ALL_COMMANDS);
 
         uint32_t expected = 0;
         for (const RHICommand& command : f.list)

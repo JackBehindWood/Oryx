@@ -43,6 +43,10 @@ void validate_binding(const RHIBindingDesc& binding)
     {
         throw Error("RHI binding array count must be non-zero");
     }
+    if (binding.array_count > RHI_MAX_TEXTURE_BINDINGS)
+    {
+        throw Error("RHI binding array count exceeds the maximum");
+    }
     if (binding.kind == RHIBindingKind::Constants && (binding.size == 0 || binding.size > RHI_MAX_CONSTANTS_SIZE))
     {
         throw Error("RHI constants binding size must be between 1 and 4096 bytes");
@@ -165,7 +169,12 @@ RHIGraphicsPipeline::RHIGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
     , m_colour_format_count(desc.colour_format_count)
     , m_depth_format(desc.depth_format)
     , m_sample_count(desc.sample_count)
+    , m_vertex_slot_mask(0)
 {
+    for (uint32_t i = 0; i < desc.vertex_input.attribute_count; ++i)
+    {
+        m_vertex_slot_mask |= 1u << desc.vertex_input.attributes[i].slot;
+    }
     for (uint32_t i = 0; i < RHI_MAX_COLOUR_TARGETS; ++i)
     {
         m_colour_formats[i] = desc.colour_formats[i];

@@ -57,12 +57,6 @@ public:
     [[nodiscard]] static const RHITexturePtr& white_texture();
     [[nodiscard]] static const RHISamplerPtr& default_sampler();
 
-    [[nodiscard]] static VertexBuffer create_vertex_buffer(const RHIVertexDeclaration& declaration, uint32_t capacity, BufferMode mode) { return VertexBuffer::create(rhi(), declaration, capacity, mode); }
-    [[nodiscard]] static IndexBuffer create_index_buffer(IndexType type, uint32_t capacity, BufferMode mode) { return IndexBuffer::create(rhi(), type, capacity, mode); }
-    [[nodiscard]] static UniformBuffer create_uniform_buffer(uint32_t size) { return UniformBuffer::create(rhi(), size); }
-    [[nodiscard]] static Texture2D create_texture_2d(const Texture2DDesc& desc) { return Texture2D::create(rhi(), desc); }
-    [[nodiscard]] static RenderTarget create_render_target(uint32_t width, uint32_t height, RHIFormat format = RHIFormat::RGBA8Unorm) { return RenderTarget::create(rhi(), width, height, format); }
-
     // Frees memory that can be rebuilt on demand (bulk teardown, mode change, memory pressure); queued draws and held resources are unaffected.
     // release_pipelines makes every GraphicsPipelineHandle stale, so holders acquire their pipelines again afterwards.
     static void release_pipelines();

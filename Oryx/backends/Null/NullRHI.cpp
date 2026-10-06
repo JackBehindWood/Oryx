@@ -428,7 +428,7 @@ void NullRHI::submit(RHICommandList& commands)
     m_last_submission.clear();
     for (const RHICommand& command : commands)
     {
-        m_last_submission.push_back(command.type());
+        m_last_submission.push_back(command.command_name());
     }
     ++m_submit_count;
     commands.drain_into(m_frame_slots[m_slot]);

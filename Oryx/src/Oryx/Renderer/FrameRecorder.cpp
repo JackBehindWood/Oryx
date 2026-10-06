@@ -54,6 +54,8 @@ private:
     std::vector<DrawItem>& m_items;
 };
 
+const uint8_t k_zero_constants[RHI_MAX_CONSTANTS_SIZE] = {};
+
 void bind_textures(RHICommandList& commands, const GraphicsPipeline& pipeline, const DrawItem& item, const DefaultResources& defaults)
 {
     const RHIBindingId binding = pipeline.try_binding(SHADER_TEXTURES_BINDING);
@@ -108,6 +110,10 @@ void record_draw_item(RHICommandList& commands, const DrawItem& item, const Grap
     {
         commands.set_constants(pipeline.binding(SHADER_FRAME_BINDING), item.constants, item.constants_size);
     }
+    else if (const RHIBindingId frame = pipeline.try_binding(SHADER_FRAME_BINDING); frame != RHI_INVALID_BINDING)
+    {
+        commands.set_constants(frame, k_zero_constants, pipeline.rhi().binding(frame).size);
+    }
     bind_textures(commands, pipeline, item, defaults);
     if (item.sampler)
     {
@@ -152,12 +158,31 @@ void record_frame(RendererContext& context)
     {
         BackBufferGuard guard(*context.viewport);
         context.commands.clear();
-        context.commands.begin_pass(back_buffer.get(), { context.clear_colour, true });
-        for (const DrawItem& item : context.items)
         {
-            record_draw_item(context.commands, item, context.pipelines, context.defaults);
+            RHIDebugScope frame(context.commands, "Frame");
+            context.commands.begin_pass(back_buffer.get(), { context.clear_colour, true });
+            {
+                RHIDebugScope pass(context.commands, "BackBuffer Pass");
+                uint32_t batch = 0;
+                for (const DrawItem& item : context.items)
+                {
+                    try
+                    {
+                        record_draw_item(context.commands, item, context.pipelines, context.defaults);
+                    }
+                    catch (const Error& error)
+                    {
+                        if (typeid(error) != typeid(Error))
+                        {
+                            throw;
+                        }
+                        throw Error(std::string(error.what()) + " [Draw Batch " + std::to_string(batch) + "]", error.detail());
+                    }
+                    ++batch;
+                }
+            }
+            context.commands.end_pass();
         }
-        context.commands.end_pass();
         context.rhi->submit(context.commands);
         guard.dismiss();
         context.rhi->present(context.viewport.get());

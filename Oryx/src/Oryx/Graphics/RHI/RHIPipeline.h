@@ -75,6 +75,8 @@ public:
     [[nodiscard]] uint32_t colour_format_count() const { return m_colour_format_count; }
     [[nodiscard]] RHIFormat depth_format() const { return m_depth_format; }
     [[nodiscard]] uint32_t sample_count() const { return m_sample_count; }
+    // Bit n is set when a vertex attribute reads from vertex buffer slot n.
+    [[nodiscard]] uint32_t vertex_slot_mask() const { return m_vertex_slot_mask; }
 
 protected:
     explicit RHIGraphicsPipeline(const RHIGraphicsPipelineDesc& desc);
@@ -84,6 +86,7 @@ private:
     uint32_t m_colour_format_count;
     RHIFormat m_depth_format;
     uint32_t m_sample_count;
+    uint32_t m_vertex_slot_mask;
 };
 
 using RHIGraphicsPipelinePtr = Ref<RHIGraphicsPipeline>;

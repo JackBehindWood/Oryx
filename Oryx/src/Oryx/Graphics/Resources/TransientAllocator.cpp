@@ -31,9 +31,10 @@ TransientAllocator::TransientAllocator(RHIBufferPtr buffer, uint32_t capacity, u
 
 TransientAllocator TransientAllocator::create(IRHI& rhi, uint32_t capacity, RHIBufferUsage usage)
 {
-    const uint32_t aligned = (capacity + REGION_ALIGNMENT - 1) / REGION_ALIGNMENT * REGION_ALIGNMENT;
     const uint32_t region_count = rhi.capabilities().frames_in_flight;
-    RHIBufferPtr buffer = rhi.create_buffer({ .size = aligned * region_count, .usage = usage | RHIBufferUsage::CopySource, .memory = RHIMemory::CpuToGpu, .name = "TransientAllocator" });
+    const uint32_t aligned = checked_buffer_bytes((static_cast<size_t>(capacity) + REGION_ALIGNMENT - 1) / REGION_ALIGNMENT, REGION_ALIGNMENT, 1);
+    const uint32_t size = checked_buffer_bytes(aligned, 1, region_count);
+    RHIBufferPtr buffer = rhi.create_buffer({ .size = size, .usage = usage | RHIBufferUsage::CopySource, .memory = RHIMemory::CpuToGpu, .name = "TransientAllocator" });
     return TransientAllocator(std::move(buffer), aligned, region_count);
 }
 

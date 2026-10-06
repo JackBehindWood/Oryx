@@ -8,6 +8,7 @@
 #include <utility>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <atomic>
 #include <iomanip>
 #include <limits>
@@ -18,6 +19,8 @@
 #include <deque>
 
 #include <typeindex>
+#include <typeinfo>
+#include <exception>
 
 #include <chrono>
 #include <cmath>

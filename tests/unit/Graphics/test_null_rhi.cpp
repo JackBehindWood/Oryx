@@ -38,9 +38,9 @@ TEST_CASE("NullRHI exposes the last submission and submit count")
 
     CHECK(rhi.submit_count() == 1);
     REQUIRE(rhi.last_submission().size() == 3);
-    CHECK(rhi.last_submission()[0] == RHICommandType::BeginPass);
-    CHECK(rhi.last_submission()[1] == RHICommandType::SetVertexBuffer);
-    CHECK(rhi.last_submission()[2] == RHICommandType::EndPass);
+    CHECK(rhi.last_submission()[0] == "BeginPass");
+    CHECK(rhi.last_submission()[1] == "SetVertexBuffer");
+    CHECK(rhi.last_submission()[2] == "EndPass");
 
     list.clear();
     list.begin_pass(back_buffer.get());

@@ -27,61 +27,58 @@ const std::vector<uint8_t>& bytes_of(const RHIBufferPtr& buffer)
 
 } // namespace
 
-TEST_CASE("VertexBuffer::append writes after the cursor and returns the first vertex")
+TEST_CASE("checked_buffer_bytes multiplies within the 32-bit limit and throws past it")
+{
+    CHECK(checked_buffer_bytes(4, 8, 3) == 96);
+    CHECK(checked_buffer_bytes(0, 8, 3) == 0);
+    CHECK(checked_buffer_bytes(0xFFFFFFFFu, 1, 1) == 0xFFFFFFFFu);
+    CHECK_THROWS_AS(checked_buffer_bytes(0x80000000u, 2, 1), Error);
+    CHECK_THROWS_AS(checked_buffer_bytes(0x10000u, 0x10000u, 1), Error);
+    CHECK_THROWS_AS(checked_buffer_bytes(0x40000000u, 1, 4), Error);
+    CHECK_THROWS_AS(checked_buffer_bytes(std::numeric_limits<size_t>::max(), 2, 1), Error);
+}
+
+TEST_CASE("Buffer creation throws instead of wrapping a 32-bit size")
 {
     NullRHI rhi;
-    VertexBuffer buffer = VertexBuffer::create(rhi, layout_for_vertex2(), 8, BufferMode::Dynamic);
-    const Vertex2 first[3] = { { 1, 2 }, { 3, 4 }, { 5, 6 } };
-    const Vertex2 second[2] = { { 7, 8 }, { 9, 10 } };
+    const uint32_t regions = rhi.capabilities().frames_in_flight;
+    const uint32_t huge = 0xFFFFFFFFu / regions + 1;
+    CHECK_THROWS_AS(TransientAllocator::create(rhi, 0xFFFFFFFFu, RHIBufferUsage::Vertex), Error);
+    CHECK_THROWS_AS(TransientAllocator::create(rhi, huge, RHIBufferUsage::Vertex), Error);
+    CHECK_THROWS_AS(VertexBuffer::create(rhi, layout_for_vertex2(), 0x20000000u, BufferMode::Static), Error);
+    CHECK_THROWS_AS(VertexBuffer::create(rhi, layout_for_vertex2(), huge, BufferMode::Dynamic), Error);
+    CHECK_THROWS_AS(IndexBuffer::create(rhi, IndexType::U32, 0x40000000u, BufferMode::Static), Error);
+    CHECK_THROWS_AS(IndexBuffer::create(rhi, IndexType::U16, huge, BufferMode::Dynamic), Error);
+    CHECK_THROWS_AS(UniformBuffer::create(rhi, 0xFFFFFFFFu), Error);
+}
 
-    CHECK(buffer.append(0, first) == 0);
-    CHECK(buffer.append(0, second) == 3);
-    CHECK(buffer.appended(0) == 5);
-    CHECK(buffer.vertex_count() == 5);
-
-    const std::vector<uint8_t>& bytes = bytes_of(buffer.rhi_ptr());
-    float written[10] = {};
-    std::memcpy(written, bytes.data() + buffer.offset(0), sizeof(written));
-    for (uint32_t i = 0; i < 10; ++i)
+TEST_CASE("UniformBuffer has one aligned region per frame in flight")
+{
+    NullRHI rhi;
+    UniformBuffer buffer = UniformBuffer::create(rhi, 24);
+    REQUIRE(buffer.region_count() == rhi.capabilities().frames_in_flight);
+    CHECK(buffer.region_size() == UniformBuffer::REGION_ALIGNMENT);
+    CHECK(buffer.rhi().size() == buffer.region_size() * buffer.region_count());
+    for (uint32_t slot = 0; slot < buffer.region_count(); ++slot)
     {
-        CHECK(written[i] == doctest::Approx(static_cast<float>(i + 1)));
+        CHECK(buffer.offset(slot) == slot * buffer.region_size());
     }
-}
+    CHECK_THROWS_AS(buffer.offset(buffer.region_count()), Error);
 
-TEST_CASE("VertexBuffer::append keeps a cursor per frame slot and reset restarts one")
-{
-    NullRHI rhi;
-    VertexBuffer buffer = VertexBuffer::create(rhi, layout_for_vertex2(), 4, BufferMode::Dynamic);
-    REQUIRE(buffer.region_count() >= 2);
-    const Vertex2 data[2] = {};
-
-    CHECK(buffer.append(0, data) == 0);
-    CHECK(buffer.append(1, data) == 0);
-    CHECK(buffer.append(0, data) == 2);
-    buffer.reset(0);
-    CHECK(buffer.appended(0) == 0);
-    CHECK(buffer.appended(1) == 2);
-    CHECK(buffer.append(0, data) == 0);
-}
-
-TEST_CASE("VertexBuffer::append throws on overflow, wrong stride, Static mode and a bad slot")
-{
-    NullRHI rhi;
-    VertexBuffer buffer = VertexBuffer::create(rhi, layout_for_vertex2(), 4, BufferMode::Dynamic);
-    const Vertex2 three[3] = {};
-    const float wrong[3] = {};
-
-    CHECK_NOTHROW(buffer.append(0, three));
-    CHECK_THROWS_AS(buffer.append(0, three), Error);
-    CHECK(buffer.appended(0) == 3);
-    CHECK_NOTHROW(buffer.append(0, three, 1));
-    CHECK_THROWS_AS(buffer.append(0, three, 1), Error);
-    CHECK_THROWS_AS(buffer.append(0, wrong), Error);
-    CHECK_THROWS_AS(buffer.append(buffer.region_count(), three), Error);
-    CHECK_THROWS_AS(buffer.reset(buffer.region_count()), Error);
-
-    VertexBuffer fixed = VertexBuffer::create(rhi, layout_for_vertex2(), 4, BufferMode::Static);
-    CHECK_THROWS_AS(fixed.append(0, three), Error);
+    for (uint32_t slot = 0; slot < buffer.region_count(); ++slot)
+    {
+        const float value[6] = { static_cast<float>(slot + 1) };
+        buffer.set_data(slot, value);
+    }
+    for (uint32_t slot = 0; slot < buffer.region_count(); ++slot)
+    {
+        float read = 0.0f;
+        std::memcpy(&read, bytes_of(buffer.rhi_ptr()).data() + buffer.offset(slot), sizeof(read));
+        CHECK(read == static_cast<float>(slot + 1));
+    }
+    const float seven[7] = {};
+    CHECK_THROWS_AS(buffer.set_data(0, seven), Error);
+    CHECK_THROWS_AS(buffer.set_data(buffer.region_count(), 1.0f), Error);
 }
 
 TEST_CASE("RHIBuffer::map is persistent for CpuToGpu buffers and throws for GpuOnly")
@@ -202,7 +199,7 @@ TEST_CASE("RHICommandList::copy_buffer records a copy, retains both buffers and 
     CHECK(list.retained_count() == 2);
 
     rhi.submit(list);
-    CHECK(rhi.last_submission() == std::vector<RHICommandType>{ RHICommandType::CopyBuffer });
+    CHECK(rhi.last_submission() == std::vector<std::string_view>{ "CopyBuffer" });
     CHECK(bytes_of(device)[4] == 12);
     CHECK(bytes_of(device)[7] == 15);
     CHECK(bytes_of(device)[3] == 0);

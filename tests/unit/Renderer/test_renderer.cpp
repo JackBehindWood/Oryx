@@ -9,6 +9,24 @@ using namespace oryx;
 namespace
 {
 
+std::vector<std::string_view> without_debug_groups(const std::vector<std::string_view>& submission)
+{
+    std::vector<std::string_view> filtered;
+    for (const std::string_view name : submission)
+    {
+        if (name != "PushDebugGroup" && name != "PopDebugGroup")
+        {
+            filtered.push_back(name);
+        }
+    }
+    return filtered;
+}
+
+} // namespace
+
+namespace
+{
+
 struct RendererGuard
 {
     ~RendererGuard() { Renderer::shutdown(); }
@@ -68,13 +86,26 @@ TEST_CASE("Renderer: init, frame and shutdown")
     CHECK(Renderer::clear_colour() == Colour{ 1.0f, 0.0f, 0.0f, 1.0f });
     Renderer::end_frame();
     CHECK(rhi.submit_count() == 1);
-    CHECK(rhi.last_submission() == std::vector<RHICommandType>{ RHICommandType::BeginPass, RHICommandType::EndPass });
+    CHECK(without_debug_groups(rhi.last_submission()) == std::vector<std::string_view>{ "BeginPass", "EndPass" });
 
     viewport.reset();
     Renderer::set_viewport({});
     Renderer::shutdown();
     CHECK_FALSE(Renderer::initialised());
     Renderer::shutdown();
+}
+
+TEST_CASE("Renderer: a presented frame is bracketed by balanced Frame and BackBuffer Pass debug groups")
+{
+    RendererGuard guard;
+    Renderer::init({ RHIBackend::Null });
+    NullRHI& rhi = static_cast<NullRHI&>(Renderer::rhi());
+    RHIViewportPtr viewport = rhi.create_viewport({ .width = 8, .height = 8 });
+    Renderer::set_viewport(viewport);
+    Renderer::end_frame();
+    CHECK(rhi.last_submission() == std::vector<std::string_view>{ "PushDebugGroup", "BeginPass", "PushDebugGroup", "PopDebugGroup", "EndPass", "PopDebugGroup" });
+    viewport.reset();
+    Renderer::set_viewport({});
 }
 
 TEST_CASE("Renderer: zero-size viewport drops the frame")
@@ -100,15 +131,15 @@ TEST_CASE("Renderer: submitted draws are recorded in order inside one pass")
     Renderer::submit(fixture.solid_item(solid));
     Renderer::end_frame();
 
-    const std::vector<RHICommandType> draw = { RHICommandType::SetPipeline, RHICommandType::SetVertexBuffer, RHICommandType::SetConstants, RHICommandType::Draw };
-    std::vector<RHICommandType> expected = { RHICommandType::BeginPass };
+    const std::vector<std::string_view> draw = { "SetPipeline", "SetVertexBuffer", "SetConstants", "Draw" };
+    std::vector<std::string_view> expected = { "BeginPass" };
     expected.insert(expected.end(), draw.begin(), draw.end());
     expected.insert(expected.end(), draw.begin(), draw.end());
-    expected.push_back(RHICommandType::EndPass);
-    CHECK(fixture.rhi.last_submission() == expected);
+    expected.push_back("EndPass");
+    CHECK(without_debug_groups(fixture.rhi.last_submission()) == expected);
 
     Renderer::end_frame();
-    CHECK(fixture.rhi.last_submission().size() == 2);
+    CHECK(without_debug_groups(fixture.rhi.last_submission()).size() == 2);
 }
 
 TEST_CASE("draw_item_add_texture throws past DRAW_ITEM_MAX_TEXTURES")
@@ -146,14 +177,14 @@ TEST_CASE("Renderer: indexed and textured items record their binds")
     Renderer::submit(item);
     Renderer::end_frame();
 
-    const std::vector<RHICommandType>& commands = fixture.rhi.last_submission();
+    const std::vector<std::string_view>& commands = without_debug_groups(fixture.rhi.last_submission());
     CHECK(commands.size() == 24);
-    CHECK(commands[3] == RHICommandType::SetIndexBuffer);
-    CHECK(commands[4] == RHICommandType::SetConstants);
-    CHECK(commands[5] == RHICommandType::BindTexture);
-    CHECK(commands[20] == RHICommandType::BindTexture);
-    CHECK(commands[21] == RHICommandType::BindSampler);
-    CHECK(commands[22] == RHICommandType::DrawIndexed);
+    CHECK(commands[3] == "SetIndexBuffer");
+    CHECK(commands[4] == "SetConstants");
+    CHECK(commands[5] == "BindTexture");
+    CHECK(commands[20] == "BindTexture");
+    CHECK(commands[21] == "BindSampler");
+    CHECK(commands[22] == "DrawIndexed");
 }
 
 TEST_CASE("Renderer: a bad draw item discards the frame and the next frame recovers")
@@ -166,7 +197,15 @@ TEST_CASE("Renderer: a bad draw item discards the frame and the next frame recov
     DrawItem item = fixture.solid_item(solid);
     item.sampler = fixture.rhi.create_sampler({});
     Renderer::submit(item);
-    CHECK_THROWS_AS(Renderer::end_frame(), Error);
+    try
+    {
+        Renderer::end_frame();
+        FAIL("end_frame did not throw");
+    }
+    catch (const Error& error)
+    {
+        CHECK(std::string(error.what()).find("Draw Batch 0") != std::string::npos);
+    }
     CHECK(fixture.rhi.submit_count() == 0);
 
     Renderer::end_frame();
@@ -250,7 +289,7 @@ struct RecordFixture
         std::vector<const RHIBindTextureCommand*> binds;
         for (const RHICommand& command : commands)
         {
-            if (command.type() == RHICommandType::BindTexture)
+            if (std::string_view(command.command_name()) == "BindTexture")
             {
                 binds.push_back(static_cast<const RHIBindTextureCommand*>(&command));
             }
@@ -258,12 +297,12 @@ struct RecordFixture
         return binds;
     }
 
-    uint32_t count(RHICommandType type) const
+    uint32_t count(std::string_view name) const
     {
         uint32_t total = 0;
         for (const RHICommand& command : commands)
         {
-            total += command.type() == type ? 1 : 0;
+            total += std::string_view(command.command_name()) == name ? 1 : 0;
         }
         return total;
     }
@@ -291,7 +330,7 @@ TEST_CASE("record_draw_item fills unset texture slots with the white default")
         CHECK(binds[i]->array_index() == i);
         CHECK(&binds[i]->texture() == fixture.defaults.white_texture.get());
     }
-    CHECK(fixture.count(RHICommandType::BindSampler) == 1);
+    CHECK(fixture.count("BindSampler") == 1);
 }
 
 TEST_CASE("record_draw_item fills every slot when the item has no textures")
@@ -318,8 +357,8 @@ TEST_CASE("record_draw_item leaves pipelines without texture bindings alone")
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
     record_draw_item(fixture.commands, fixture.item(pipeline_desc(pipeline_def(Primitive2D::Triangle), Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
-    CHECK(fixture.count(RHICommandType::BindTexture) == 0);
-    CHECK(fixture.count(RHICommandType::BindSampler) == 0);
+    CHECK(fixture.count("BindTexture") == 0);
+    CHECK(fixture.count("BindSampler") == 0);
 
     DrawItem textured = fixture.item(pipeline_desc(pipeline_def(Primitive2D::Triangle), Renderer::shaders(), Renderer::back_buffer_format()));
     draw_item_add_texture(textured, fixture.defaults.white_texture);
@@ -342,7 +381,7 @@ TEST_CASE("record_draw_item binds the default sampler only when the item has non
     std::vector<const RHIBindSamplerCommand*> binds;
     for (const RHICommand& command : fixture.commands)
     {
-        if (command.type() == RHICommandType::BindSampler)
+        if (std::string_view(command.command_name()) == "BindSampler")
         {
             binds.push_back(static_cast<const RHIBindSamplerCommand*>(&command));
         }
@@ -387,7 +426,7 @@ TEST_CASE("Renderer: queue capacity survives frames")
             Renderer::submit(fixture.solid_item(solid));
         }
         Renderer::end_frame();
-        CHECK(fixture.rhi.last_submission().size() == 2 + 100 * 4);
+        CHECK(without_debug_groups(fixture.rhi.last_submission()).size() == 2 + 100 * 4);
     }
 }
 
@@ -410,7 +449,7 @@ TEST_CASE("Renderer: releasing pipelines stales handles and the next frame recov
     CHECK_NOTHROW(Renderer::resolve_pipeline(again));
     Renderer::submit(fixture.solid_item(again));
     Renderer::end_frame();
-    CHECK(fixture.rhi.last_submission().size() == 6);
+    CHECK(without_debug_groups(fixture.rhi.last_submission()).size() == 6);
 }
 
 TEST_CASE("Renderer: trim keeps the renderer usable")
@@ -418,11 +457,11 @@ TEST_CASE("Renderer: trim keeps the renderer usable")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     DrawFixture fixture;
-    const std::vector<RHICommandType> before = [&]
+    const std::vector<std::string_view> before = [&]
     {
         Renderer::submit(fixture.solid_item(fixture.solid()));
         Renderer::end_frame();
-        return fixture.rhi.last_submission();
+        return without_debug_groups(fixture.rhi.last_submission());
     }();
 
     Renderer::trim();
@@ -432,7 +471,7 @@ TEST_CASE("Renderer: trim keeps the renderer usable")
 
     Renderer::submit(fixture.solid_item(fixture.solid()));
     Renderer::end_frame();
-    CHECK(fixture.rhi.last_submission() == before);
+    CHECK(without_debug_groups(fixture.rhi.last_submission()) == before);
 
     Renderer::release_shader_cache();
     CHECK(Renderer::shaders().contains<QuadPS>(1));
@@ -451,13 +490,13 @@ TEST_CASE("Renderer: a draw item binds every vertex stream it fills")
     Renderer::end_frame();
 
     uint32_t vertex_binds = 0;
-    for (const RHICommandType type : fixture.rhi.last_submission())
+    for (const std::string_view type : without_debug_groups(fixture.rhi.last_submission()))
     {
-        vertex_binds += type == RHICommandType::SetVertexBuffer ? 1 : 0;
+        vertex_binds += type == "SetVertexBuffer" ? 1 : 0;
     }
     CHECK(vertex_binds == 2);
 
-    VertexBuffer buffer = Renderer::create_vertex_buffer(vertex_declaration<Vertex2DLine>(), 4, BufferMode::Static);
+    VertexBuffer buffer = VertexBuffer::create(Renderer::rhi(), vertex_declaration<Vertex2DLine>(), 4, BufferMode::Static);
     DrawItem staged;
     CHECK_NOTHROW(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS - 1));
     CHECK_THROWS_AS(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS), Error);
@@ -485,11 +524,11 @@ TEST_CASE("Renderer: begin_scene, draw and end_scene record one pass of batched 
     CHECK(Renderer::batch_stats().draws == 4);
 
     Renderer::end_frame();
-    const std::vector<RHICommandType> submission = fixture.rhi.last_submission();
-    CHECK(submission.front() == RHICommandType::BeginPass);
-    CHECK(submission.back() == RHICommandType::EndPass);
-    CHECK(std::count(submission.begin(), submission.end(), RHICommandType::DrawIndexed) == 2);
-    CHECK(std::count(submission.begin(), submission.end(), RHICommandType::Draw) == 2);
+    const std::vector<std::string_view> submission = without_debug_groups(fixture.rhi.last_submission());
+    CHECK(submission.front() == "BeginPass");
+    CHECK(submission.back() == "EndPass");
+    CHECK(std::count(submission.begin(), submission.end(), "DrawIndexed") == 2);
+    CHECK(std::count(submission.begin(), submission.end(), "Draw") == 2);
     CHECK(Renderer::batch_stats().draws == 0);
 
     Renderer::begin_scene(Camera2D(2.0f, 2.0f));

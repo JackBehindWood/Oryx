@@ -122,8 +122,8 @@ void run_resource_checks(IRHI& rhi)
         UniformBuffer buffer = UniformBuffer::create(rhi, 16);
         const float four[4] = {};
         const float five[5] = {};
-        CHECK_NOTHROW(buffer.set_data(four));
-        CHECK_THROWS_AS(buffer.set_data(five), Error);
+        CHECK_NOTHROW(buffer.set_data(0, four));
+        CHECK_THROWS_AS(buffer.set_data(0, five), Error);
         CHECK_THROWS_AS(UniformBuffer::create(rhi, 0), Error);
     }
 
@@ -183,15 +183,15 @@ TEST_CASE("Resources: Metal backend")
 }
 #endif
 
-TEST_CASE("Resources: Renderer forwarders")
+TEST_CASE("Resources: wrappers on the Renderer device")
 {
     Renderer::init({ RHIBackend::Null });
     {
-        VertexBuffer vertices = Renderer::create_vertex_buffer(layout_for_vertex2(), 4, BufferMode::Dynamic);
-        IndexBuffer indices = Renderer::create_index_buffer(IndexType::U16, 6, BufferMode::Static);
-        UniformBuffer uniform = Renderer::create_uniform_buffer(64);
-        Texture2D texture = Renderer::create_texture_2d({ .width = 1, .height = 1 });
-        RenderTarget target = Renderer::create_render_target(4, 4);
+        VertexBuffer vertices = VertexBuffer::create(Renderer::rhi(), layout_for_vertex2(), 4, BufferMode::Dynamic);
+        IndexBuffer indices = IndexBuffer::create(Renderer::rhi(), IndexType::U16, 6, BufferMode::Static);
+        UniformBuffer uniform = UniformBuffer::create(Renderer::rhi(), 64);
+        Texture2D texture = Texture2D::create(Renderer::rhi(), { .width = 1, .height = 1 });
+        RenderTarget target = RenderTarget::create(Renderer::rhi(), 4, 4);
         CHECK(vertices.region_count() == Renderer::rhi().capabilities().frames_in_flight);
         CHECK(Renderer::frame_slot() < Renderer::rhi().capabilities().frames_in_flight);
         CHECK(indices.capacity() == 6);

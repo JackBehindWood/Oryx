@@ -22,7 +22,7 @@ IndexBuffer::IndexBuffer(RHIBufferPtr buffer, IndexType type, uint32_t capacity,
     {
         throw Error("IndexBuffer capacity and region count must be non-zero");
     }
-    if (static_cast<uint64_t>(m_capacity) * index_bytes() * m_region_count > m_buffer->size())
+    if (checked_buffer_bytes(m_capacity, index_bytes(), m_region_count) > m_buffer->size())
     {
         throw Error("IndexBuffer RHI buffer is too small for its regions");
     }
@@ -32,7 +32,7 @@ IndexBuffer IndexBuffer::create(IRHI& rhi, IndexType type, uint32_t capacity, Bu
 {
     const uint32_t region_count = mode == BufferMode::Dynamic ? rhi.capabilities().frames_in_flight : 1;
     const uint32_t index_bytes = type == IndexType::U32 ? 4 : 2;
-    RHIBufferPtr buffer = rhi.create_buffer({ .size = capacity * index_bytes * region_count, .usage = RHIBufferUsage::Index, .memory = RHIMemory::CpuToGpu });
+    RHIBufferPtr buffer = rhi.create_buffer({ .size = checked_buffer_bytes(capacity, index_bytes, region_count), .usage = RHIBufferUsage::Index, .memory = RHIMemory::CpuToGpu });
     return IndexBuffer(std::move(buffer), type, capacity, mode, region_count);
 }
 

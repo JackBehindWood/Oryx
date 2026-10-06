@@ -128,7 +128,10 @@ TEST_CASE("A frame recorded with real pipelines is accepted by NullRHI")
     f.list.set_pipeline(&quad.rhi());
     f.list.set_vertex_buffer(0, f.vertices.get());
     f.list.set_constants(quad.binding("frame"), matrix.data(), sizeof(matrix));
-    f.list.bind_texture(quad.binding("textures"), f.texture.get(), 0);
+    for (uint32_t i = 0; i < quad.rhi().binding(quad.binding("textures")).array_count; ++i)
+    {
+        f.list.bind_texture(quad.binding("textures"), f.texture.get(), i);
+    }
     f.list.bind_sampler(quad.binding("smp"), f.sampler.get());
     f.list.draw(6);
     f.list.end_pass();
@@ -163,9 +166,9 @@ TEST_CASE("A pipeline with two vertex streams records both buffers")
     f.rhi.submit(f.list);
 
     uint32_t vertex_binds = 0;
-    for (const RHICommandType type : f.rhi.last_submission())
+    for (const std::string_view type : f.rhi.last_submission())
     {
-        vertex_binds += type == RHICommandType::SetVertexBuffer ? 1 : 0;
+        vertex_binds += type == "SetVertexBuffer" ? 1 : 0;
     }
     CHECK(vertex_binds == 2);
 }
