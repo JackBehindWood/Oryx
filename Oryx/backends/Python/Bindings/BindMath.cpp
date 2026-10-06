@@ -11,11 +11,11 @@ namespace
 {
 
 // Adding a vector or matrix type is one line in these tables; the Python name, operators and buffer come from the templates in BindMath.h.
-constexpr std::array<void (*)(py::module_&), 3> kVectors = {
+constexpr std::array<void (*)(py::module_&), 3> k_vectors = {
     &bind_vector<2, double>, &bind_vector<3, double>, &bind_vector<4, double>,
 };
 
-constexpr std::array<void (*)(py::module_&), 3> kMatrices = {
+constexpr std::array<void (*)(py::module_&), 3> k_matrices = {
     &bind_matrix<2, 2, double>, &bind_matrix<3, 3, double>, &bind_matrix<4, 4, double>,
 };
 
@@ -36,7 +36,7 @@ void bind_scalar_functions(py::module_& module)
 }
 
 // Constants and functions that belong to no type: one line each in bind_scalar_functions.
-constexpr std::array<void (*)(py::module_&), 1> kOneOffs = {
+constexpr std::array<void (*)(py::module_&), 1> k_one_offs = {
     &bind_scalar_functions,
 };
 
@@ -45,15 +45,15 @@ constexpr std::array<void (*)(py::module_&), 1> kOneOffs = {
 void bind_math(py::module_& module)
 {
     py::module_ math_module = module.def_submodule("math", "Vectors and matrices of doubles, and scalar helpers.");
-    for (void (*binder)(py::module_&) : kVectors)
+    for (void (*binder)(py::module_&) : k_vectors)
     {
         binder(math_module);
     }
-    for (void (*binder)(py::module_&) : kMatrices)
+    for (void (*binder)(py::module_&) : k_matrices)
     {
         binder(math_module);
     }
-    for (void (*binder)(py::module_&) : kOneOffs)
+    for (void (*binder)(py::module_&) : k_one_offs)
     {
         binder(math_module);
     }

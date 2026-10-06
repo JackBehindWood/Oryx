@@ -12,21 +12,31 @@ concurrency:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    name: build (${{ matrix.os }}, python ${{ matrix.python }}, CPython ${{ matrix.py }})
+    name: build (${{ matrix.os }}, python ${{ matrix.python }}, CPython ${{ matrix.py }}, graphics ${{ matrix.graphics }})
     env:
       # Managed CPython ships a shared libpython, which the embedded scripting backend links.
       UV_PYTHON_PREFERENCE: only-managed
-      BUILD_FLAGS: ${{ matrix.python == 'off' && '--without python' || '' }}
+      BUILD_FLAGS: ${{ format('{0} {1}', matrix.python == 'off' && '--without python' || '', matrix.graphics == 'off' && '--without graphics' || '') }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python: ["on", "off"]
         py: ["3.11"]
+        graphics: ["on"]
         include:
+          - os: ubuntu-latest
+            python: "on"
+            py: "3.11"
+            graphics: "off"
+          - os: macos-latest
+            python: "on"
+            py: "3.11"
+            graphics: "off"
           # Newest CPython: annotations are evaluated lazily from 3.14 on.
           - os: ubuntu-latest
             python: "on"
             py: "3.14"
+            graphics: "on"
 
     steps:
     - uses: actions/checkout@v4
@@ -37,6 +47,14 @@ jobs:
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+
+    - name: Cache slangc
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pyforge/deps/slang
+          ~/Library/Caches/pyforge/deps/slang
+        key: slangc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('forge.toml') }}
 
     - name: Set up build environment (Ubuntu)
       if: runner.os == 'Linux'
@@ -53,8 +71,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ runner.os == 'macOS' && '~/Library/Caches/ccache' || '~/.cache/ccache' }}
-        key: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-${{ github.sha }}
-        restore-keys: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-
+        key: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-${{ github.sha }}
+        restore-keys: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-
 
     - name: Select CPython
       run: echo "UV_PYTHON=${{ matrix.py }}" >> "$GITHUB_ENV"
@@ -74,14 +92,17 @@ jobs:
     - name: Configure and compile
       run: uv run forge $BUILD_FLAGS compile
 
+    - name: Check boundaries (includes, and graphics-off symbols)
+      run: uv run forge $BUILD_FLAGS boundaries check --artifacts
+
     - name: ccache statistics
       run: ccache -s
 
     - name: Test (unit, integration, python when enabled)
       run: uv run forge $BUILD_FLAGS test
 
-    - name: Run Oasis sandbox
-      run: uv run forge $BUILD_FLAGS run
+    - name: Run Oasis sandbox (headless, non-interactive)
+      run: uv run forge $BUILD_FLAGS run -- --no-window --simulate=random,first-legal,10
 
     - name: Benchmark smoke run
       run: |

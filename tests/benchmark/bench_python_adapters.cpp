@@ -12,11 +12,11 @@ using namespace oryx::test;
 namespace
 {
 
-constexpr int64_t kCalls = 200'000;
-constexpr int32_t kDecisions = 40;
-constexpr int64_t kPlayoutsPerDecision = 90;
+constexpr int64_t k_calls = 200'000;
+constexpr int32_t k_decisions = 40;
+constexpr int64_t k_playouts_per_decision = 90;
 
-constexpr const char* kFirstLegalStrategy = R"(
+constexpr const char* k_first_legal_strategy = R"(
 import oryx
 
 class BenchFirst(oryx.Strategy, id="bench-first"):
@@ -71,19 +71,19 @@ TEST_CASE("Benchmark: Python adapter calls on a Python Nim state")
     RunningPython python;
     python.load(repo_file("Oasis/scripts/nim.py"));
 
-    UniquePtr<IGame> game = create_game("nim", Params{ { "stones", kCalls + 10 }, { "max_take", int64_t{ 3 } } });
+    UniquePtr<IGame> game = create_game("nim", Params{ { "stones", k_calls + 10 }, { "max_take", int64_t{ 3 } } });
     UniquePtr<IState> state = game->new_initial_state();
     volatile size_t sink = 0;
 
-    std::cout << "\nPython Nim state adapter (" << kCalls << " calls each)\n";
-    print_ns("legal_actions", ns_per_call(kCalls, [&] { sink += state->legal_actions().size(); }));
-    print_ns("current_player", ns_per_call(kCalls, [&] { sink += static_cast<size_t>(state->current_player()); }));
-    print_ns("is_terminal", ns_per_call(kCalls, [&] { sink += state->is_terminal() ? 1 : 0; }));
-    print_ns("outcome", ns_per_call(kCalls, [&] { sink += state->outcome().rewards.player_count(); }));
-    print_ns("action_to_string", ns_per_call(kCalls, [&] { sink += state->action_to_string(1).size(); }));
-    print_ns("apply", ns_per_call(kCalls, [&] { state->apply(1); }));
-    print_ns("undo", ns_per_call(kCalls, [&] { state->undo(1); }));
-    print_ns("apply+undo pair", ns_per_call(kCalls, [&] { state->apply(1); state->undo(1); }));
+    std::cout << "\nPython Nim state adapter (" << k_calls << " calls each)\n";
+    print_ns("legal_actions", ns_per_call(k_calls, [&] { sink += state->legal_actions().size(); }));
+    print_ns("current_player", ns_per_call(k_calls, [&] { sink += static_cast<size_t>(state->current_player()); }));
+    print_ns("is_terminal", ns_per_call(k_calls, [&] { sink += state->is_terminal() ? 1 : 0; }));
+    print_ns("outcome", ns_per_call(k_calls, [&] { sink += state->outcome().rewards.player_count(); }));
+    print_ns("action_to_string", ns_per_call(k_calls, [&] { sink += state->action_to_string(1).size(); }));
+    print_ns("apply", ns_per_call(k_calls, [&] { state->apply(1); }));
+    print_ns("undo", ns_per_call(k_calls, [&] { state->undo(1); }));
+    print_ns("apply+undo pair", ns_per_call(k_calls, [&] { state->apply(1); state->undo(1); }));
 
     CHECK(state->legal_actions().size() == 3);
 }
@@ -93,7 +93,7 @@ TEST_CASE("Benchmark: Python strategy decide() overhead")
     TempDir dir;
     RunningPython python;
     python.load(repo_file("Oasis/scripts/nim.py"));
-    python.load(dir.write("bench_first.py", kFirstLegalStrategy));
+    python.load(dir.write("bench_first.py", k_first_legal_strategy));
 
     UniquePtr<IGame> game = create_game("nim", Params{ { "stones", int64_t{ 21 } }, { "max_take", int64_t{ 3 } } });
     UniquePtr<IState> state = game->new_initial_state();
@@ -101,8 +101,8 @@ TEST_CASE("Benchmark: Python strategy decide() overhead")
     UniquePtr<IStrategy> strategy = StrategyRegistry::create("bench-first", {});
     volatile size_t sink = 0;
 
-    std::cout << "\nPython strategy decide() (" << kCalls / 4 << " calls)\n";
-    print_ns("decide (first legal action)", ns_per_call(kCalls / 4, [&] { sink += strategy->decide(context); }));
+    std::cout << "\nPython strategy decide() (" << k_calls / 4 << " calls)\n";
+    print_ns("decide (first legal action)", ns_per_call(k_calls / 4, [&] { sink += strategy->decide(context); }));
 }
 
 TEST_CASE("Benchmark: Python Monte Carlo strategy")
@@ -118,15 +118,15 @@ TEST_CASE("Benchmark: Python Monte Carlo strategy")
 
     Clock::time_point start = Clock::now();
     ActionId action = 0;
-    for (int32_t i = 0; i < kDecisions; ++i)
+    for (int32_t i = 0; i < k_decisions; ++i)
     {
         action = strategy->decide(context);
     }
     double seconds = nanoseconds_since(start) / 1e9;
 
     std::cout << "\nPython Monte Carlo on Python Nim (21 stones, 30 playouts x 3 actions per decision)\n";
-    std::cout << "  " << static_cast<double>(kDecisions) / seconds << " decisions/s, "
-              << static_cast<double>(kDecisions * kPlayoutsPerDecision) / seconds << " playouts/s\n";
+    std::cout << "  " << static_cast<double>(k_decisions) / seconds << " decisions/s, "
+              << static_cast<double>(k_decisions * k_playouts_per_decision) / seconds << " playouts/s\n";
     CHECK(is_valid(action));
 }
 

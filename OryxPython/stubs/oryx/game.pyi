@@ -97,6 +97,11 @@ class StateHandle:
         ...
     def undo(self, action: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
+    @property
+    def native(self) -> typing.Any:
+        """
+        The script's own state object (read it, do not change it); None for a state implemented in C++.
+        """
 class Strategy:
     """
     Base class of strategies defined in Python: `class Greedy(oryx.Strategy, id="greedy")` registers on import.

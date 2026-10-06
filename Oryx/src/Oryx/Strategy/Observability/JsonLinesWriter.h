@@ -5,7 +5,7 @@
 namespace oryx
 {
 
-constexpr int32_t kTraceSchemaVersion = 1;
+constexpr int32_t k_trace_schema_version = 1;
 
 // One JSON object per decision behind a {"schema_version": N} header line; the stream must outlive the writer.
 class JsonLinesWriter : public IDecisionObserver

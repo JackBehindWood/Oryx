@@ -43,8 +43,11 @@ def test_matrices_multiply_transpose_and_invert():
     with pytest.raises(IndexError, match="index out of range"):
         a[2, 0]
 
-    assert hasattr(m.Mat4, "determinant") is False
-    assert hasattr(m.Mat3, "inverse") is True
+    scaled = m.Mat4.identity() * 2
+    assert scaled.determinant() == 16.0
+    assert scaled.inverse() * 2 == m.Mat4.identity()
+    with pytest.raises(oryx.OryxError, match="Mat4 is singular and cannot be inverted"):
+        (m.Mat4.identity() * 0).inverse()
 
 
 def test_vectors_and_matrices_expose_the_buffer_protocol():

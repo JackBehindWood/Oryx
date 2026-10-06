@@ -9,10 +9,16 @@
 #include "doctest.h"
 
 #include "Oryx.h"
+#ifdef OX_ENABLE_GRAPHICS
+#include "Oryx/Shaders/Source/ShaderSettings.h"
+#endif
 
 int main(int argc, char** argv)
 {
     oryx::init();
+#ifdef OX_ENABLE_GRAPHICS
+    oryx::update_settings<oryx::ShaderSettings>([](oryx::ShaderSettings& settings) { settings.error_fallback = false; });
+#endif
 
     doctest::Context context;
     context.applyCommandLine(argc, argv);

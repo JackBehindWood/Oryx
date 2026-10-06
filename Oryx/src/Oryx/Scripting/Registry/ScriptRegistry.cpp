@@ -126,10 +126,16 @@ void register_scripted_strategy(const std::string& id, const ScriptOrigin& origi
     register_scripted<IStrategy>("strategy", id, origin, std::move(factory), std::move(info), overwrite);
 }
 
+void register_scripted_console_board(const std::string& game, const ScriptOrigin& origin, ConsoleBoardRegistry::Factory factory, EntryInfo info, bool overwrite)
+{
+    register_scripted<IConsoleBoard>("console board", game, origin, std::move(factory), std::move(info), overwrite);
+}
+
 void unregister_scripted(const std::string& language)
 {
     unregister_language<IGame>(language);
     unregister_language<IStrategy>(language);
+    unregister_language<IConsoleBoard>(language);
 }
 
 const ScriptOrigin* scripted_game_origin(const std::string& id)
@@ -141,6 +147,12 @@ const ScriptOrigin* scripted_game_origin(const std::string& id)
 const ScriptOrigin* scripted_strategy_origin(const std::string& id)
 {
     const ScriptedEntry<IStrategy>* entry = find_scripted<IStrategy>(id);
+    return entry == nullptr ? nullptr : &entry->origin;
+}
+
+const ScriptOrigin* scripted_console_board_origin(const std::string& game)
+{
+    const ScriptedEntry<IConsoleBoard>* entry = find_scripted<IConsoleBoard>(game);
     return entry == nullptr ? nullptr : &entry->origin;
 }
 

@@ -8,13 +8,19 @@
 #include <utility>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <atomic>
 #include <iomanip>
 #include <limits>
+#include <mutex>
+#include <cstring>
 #include <cstdio>
 #include <functional>
+#include <deque>
 
 #include <typeindex>
+#include <typeinfo>
+#include <exception>
 
 #include <chrono>
 #include <cmath>
@@ -35,6 +41,8 @@
 #include <variant>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <cctype>
 
 #include "Oryx/Core/Base.h"
 

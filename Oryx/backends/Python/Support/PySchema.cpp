@@ -102,7 +102,7 @@ void add_or_replace(ParamSchema& schema, ParamSpec spec)
 ScriptOrigin origin_of_class(const py::handle& cls)
 {
     ScriptOrigin origin;
-    origin.language = kLanguage;
+    origin.language = k_language;
     origin.module = cls.attr("__module__").cast<std::string>();
 
     py::object modules = py::module_::import("sys").attr("modules");

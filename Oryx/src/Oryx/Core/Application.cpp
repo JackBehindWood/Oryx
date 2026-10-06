@@ -1,6 +1,8 @@
 #include "oxpch.h"
 #include "Oryx/Core/Application.h"
+#include "Oryx/Assets/Assets.h"
 #include "Oryx/Core/Error.h"
+#include "Oryx/Events/WindowEvent.h"
 
 namespace oryx 
 {
@@ -70,10 +72,33 @@ Application::~Application()
 
 void Application::run()
 {
+    m_timer.start();
     while (m_running)
     {
-        m_layer_stack.update();
+        Assets::update();
+        m_layer_stack.update(m_timer.tick());
     }
+}
+
+Window& Application::create_window(WindowDesc desc)
+{
+    return adopt_window(Window::create(std::move(desc)));
+}
+
+Window& Application::adopt_window(UniquePtr<Window> window)
+{
+    m_window = std::move(window);
+    return *m_window;
+}
+
+void Application::on_event(Event& event)
+{
+    EventDispatcher dispatcher(event);
+    dispatcher.dispatch<WindowCloseEvent>([this](WindowCloseEvent&)
+    {
+        close();
+        return false;
+    });
 }
 
 void Application::post_event(Event& event)

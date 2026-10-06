@@ -15,7 +15,7 @@ namespace
 {
 
 // Must be __STDCPP_DEFAULT_NEW_ALIGNMENT__, not alignof(std::max_align_t): on Apple Clang/AArch64 the two differ (16 vs 8).
-constexpr size_t kDefaultAlignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
+constexpr size_t k_default_alignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
 
 // Sized by the platform, not a header of ours: libc++'s dylib allocates some blocks with the platform allocator that reach our delete.
 size_t usable_size(void* pointer)
@@ -31,7 +31,7 @@ size_t usable_size(void* pointer)
 
 void* platform_allocate(size_t size, size_t alignment) noexcept
 {
-    if (alignment <= kDefaultAlignment)
+    if (alignment <= k_default_alignment)
     {
         return std::malloc(size);
     }
@@ -45,7 +45,7 @@ void* platform_allocate(size_t size, size_t alignment) noexcept
 size_t platform_size(void* pointer, size_t alignment)
 {
 #if defined(_WIN32)
-    if (alignment > kDefaultAlignment)
+    if (alignment > k_default_alignment)
     {
         return _aligned_msize(pointer, alignment, 0);
     }
@@ -57,7 +57,7 @@ size_t platform_size(void* pointer, size_t alignment)
 void platform_free(void* pointer, size_t alignment) noexcept
 {
 #if defined(_WIN32)
-    if (alignment > kDefaultAlignment)
+    if (alignment > k_default_alignment)
     {
         _aligned_free(pointer);
         return;
@@ -79,7 +79,7 @@ void* tracked_allocate(size_t size, size_t alignment) noexcept
     return pointer;
 }
 
-void tracked_free(void* pointer, size_t alignment = kDefaultAlignment) noexcept
+void tracked_free(void* pointer, size_t alignment = k_default_alignment) noexcept
 {
     if (pointer == nullptr)
     {
@@ -107,10 +107,10 @@ size_t to_size(std::align_val_t alignment)
 
 } // namespace
 
-void* operator new(size_t size) { return allocate_or_throw(size, kDefaultAlignment); }
-void* operator new[](size_t size) { return allocate_or_throw(size, kDefaultAlignment); }
-void* operator new(size_t size, const std::nothrow_t&) noexcept { return tracked_allocate(size, kDefaultAlignment); }
-void* operator new[](size_t size, const std::nothrow_t&) noexcept { return tracked_allocate(size, kDefaultAlignment); }
+void* operator new(size_t size) { return allocate_or_throw(size, k_default_alignment); }
+void* operator new[](size_t size) { return allocate_or_throw(size, k_default_alignment); }
+void* operator new(size_t size, const std::nothrow_t&) noexcept { return tracked_allocate(size, k_default_alignment); }
+void* operator new[](size_t size, const std::nothrow_t&) noexcept { return tracked_allocate(size, k_default_alignment); }
 
 void* operator new(size_t size, std::align_val_t alignment) { return allocate_or_throw(size, to_size(alignment)); }
 void* operator new[](size_t size, std::align_val_t alignment) { return allocate_or_throw(size, to_size(alignment)); }

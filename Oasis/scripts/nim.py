@@ -44,3 +44,13 @@ class Nim(oryx.Game, id="nim"):
 
     def new_initial_state(self):
         return NimState(self.stones, self.max_take)
+
+
+class NimBoard(oryx.ConsoleBoard, game="nim"):
+    """Shows the pile as stones; moves use the generic prompt."""
+
+    shows_moves = False
+
+    def on_turn(self, state):
+        stones = state.native.stones
+        print(f"Pile: {'O ' * stones}({stones})", flush=True)

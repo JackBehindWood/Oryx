@@ -11,10 +11,10 @@ namespace oryx::python
 namespace
 {
 
-constexpr int32_t kLoggingInfo = 20;
-constexpr int32_t kLoggingWarning = 30;
-constexpr int32_t kLoggingError = 40;
-constexpr int32_t kLoggingCritical = 50;
+constexpr int32_t k_logging_info = 20;
+constexpr int32_t k_logging_warning = 30;
+constexpr int32_t k_logging_error = 40;
+constexpr int32_t k_logging_critical = 50;
 
 template<spdlog::level::level_enum Level>
 void log_at(std::string_view message)
@@ -24,19 +24,19 @@ void log_at(std::string_view message)
 
 spdlog::level::level_enum level_from_logging(int32_t logging_level)
 {
-    if (logging_level >= kLoggingCritical)
+    if (logging_level >= k_logging_critical)
     {
         return spdlog::level::critical;
     }
-    if (logging_level >= kLoggingError)
+    if (logging_level >= k_logging_error)
     {
         return spdlog::level::err;
     }
-    if (logging_level >= kLoggingWarning)
+    if (logging_level >= k_logging_warning)
     {
         return spdlog::level::warn;
     }
-    if (logging_level >= kLoggingInfo)
+    if (logging_level >= k_logging_info)
     {
         return spdlog::level::info;
     }

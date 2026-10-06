@@ -15,13 +15,13 @@ LayerStack::~LayerStack()
     }
 }
 
-void LayerStack::update()
+void LayerStack::update(double delta_time)
 {
     for (LayerPtr& layer : m_layers)
     {
         if (!layer->is_disabled())
         {
-            invoke(*layer, "update", [&layer] { layer->update(); });
+            invoke(*layer, "update", [&layer, delta_time] { layer->update(delta_time); });
         }
     }
 }

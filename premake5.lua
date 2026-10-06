@@ -4,6 +4,7 @@
 include "premake/forge.lua"
 include "premake/oryx.lua"
 include "premake/python.lua"
+include "premake/graphics.lua"
 
 workspace "oryx"
 	startproject "Oryx"
@@ -42,6 +43,7 @@ workspace "oryx"
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 forge.on_dependency(useOryxPythonPIC)
+forge.on_dependency(useOryxGlfw)
 
 group "Dependencies"
     forge.dependency_projects()

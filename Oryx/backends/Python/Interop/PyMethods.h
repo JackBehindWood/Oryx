@@ -50,6 +50,8 @@ public:
     {
         PyRef function;
         PyRef name;
+        // False for a method the class does not define (a base class's placeholder does not count).
+        bool defined = false;
     };
 
     PyRef type;
@@ -113,5 +115,6 @@ Result call_method(const PyScriptObject& object, const PyClassMethods& methods, 
 using StateMethods = PyMethods<"state", 6, "legal_actions", "apply", "undo", "current_player", "is_terminal", "outcome", "action_to_string">;
 using GameMethods = PyMethods<"game", 1, "new_initial_state">;
 using StrategyMethods = PyMethods<"strategy", 1, "decide">;
+using BoardMethods = PyMethods<"board", 0, "on_turn", "poll_action">;
 
 } // namespace oryx::python

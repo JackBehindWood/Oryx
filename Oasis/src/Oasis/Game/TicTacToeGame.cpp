@@ -3,7 +3,7 @@
 namespace {
 
 // Row/col triples for the 8 winning lines: 3 rows, 3 columns, 2 diagonals.
-constexpr size_t kLines[8][3][2] = {
+constexpr size_t k_lines[8][3][2] = {
     { { 0, 0 }, { 0, 1 }, { 0, 2 } },
     { { 1, 0 }, { 1, 1 }, { 1, 2 } },
     { { 2, 0 }, { 2, 1 }, { 2, 2 } },
@@ -34,8 +34,8 @@ oryx::ActionList TicTacToeState::legal_actions() const
             }
         }
     }
-    // Trips if this ever changes shape - kActionListInlineCapacity is measured from this exact board (docs/design/quality.md, decision-log.md).
-    OX_CORE_ASSERT(actions.size() <= oryx::kActionListInlineCapacity, "TicTacToe legal_actions() exceeded ActionList's inline capacity");
+    // Trips if this ever changes shape - k_action_list_inline_capacity is measured from this exact board (docs/design/quality.md, decision-log.md).
+    OX_CORE_ASSERT(actions.size() <= oryx::k_action_list_inline_capacity, "TicTacToe legal_actions() exceeded ActionList's inline capacity");
     return actions;
 }
 
@@ -57,7 +57,7 @@ void TicTacToeState::undo(oryx::ActionId action)
 
 Mark TicTacToeState::winner() const
 {
-    for (const auto& line : kLines)
+    for (const auto& line : k_lines)
     {
         Mark first = m_board.at(line[0][0], line[0][1]);
         if (first == Mark::Empty)

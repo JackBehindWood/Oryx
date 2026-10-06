@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Oryx/Core/LayerStack.h"
+#include "Oryx/Core/Timer.h"
+#include "Oryx/Core/Window.h"
+#include "Oryx/Events/ApplicationEvent.h"
 #include "Oryx/Events/Event.h"
 
 namespace oryx
@@ -37,13 +40,21 @@ public:
 
     void close(int32_t exit_code = 0)
     {
-        m_running = false;
         if (m_exit_code == 0)
         {
             m_exit_code = exit_code;
         }
+
+        if (m_running)
+        {
+            m_running = false;
+            ApplicationCloseEvent event(m_exit_code);
+            post_event(event);
+        }
     }
 
+    // True once close() has run, directly or via a WindowCloseEvent; the loop ends after the current frame.
+    [[nodiscard]] bool closing() const { return !m_running; }
     [[nodiscard]] int32_t exit_code() const { return m_exit_code; }
 
     template<typename T, typename... Args>
@@ -54,11 +65,15 @@ public:
 
     void post_event(Event& event);
 
+    Window& create_window(WindowDesc desc);
+    Window& adopt_window(UniquePtr<Window> window);
+    [[nodiscard]] Window* window() { return m_window.get(); }
+
     static Application& Get() { return *s_instance; }
 
 protected:
-    // Runs before the layer stack sees the event, so a concrete Application (not itself a Layer) can react to it.
-    virtual void on_event(Event&) {}
+    // Runs before the layer stack sees the event, so a concrete Application (not itself a Layer) can react to it; overrides must call Application::on_event.
+    virtual void on_event(Event& event);
 
     // Runs after LayerStack disabled a layer that threw in attach/update/event; the default keeps the application running.
     virtual void on_layer_disabled(Layer&, std::string_view /*phase*/) {}
@@ -66,7 +81,10 @@ protected:
 private:
     bool m_running = true;
     int32_t m_exit_code = 0;
+    // Declared before the layer stack so layers detach while the window is still alive.
+    UniquePtr<Window> m_window;
     LayerStack m_layer_stack;
+    Timer m_timer;
 
     static Application* s_instance;
 };

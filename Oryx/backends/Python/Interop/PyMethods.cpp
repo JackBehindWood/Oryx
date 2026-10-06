@@ -91,6 +91,7 @@ SharedPtr<const PyClassMethods> class_methods_for(PyObject* type, const void* se
         {
             throw ScriptError(std::string(owner) + " class '" + reinterpret_cast<PyTypeObject*>(type)->tp_name + "' must define " + name + "()");
         }
+        entry.defined = defined;
         if (defined)
         {
             entry.function = plain_function_of(raw.get());

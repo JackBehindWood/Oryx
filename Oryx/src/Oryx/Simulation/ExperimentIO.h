@@ -6,9 +6,9 @@
 namespace oryx
 {
 
-constexpr int32_t kResultSchemaVersion = 1;
-constexpr const char* kResultFileName = "result.yaml";
-constexpr const char* kTrialsFileName = "trials.csv";
+constexpr int32_t k_result_schema_version = 1;
+constexpr const char* k_result_file_name = "result.yaml";
+constexpr const char* k_trials_file_name = "trials.csv";
 
 // Writes result.yaml (version, spec, metadata, per-matchup summary) and a streamed trials.csv into `directory`.
 void save_result(const ExperimentResult& result, const std::filesystem::path& directory);

@@ -82,6 +82,25 @@ private:
     uint32_t m_pile_size;
 };
 
+class CallbackActionSource : public IActionSource
+{
+public:
+    explicit CallbackActionSource(std::function<ActionId(const Context&)> callback)
+        : m_callback(std::move(callback))
+    {
+    }
+
+    ActionId next_action(const Context& context) override { return m_callback(context); }
+
+private:
+    std::function<ActionId(const Context&)> m_callback;
+};
+
+inline UniquePtr<ExternalStrategy> make_external(std::function<ActionId(const Context&)> callback)
+{
+    return create_unique<ExternalStrategy>(create_shared<CallbackActionSource>(std::move(callback)));
+}
+
 class DummyGreedyStrategy : public IStrategy
 {
 public:

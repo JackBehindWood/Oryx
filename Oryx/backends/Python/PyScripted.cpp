@@ -127,4 +127,58 @@ ActionId PyScriptedStrategy::decide(const Context& context)
     return action;
 }
 
+PyScriptedConsoleBoard::PyScriptedConsoleBoard(PyRef board, SharedPtr<const ScriptOrigin> origin)
+    : PyAdapter(std::move(board), std::move(origin))
+{
+    PyGil gil;
+    PyRef shows = PyRef::steal(PyObject_GetAttrString(m_object.get(), "shows_moves"));
+    if (!shows)
+    {
+        PyErr_Clear();
+        return;
+    }
+    if (!PyConvert<bool>::from_py(shows.get(), m_shows_moves))
+    {
+        throw_wrong_type(std::string(Py_TYPE(m_object.get())->tp_name) + ".shows_moves", PyConvert<bool>::expected, shows.get());
+    }
+}
+
+void PyScriptedConsoleBoard::on_turn(const IState& state)
+{
+    if (!defines<"on_turn">())
+    {
+        m_fallback.on_turn(state);
+        return;
+    }
+
+    PyGil gil;
+    SharedPtr<ScriptLease> lease = create_shared<ScriptLease>();
+    PyRef lent = PyRef::steal(py::cast(create_shared<PyState>(const_cast<IState&>(state), lease, StateAccess::ReadOnly)).release().ptr());
+    LeaseScope scope(*lease);
+    call<"on_turn">(lent);
+}
+
+ActionId PyScriptedConsoleBoard::poll_action(const IState& state)
+{
+    if (!defines<"poll_action">())
+    {
+        return m_fallback.poll_action(state);
+    }
+
+    PyGil gil;
+    SharedPtr<ScriptLease> lease = create_shared<ScriptLease>();
+    PyRef lent = PyRef::steal(py::cast(create_shared<PyState>(const_cast<IState&>(state), lease, StateAccess::ReadOnly)).release().ptr());
+    ActionId action = 0;
+    {
+        LeaseScope scope(*lease);
+        action = call<"poll_action", ActionId>(lent);
+    }
+
+    if (action != PENDING_ACTION && action != UNDO_ACTION)
+    {
+        check_legal(state, action, "board.poll_action() returned an illegal action");
+    }
+    return action;
+}
+
 } // namespace oryx::python

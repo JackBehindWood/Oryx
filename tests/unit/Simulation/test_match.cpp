@@ -178,9 +178,9 @@ TEST_CASE("Match with an ExternalStrategy seat advances via decide()/apply() usi
 
     std::vector<ActionId> scripted = { 3, 3 };
     size_t next = 0;
-    ExternalStrategy strategy_b([&](const Context&) -> ActionId { return scripted[next++]; });
+    UniquePtr<ExternalStrategy> strategy_b = make_external([&](const Context&) -> ActionId { return scripted[next++]; });
 
-    Match match(game, { &strategy_a, &strategy_b });
+    Match match(game, { &strategy_a, strategy_b.get() });
 
     CHECK(match.current_player() == 0);
     match.apply(match.decide());

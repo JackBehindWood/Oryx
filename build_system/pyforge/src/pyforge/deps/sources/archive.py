@@ -38,6 +38,10 @@ class ArchiveSource:
     """A .tar.gz/.zip downloaded into the shared cache, keyed by its sha256; a single top-level folder is flattened."""
 
     def fetch(self, root: Path, dep: ResolvedDependency) -> None:
+        if not dep.spec.url:
+            from ..resolve import host_platform
+
+            raise DependencyError(f"Dependency '{dep.name}' has no archive for {host_platform()}; forge.toml lists: {', '.join(sorted(dep.spec.platforms)) or 'none'}")
         with tempfile.TemporaryDirectory(prefix="forge-dl-") as scratch:
             archive = Path(scratch) / url_filename(dep.spec.url)
             download_verified(dep.spec.url, dep.spec.sha256, archive, dep.name)

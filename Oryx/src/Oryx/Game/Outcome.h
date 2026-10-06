@@ -31,4 +31,26 @@ struct Outcome
     Rewards<double> rewards{ 0 };
 };
 
+// The player with the strictly highest reward, or -1 for a draw (or no players).
+[[nodiscard]] inline int32_t winner_of(const Outcome& outcome)
+{
+    size_t best = 0;
+    bool tie = false;
+    for (size_t player = 1; player < outcome.rewards.player_count(); ++player)
+    {
+        double reward = outcome.rewards[static_cast<PlayerId>(player)];
+        double best_reward = outcome.rewards[static_cast<PlayerId>(best)];
+        if (reward > best_reward)
+        {
+            best = player;
+            tie = false;
+        }
+        else if (reward == best_reward)
+        {
+            tie = true;
+        }
+    }
+    return tie || outcome.rewards.player_count() == 0 ? -1 : static_cast<int32_t>(best);
+}
+
 } // namespace oryx

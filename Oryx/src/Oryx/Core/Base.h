@@ -40,3 +40,4 @@ namespace oryx
 
 #include "Oryx/Core/Log.h"
 #include "Oryx/Core/Assert.h"
+#include "Oryx/Memory/RefCounted.h"

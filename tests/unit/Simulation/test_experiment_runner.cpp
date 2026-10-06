@@ -237,7 +237,7 @@ TEST_CASE("Saved results are byte-identical for the same spec")
     save_result(run_experiment(spec), first);
     save_result(run_experiment(spec), second);
 
-    for (const char* name : { kResultFileName, kTrialsFileName })
+    for (const char* name : { k_result_file_name, k_trials_file_name })
     {
         std::ifstream a(first / name);
         std::ifstream b(second / name);
@@ -276,17 +276,17 @@ TEST_CASE("load_result() rejects a missing directory, an unknown schema version,
         return text.replace(at, from.size(), to);
     };
 
-    std::string yaml = read(directory / kResultFileName);
-    std::string csv = read(directory / kTrialsFileName);
+    std::string yaml = read(directory / k_result_file_name);
+    std::string csv = read(directory / k_trials_file_name);
 
-    write(directory / kResultFileName, replace(yaml, "schema_version: 1", "schema_version: 99"));
+    write(directory / k_result_file_name, replace(yaml, "schema_version: 1", "schema_version: 99"));
     CHECK_THROWS_WITH_AS(load_result(directory), doctest::Contains("schema_version 99"), ExperimentError);
 
-    write(directory / kResultFileName, replace(yaml, "repeats: 2", "repeats: 3"));
+    write(directory / k_result_file_name, replace(yaml, "repeats: 2", "repeats: 3"));
     CHECK_THROWS_WITH_AS(load_result(directory), doctest::Contains("spec_hash"), ExperimentError);
 
-    write(directory / kResultFileName, yaml);
-    write(directory / kTrialsFileName, csv.substr(0, csv.size() / 2));
+    write(directory / k_result_file_name, yaml);
+    write(directory / k_trials_file_name, csv.substr(0, csv.size() / 2));
     CHECK_THROWS_AS(load_result(directory), ExperimentError);
 }
 
@@ -294,35 +294,35 @@ TEST_CASE("load_result() reports a malformed result.yaml as an ExperimentError")
 {
     std::filesystem::path directory = temp_directory("bad-yaml");
     save_result(run_experiment(make_spec()), directory);
-    std::string yaml = read_text(directory / kResultFileName);
+    std::string yaml = read_text(directory / k_result_file_name);
 
     SUBCASE("not yaml at all")
     {
-        write_text(directory / kResultFileName, "{ unclosed: [");
+        write_text(directory / k_result_file_name, "{ unclosed: [");
     }
     SUBCASE("empty file")
     {
-        write_text(directory / kResultFileName, "");
+        write_text(directory / k_result_file_name, "");
     }
     SUBCASE("missing schema_version")
     {
-        write_text(directory / kResultFileName, replace_first(yaml, "schema_version", "schema_versio"));
+        write_text(directory / k_result_file_name, replace_first(yaml, "schema_version", "schema_versio"));
     }
     SUBCASE("missing metadata")
     {
-        write_text(directory / kResultFileName, replace_first(yaml, "metadata:", "metadat:"));
+        write_text(directory / k_result_file_name, replace_first(yaml, "metadata:", "metadat:"));
     }
     SUBCASE("non-numeric master seed")
     {
-        write_text(directory / kResultFileName, replace_first(yaml, "master_seed: 1234", "master_seed: 12x4"));
+        write_text(directory / k_result_file_name, replace_first(yaml, "master_seed: 1234", "master_seed: 12x4"));
     }
     SUBCASE("master seed beyond 64 bits")
     {
-        write_text(directory / kResultFileName, replace_first(yaml, "master_seed: 1234", "master_seed: 99999999999999999999999"));
+        write_text(directory / k_result_file_name, replace_first(yaml, "master_seed: 1234", "master_seed: 99999999999999999999999"));
     }
     SUBCASE("negative master seed")
     {
-        write_text(directory / kResultFileName, replace_first(yaml, "master_seed: 1234", "master_seed: -5"));
+        write_text(directory / k_result_file_name, replace_first(yaml, "master_seed: 1234", "master_seed: -5"));
     }
     CHECK_THROWS_AS(load_result(directory), ExperimentError);
 }
@@ -331,41 +331,41 @@ TEST_CASE("load_result() reports a malformed trials.csv as an ExperimentError")
 {
     std::filesystem::path directory = temp_directory("bad-csv");
     save_result(run_experiment(make_spec()), directory);
-    std::string csv = read_text(directory / kTrialsFileName);
+    std::string csv = read_text(directory / k_trials_file_name);
     std::string first_row = csv.substr(csv.find('\n') + 1, csv.find('\n', csv.find('\n') + 1) - csv.find('\n') - 1);
     std::string matchup = first_row.substr(0, first_row.find(','));
 
     SUBCASE("empty file")
     {
-        write_text(directory / kTrialsFileName, "");
+        write_text(directory / k_trials_file_name, "");
     }
     SUBCASE("header only")
     {
-        write_text(directory / kTrialsFileName, "matchup,repeat,metric,value\n");
+        write_text(directory / k_trials_file_name, "matchup,repeat,metric,value\n");
     }
     SUBCASE("wrong column count")
     {
-        write_text(directory / kTrialsFileName, csv + "a,b\n");
+        write_text(directory / k_trials_file_name, csv + "a,b\n");
     }
     SUBCASE("repeat with trailing garbage")
     {
-        write_text(directory / kTrialsFileName, replace_first(csv, "," + std::string("0,"), ",0x,"));
+        write_text(directory / k_trials_file_name, replace_first(csv, "," + std::string("0,"), ",0x,"));
     }
     SUBCASE("value with trailing garbage")
     {
-        write_text(directory / kTrialsFileName, replace_first(csv, first_row, first_row + "z"));
+        write_text(directory / k_trials_file_name, replace_first(csv, first_row, first_row + "z"));
     }
     SUBCASE("matchup missing from the spec")
     {
-        write_text(directory / kTrialsFileName, replace_first(csv, matchup, "no such matchup"));
+        write_text(directory / k_trials_file_name, replace_first(csv, matchup, "no such matchup"));
     }
     SUBCASE("repeat outside the spec")
     {
-        write_text(directory / kTrialsFileName, replace_first(csv, matchup + ",0,", matchup + ",7,"));
+        write_text(directory / k_trials_file_name, replace_first(csv, matchup + ",0,", matchup + ",7,"));
     }
     SUBCASE("metric listed twice")
     {
-        write_text(directory / kTrialsFileName, csv + first_row + "\n");
+        write_text(directory / k_trials_file_name, csv + first_row + "\n");
     }
     CHECK_THROWS_AS(load_result(directory), ExperimentError);
 }
@@ -377,11 +377,11 @@ TEST_CASE("load_result() reads a trials.csv with CRLF line endings")
     save_result(result, directory);
 
     std::string crlf;
-    for (char character : read_text(directory / kTrialsFileName))
+    for (char character : read_text(directory / k_trials_file_name))
     {
         crlf += character == '\n' ? "\r\n" : std::string(1, character);
     }
-    write_text(directory / kTrialsFileName, crlf);
+    write_text(directory / k_trials_file_name, crlf);
     CHECK(trials_equal(load_result(directory), result));
 }
 
@@ -406,7 +406,7 @@ TEST_CASE("save_result() writes nothing when a label cannot be stored in CSV")
     ExperimentResult result = run_experiment(spec);
     std::filesystem::path directory = temp_directory("newline");
     CHECK_THROWS_AS(save_result(result, directory), ExperimentError);
-    CHECK_FALSE(std::filesystem::exists(directory / kResultFileName));
+    CHECK_FALSE(std::filesystem::exists(directory / k_result_file_name));
 }
 
 TEST_CASE("save_result() reports an uncreatable directory as an ExperimentError")
@@ -493,7 +493,7 @@ TEST_CASE("Intervals use Student-t critical values for few repeats")
     CHECK(t_critical_95(1) == doctest::Approx(12.706));
     CHECK(t_critical_95(4) == doctest::Approx(2.776));
     CHECK(t_critical_95(30) == doctest::Approx(2.042));
-    CHECK(t_critical_95(31) == doctest::Approx(kZ95));
+    CHECK(t_critical_95(31) == doctest::Approx(k_z95));
     Summary five = summarize({ 1.0, 2.0, 3.0, 4.0, 5.0 });
     CHECK(five.ci_half_width == doctest::Approx(2.776 * five.stddev / std::sqrt(5.0)));
 }

@@ -2,6 +2,7 @@
 Oryx's scripting API: games, strategies, matches, simulation and debugging.
 """
 from __future__ import annotations
+from oryx.board import ConsoleBoard
 from oryx.errors import IllegalActionError
 from oryx.errors import NotInitialisedError
 from oryx.errors import OryxAssertionError
@@ -29,6 +30,7 @@ from oryx.registry import list_games
 from oryx.registry import list_strategies
 from oryx.registry import make_game
 from oryx.registry import make_strategy
+from oryx.registry import register_console_board
 from oryx.registry import register_game
 from oryx.registry import register_strategy
 from oryx.results import BatchResult
@@ -37,6 +39,7 @@ from oryx.simulation import Match
 from oryx.simulation import simulate
 import typing
 from . import benchmark
+from . import board
 from . import debug
 from . import errors
 from . import experiment
@@ -47,7 +50,7 @@ from . import random
 from . import registry
 from . import results
 from . import simulation
-__all__: list[str] = ['ActionFeatures', 'BatchResult', 'BatchRunner', 'Context', 'Decision', 'Experiment', 'ExperimentResult', 'Game', 'GameHandle', 'IllegalActionError', 'Match', 'NotInitialisedError', 'Observer', 'OryxAssertionError', 'OryxError', 'ParamError', 'Random', 'ScriptError', 'SettingsError', 'State', 'StateHandle', 'Strategy', 'StrategyHandle', 'Tournament', 'benchmark', 'debug', 'describe_game', 'describe_strategy', 'errors', 'experiment', 'game', 'init', 'list_games', 'list_strategies', 'make_game', 'make_strategy', 'math', 'observability', 'random', 'register_game', 'register_strategy', 'registry', 'results', 'simulate', 'simulation']
+__all__: list[str] = ['ActionFeatures', 'BatchResult', 'BatchRunner', 'ConsoleBoard', 'Context', 'Decision', 'Experiment', 'ExperimentResult', 'Game', 'GameHandle', 'IllegalActionError', 'Match', 'NotInitialisedError', 'Observer', 'OryxAssertionError', 'OryxError', 'ParamError', 'Random', 'ScriptError', 'SettingsError', 'State', 'StateHandle', 'Strategy', 'StrategyHandle', 'Tournament', 'benchmark', 'board', 'debug', 'describe_game', 'describe_strategy', 'errors', 'experiment', 'game', 'init', 'list_games', 'list_strategies', 'make_game', 'make_strategy', 'math', 'observability', 'random', 'register_console_board', 'register_game', 'register_strategy', 'registry', 'results', 'simulate', 'simulation']
 def init(settings: str | os.PathLike[str] | None = None) -> None:
     """
     Initialises Oryx for a standalone Python process and installs the throwing assertion handler, so a C++ assert reached from Python raises OryxAssertionError. Reads `settings` (else the nearest oryx.yaml above the working directory, if any) and imports the scripts under its `scripting.roots`; calling it again loads nothing new.

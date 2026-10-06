@@ -96,12 +96,12 @@ TEST_CASE("ActionHistory::undo and redo return INVALID_ACTION instead of touchin
 TEST_CASE("ActionHistory keeps recording past its inline capacity")
 {
     ActionHistory history;
-    for (ActionId action = 0; action < 2 * kActionHistoryInlineCapacity; ++action)
+    for (ActionId action = 0; action < 2 * k_action_history_inline_capacity; ++action)
     {
         history.record(action);
     }
 
-    CHECK(history.size() == 2 * kActionHistoryInlineCapacity);
+    CHECK(history.size() == 2 * k_action_history_inline_capacity);
     CHECK(history.actions().front() == 0);
-    CHECK(history.actions().back() == 2 * kActionHistoryInlineCapacity - 1);
+    CHECK(history.actions().back() == 2 * k_action_history_inline_capacity - 1);
 }

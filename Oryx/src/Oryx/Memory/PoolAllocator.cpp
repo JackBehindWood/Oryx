@@ -10,7 +10,7 @@ namespace
 {
 
 // Keeps the first block of a chunk at the chunk's own 16-byte alignment.
-constexpr size_t kChunkHeaderSize = 16;
+constexpr size_t k_chunk_header_size = 16;
 
 class SpinGuard
 {
@@ -45,8 +45,8 @@ PoolAllocator::~PoolAllocator()
         while (chunk != nullptr)
         {
             Chunk* next = chunk->next;
-            OX_ASAN_UNPOISON(chunk, kChunkSize);
-            m_upstream.deallocate(chunk, kChunkSize, kMaxAlignment);
+            OX_ASAN_UNPOISON(chunk, k_chunk_size);
+            m_upstream.deallocate(chunk, k_chunk_size, k_max_alignment);
             chunk = next;
         }
     }
@@ -55,18 +55,18 @@ PoolAllocator::~PoolAllocator()
 namespace
 {
 
-constexpr size_t kGranule = 8;
-constexpr size_t kGranules = PoolAllocator::kClassSizes.back() / kGranule + 1;
+constexpr size_t k_granule = 8;
+constexpr size_t k_granules = PoolAllocator::k_class_sizes.back() / k_granule + 1;
 
 // class_index for every size in 8-byte steps, for 8- and 16-byte alignment; the linear search runs only at compile time.
-constexpr std::array<uint8_t, kGranules> class_table(size_t alignment)
+constexpr std::array<uint8_t, k_granules> class_table(size_t alignment)
 {
-    std::array<uint8_t, kGranules> table{};
-    for (size_t granule = 0; granule < kGranules; ++granule)
+    std::array<uint8_t, k_granules> table{};
+    for (size_t granule = 0; granule < k_granules; ++granule)
     {
-        size_t size = granule * kGranule;
+        size_t size = granule * k_granule;
         size_t index = 0;
-        while (index < PoolAllocator::kClassSizes.size() && (PoolAllocator::kClassSizes[index] < size || PoolAllocator::kClassSizes[index] % alignment != 0))
+        while (index < PoolAllocator::k_class_sizes.size() && (PoolAllocator::k_class_sizes[index] < size || PoolAllocator::k_class_sizes[index] % alignment != 0))
         {
             ++index;
         }
@@ -75,30 +75,30 @@ constexpr std::array<uint8_t, kGranules> class_table(size_t alignment)
     return table;
 }
 
-constexpr std::array<uint8_t, kGranules> kClassBy8 = class_table(8);
-constexpr std::array<uint8_t, kGranules> kClassBy16 = class_table(16);
+constexpr std::array<uint8_t, k_granules> k_class_by8 = class_table(8);
+constexpr std::array<uint8_t, k_granules> k_class_by16 = class_table(16);
 
 } // namespace
 
 size_t PoolAllocator::class_index(size_t size, size_t alignment)
 {
-    if (alignment > kMaxAlignment || size > kClassSizes.back())
+    if (alignment > k_max_alignment || size > k_class_sizes.back())
     {
-        return kClassSizes.size();
+        return k_class_sizes.size();
     }
-    size_t granule = (size + kGranule - 1) / kGranule;
-    return alignment == kMaxAlignment ? kClassBy16[granule] : kClassBy8[granule];
+    size_t granule = (size + k_granule - 1) / k_granule;
+    return alignment == k_max_alignment ? k_class_by16[granule] : k_class_by8[granule];
 }
 
 void* PoolAllocator::allocate(size_t size, size_t alignment)
 {
     size_t index = class_index(std::max<size_t>(size, 1), alignment);
-    if (index == kClassSizes.size())
+    if (index == k_class_sizes.size())
     {
         return m_upstream.allocate(size, alignment);
     }
 
-    size_t block_size = kClassSizes[index];
+    size_t block_size = k_class_sizes[index];
     SizeClass& size_class = m_classes[index];
     SpinGuard guard(size_class.lock);
 
@@ -122,7 +122,7 @@ void* PoolAllocator::allocate(size_t size, size_t alignment)
 void PoolAllocator::deallocate(void* pointer, size_t size, size_t alignment) noexcept
 {
     size_t index = class_index(std::max<size_t>(size, 1), alignment);
-    if (index == kClassSizes.size())
+    if (index == k_class_sizes.size())
     {
         m_upstream.deallocate(pointer, size, alignment);
         return;
@@ -133,18 +133,18 @@ void PoolAllocator::deallocate(void* pointer, size_t size, size_t alignment) noe
     FreeBlock* block = static_cast<FreeBlock*>(pointer);
     block->next = size_class.free_list;
     size_class.free_list = block;
-    OX_ASAN_POISON(block, kClassSizes[index]);
+    OX_ASAN_POISON(block, k_class_sizes[index]);
 }
 
 void PoolAllocator::refill(SizeClass& size_class, size_t block_size)
 {
-    std::byte* memory = static_cast<std::byte*>(m_upstream.allocate(kChunkSize, kMaxAlignment));
+    std::byte* memory = static_cast<std::byte*>(m_upstream.allocate(k_chunk_size, k_max_alignment));
     Chunk* chunk = reinterpret_cast<Chunk*>(memory);
     chunk->next = size_class.chunks;
     size_class.chunks = chunk;
 
-    size_class.cursor = memory + kChunkHeaderSize;
-    size_class.end = memory + kChunkHeaderSize + (kChunkSize - kChunkHeaderSize) / block_size * block_size;
+    size_class.cursor = memory + k_chunk_header_size;
+    size_class.end = memory + k_chunk_header_size + (k_chunk_size - k_chunk_header_size) / block_size * block_size;
     OX_ASAN_POISON(size_class.cursor, static_cast<size_t>(size_class.end - size_class.cursor));
 }
 

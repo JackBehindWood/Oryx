@@ -19,6 +19,10 @@ project "Tests"
     -- Oasis's game/strategy sources are compiled in (not the Oasis executable's app/UI code) so their rules are unit-testable.
     files {
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToeGame.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/TicTacToePresenter.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/HexapawnGame.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/HexapawnPresenter.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/Options.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Strategy/TicTacToeHeuristicStrategy.cpp",
     }
 
@@ -26,11 +30,14 @@ project "Tests"
         ".",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src",
         "%{_MAIN_SCRIPT_DIR}/Oryx/src",
+        "%{_MAIN_SCRIPT_DIR}/Oryx/backends/Null",
         forge.include("spdlog"),
+        forge.include("stb"),
     }
 
     defines {
         "SPDLOG_COMPILED_LIB",
+        "OX_TEST_DATA_DIR=\"tests/data\"",
         -- A literal path, deliberately not %{wks.location}-based: that token (like every
         -- location-relative token) resolves relative to the generated build file's own
         -- directory (build/), which is right for targetdir/objdir (make runs from there) but
@@ -39,6 +46,10 @@ project "Tests"
         "OX_BUILD_OUTPUT_DIR=\"" .. "build/bin/" .. outputdir .. "\"",
     }
     useOryxPython()
+    useOryxGraphics()
+    if not graphicsEnabled() then
+        removefiles { "unit/Renderer/**", "unit/Graphics/**", "unit/Shaders/**", "unit/Board/Graphics/**", "unit/Assets/test_gpu_*" }
+    end
 
     useOryxWholeArchive()
     useOryxAllocationCensus()

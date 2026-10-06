@@ -18,6 +18,13 @@ void SimulationLayer::event(Event& event)
 {
     EventDispatcher dispatcher(event);
     dispatcher.dispatch<StartSimulationEvent>(OX_BIND_EVENT_FN(on_start_simulation));
+    dispatcher.dispatch<RestartSimulationEvent>(OX_BIND_EVENT_FN(on_restart_simulation));
+}
+
+bool SimulationLayer::on_restart_simulation(RestartSimulationEvent&)
+{
+    m_restart_requested = true;
+    return true;
 }
 
 bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
@@ -25,7 +32,8 @@ bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
     m_game = event.take_game();
     m_strategy_storage = event.take_strategies();
     m_match_count = event.match_count();
-    m_on_turn = event.take_on_turn();
+    m_observer = event.take_observer();
+    m_linger = event.linger();
 
     m_strategies.reserve(m_strategy_storage.size());
     for (const UniquePtr<IStrategy>& strategy : m_strategy_storage)
@@ -62,7 +70,7 @@ bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
     return true;
 }
 
-void SimulationLayer::update()
+void SimulationLayer::update(double)
 {
     if (!m_game)
     {
@@ -71,7 +79,7 @@ void SimulationLayer::update()
 
     if (!m_match)
     {
-        if (m_completed >= m_match_count)
+        if (!m_linger && m_completed >= m_match_count)
         {
             // close() is unconditional: not every front-end handles this event, and update() would otherwise re-post it every tick.
             if (m_benchmark)
@@ -91,15 +99,21 @@ void SimulationLayer::update()
             return;
         }
         m_match = create_unique<Match>(*m_game, m_strategies);
+        m_restart_requested = false;
     }
 
-    if (m_on_turn)
+    if (m_observer)
     {
-        m_on_turn(m_match->state());
+        m_observer->on_turn(m_match->state());
     }
 
     if (m_match->is_terminal())
     {
+        if (m_linger && !m_restart_requested)
+        {
+            return;
+        }
+        m_restart_requested = false;
         accumulate(m_result, m_match->outcome());
         m_result.decisions += static_cast<int64_t>(m_match->history().size());
         ++m_completed;
@@ -109,10 +123,15 @@ void SimulationLayer::update()
 
     ActionId action = m_match->decide();
 
+    if (action == PENDING_ACTION)
+    {
+        return;
+    }
+
     if (!is_valid(action))
     {
-        OX_CORE_INFO("Input closed before the match finished - exiting.");
-        Application::Get().close();
+        OX_CORE_ERROR("SimulationLayer: a strategy returned INVALID_ACTION in a non-terminal state of '{}'.", m_game->name());
+        Application::Get().close(1);
         return;
     }
 
@@ -127,6 +146,7 @@ void SimulationLayer::update()
         return;
     }
 
+    OX_CORE_ASSERT(is_game_action(action), "SimulationLayer: a strategy returned a reserved action id.");
     m_match->apply(action);
 }
 

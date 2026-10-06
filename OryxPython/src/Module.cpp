@@ -26,7 +26,7 @@ void init_research_host(const oryx::python::hints::PathArg& settings)
 // Runs before Py_FinalizeEx, while the objects these statics hold can still be released.
 void tear_down_research_host()
 {
-    oryx::unregister_scripted(oryx::python::kLanguage);
+    oryx::unregister_scripted(oryx::python::k_language);
     oryx::python::PythonContext::shut_down();
 }
 

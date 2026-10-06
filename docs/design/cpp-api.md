@@ -23,6 +23,7 @@ Likewise, advanced metaprogramming should not become a prerequisite for understa
 
 * Functions and methods: `snake_case` (e.g. `legal_actions()`)
 * Classes: `PascalCase` (e.g. `class Rewards`)
+* File-scope and namespace-scope `constexpr` constants: `k_snake_case` (e.g. `k_restart_hint`, `k_board_gutter`, `k_action_list_inline_capacity`). Real macro and system constants keep `UPPER_SNAKE` (`PENDING_ACTION`, `INVALID_ACTION`, `UNDO_ACTION`, `RHI_MAX_*`, `MAX_TEXTURES`).
 * Interfaces (no data members; every method pure virtual, apart from optional
   capability hooks that default to "not provided" — `IGame::action_features()`
   returns `nullptr`, `IStrategy::required_capabilities()` returns `{}`)
@@ -60,6 +61,17 @@ This was not written down before the Phase 2 brainstorm; existing code
 predates it and is not being retrofitted (e.g. `Application::Get()` is a
 static accessor, `create_application()` a free function — both fine as
 historical exceptions, not examples to copy for new pure interfaces).
+
+### RHI Resource Arguments
+
+* Public RHI entry points (`IRHI`, `RHICommandList`) take resources as raw
+  pointers (`RHIBuffer*`, `RHITexture*`, `RHIViewport*`, ...) and reject null
+  at the boundary with `rhi_require_non_null`, which throws `Error`.
+* `IRHICommandContext` (implemented by backends) takes references: it only
+  sees resources a recording already validated, so non-null is guaranteed.
+* A pointer that may legitimately be null (`IRHI::present`'s `source`) is
+  documented as optional; nothing else is. `Ref<T>` is not taken by value
+  where nothing retains the resource.
 
 ### Math Module
 

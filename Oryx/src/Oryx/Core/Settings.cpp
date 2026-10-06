@@ -1,7 +1,7 @@
 #include "oxpch.h"
 #include "Oryx/Core/Settings.h"
 
-#include "Oryx/Core/Application.h"
+#include "Oryx/Core/CommandLine.h"
 
 #include <yaml-cpp/yaml.h>
 
@@ -152,12 +152,11 @@ std::vector<std::string> SettingsNode::strings(std::string_view key) const
 std::filesystem::path SettingsNode::path(std::string_view key, std::filesystem::path fallback) const
 {
     std::string text = string(key);
-    if (text.empty())
+    std::filesystem::path result(text.empty() ? fallback : std::filesystem::path(text));
+    if (result.empty())
     {
-        return fallback;
+        return result;
     }
-
-    std::filesystem::path result(text);
     return result.is_absolute() ? result : (SettingsAccess::file_of(*this).parent_path() / result).lexically_normal();
 }
 
@@ -175,8 +174,8 @@ std::vector<std::filesystem::path> SettingsNode::paths(std::string_view key) con
 namespace
 {
 
-constexpr std::string_view kSettingsFlag = "--settings=";
-constexpr const char* kDefaultFileName = "oryx.yaml";
+constexpr const char* k_settings_option = "settings";
+constexpr const char* k_default_file_name = "oryx.yaml";
 
 struct Section
 {
@@ -187,9 +186,18 @@ struct Section
     SettingsAssigner assign;
 };
 
+struct Subscriber
+{
+    uint64_t id;
+    std::type_index type;
+    std::function<void(const void*)> callback;
+};
+
 struct State
 {
     std::vector<Section> sections;
+    std::vector<Subscriber> subscribers;
+    uint64_t next_subscriber = 1;
     std::filesystem::path file;
     bool file_required = false;
     std::vector<std::filesystem::path> default_files;
@@ -199,6 +207,30 @@ State& state()
 {
     static State instance;
     return instance;
+}
+
+// Callbacks may unsubscribe while running, so each call goes through a copy; one that throws is logged and the rest still run.
+void notify(const Section& section)
+{
+    std::vector<Subscriber> pending;
+    for (const Subscriber& subscriber : state().subscribers)
+    {
+        if (subscriber.type == section.type)
+        {
+            pending.push_back(subscriber);
+        }
+    }
+    for (const Subscriber& subscriber : pending)
+    {
+        try
+        {
+            subscriber.callback(section.value.get());
+        }
+        catch (const Error& error)
+        {
+            error.log();
+        }
+    }
 }
 
 // False when the optional default file does not exist.
@@ -275,6 +307,10 @@ void apply(const std::filesystem::path& file, bool required)
     }
     current.file = file;
     current.file_required = required;
+    for (const Section& section : current.sections)
+    {
+        notify(section);
+    }
     if (exists)
     {
         OX_CORE_INFO("Settings: loaded {}", file.string());
@@ -292,28 +328,95 @@ void register_settings_section(std::string name, std::type_index type, SharedPtr
     state().sections.push_back(Section{ std::move(name), type, std::move(value), std::move(build), assign });
 }
 
-const void* settings_value(std::type_index type)
+namespace
+{
+
+const Section& section_of(std::type_index type)
 {
     for (const Section& section : state().sections)
     {
         if (section.type == type)
         {
-            return section.value.get();
+            return section;
         }
     }
     throw SettingsError(std::string("no settings section is registered for ") + type.name());
 }
 
+} // namespace
+
+const void* settings_value(std::type_index type)
+{
+    return section_of(type).value.get();
+}
+
+void assign_settings(std::type_index type, void* edited)
+{
+    const Section& section = section_of(type);
+    section.assign(section.value.get(), edited);
+    notify(section);
+}
+
+uint64_t subscribe_settings(std::type_index type, std::function<void(const void*)> callback)
+{
+    (void)section_of(type);
+    State& current = state();
+    const uint64_t id = current.next_subscriber++;
+    current.subscribers.push_back(Subscriber{ id, type, std::move(callback) });
+    return id;
+}
+
+void unsubscribe_settings(uint64_t id)
+{
+    std::vector<Subscriber>& subscribers = state().subscribers;
+    subscribers.erase(std::remove_if(subscribers.begin(), subscribers.end(), [id](const Subscriber& subscriber) { return subscriber.id == id; }), subscribers.end());
+}
+
+SettingsSubscription::SettingsSubscription(uint64_t id)
+    : m_id(id)
+{
+}
+
+SettingsSubscription::SettingsSubscription(SettingsSubscription&& other) noexcept
+    : m_id(std::exchange(other.m_id, 0))
+{
+}
+
+SettingsSubscription& SettingsSubscription::operator=(SettingsSubscription&& other) noexcept
+{
+    if (this != &other)
+    {
+        reset();
+        m_id = std::exchange(other.m_id, 0);
+    }
+    return *this;
+}
+
+SettingsSubscription::~SettingsSubscription()
+{
+    reset();
+}
+
+void SettingsSubscription::reset()
+{
+    if (m_id != 0)
+    {
+        unsubscribe_settings(m_id);
+        m_id = 0;
+    }
+}
+
 void load_settings(const ApplicationCommandLineArgs& args)
 {
-    for (int32_t i = 0; i < args.count; ++i)
+    load_settings(CommandLine::global().parse(args));
+}
+
+void load_settings(const ParsedArgs& args)
+{
+    if (args.has(k_settings_option))
     {
-        std::string_view arg = args[i];
-        if (arg.substr(0, kSettingsFlag.size()) == kSettingsFlag)
-        {
-            apply(std::filesystem::absolute(std::string(arg.substr(kSettingsFlag.size()))), true);
-            return;
-        }
+        apply(std::filesystem::absolute(args.value(k_settings_option)), true);
+        return;
     }
 
     for (const std::filesystem::path& candidate : state().default_files)
@@ -326,7 +429,7 @@ void load_settings(const ApplicationCommandLineArgs& args)
             return;
         }
     }
-    apply(std::filesystem::absolute(kDefaultFileName), false);
+    apply(std::filesystem::absolute(k_default_file_name), false);
 }
 
 void register_default_settings_file(std::filesystem::path file)
@@ -354,6 +457,26 @@ void reset_settings()
     current.file.clear();
     current.file_required = false;
     current.default_files.clear();
+    for (const Section& section : current.sections)
+    {
+        notify(section);
+    }
 }
+
+namespace
+{
+
+class SettingsCommandLine : public ICommandLineContributor
+{
+public:
+    void declare(CommandLine& command_line) const override
+    {
+        command_line.option(k_settings_option, "FILE", "Settings file to load instead of the default oryx.yaml");
+    }
+};
+
+OX_REGISTER_COMMAND_LINE(SettingsCommandLine, "settings")
+
+} // namespace
 
 } // namespace oryx

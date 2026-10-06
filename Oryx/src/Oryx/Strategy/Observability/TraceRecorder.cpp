@@ -8,7 +8,7 @@ void TraceRecorder::on_decision(const IState& state, const Decision& decision)
     TraceEntry entry;
     entry.ply = static_cast<int32_t>(m_entries.size());
     entry.decision = decision;
-    entry.chosen_label = is_valid(decision.chosen) ? state.action_to_string(decision.chosen) : std::string();
+    entry.chosen_label = is_game_action(decision.chosen) ? state.action_to_string(decision.chosen) : std::string();
     entry.score_labels.reserve(decision.scores.size());
     for (const ActionScore& score : decision.scores)
     {

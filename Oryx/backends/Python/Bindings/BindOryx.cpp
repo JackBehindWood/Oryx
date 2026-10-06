@@ -12,7 +12,7 @@ namespace
 {
 
 // Order matters: the exception types come first and scripted classes after the handles they refer to.
-constexpr std::array<void (*)(py::module_&), 12> kBinders = {
+constexpr std::array<void (*)(py::module_&), 12> k_binders = {
     &bind_errors, &bind_debug, &bind_game, &bind_registry, &bind_observability, &bind_results, &bind_simulation, &bind_experiment, &bind_random, &bind_math, &bind_benchmark, &bind_scripted,
 };
 
@@ -31,14 +31,15 @@ void reexport(py::module_& module, const char* submodule, std::initializer_list<
 void bind_oryx(py::module_& module)
 {
     module.doc() = "Oryx's scripting API: games, strategies, matches, simulation and debugging.";
-    for (void (*binder)(py::module_&) : kBinders)
+    for (void (*binder)(py::module_&) : k_binders)
     {
         binder(module);
     }
 
     reexport(module, "errors", { "OryxError", "ParamError", "ScriptError", "OryxAssertionError", "SettingsError", "IllegalActionError", "NotInitialisedError" });
     reexport(module, "game", { "GameHandle", "StateHandle", "StrategyHandle", "Context", "ActionFeatures", "Game", "Strategy", "State" });
-    reexport(module, "registry", { "make_game", "make_strategy", "list_games", "list_strategies", "describe_game", "describe_strategy", "register_game", "register_strategy" });
+    reexport(module, "board", { "ConsoleBoard" });
+    reexport(module, "registry", { "make_game", "make_strategy", "list_games", "list_strategies", "describe_game", "describe_strategy", "register_game", "register_strategy", "register_console_board" });
     reexport(module, "observability", { "Decision", "Observer" });
     reexport(module, "results", { "BatchResult" });
     reexport(module, "simulation", { "Match", "BatchRunner", "simulate" });
@@ -66,7 +67,7 @@ namespace oryx::python
 
 void register_oryx_module()
 {
-    if (PyImport_AppendInittab(kModuleName, &PyInit_oryx_embedded) == -1)
+    if (PyImport_AppendInittab(k_module_name, &PyInit_oryx_embedded) == -1)
     {
         throw std::runtime_error("could not register the oryx module");
     }

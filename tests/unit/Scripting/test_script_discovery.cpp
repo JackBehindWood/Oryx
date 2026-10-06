@@ -65,8 +65,8 @@ bool logged(const CoreLogCapture& capture, const std::string& text)
 
 TEST_CASE("script_options reads --script, --module and --script-root, as separate or joined values")
 {
-    Arguments args({ "app", "--script", "a.py", "--script=b.py", "--module", "mod.one", "--module=mod.two", "--script-root", "scripts", "--script-root=more", "--unrelated", "x" });
-    ScriptDiscoveryOptions options = script_options(args.get());
+    ParsedArgs parsed = CommandLine::global().parse(std::vector<std::string>{ "--script", "a.py", "--script=b.py", "--module", "mod.one", "--module=mod.two", "--script-root", "scripts", "--script-root=more" });
+    ScriptDiscoveryOptions options = script_options(parsed);
 
     CHECK(options.script_files == std::vector<std::string>{ "a.py", "b.py" });
     CHECK(options.modules == std::vector<std::string>{ "mod.one", "mod.two" });
@@ -74,14 +74,13 @@ TEST_CASE("script_options reads --script, --module and --script-root, as separat
     CHECK_FALSE(options.root.empty());
 }
 
-TEST_CASE("script_options warns about a flag that has no value and ignores it")
+TEST_CASE("script_options is empty without script options")
 {
-    CoreLogCapture capture;
-    Arguments args({ "app", "--script" });
-    ScriptDiscoveryOptions options = script_options(args.get());
+    ScriptDiscoveryOptions options = script_options(CommandLine::global().parse(std::vector<std::string>{}));
 
     CHECK(options.script_files.empty());
-    CHECK(logged(capture, "--script needs a value"));
+    CHECK(options.modules.empty());
+    CHECK(options.roots.empty());
 }
 
 TEST_CASE("discover_scripts finds every script under a root in path order, with the root it is imported from")

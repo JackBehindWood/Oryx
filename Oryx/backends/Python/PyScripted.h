@@ -2,7 +2,9 @@
 
 #include "Interop/PyMethods.h"
 
+#include "Oryx/Board/Console/ConsoleBoard.h"
 #include "Oryx/Core/Params.h"
+#include "Oryx/Scripting/Interfaces/IScriptedConsoleBoard.h"
 #include "Oryx/Scripting/Interfaces/IScriptedGame.h"
 #include "Oryx/Scripting/Interfaces/IScriptedState.h"
 #include "Oryx/Scripting/Interfaces/IScriptedStrategy.h"
@@ -20,6 +22,12 @@ protected:
         , m_methods(load_methods())
         , m_origin(std::move(origin))
     {
+    }
+
+    template<FixedString Name>
+    [[nodiscard]] bool defines() const
+    {
+        return m_methods->entries[Set::template index<Name>()].defined;
     }
 
     template<FixedString Name, typename Result = void, typename... Args>
@@ -54,6 +62,8 @@ public:
     std::string action_to_string(ActionId action) const override;
 
     const ScriptOrigin& origin() const override { return *m_origin; }
+    // The script's own state object, for boards that read game-specific fields.
+    [[nodiscard]] PyRef script_object() const { return PyRef::borrow(m_object.get()); }
 
 private:
     size_t m_player_count;
@@ -88,6 +98,23 @@ public:
     ActionId decide(const Context& context) override;
 
     const ScriptOrigin& origin() const override { return *m_origin; }
+};
+
+// A board defined in Python; any method the script leaves out is played by the generic ConsoleBoard.
+class PyScriptedConsoleBoard : public IScriptedConsoleBoard, private PyAdapter<BoardMethods>
+{
+public:
+    PyScriptedConsoleBoard(PyRef board, SharedPtr<const ScriptOrigin> origin);
+
+    void on_turn(const IState& state) override;
+    ActionId poll_action(const IState& state) override;
+    bool shows_moves() const override { return m_shows_moves; }
+
+    const ScriptOrigin& origin() const override { return *m_origin; }
+
+private:
+    ConsoleBoard m_fallback;
+    bool m_shows_moves = false;
 };
 
 } // namespace oryx::python

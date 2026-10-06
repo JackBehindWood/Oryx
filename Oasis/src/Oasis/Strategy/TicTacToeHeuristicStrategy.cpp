@@ -4,9 +4,9 @@
 
 namespace {
 
-// Duplicated from TicTacToeGame.cpp's private kLines: two call sites don't
+// Duplicated from TicTacToeGame.cpp's private k_lines: two call sites don't
 // justify extracting a shared utility yet (docs/design/principles.md).
-constexpr size_t kLines[8][3][2] = {
+constexpr size_t k_lines[8][3][2] = {
     { { 0, 0 }, { 0, 1 }, { 0, 2 } },
     { { 1, 0 }, { 1, 1 }, { 1, 2 } },
     { { 2, 0 }, { 2, 1 }, { 2, 2 } },
@@ -21,7 +21,7 @@ constexpr size_t kLines[8][3][2] = {
 // empty), or INVALID_ACTION if no such line exists.
 oryx::ActionId find_completing_move(const oasis::TicTacToeState& state, oasis::Mark mark)
 {
-    for (const auto& line : kLines)
+    for (const auto& line : k_lines)
     {
         int32_t mark_count = 0;
         int32_t empty_index = -1;
@@ -74,14 +74,14 @@ oryx::ActionId TicTacToeHeuristicStrategy::decide(const oryx::Context& context)
 
     oryx::ActionList actions = tic_tac_toe.legal_actions();
 
-    constexpr oryx::ActionId kCenter = 4;
-    if (std::find(actions.begin(), actions.end(), kCenter) != actions.end())
+    constexpr oryx::ActionId k_center = 4;
+    if (std::find(actions.begin(), actions.end(), k_center) != actions.end())
     {
-        return kCenter;
+        return k_center;
     }
 
-    constexpr oryx::ActionId kCorners[] = { 0, 2, 6, 8 };
-    for (oryx::ActionId corner : kCorners)
+    constexpr oryx::ActionId k_corners[] = { 0, 2, 6, 8 };
+    for (oryx::ActionId corner : k_corners)
     {
         if (std::find(actions.begin(), actions.end(), corner) != actions.end())
         {

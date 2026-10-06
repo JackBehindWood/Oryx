@@ -161,7 +161,7 @@ TEST_CASE("ScriptingLayer is disabled by the layer boundary when a runtime fails
 
     CHECK(layer.is_disabled());
     CHECK(log == std::vector<std::string>{ "alpha:start" });
-    CHECK_NOTHROW(stack.update());
+    CHECK_NOTHROW(stack.update(0.016));
 }
 
 TEST_CASE("Destroying the ScriptingLayer leaves the runtimes running until shutdown")

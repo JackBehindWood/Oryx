@@ -5,7 +5,7 @@
 #include "Support/PyResolve.h"
 #include "Support/PyTypeHints.h"
 #include "Oryx/Benchmark/BenchmarkRunner.h"
-#include "Oryx/Benchmark/Timer.h"
+#include "Oryx/Core/Timer.h"
 #include "Oryx/Memory/DefaultAllocator.h"
 #include "Oryx/Scripting/Support/InitGuard.h"
 

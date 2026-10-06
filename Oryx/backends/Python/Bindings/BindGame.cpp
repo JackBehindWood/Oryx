@@ -3,6 +3,7 @@
 
 #include <pybind11/stl.h>
 
+#include "PyScripted.h"
 #include "Support/PyHandles.h"
 #include "Oryx/Scripting/Support/ScriptUtil.h"
 
@@ -13,6 +14,13 @@ namespace oryx::python
 
 namespace
 {
+
+// The script's own object behind a scripted state (for game-specific fields), None for a state implemented in C++.
+py::object native_of(const PyState& state)
+{
+    const PyScriptedState* scripted = dynamic_cast<const PyScriptedState*>(&state.get());
+    return scripted == nullptr ? py::none() : py::reinterpret_borrow<py::object>(scripted->script_object().get());
+}
 
 SharedPtr<PyState> new_initial_state(const PyGame& game)
 {
@@ -40,6 +48,7 @@ void bind_game(py::module_& module)
         .def("current_player", [](const PyState& state) { return state.get().current_player(); })
         .def("is_terminal", [](const PyState& state) { return state.get().is_terminal(); })
         .def("outcome", &PyState::outcome)
+        .def_property_readonly("native", &native_of, "The script's own state object (read it, do not change it); None for a state implemented in C++.")
         .def("action_to_string", [](const PyState& state, ActionId action) { return state.get().action_to_string(action); }, py::arg("action"));
 
     py::class_<PyStrategy>(game_module, "StrategyHandle", "A strategy owned by the engine, whether it is implemented in C++ or in a script.");

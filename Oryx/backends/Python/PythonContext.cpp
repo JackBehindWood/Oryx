@@ -24,7 +24,7 @@ bool g_shut_down = false;
 
 PythonContext::PythonContext(Token)
 {
-    PyRef module = PyRef::steal(PyImport_ImportModule(kModuleName));
+    PyRef module = PyRef::steal(PyImport_ImportModule(k_module_name));
     if (!module)
     {
         throw_python_error("could not import the native oryx module");
@@ -35,13 +35,15 @@ PythonContext::PythonContext(Token)
     m_game = PyRef::steal(PyObject_GetAttrString(module.get(), "Game"));
     m_strategy = PyRef::steal(PyObject_GetAttrString(module.get(), "Strategy"));
     m_state = PyRef::steal(PyObject_GetAttrString(module.get(), "State"));
-    if (!m_object || !m_game || !m_strategy || !m_state)
+    m_board = PyRef::steal(PyObject_GetAttrString(module.get(), "ConsoleBoard"));
+    if (!m_object || !m_game || !m_strategy || !m_state || !m_board)
     {
-        throw_python_error("the native oryx module has no Game, Strategy and State");
+        throw_python_error("the native oryx module has no Game, Strategy, State and ConsoleBoard");
     }
     collect_placeholders<GameMethods>(m_game.get());
     collect_placeholders<StrategyMethods>(m_strategy.get());
     collect_placeholders<StateMethods>(m_state.get());
+    collect_placeholders<BoardMethods>(m_board.get(), BoardMethods::count);
 }
 
 PythonContext& PythonContext::current()
@@ -96,10 +98,10 @@ bool PythonContext::is_placeholder(PyObject* attribute) const
 }
 
 template<typename Methods>
-void PythonContext::collect_placeholders(PyObject* base)
+void PythonContext::collect_placeholders(PyObject* base, size_t count)
 {
     PyObject* own = reinterpret_cast<PyTypeObject*>(base)->tp_dict;
-    for (size_t i = 0; i < Methods::required; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         std::string name(Methods::names[i]);
         if (PyObject* found = PyDict_GetItemString(own, name.c_str()))
@@ -111,7 +113,7 @@ void PythonContext::collect_placeholders(PyObject* base)
 
 bool PythonContext::is_base_class(PyObject* cls) const
 {
-    return cls == m_object.get() || cls == m_game.get() || cls == m_strategy.get() || cls == m_state.get();
+    return cls == m_object.get() || cls == m_game.get() || cls == m_strategy.get() || cls == m_state.get() || cls == m_board.get();
 }
 
 } // namespace oryx::python

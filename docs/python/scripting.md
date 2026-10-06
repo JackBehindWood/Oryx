@@ -91,6 +91,21 @@ class MonteCarlo(oryx.Strategy, id="monte-carlo"):
 
 Because a strategy only uses the state interface, one script plays every game, whether the game is C++ or Python. A strategy that only understands one game's state should be named `<game>/<name>`, and Oasis then offers it for that game only.
 
+## A board
+
+A board decides how a game looks in the terminal and how a human picks a move. Register one for any game, including a C++ one, with `game=`:
+
+```python
+class NimBoard(oryx.ConsoleBoard, game="nim"):
+    shows_moves = False
+
+    def on_turn(self, state):
+        stones = state.native.stones
+        print(f"Pile: {'O ' * stones}({stones})", flush=True)
+```
+
+`on_turn(state)` runs every update (including on the finished game) and `poll_action(state)` returns the human's move, `oryx.board.UNDO_ACTION`, or `oryx.board.PENDING_ACTION` while none is chosen. Define either or both; what you leave out uses the generic prompt (`oryx.board.read_move(state)` is that prompt, if you want to call it yourself). The state is read-only and only valid during the call. `state.native` is your own state object for a Python game and `None` for a C++ game, so a board for a C++ game uses the generic state methods. The winner is announced for you.
+
 ## Where scripts are found
 
 A script is a plain `.py` file under a **script root**. The roots come from the settings file, `oryx.yaml`. Oasis reads `Oasis/oryx.yaml` (relative to the working directory, which is the repository root), or the file named by `--settings=<file>`; an application that registers no file of its own gets `oryx.yaml` from the working directory. `Oasis/oryx.yaml` is:
@@ -131,6 +146,7 @@ A game or strategy written in Python is correct but slow inside a hot loop: ever
 
 * Installed packages that provide games through Python entry points, until packages can be installed.
 * Game parameters on the Oasis command line: a game is created with its defaults.
+* Graphical boards: boards written in Python draw in the terminal only.
 * `import oryx` from a REPL or notebook: that research host comes last in Phase 7.
 
 See the [Python API design](../design/python-api.md) for the decisions behind all of this.

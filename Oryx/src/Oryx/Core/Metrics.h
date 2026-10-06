@@ -13,8 +13,8 @@ struct Metrics
 // Keys ending "_max" combine by maximum instead of sum, so a peak survives merging trials.
 [[nodiscard]] inline bool is_max_metric(const std::string& key)
 {
-    constexpr std::string_view kMaxSuffix = "_max";
-    return key.size() > kMaxSuffix.size() && key.compare(key.size() - kMaxSuffix.size(), kMaxSuffix.size(), kMaxSuffix) == 0;
+    constexpr std::string_view k_max_suffix = "_max";
+    return key.size() > k_max_suffix.size() && key.compare(key.size() - k_max_suffix.size(), k_max_suffix.size(), k_max_suffix) == 0;
 }
 
 inline void add_metric(Metrics& metrics, const std::string& key, double value)

@@ -5,7 +5,7 @@
 namespace
 {
 
-const oryx::ScriptOrigin kOrigin{ "python", "nim", "scripts/nim.py" };
+const oryx::ScriptOrigin k_origin{ "python", "nim", "scripts/nim.py" };
 
 class StubScriptedState : public oryx::IScriptedState
 {
@@ -17,7 +17,7 @@ public:
     bool is_terminal() const override { return true; }
     oryx::Outcome outcome() const override { return {}; }
     std::string action_to_string(oryx::ActionId) const override { return "stub"; }
-    const oryx::ScriptOrigin& origin() const override { return kOrigin; }
+    const oryx::ScriptOrigin& origin() const override { return k_origin; }
 };
 
 class StubScriptedGame : public oryx::IScriptedGame
@@ -26,7 +26,7 @@ public:
     oryx::UniquePtr<oryx::IState> new_initial_state() const override { return oryx::create_unique<StubScriptedState>(); }
     std::string name() const override { return "stub"; }
     int32_t num_players() const override { return 2; }
-    const oryx::ScriptOrigin& origin() const override { return kOrigin; }
+    const oryx::ScriptOrigin& origin() const override { return k_origin; }
     const oryx::ParamSchema& param_schema() const override { return m_schema; }
 
 private:
@@ -37,7 +37,7 @@ class StubScriptedStrategy : public oryx::IScriptedStrategy
 {
 public:
     oryx::ActionId decide(const oryx::Context&) override { return oryx::INVALID_ACTION; }
-    const oryx::ScriptOrigin& origin() const override { return kOrigin; }
+    const oryx::ScriptOrigin& origin() const override { return k_origin; }
 };
 
 } // namespace
@@ -55,7 +55,7 @@ TEST_CASE("Scripted game, state and strategy interfaces plug into the core inter
     oryx::Context context(*state);
     CHECK(strategy.decide(context) == oryx::INVALID_ACTION);
 
-    CHECK(scripted_game.origin() == kOrigin);
+    CHECK(scripted_game.origin() == k_origin);
     CHECK(scripted_game.param_schema().size() == 1);
     CHECK(scripted_strategy.origin().language == "python");
 }

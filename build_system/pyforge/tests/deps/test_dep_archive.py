@@ -95,3 +95,33 @@ def test_url_filename_never_escapes_its_directory(url):
     from pyforge.deps.sources.archive import url_filename
 
     assert url_filename(url) == "download"
+
+
+def test_platform_archive_is_picked_for_the_host(monkeypatch):
+    from pyforge.config import PlatformArchive
+    from pyforge.deps import resolve
+
+    spec = Dependency(source="archive", kind="tool", binary="bin/tool", platforms={"macos-aarch64": PlatformArchive("http://h/mac.tgz", "a" * 64), "linux-x86_64": PlatformArchive("http://h/lin.tgz", "b" * 64)})
+    monkeypatch.setattr(resolve, "host_platform", lambda: "linux-x86_64")
+    picked = resolve.for_host(spec)
+    assert (picked.url, picked.sha256) == ("http://h/lin.tgz", "b" * 64)
+
+
+def test_platform_missing_fails_only_at_fetch(tmp_path, monkeypatch):
+    from pyforge.config import PlatformArchive
+    from pyforge.deps import resolve
+
+    spec = Dependency(source="archive", kind="tool", binary="bin/tool", platforms={"macos-aarch64": PlatformArchive("http://h/mac.tgz", "a" * 64)})
+    monkeypatch.setattr(resolve, "host_platform", lambda: "freebsd-riscv")
+    assert resolve.for_host(spec) is spec
+    with pytest.raises(DependencyError, match="no archive for freebsd-riscv"):
+        ArchiveSource().fetch(tmp_path, ResolvedDependency("tool", spec, tmp_path / "d"))
+
+
+def test_tool_needs_binary_and_accepts_platforms_without_url():
+    base = {"project": {"name": "p"}}
+    plats = {"macos-aarch64": {"url": "http://h/x.tgz", "sha256": "a" * 64}}
+    with pytest.raises(SchemaError, match="binary"):
+        parse_config({**base, "dependencies": {"t": {"source": "archive", "kind": "tool", "platforms": plats}}})
+    cfg = parse_config({**base, "dependencies": {"t": {"source": "archive", "kind": "tool", "binary": "bin/t", "platforms": plats}}})
+    assert cfg.dependencies["t"].platforms["macos-aarch64"].sha256 == "a" * 64

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "Oryx/Benchmark/Timer.h"
+#include "Oryx/Core/Timer.h"
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/Layer.h"
 #include "Oryx/Memory/MemoryStats.h"
 #include "Oryx/Containers/SmallVector.h"
 #include "Oryx/Game/IGame.h"
+#include "Oryx/Simulation/ITurnObserver.h"
 #include "Oryx/Simulation/BatchRunner.h"
 #include "Oryx/Simulation/Match.h"
 #include "Oryx/Strategy/IStrategy.h"
@@ -14,27 +15,30 @@ namespace oryx
 {
 
 class StartSimulationEvent;
+class RestartSimulationEvent;
 
 class SimulationLayer : public Layer
 {
 public:
-    using TurnObserver = std::function<void(IState& state)>;
-
     explicit SimulationLayer(bool benchmark = false);
 
     void event(Event& event) override;
-    void update() override;
+    void update(double delta_time) override;
 
     [[nodiscard]] const BatchResult& result() const { return m_result; }
 
 private:
     bool on_start_simulation(StartSimulationEvent& event);
+    bool on_restart_simulation(RestartSimulationEvent& event);
 
     UniquePtr<IGame> m_game;
     SmallVector<UniquePtr<IStrategy>, 2> m_strategy_storage;
     SmallVector<IStrategy*, 2> m_strategies;
     int32_t m_match_count = 0;
-    TurnObserver m_on_turn;
+    SharedPtr<ITurnObserver> m_observer;
+    // A lingering simulation keeps a finished match until a restart is requested and runs until the application closes.
+    bool m_linger = false;
+    bool m_restart_requested = false;
     bool m_benchmark;
     Timer m_timer;
     MemoryStats m_memory_before;
