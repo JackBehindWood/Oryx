@@ -15,10 +15,19 @@ const char* side_name(oryx::PlayerId player)
 
 } // namespace
 
-void HexapawnPresenter::describe(const oryx::IState& state, oryx::PlayerId, oryx::BoardView& out) const
+HexapawnPresenter::HexapawnPresenter()
+    : m_layout(oryx::make_grid_layout(k_size, k_size, true))
+{
+}
+
+oryx::SharedPtr<const oryx::BoardLayout> HexapawnPresenter::layout(const oryx::IState&) const
+{
+    return m_layout;
+}
+
+void HexapawnPresenter::describe_pieces(const oryx::IState& state, oryx::PlayerId, oryx::BoardContent& out) const
 {
     const HexapawnState& board = static_cast<const HexapawnState&>(state);
-    oryx::grid_spaces(k_size, k_size, true, out);
 
     for (uint32_t square = 0; square < k_size * k_size; ++square)
     {

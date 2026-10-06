@@ -151,3 +151,25 @@ TEST_CASE("static Input reads the primary window and is empty without one")
     Input::cursor_position(cursor);
     CHECK(cursor[1] == 9.0f);
 }
+
+TEST_CASE("NullWindow scale changes the framebuffer and keeps the logical size")
+{
+    WindowApp app;
+    NativeWindowHandle handle = app.window->native_handle();
+    CHECK(handle.content_scale == 1.0f);
+    CHECK(handle.framebuffer_width == handle.width);
+
+    app.window->inject_scale(2.0f);
+    handle = app.window->native_handle();
+    CHECK(handle.width == 640);
+    CHECK(handle.height == 480);
+    CHECK(handle.framebuffer_width == 1280);
+    CHECK(handle.framebuffer_height == 960);
+    CHECK(handle.content_scale == 2.0f);
+    CHECK(app.recorder->types == std::vector<EventType>{ EventType::WindowResize });
+
+    app.window->inject_scale(1.5f);
+    CHECK(app.window->native_handle().framebuffer_width == 960);
+    CHECK_THROWS_AS(app.window->inject_scale(0.0f), Error);
+    CHECK_THROWS_AS(app.window->inject_scale(std::numeric_limits<float>::quiet_NaN()), Error);
+}

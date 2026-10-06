@@ -1,125 +1,161 @@
 #include "MoveBuilder.h"
 
-#include "Oryx/Core/Error.h"
-
 namespace oryx
 {
 
 namespace
 {
 
-bool is_prefix(const PickList& prefix, const PickList& of)
-{
-    return prefix.size() <= of.size() && std::equal(prefix.begin(), prefix.end(), of.begin());
-}
+const Pick k_confirm_pick = { PickKind::Confirm, 0, "confirm" };
 
 } // namespace
 
-void MoveBuilder::reset(std::vector<MoveCandidate> candidates)
+void MoveBuilder::reset(const std::vector<MoveCandidate>& candidates)
 {
-    for (size_t index = 0; index < candidates.size(); ++index)
-    {
-        const MoveCandidate& candidate = candidates[index];
-        if (candidate.picks.empty())
-        {
-            throw Error("Action " + to_string(candidate.action) + " has no picks");
-        }
-        for (size_t other = index + 1; other < candidates.size(); ++other)
-        {
-            if (is_prefix(candidate.picks, candidates[other].picks) || is_prefix(candidates[other].picks, candidate.picks))
-            {
-                throw Error("The picks of actions " + to_string(candidate.action) + " and " + to_string(candidates[other].action) + " are ambiguous: one starts with the other");
-            }
-        }
-    }
-    m_candidates = std::move(candidates);
+    m_tree.build(candidates);
+    m_path.clear();
+    m_picked.clear();
+    m_path.reserve(m_tree.max_depth());
+    m_picked.reserve(m_tree.max_depth());
+}
+
+void MoveBuilder::clear()
+{
+    m_path.clear();
     m_picked.clear();
 }
 
-bool MoveBuilder::continues(const MoveCandidate& candidate, const Pick& pick) const
+bool MoveBuilder::ready() const
 {
-    size_t depth = m_picked.size();
-    return candidate.picks.size() > depth && is_prefix(m_picked, candidate.picks) && candidate.picks[depth] == pick;
+    uint32_t node = current();
+    return !m_path.empty() && m_tree.is_move(node) && m_tree.has_children(node);
 }
 
-ActionId MoveBuilder::extend(const Pick& pick)
+uint32_t MoveBuilder::resolve(const Pick& pick, bool& restart) const
 {
-    const MoveCandidate* match = nullptr;
-    for (const MoveCandidate& candidate : m_candidates)
+    restart = false;
+    uint32_t node = m_tree.child(current(), pick);
+    if (node != MoveTree::k_none || m_path.empty())
     {
-        if (continues(candidate, pick))
-        {
-            match = &candidate;
-            break;
-        }
+        return node;
     }
-    if (match == nullptr)
-    {
-        return INVALID_ACTION;
-    }
-
-    m_picked.push_back(match->picks[m_picked.size()]);
-    for (const MoveCandidate& candidate : m_candidates)
-    {
-        if (candidate.picks == m_picked)
-        {
-            ActionId action = candidate.action;
-            m_picked.clear();
-            return action;
-        }
-    }
-    return PENDING_ACTION;
+    restart = true;
+    return m_tree.child(MoveTree::k_root, pick);
 }
 
-ActionId MoveBuilder::pick(const Pick& pick)
+PickResult MoveBuilder::pick(const Pick& pick)
 {
-    ActionId action = extend(pick);
-    if (action != INVALID_ACTION || m_picked.empty())
+    if (pick.kind == PickKind::Confirm)
     {
-        return action;
+        return confirm();
     }
 
-    PickList previous = std::move(m_picked);
-    m_picked.clear();
-    action = extend(pick);
-    if (action == INVALID_ACTION)
+    bool restart = false;
+    uint32_t node = resolve(pick, restart);
+    if (node == MoveTree::k_none)
     {
-        m_picked = std::move(previous);
+        return {};
     }
-    return action;
+    if (restart)
+    {
+        clear();
+    }
+
+    ActionId action = m_tree.node(node).action;
+    if (action != INVALID_ACTION && !m_tree.has_children(node))
+    {
+        clear();
+        return { PickStatus::Complete, action };
+    }
+
+    m_path.push_back(node);
+    m_picked.push_back(m_tree.node(node).pick);
+    return { action != INVALID_ACTION ? PickStatus::Ready : PickStatus::Pending, action };
+}
+
+PickResult MoveBuilder::confirm()
+{
+    if (!ready())
+    {
+        return {};
+    }
+    ActionId action = m_tree.node(current()).action;
+    clear();
+    return { PickStatus::Complete, action };
 }
 
 bool MoveBuilder::back()
 {
-    if (m_picked.empty())
+    if (m_path.empty())
     {
         return false;
     }
+    m_path.pop_back();
     m_picked.pop_back();
     return true;
+}
+
+void MoveBuilder::list_after(uint32_t node, PickList& out) const
+{
+    out.clear();
+    for (uint32_t child = m_tree.node(node).first_child; child != MoveTree::k_none; child = m_tree.node(child).next_sibling)
+    {
+        out.push_back(m_tree.node(child).pick);
+    }
 }
 
 PickList MoveBuilder::next_picks() const
 {
     PickList next;
-    for (const MoveCandidate& candidate : m_candidates)
-    {
-        if (candidate.picks.size() <= m_picked.size() || !is_prefix(m_picked, candidate.picks))
-        {
-            continue;
-        }
-        const Pick& pick = candidate.picks[m_picked.size()];
-        if (std::find(next.begin(), next.end(), pick) == next.end())
-        {
-            next.push_back(pick);
-        }
-    }
+    next_picks(next);
     return next;
+}
+
+void MoveBuilder::next_picks(PickList& out) const
+{
+    list_after(current(), out);
+    if (ready())
+    {
+        out.push_back(k_confirm_pick);
+    }
+}
+
+PickList MoveBuilder::preview(const Pick& pick) const
+{
+    PickList out;
+    preview(pick, out);
+    return out;
+}
+
+void MoveBuilder::preview(const Pick& pick, PickList& out) const
+{
+    out.clear();
+    if (pick.kind == PickKind::Confirm)
+    {
+        return;
+    }
+
+    bool restart = false;
+    uint32_t node = resolve(pick, restart);
+    if (node == MoveTree::k_none)
+    {
+        return;
+    }
+    list_after(node, out);
+    if (!out.empty() && m_tree.is_move(node))
+    {
+        out.push_back(k_confirm_pick);
+    }
 }
 
 bool MoveBuilder::can_pick(const Pick& pick) const
 {
-    return std::any_of(m_candidates.begin(), m_candidates.end(), [&](const MoveCandidate& candidate) { return continues(candidate, pick); });
+    if (pick.kind == PickKind::Confirm)
+    {
+        return ready();
+    }
+    bool restart = false;
+    return resolve(pick, restart) != MoveTree::k_none;
 }
 
 std::vector<MoveCandidate> collect_candidates(const IBoardPresenter& presenter, const IState& state)
@@ -131,6 +167,7 @@ std::vector<MoveCandidate> collect_candidates(const IBoardPresenter& presenter, 
     }
     for (ActionId action : state.legal_actions())
     {
+        OX_CORE_ASSERT(is_game_action(action), "legal_actions() returned a reserved action id.");
         MoveCandidate candidate;
         candidate.action = action;
         presenter.action_picks(state, action, candidate.picks);

@@ -11,9 +11,10 @@ namespace
 BoardScene grid_scene(uint32_t columns, uint32_t rows)
 {
     BoardView view;
-    grid_spaces(columns, rows, false, view);
+    view.layout = make_grid_layout(columns, rows, false);
+    std::vector<SpaceId> unchanged;
     BoardScene scene;
-    build_board_scene(view, FakePresenter(), MoveBuilder(), {}, scene);
+    build_board_scene(view, FakePresenter(), MoveBuilder(), { unchanged }, scene);
     return scene;
 }
 
@@ -35,8 +36,8 @@ TEST_CASE("fit_board_2d centres the board between the status and menu bands at a
         BoardProjection2D layout = fit_board_2d(scene, viewport);
         REQUIRE(layout.scale > 0.0f);
 
-        Vec2f low = board_to_world(layout, scene.min);
-        Vec2f high = board_to_world(layout, scene.max);
+        Vec2f low = board_to_world(layout, scene.layout->min());
+        Vec2f high = board_to_world(layout, scene.layout->max());
         CHECK(low[0] >= k_board_gutter - 0.01f);
         CHECK(high[0] <= viewport[0] - k_board_gutter + 0.01f);
         CHECK(low[1] >= k_board_menu_band + k_board_gutter - 0.01f);
@@ -47,27 +48,23 @@ TEST_CASE("fit_board_2d centres the board between the status and menu bands at a
 
 TEST_CASE("cursor_to_board inverts the layout so every space is hit under its centre")
 {
-    BoardView view;
-    grid_spaces(8, 8, true, view);
+    SharedPtr<const BoardLayout2D> board = make_grid_layout(8, 8, true);
     BoardScene scene = grid_scene(8, 8);
     BoardProjection2D layout = fit_board_2d(scene, { 1280.0f, 720.0f });
 
-    for (SpaceId space = 0; space < view.spaces.size(); ++space)
+    for (SpaceId space = 0; space < board->space_count(); ++space)
     {
-        const BoardSpace& target = view.spaces[space];
-        Vec2f cursor = cursor_at(layout, { target.position[0], target.position[1] });
-        CHECK(space_at(view, cursor_to_board(layout, cursor)) == space);
+        Vec2f cursor = cursor_at(layout, board->position(space));
+        CHECK(space_at(*board, cursor_to_board(layout, cursor)) == space);
     }
-    CHECK(space_at(view, cursor_to_board(layout, { 1.0f, 1.0f })) == k_no_space);
+    CHECK(space_at(*board, cursor_to_board(layout, { 1.0f, 1.0f })) == k_no_space);
 }
 
 TEST_CASE("fit_board_2d gives a zero scale for a degenerate window or board, and nothing is hit")
 {
     BoardProjection2D layout = fit_board_2d(grid_scene(3, 3), { 10.0f, 10.0f });
     CHECK(layout.scale == 0.0f);
-    BoardView view;
-    grid_spaces(3, 3, false, view);
-    CHECK(space_at(view, cursor_to_board(layout, { 5.0f, 5.0f })) == k_no_space);
+    CHECK(space_at(*make_grid_layout(3, 3, false), cursor_to_board(layout, { 5.0f, 5.0f })) == k_no_space);
 
     CHECK(fit_board_2d(BoardScene{}, { 800.0f, 600.0f }).scale == 0.0f);
 }

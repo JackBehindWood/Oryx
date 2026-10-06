@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Oryx/Board/BoardSession.h"
-#include "Oryx/Board/IGraphicsBoard.h"
 #include "Oryx/Board/Selection.h"
 #include "Oryx/Core/Layer.h"
 
@@ -10,20 +9,18 @@ namespace oryx
 
 struct BoardLayerDesc
 {
-    // Graphical needs a window and renderer the application has already created.
-    selection::FrontEnd front_end = selection::FrontEnd::Console;
     // Empty picks the default (the terminal asks when it can).
     std::string game;
     // A strategy name, k_human_opponent for hot-seat, or empty to pick the default (the terminal asks when it can).
     std::string opponent;
-    // Graphical only: makes the windowed board. Empty uses GraphicsBoardRegistry alone; applications pass BoardGraphics' create_graphics_board,
-    // which also serves games that register only a presenter.
-    GraphicsBoardFactory create_graphics_board;
+    // Makes the board; empty plays in the terminal. A windowed board comes from here, with whatever feeds it frames registered by the factory itself.
+    BoardFactory create_board;
+    // The board reads stdin: choices are prompted for, the outcome is printed, and the application closes when stdin runs out.
+    bool terminal = true;
 };
 
-// Plays one game with a human against a strategy (or another human) through the game's registered board; knows no game by name.
-// It owns what every board shares: the outcome announcement, reading a window's input once per frame (BoardInput), restarting a finished
-// windowed game and quitting when stdin runs out.
+// Plays one game with a human against a strategy (or another human) through the game's board; knows no game by name, and no window, device or renderer.
+// It owns what every board shares: the outcome announcement, restarting a finished game when the board asks, and quitting when stdin runs out.
 class BoardLayer : public Layer
 {
 public:
@@ -35,12 +32,11 @@ public:
 private:
     void start();
 
-    selection::FrontEnd m_front_end;
     std::string m_requested_game;
     std::string m_requested_opponent;
-    GraphicsBoardFactory m_create_graphics_board;
+    BoardFactory m_create_board;
+    bool m_terminal;
     SharedPtr<BoardSession> m_session;
-    IGraphicsBoard* m_graphics_board = nullptr;
 };
 
 } // namespace oryx

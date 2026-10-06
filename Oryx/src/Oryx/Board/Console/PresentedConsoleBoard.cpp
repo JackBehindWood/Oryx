@@ -29,11 +29,11 @@ void trim_right(std::string& line)
     line.erase(line.find_last_not_of(' ') + 1);
 }
 
-std::string pick_name(const BoardView& view, const Pick& pick)
+std::string pick_name(const BoardLayout& layout, const Pick& pick)
 {
-    if (pick.kind == PickKind::Space && pick.value < view.spaces.size())
+    if (pick.kind == PickKind::Space && pick.value < layout.space_count())
     {
-        return view.spaces[pick.value].label;
+        return layout.label(pick.value);
     }
     return pick.label;
 }
@@ -47,10 +47,14 @@ bool same_word(const std::string& a, const std::string& b)
 
 std::string board_text(const BoardScene& scene)
 {
-    std::vector<float> xs = scene_columns(scene);
-    std::vector<float> ys = scene_rows(scene);
+    if (scene.layout == nullptr)
+    {
+        return scene.status.empty() ? std::string() : scene.status + "\n";
+    }
+    const BoardLayout& layout = *scene.layout;
+    size_t count = layout.space_count();
 
-    std::vector<std::string> glyphs(scene.spaces.size(), ".");
+    std::vector<std::string> glyphs(count, ".");
     for (const ScenePiece& piece : scene.pieces)
     {
         if (piece.space < glyphs.size() && !piece.style.glyph.empty())
@@ -58,6 +62,23 @@ std::string board_text(const BoardScene& scene)
             glyphs[piece.space] = piece.style.glyph;
         }
     }
+
+    std::string text;
+    if (!layout.text_grid())
+    {
+        for (SpaceId space = 0; space < count; ++space)
+        {
+            text += layout.label(space) + ": " + glyphs[space] + "\n";
+        }
+        if (!scene.status.empty())
+        {
+            text += scene.status + "\n";
+        }
+        return text;
+    }
+
+    const std::vector<float>& xs = layout.columns();
+    const std::vector<float>& ys = layout.rows();
 
     size_t glyph_width = 1;
     for (const std::string& glyph : glyphs)
@@ -67,45 +88,42 @@ std::string board_text(const BoardScene& scene)
     size_t cell_width = glyph_width + 2;
 
     std::vector<std::string> cells(xs.size() * ys.size(), std::string(cell_width, ' '));
-    for (size_t index = 0; index < scene.spaces.size(); ++index)
+    for (SpaceId space = 0; space < count; ++space)
     {
-        const SceneSpace& space = scene.spaces[index];
+        SpaceHighlight highlight = scene.highlights[space];
         std::string open = " ";
         std::string close = " ";
-        if (has_highlight(space.highlight, SpaceHighlight::Picked))
+        if (has_highlight(highlight, SpaceHighlight::Picked))
         {
             open = "(";
             close = ")";
         }
-        else if (has_highlight(space.highlight, SpaceHighlight::Changed))
+        else if (has_highlight(highlight, SpaceHighlight::Changed))
         {
             open = "[";
             close = "]";
         }
-        size_t row = axis_index(ys, space.space.position[1]);
-        size_t col = axis_index(xs, space.space.position[0]);
-        cells[row * xs.size() + col] = open + centred(glyphs[index], glyph_width) + close;
+        cells[layout.row_index(space) * xs.size() + layout.column_index(space)] = open + centred(glyphs[space], glyph_width) + close;
     }
 
-    bool row_labels = scene.row_labels.size() == ys.size();
-    bool column_labels = scene.column_labels.size() == xs.size();
+    bool row_labels = layout.row_labels().size() == ys.size();
+    bool column_labels = layout.column_labels().size() == xs.size();
     size_t label_width = 0;
     if (row_labels)
     {
-        for (const std::string& label : scene.row_labels)
+        for (const std::string& label : layout.row_labels())
         {
             label_width = std::max(label_width, display_width(label));
         }
     }
     std::string margin = row_labels ? std::string(label_width + 1, ' ') : "";
 
-    std::string text;
     for (size_t row = 0; row < ys.size(); ++row)
     {
         std::string line;
         if (row_labels)
         {
-            const std::string& label = scene.row_labels[ys.size() - 1 - row];
+            const std::string& label = layout.row_labels()[ys.size() - 1 - row];
             line += std::string(label_width - display_width(label), ' ') + label + " ";
         }
         for (size_t col = 0; col < xs.size(); ++col)
@@ -119,7 +137,7 @@ std::string board_text(const BoardScene& scene)
     if (column_labels)
     {
         std::string line = margin;
-        for (const std::string& label : scene.column_labels)
+        for (const std::string& label : layout.column_labels())
         {
             line += centred(label, cell_width);
         }
@@ -135,44 +153,39 @@ std::string board_text(const BoardScene& scene)
 }
 
 PresentedConsoleBoard::PresentedConsoleBoard(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat)
-    : m_presentation(std::move(presenter), std::move(game), seat)
+    : m_interaction(std::move(presenter), std::move(game), seat)
 {
 }
 
 void PresentedConsoleBoard::on_turn(const IState& state)
 {
-    if (m_presentation.update(state))
+    if (m_interaction.update(state))
     {
         print();
     }
 }
 
-void PresentedConsoleBoard::print() const
+void PresentedConsoleBoard::print()
 {
-    BoardScene scene;
-    m_presentation.build_scene(k_no_space, scene);
-    std::cout << board_text(scene);
+    std::cout << board_text(m_interaction.scene());
 }
 
 ActionId PresentedConsoleBoard::poll_action(const IState& state)
 {
-    if (m_presentation.update(state))
-    {
-        print();
-    }
-    if (!m_presentation.accepts_moves())
+    on_turn(state);
+    if (!m_interaction.accepts_moves())
     {
         return PENDING_ACTION;
     }
 
-    MoveBuilder& builder = m_presentation.builder();
-    const BoardView& view = m_presentation.view();
+    const MoveBuilder& builder = m_interaction.presentation().builder();
+    const BoardLayout& layout = *m_interaction.presentation().view().layout;
     while (std::cin)
     {
         std::string moves;
         for (const Pick& pick : builder.next_picks())
         {
-            moves += (moves.empty() ? "" : " ") + pick_name(view, pick);
+            moves += (moves.empty() ? "" : " ") + pick_name(layout, pick);
         }
         std::cout << (builder.picked().empty() ? "Moves: " : "Then: ") << moves << "\n";
         std::cout << "Enter a move, 'b' to take back a pick or 'u' to undo: ";
@@ -191,27 +204,28 @@ ActionId PresentedConsoleBoard::poll_action(const IState& state)
         {
             if (word == "u" || word == "undo")
             {
-                builder.clear();
-                return UNDO_ACTION;
+                m_interaction.undo();
+                return m_interaction.poll();
             }
             if (word == "b" || word == "back")
             {
-                builder.back();
+                m_interaction.back();
                 continue;
             }
 
             PickList next = builder.next_picks();
-            auto match = std::find_if(next.begin(), next.end(), [&](const Pick& pick) { return same_word(pick_name(view, pick), word); });
+            PickList::iterator match = std::find_if(next.begin(), next.end(), [&](const Pick& pick) { return same_word(pick_name(layout, pick), word); });
             understood = match != next.end();
             if (understood)
             {
-                action = builder.pick(*match);
+                m_interaction.submit(*match);
+                action = m_interaction.poll();
             }
         }
 
         if (!understood)
         {
-            builder.clear();
+            m_interaction.cancel();
             std::cout << "That isn't a legal move. Try again.\n";
             continue;
         }

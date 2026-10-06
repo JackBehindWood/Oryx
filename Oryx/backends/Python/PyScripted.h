@@ -2,7 +2,7 @@
 
 #include "Interop/PyMethods.h"
 
-#include "Oryx/Board/ConsoleBoard.h"
+#include "Oryx/Board/Console/ConsoleBoard.h"
 #include "Oryx/Core/Params.h"
 #include "Oryx/Scripting/Interfaces/IScriptedConsoleBoard.h"
 #include "Oryx/Scripting/Interfaces/IScriptedGame.h"

@@ -20,8 +20,7 @@ BoardInput hover(const PresentedGraphicsBoard2D& board, SpaceId space)
     BoardScene scene;
     board.presentation().build_scene(k_no_space, scene);
     BoardProjection2D layout = fit_board_2d(scene, k_viewport);
-    const Vec3f& position = scene.spaces[space].space.position;
-    Vec2f world = board_to_world(layout, { position[0], position[1] });
+    Vec2f world = board_to_world(layout, scene.layout->position(space));
 
     BoardInput input;
     input.viewport = k_viewport;
@@ -156,4 +155,73 @@ TEST_CASE("PresentedGraphicsBoard2D draws the scene through the renderer, and no
     tiny.viewport = { 4.0f, 4.0f };
     board.render(tiny);
     CHECK(Renderer::batch_stats().primitives == before);
+}
+
+namespace
+{
+
+BoardInput frame_at(const PresentedGraphicsBoard2D& board, SpaceId space, bool select, bool down, bool released)
+{
+    BoardInput input = hover(board, space);
+    input.select = select;
+    input.select_down = down;
+    input.select_released = released;
+    return input;
+}
+
+} // namespace
+
+TEST_CASE("PresentedGraphicsBoard2D plays a move by dragging a piece onto its target")
+{
+    PresentedGraphicsBoard2D board(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
+    HexapawnState state;
+    board.on_turn(state);
+
+    board.update(frame_at(board, 6, true, true, false), 0.016);
+    CHECK(board.dragging());
+    board.update(frame_at(board, 4, false, true, false), 0.016);
+    CHECK(board.dragging());
+    CHECK(board.poll_action(state) == PENDING_ACTION);
+
+    BoardScene scene;
+    board.presentation().build_scene(k_no_space, scene);
+    board.update(frame_at(board, 3, false, false, true), 0.016);
+    CHECK_FALSE(board.dragging());
+    CHECK(board.poll_action(state) == pawn(6, HexapawnState::Forward));
+}
+
+TEST_CASE("PresentedGraphicsBoard2D treats a release over the pressed cell as a click and a drop elsewhere as nothing")
+{
+    PresentedGraphicsBoard2D board(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
+    HexapawnState state;
+    board.on_turn(state);
+
+    board.update(frame_at(board, 6, true, true, false), 0.016);
+    board.update(frame_at(board, 6, false, false, true), 0.016);
+    CHECK_FALSE(board.dragging());
+    CHECK(board.presentation().builder().picked().size() == 1);
+
+    board.update(frame_at(board, 7, true, true, false), 0.016);
+    board.update(frame_at(board, 8, false, false, true), 0.016);
+    CHECK(board.presentation().builder().picked().size() == 1);
+    CHECK(board.poll_action(state) == PENDING_ACTION);
+}
+
+TEST_CASE("PresentedGraphicsBoard2D cancels a drag on back and ends one whose release it never saw")
+{
+    PresentedGraphicsBoard2D board(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
+    HexapawnState state;
+    board.on_turn(state);
+
+    board.update(frame_at(board, 6, true, true, false), 0.016);
+    BoardInput cancel = frame_at(board, 3, false, true, false);
+    cancel.back = true;
+    board.update(cancel, 0.016);
+    CHECK_FALSE(board.dragging());
+    CHECK(board.presentation().builder().picked().empty());
+
+    board.update(frame_at(board, 6, true, true, false), 0.016);
+    board.update(frame_at(board, 3, false, false, false), 0.016);
+    CHECK_FALSE(board.dragging());
+    CHECK(board.presentation().builder().picked().size() == 1);
 }

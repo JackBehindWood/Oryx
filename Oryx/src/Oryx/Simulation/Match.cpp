@@ -75,6 +75,7 @@ ActionId Match::decide() const
 
 void Match::apply(ActionId action)
 {
+    OX_CORE_ASSERT(is_game_action(action), "Match::apply needs a game action, not a sentinel.");
     m_state->apply(action);
     m_history.record(action);
 }
@@ -82,7 +83,7 @@ void Match::apply(ActionId action)
 ActionId Match::undo()
 {
     ActionId action = m_history.undo();
-    if (is_valid(action))
+    if (is_game_action(action))
     {
         m_state->undo(action);
     }
@@ -92,7 +93,7 @@ ActionId Match::undo()
 ActionId Match::redo()
 {
     ActionId action = m_history.redo();
-    if (is_valid(action))
+    if (is_game_action(action))
     {
         m_state->apply(action);
     }

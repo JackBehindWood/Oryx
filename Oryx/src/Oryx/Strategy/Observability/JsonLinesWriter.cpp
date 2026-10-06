@@ -57,7 +57,7 @@ JsonLinesWriter::JsonLinesWriter(std::ostream& out)
 void JsonLinesWriter::on_decision(const IState& state, const Decision& decision)
 {
     m_out << "{\"ply\":" << std::to_string(m_ply++) << ",\"player\":" << std::to_string(decision.player) << ",\"chosen\":" << std::to_string(decision.chosen)
-          << ",\"chosen_label\":" << quoted(is_valid(decision.chosen) ? state.action_to_string(decision.chosen) : std::string());
+          << ",\"chosen_label\":" << quoted(is_game_action(decision.chosen) ? state.action_to_string(decision.chosen) : std::string());
 
     m_out << ",\"scores\":[";
     for (size_t i = 0; i < decision.scores.size(); ++i)

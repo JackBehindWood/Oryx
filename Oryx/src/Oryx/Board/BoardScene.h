@@ -35,46 +35,43 @@ constexpr bool has_highlight(SpaceHighlight set, SpaceHighlight flag)
     return (static_cast<uint8_t>(set) & static_cast<uint8_t>(flag)) != 0;
 }
 
-struct SceneSpace
-{
-    BoardSpace space;
-    SpaceHighlight highlight = SpaceHighlight::None;
-};
-
 struct ScenePiece
 {
     PieceStyle style;
     SpaceId space = k_no_space;
 };
 
-// What a front end draws for one frame: the view resolved to styles and highlights, in board units and free of rendering types.
+// A piece being dragged: its space and where the cursor is, in logical window points with the origin top left.
+struct SceneDrag
+{
+    bool active = false;
+    SpaceId space = k_no_space;
+    Vec2f cursor;
+};
+
+// What a front end draws for one frame: the view resolved to styles and highlights, free of rendering types. The layout is shared, not copied.
 struct BoardScene
 {
-    std::vector<SceneSpace> spaces;
+    SharedPtr<const BoardLayout> layout;
+    // One per layout space.
+    std::vector<SpaceHighlight> highlights;
     std::vector<ScenePiece> pieces;
-    std::vector<std::string> column_labels;
-    std::vector<std::string> row_labels;
-    // The option picks to offer as a menu now; empty while the next pick is a space.
+    // The option and Confirm picks to offer as a menu now; empty while the next pick is a space.
     PickList options;
+    SceneDrag drag;
     std::string status;
-    // The spaces' extent on the table (x, y), for fitting the board to a viewport.
-    Vec2f min;
-    Vec2f max;
+    // Scratch reused between frames so building a scene allocates nothing once warm.
+    PickList pending;
 };
 
 struct SceneState
 {
     // Spaces to mark as changed by the last move.
-    std::vector<SpaceId> changed;
+    const std::vector<SpaceId>& changed;
     SpaceId hovered = k_no_space;
+    SceneDrag drag;
 };
 
 void build_board_scene(const BoardView& view, const IBoardPresenter& presenter, const MoveBuilder& builder, const SceneState& state, BoardScene& out);
-
-// The distinct x positions of the spaces, ascending, and the distinct y positions, descending (top row first): the columns and rows of a grid.
-[[nodiscard]] std::vector<float> scene_columns(const BoardScene& scene);
-[[nodiscard]] std::vector<float> scene_rows(const BoardScene& scene);
-// The index of `value` in an axis from scene_columns or scene_rows.
-[[nodiscard]] size_t axis_index(const std::vector<float>& axis, float value);
 
 } // namespace oryx

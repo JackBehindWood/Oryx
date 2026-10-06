@@ -13,7 +13,7 @@ int32_t play_console_game(const std::string& input, std::string& out_output)
     ConsoleScope console(input);
     Application app({ 0, nullptr });
     app.push_layer<SimulationLayer>();
-    app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Console, "tictactoe", selection::k_human_opponent });
+    app.push_layer<BoardLayer>(BoardLayerDesc{ "tictactoe", selection::k_human_opponent });
     app.run();
     out_output = console.output();
     return app.exit_code();
@@ -56,7 +56,7 @@ TEST_CASE("BoardLayer fails with an error for an unknown game")
     ConsoleScope console("");
     Application app({ 0, nullptr });
     app.push_layer<SimulationLayer>();
-    app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Console, "no-such-game", "" });
+    app.push_layer<BoardLayer>(BoardLayerDesc{ "no-such-game", "" });
     app.run();
 
     CHECK(app.exit_code() == 1);
@@ -71,30 +71,38 @@ namespace
 
 constexpr Vec2f k_window = { 800.0f, 600.0f };
 
+// Declared before the Application so the device outlives the layers that hold RHI resources.
+struct RendererScope
+{
+    explicit RendererScope(RHIBackend backend) { Renderer::init({ backend }); }
+    ~RendererScope() { Renderer::shutdown(); }
+};
+
 struct WindowedGame
 {
     WindowedGame()
-        : app({ 0, nullptr })
+        : renderer(RHIBackend::Null)
+        , app({ 0, nullptr })
     {
-        Renderer::init({ RHIBackend::Null });
         window = static_cast<NullWindow*>(&app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", static_cast<int32_t>(k_window[0]), static_cast<int32_t>(k_window[1]) })));
+        graphics = &app.push_overlay<GraphicsLayer>();
         simulation = &app.push_layer<SimulationLayer>();
-        GraphicsBoardFactory factory = [this](const std::string& game, PlayerId seat)
+        BoardFactory factory = [this](const std::string& game, PlayerId seat) -> SharedPtr<IBoard>
         {
-            UniquePtr<IGraphicsBoard> created = create_graphics_board(game, seat);
+            SharedPtr<IGraphicsBoard> created = create_graphics_board(game, seat);
             board = dynamic_cast<PresentedGraphicsBoard2D*>(created.get());
+            graphics->add_client(*created);
             return created;
         };
-        layer = &app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Graphical, "hexapawn", selection::k_human_opponent, factory });
+        layer = &app.push_layer<BoardLayer>(BoardLayerDesc{ "hexapawn", selection::k_human_opponent, factory, false });
     }
 
-    ~WindowedGame() { Renderer::shutdown(); }
 
     void frame()
     {
         simulation->update(0.016);
         layer->update(0.016);
-        window->poll_events();
+        graphics->update(0.016);
     }
 
     void click(SpaceId space)
@@ -102,8 +110,7 @@ struct WindowedGame
         BoardScene scene;
         board->presentation().build_scene(k_no_space, scene);
         BoardProjection2D layout = fit_board_2d(scene, k_window);
-        const Vec3f& position = scene.spaces[space].space.position;
-        Vec2f world = board_to_world(layout, { position[0], position[1] });
+        Vec2f world = board_to_world(layout, scene.layout->position(space));
         window->inject_cursor(world[0], k_window[1] - world[1]);
         window->inject_mouse_button(MouseCode::Left, true);
         frame();
@@ -111,10 +118,12 @@ struct WindowedGame
         frame();
     }
 
+    RendererScope renderer;
     Application app;
     NullWindow* window = nullptr;
     SimulationLayer* simulation = nullptr;
     BoardLayer* layer = nullptr;
+    GraphicsLayer* graphics = nullptr;
     PresentedGraphicsBoard2D* board = nullptr;
 };
 
@@ -140,9 +149,10 @@ TEST_CASE("BoardLayer plays a presented game in a window from clicks alone, then
         game.frame();
     }
     game.window->inject_key(KeyCode::R, true);
-    game.frame();
-    game.frame();
-    game.frame();
+    for (int32_t frame = 0; frame < 4; ++frame)
+    {
+        game.frame();
+    }
     CHECK_FALSE(game.board->presentation().terminal());
     CHECK(game.board->presentation().view().status == "White to move");
 }

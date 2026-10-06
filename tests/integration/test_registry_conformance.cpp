@@ -112,6 +112,40 @@ TEST_CASE("Every registered strategy returns a legal action in the initial state
     }
 }
 
+namespace
+{
+
+struct PresenterSnapshot
+{
+    SharedPtr<const BoardLayout> layout;
+    BoardContent content;
+    std::vector<PickList> picks;
+};
+
+PresenterSnapshot snapshot(const IBoardPresenter& presenter, const IState& state)
+{
+    PresenterSnapshot shot;
+    shot.layout = presenter.layout(state);
+    presenter.describe_pieces(state, state.current_player(), shot.content);
+    if (!state.is_terminal())
+    {
+        for (ActionId action : state.legal_actions())
+        {
+            PickList picks;
+            presenter.action_picks(state, action, picks);
+            shot.picks.push_back(std::move(picks));
+        }
+    }
+    return shot;
+}
+
+bool same(const PresenterSnapshot& a, const PresenterSnapshot& b)
+{
+    return a.layout == b.layout && a.content.pieces == b.content.pieces && a.content.status == b.content.status && a.picks == b.picks;
+}
+
+} // namespace
+
 TEST_CASE("Every registered presenter describes its game's states validly, and the picks of each legal action play exactly that action")
 {
     for (const std::string& name : BoardPresenterRegistry::names())
@@ -125,7 +159,8 @@ TEST_CASE("Every registered presenter describes its game's states validly, and t
         for (size_t ply = 0;; ++ply)
         {
             BoardView view;
-            presenter->describe(*state, state->current_player(), view);
+            view.layout = presenter->layout(*state);
+            presenter->describe_pieces(*state, state->current_player(), view);
             CHECK_NOTHROW(validate_view(view, name));
             CHECK_FALSE(view.status.empty());
             if (state->is_terminal())
@@ -141,15 +176,55 @@ TEST_CASE("Every registered presenter describes its game's states validly, and t
                 ActionId played = INVALID_ACTION;
                 for (const Pick& pick : candidate.picks)
                 {
-                    CHECK((pick.kind != PickKind::Space || pick.value < view.spaces.size()));
+                    CHECK((pick.kind != PickKind::Space || pick.value < view.layout->space_count()));
                     CHECK((pick.kind != PickKind::Option || !pick.label.empty()));
-                    played = builder.pick(pick);
+                    played = builder.pick(pick).action;
                 }
                 CHECK(played == candidate.action);
             }
 
             ActionList legal = state->legal_actions();
             state->apply(legal[ply % legal.size()]);
+        }
+    }
+}
+
+TEST_CASE("Every registered presenter is stateless: layout, pieces and picks repeat over repeated and reversed states")
+{
+    for (const std::string& name : BoardPresenterRegistry::names())
+    {
+        CAPTURE(name);
+        UniquePtr<IGame> game = try_create_game(name);
+        REQUIRE(game != nullptr);
+        UniquePtr<IBoardPresenter> presenter = BoardPresenterRegistry::create(name);
+
+        std::vector<ActionId> played;
+        std::vector<PresenterSnapshot> shots;
+        UniquePtr<IState> state = game->new_initial_state();
+        for (size_t ply = 0;; ++ply)
+        {
+            shots.push_back(snapshot(*presenter, *state));
+            if (state->is_terminal())
+            {
+                break;
+            }
+            ActionList legal = state->legal_actions();
+            played.push_back(legal[ply % legal.size()]);
+            state->apply(played.back());
+        }
+
+        for (size_t pass = 0; pass < 2; ++pass)
+        {
+            for (size_t index = shots.size(); index-- > 0;)
+            {
+                UniquePtr<IState> replay = game->new_initial_state();
+                for (size_t step = 0; step < index; ++step)
+                {
+                    replay->apply(played[step]);
+                }
+                CHECK(same(shots[index], snapshot(*presenter, *replay)));
+                CHECK(shots[index].layout == shots.front().layout);
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Oryx/Board/BoardPresentation.h"
-#include "Oryx/Board/IConsoleBoard.h"
+#include "Oryx/Board/BoardInteraction.h"
+#include "Oryx/Board/Console/IConsoleBoard.h"
 
 namespace oryx
 {
@@ -18,9 +18,9 @@ public:
     bool shows_moves() const override { return true; }
 
 private:
-    void print() const;
+    void print();
 
-    BoardPresentation m_presentation;
+    BoardInteraction m_interaction;
 };
 
 // The board as text: one row per distinct y, one column per distinct x, axis labels when the view has them,

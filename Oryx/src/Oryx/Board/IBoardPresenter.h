@@ -13,7 +13,9 @@ enum class PickKind : uint8_t
     // `value` is a SpaceId.
     Space,
     // `value` is a game-defined choice offered as a menu (e.g. the piece a pawn promotes to).
-    Option
+    Option,
+    // Ends a move that is already legal but could continue (e.g. stopping a multi-jump early); only MoveBuilder offers it, presenters never emit it.
+    Confirm
 };
 
 // One step of playing a move: a move is the sequence of picks a person makes, so the same presenter drives a mouse, a terminal or a controller.
@@ -21,7 +23,7 @@ struct Pick
 {
     PickKind kind = PickKind::Space;
     uint32_t value = 0;
-    // Menu text, for options only; spaces are named by their BoardSpace::label.
+    // Menu text, for options only; spaces are named by their BoardLayout label.
     std::string label;
 };
 
@@ -38,9 +40,11 @@ class IBoardPresenter
 public:
     virtual ~IBoardPresenter() = default;
 
+    // The board of `state`; the same shared pointer for the same board, because a new pointer means a layout change.
+    [[nodiscard]] virtual SharedPtr<const BoardLayout> layout(const IState& state) const = 0;
     // Fills `out`, which arrives cleared, with what `viewer` would see at the table; a seat must never be shown what it could not see.
-    virtual void describe(const IState& state, PlayerId viewer, BoardView& out) const = 0;
-    // The picks that play `action`, a legal action of `state`. Distinct actions need distinct sequences and none may be a prefix of another.
+    virtual void describe_pieces(const IState& state, PlayerId viewer, BoardContent& out) const = 0;
+    // The picks that play `action`, a legal action of `state`. Distinct actions need distinct sequences; one may be a prefix of another, which makes the shorter move an optional stop.
     virtual void action_picks(const IState& state, ActionId action, PickList& out) const = 0;
     [[nodiscard]] virtual PieceStyle piece_style(PieceKind kind, PlayerId owner) const = 0;
 };

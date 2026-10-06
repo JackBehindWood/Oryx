@@ -71,7 +71,7 @@ AnnouncingStrategy::AnnouncingStrategy(UniquePtr<IStrategy> inner, std::string n
 ActionId AnnouncingStrategy::decide(const Context& context)
 {
     ActionId action = m_inner->decide(context);
-    if (is_valid(action))
+    if (is_game_action(action))
     {
         std::cout << "'" << m_name << "' plays: " << context.state().action_to_string(action) << "\n";
     }

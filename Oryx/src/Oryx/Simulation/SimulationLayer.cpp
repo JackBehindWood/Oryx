@@ -146,6 +146,7 @@ void SimulationLayer::update(double)
         return;
     }
 
+    OX_CORE_ASSERT(is_game_action(action), "SimulationLayer: a strategy returned a reserved action id.");
     m_match->apply(action);
 }
 

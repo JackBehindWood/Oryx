@@ -1,6 +1,6 @@
 #include "BoardSession.h"
 
-#include "Oryx/Board/ConsoleGame.h"
+#include "Oryx/Board/Console/ConsoleGame.h"
 
 namespace oryx
 {

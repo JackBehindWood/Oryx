@@ -24,6 +24,12 @@ constexpr bool is_valid(ActionId action)
     return action != INVALID_ACTION; 
 }
 
+// A game's legal action IDs stay strictly below PENDING_ACTION, so the three sentinels never collide with a real move.
+constexpr bool is_game_action(ActionId action)
+{
+    return action < PENDING_ACTION;
+}
+
 inline std::string to_string(ActionId action) 
 {
     return std::to_string(action); 

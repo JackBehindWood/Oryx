@@ -29,7 +29,7 @@ public:
     [[nodiscard]] MoveBuilder& builder() { return m_builder; }
     [[nodiscard]] const MoveBuilder& builder() const { return m_builder; }
 
-    void build_scene(SpaceId hovered, BoardScene& out) const;
+    void build_scene(SpaceId hovered, BoardScene& out, const SceneDrag& drag = {}) const;
 
 private:
     UniquePtr<IBoardPresenter> m_presenter;

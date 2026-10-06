@@ -48,7 +48,7 @@ project "Tests"
     useOryxPython()
     useOryxGraphics()
     if not graphicsEnabled() then
-        removefiles { "unit/Renderer/**", "unit/Graphics/**", "unit/Shaders/**", "unit/BoardGraphics/**", "unit/Assets/test_gpu_*" }
+        removefiles { "unit/Renderer/**", "unit/Graphics/**", "unit/Shaders/**", "unit/Board/Graphics/**", "unit/Assets/test_gpu_*" }
     end
 
     useOryxWholeArchive()

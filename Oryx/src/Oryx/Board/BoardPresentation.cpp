@@ -10,7 +10,7 @@ namespace
 
 bool same_view(const BoardView& a, const BoardView& b)
 {
-    return a.spaces.size() == b.spaces.size() && a.pieces == b.pieces && a.status == b.status;
+    return a.layout == b.layout && a.pieces == b.pieces && a.status == b.status;
 }
 
 } // namespace
@@ -32,8 +32,10 @@ bool BoardPresentation::update(const IState& state)
     bool terminal = state.is_terminal();
     ActionList legal = terminal ? ActionList{} : state.legal_actions();
 
-    m_next = BoardView{};
-    m_presenter->describe(state, m_seat == k_all_seats ? to_move : m_seat, m_next);
+    m_next.layout = m_presenter->layout(state);
+    m_next.pieces.clear();
+    m_next.status.clear();
+    m_presenter->describe_pieces(state, m_seat == k_all_seats ? to_move : m_seat, m_next);
 
     if (m_described && same_view(m_view, m_next) && to_move == m_to_move && terminal == m_terminal && legal == m_legal)
     {
@@ -57,9 +59,9 @@ bool BoardPresentation::accepts_moves() const
     return m_described && !m_terminal && (m_seat == k_all_seats || m_seat == m_to_move);
 }
 
-void BoardPresentation::build_scene(SpaceId hovered, BoardScene& out) const
+void BoardPresentation::build_scene(SpaceId hovered, BoardScene& out, const SceneDrag& drag) const
 {
-    build_board_scene(m_view, *m_presenter, m_builder, { m_changed, hovered }, out);
+    build_board_scene(m_view, *m_presenter, m_builder, { m_changed, hovered, drag }, out);
 }
 
 } // namespace oryx

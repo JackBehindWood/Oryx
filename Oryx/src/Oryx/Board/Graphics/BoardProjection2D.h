@@ -32,7 +32,9 @@ constexpr float k_board_gutter = 28.0f;
 [[nodiscard]] Vec2f cursor_to_board(const BoardProjection2D& layout, const Vec2f& cursor);
 [[nodiscard]] Vec2f cursor_to_world(const BoardProjection2D& layout, const Vec2f& cursor);
 
-// One button per option, centred in the bottom band.
+// The `index`th of `count` buttons, centred in the bottom band.
+[[nodiscard]] OptionButton2D option_button_2d(const BoardProjection2D& layout, size_t count, size_t index);
+// All `count` buttons.
 void option_buttons_2d(const BoardProjection2D& layout, size_t count, std::vector<OptionButton2D>& out);
 // The index of the button under the cursor, or `buttons.size()`.
 [[nodiscard]] size_t option_at(const std::vector<OptionButton2D>& buttons, const BoardProjection2D& layout, const Vec2f& cursor);

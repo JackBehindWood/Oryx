@@ -28,7 +28,7 @@ TEST_CASE("BoardPresentation reports a change only when what is shown or playabl
     CHECK(presentation.changed().empty());
     CHECK(presentation.view().status == "X to move");
 
-    CHECK(presentation.builder().pick(space(4)) == 4);
+    CHECK(presentation.builder().pick(space(4)).action == 4);
     state.apply(4);
     CHECK(presentation.update(state));
     CHECK(presentation.changed() == std::vector<SpaceId>{ 4 });
@@ -45,7 +45,7 @@ TEST_CASE("BoardPresentation drops a half-built move when the state changes")
     oasis::HexapawnState state;
     presentation.update(state);
 
-    CHECK(presentation.builder().pick(space(6)) == PENDING_ACTION);
+    CHECK(presentation.builder().pick(space(6)).status == PickStatus::Pending);
     CHECK_FALSE(presentation.update(state));
     CHECK(presentation.builder().picked().size() == 1);
 
@@ -84,13 +84,13 @@ TEST_CASE("BoardPresentation accepts moves only for its seat and shows that seat
 
 TEST_CASE("BoardPresentation rejects an invalid view from its presenter")
 {
-    class UnlabelledPresenter : public FakePresenter
+    class StrayPiecePresenter : public FakePresenter
     {
     public:
-        void describe(const IState&, PlayerId, BoardView& out) const override { out.spaces.push_back({}); }
+        void describe_pieces(const IState&, PlayerId, BoardContent& out) const override { out.pieces.push_back({ 0, 0, 7 }); }
     };
 
-    BoardPresentation presentation(create_unique<UnlabelledPresenter>(), "dummy", k_all_seats);
+    BoardPresentation presentation(create_unique<StrayPiecePresenter>(), "dummy", k_all_seats);
     CHECK_THROWS_AS(presentation.update(*DummyGame(5).new_initial_state()), Error);
     CHECK_THROWS_AS(BoardPresentation(nullptr, "dummy", k_all_seats), Error);
 }
@@ -105,36 +105,36 @@ TEST_CASE("build_board_scene resolves styles and highlights for any front end")
 
     BoardScene scene;
     presentation.build_scene(k_no_space, scene);
-    REQUIRE(scene.spaces.size() == 9);
+    REQUIRE(scene.highlights.size() == 9);
     CHECK(scene.pieces.size() == 6);
-    CHECK(scene.min == Vec2f(-0.5f, -0.5f));
-    CHECK(scene.max == Vec2f(2.5f, 2.5f));
+    CHECK(scene.layout->min() == Vec2f(-0.5f, -0.5f));
+    CHECK(scene.layout->max() == Vec2f(2.5f, 2.5f));
     CHECK(scene.status == "Black to move");
-    CHECK(scene.spaces[0].highlight == SpaceHighlight::None);
+    CHECK(scene.highlights[0] == SpaceHighlight::None);
 
     oasis::HexapawnState fresh;
     BoardPresentation first(create_unique<oasis::HexapawnPresenter>(), "hexapawn", k_all_seats);
     first.update(fresh);
     first.update(state);
     first.build_scene(k_no_space, scene);
-    CHECK(scene.spaces[4].highlight == SpaceHighlight::Changed);
-    CHECK(scene.spaces[7].highlight == SpaceHighlight::Changed);
+    CHECK(scene.highlights[4] == SpaceHighlight::Changed);
+    CHECK(scene.highlights[7] == SpaceHighlight::Changed);
 
     first.build_scene(0, scene);
-    CHECK(has_highlight(scene.spaces[0].highlight, SpaceHighlight::Hover));
+    CHECK(has_highlight(scene.highlights[0], SpaceHighlight::Hover));
     first.build_scene(1, scene);
-    CHECK(!has_highlight(scene.spaces[1].highlight, SpaceHighlight::Hover));
+    CHECK(!has_highlight(scene.highlights[1], SpaceHighlight::Hover));
 
-    CHECK(first.builder().pick(space(0)) == PENDING_ACTION);
+    CHECK(first.builder().pick(space(0)).status == PickStatus::Pending);
     first.build_scene(k_no_space, scene);
-    CHECK(has_highlight(scene.spaces[0].highlight, SpaceHighlight::Picked));
-    CHECK(has_highlight(scene.spaces[3].highlight, SpaceHighlight::Target));
-    CHECK(has_highlight(scene.spaces[4].highlight, SpaceHighlight::Target));
-    CHECK(!has_highlight(scene.spaces[5].highlight, SpaceHighlight::Target));
+    CHECK(has_highlight(scene.highlights[0], SpaceHighlight::Picked));
+    CHECK(has_highlight(scene.highlights[3], SpaceHighlight::Target));
+    CHECK(has_highlight(scene.highlights[4], SpaceHighlight::Target));
+    CHECK(!has_highlight(scene.highlights[5], SpaceHighlight::Target));
     CHECK(scene.options.empty());
 
-    CHECK(scene_columns(scene) == std::vector<float>{ 0.0f, 1.0f, 2.0f });
-    CHECK(scene_rows(scene) == std::vector<float>{ 2.0f, 1.0f, 0.0f });
+    CHECK(scene.layout->columns() == std::vector<float>{ 0.0f, 1.0f, 2.0f });
+    CHECK(scene.layout->rows() == std::vector<float>{ 2.0f, 1.0f, 0.0f });
 }
 
 TEST_CASE("build_board_scene offers option picks as a menu")
@@ -146,4 +146,50 @@ TEST_CASE("build_board_scene offers option picks as a menu")
     presentation.build_scene(k_no_space, scene);
     REQUIRE(scene.options.size() == 3);
     CHECK(scene.options[2].label == "take3");
+}
+
+namespace
+{
+
+// Shows a piece that only seat 0 may see, and records every viewer it was asked to describe for.
+class SecretPresenter : public FakePresenter
+{
+public:
+    void describe_pieces(const IState& state, PlayerId viewer, BoardContent& out) const override
+    {
+        FakePresenter::describe_pieces(state, viewer, out);
+        viewers.push_back(viewer);
+        if (viewer == 0)
+        {
+            out.pieces.push_back({ 0, 0, 0 });
+        }
+    }
+
+    mutable std::vector<PlayerId> viewers;
+};
+
+} // namespace
+
+TEST_CASE("BoardPresentation describes the table for its seat, or for whoever is to move in hot-seat, and never shows a seat what it cannot see")
+{
+    UniquePtr<IState> state = DummyGame(5).new_initial_state();
+
+    auto shown = [&](PlayerId seat, const IState& at)
+    {
+        UniquePtr<SecretPresenter> presenter = create_unique<SecretPresenter>();
+        SecretPresenter* raw = presenter.get();
+        BoardPresentation presentation(std::move(presenter), "dummy", seat);
+        presentation.update(at);
+        CHECK(raw->viewers == std::vector<PlayerId>{ seat == k_all_seats ? at.current_player() : seat });
+        return presentation.view().pieces.size();
+    };
+
+    CHECK(shown(0, *state) == 1);
+    CHECK(shown(1, *state) == 0);
+    CHECK(shown(k_all_seats, *state) == 1);
+
+    state->apply(1);
+    CHECK(shown(0, *state) == 1);
+    CHECK(shown(1, *state) == 0);
+    CHECK(shown(k_all_seats, *state) == 0);
 }

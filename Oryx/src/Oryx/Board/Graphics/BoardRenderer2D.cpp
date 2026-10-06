@@ -52,16 +52,15 @@ void draw_piece(const PieceStyle& style, const Vec2f& centre, float size, const 
     }
 }
 
-void draw_space(const SceneSpace& scene_space, const BoardProjection2D& layout, const BoardTheme2D& theme)
+void draw_space(const BoardLayout2D& board, SpaceId space, SpaceHighlight highlight, const BoardProjection2D& layout, const BoardTheme2D& theme)
 {
-    const BoardSpace& space = scene_space.space;
-    Vec2f centre = board_to_world(layout, { space.position[0], space.position[1] });
-    Vec2f size = { space.size[0] * layout.scale * (1.0f - theme.space_gap), space.size[1] * layout.scale * (1.0f - theme.space_gap) };
+    Vec2f centre = board_to_world(layout, board.position(space));
+    Vec2f size = { board.size(space)[0] * layout.scale * (1.0f - theme.space_gap), board.size(space)[1] * layout.scale * (1.0f - theme.space_gap) };
     float radius = std::min(size[0], size[1]) * 0.5f;
 
     auto fill = [&](const Colour& colour)
     {
-        if (space.shape == SpaceShape::Circle)
+        if (board.shape(space) == SpaceShape::Circle)
         {
             Renderer::draw_circle(centre, radius, colour);
         }
@@ -71,39 +70,39 @@ void draw_space(const SceneSpace& scene_space, const BoardProjection2D& layout, 
         }
     };
 
-    fill(theme.tones[space.tone % 2]);
-    if (has_highlight(scene_space.highlight, SpaceHighlight::Changed))
+    fill(theme.tones[board.tone(space) % 2]);
+    if (has_highlight(highlight, SpaceHighlight::Changed))
     {
         fill(theme.changed);
     }
-    if (has_highlight(scene_space.highlight, SpaceHighlight::Picked))
+    if (has_highlight(highlight, SpaceHighlight::Picked))
     {
         fill(theme.picked);
     }
-    if (has_highlight(scene_space.highlight, SpaceHighlight::Hover))
+    if (has_highlight(highlight, SpaceHighlight::Hover))
     {
         fill(theme.hover);
     }
 }
 
-void draw_axis_labels(const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font)
+void draw_axis_labels(const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font)
 {
-    std::vector<float> columns = scene_columns(scene);
-    std::vector<float> rows = scene_rows(scene);
-    if (scene.column_labels.size() == columns.size())
+    const std::vector<float>& columns = board.columns();
+    const std::vector<float>& rows = board.rows();
+    if (board.column_labels().size() == columns.size())
     {
-        float y = board_to_world(layout, { 0.0f, scene.min[1] })[1] - k_board_gutter * 0.5f;
+        float y = board_to_world(layout, { 0.0f, board.min()[1] })[1] - k_board_gutter * 0.5f;
         for (size_t index = 0; index < columns.size(); ++index)
         {
-            draw_text_centred(font, { board_to_world(layout, { columns[index], 0.0f })[0], y }, scene.column_labels[index], k_label_height, theme.label);
+            draw_text_centred(font, { board_to_world(layout, { columns[index], 0.0f })[0], y }, board.column_labels()[index], k_label_height, theme.label);
         }
     }
-    if (scene.row_labels.size() == rows.size())
+    if (board.row_labels().size() == rows.size())
     {
-        float x = board_to_world(layout, { scene.min[0], 0.0f })[0] - k_board_gutter * 0.5f;
+        float x = board_to_world(layout, { board.min()[0], 0.0f })[0] - k_board_gutter * 0.5f;
         for (size_t index = 0; index < rows.size(); ++index)
         {
-            draw_text_centred(font, { x, board_to_world(layout, { 0.0f, rows[index] })[1] }, scene.row_labels[rows.size() - 1 - index], k_label_height, theme.label);
+            draw_text_centred(font, { x, board_to_world(layout, { 0.0f, rows[index] })[1] }, board.row_labels()[rows.size() - 1 - index], k_label_height, theme.label);
         }
     }
 }
@@ -112,44 +111,44 @@ void draw_axis_labels(const BoardScene& scene, const BoardProjection2D& layout, 
 
 void draw_board_2d(const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const std::string& status)
 {
-    if (layout.scale <= 0.0f)
+    if (layout.scale <= 0.0f || scene.layout == nullptr)
     {
         return;
     }
+    const BoardLayout2D& board = layout_as<BoardLayout2D>(scene.layout, "board");
 
-    for (const SceneSpace& space : scene.spaces)
+    for (SpaceId space = 0; space < board.space_count(); ++space)
     {
-        draw_space(space, layout, theme);
+        draw_space(board, space, scene.highlights[space], layout, theme);
     }
 
     for (const ScenePiece& piece : scene.pieces)
     {
-        if (piece.space >= scene.spaces.size())
+        if (piece.space >= board.space_count())
         {
             continue;
         }
-        const BoardSpace& space = scene.spaces[piece.space].space;
-        Vec2f centre = board_to_world(layout, { space.position[0], space.position[1] });
-        draw_piece(piece.style, centre, std::min(space.size[0], space.size[1]) * layout.scale * theme.piece_size, theme);
+        bool dragged = scene.drag.active && scene.drag.space == piece.space;
+        Vec2f centre = dragged ? cursor_to_world(layout, scene.drag.cursor) : board_to_world(layout, board.position(piece.space));
+        draw_piece(piece.style, centre, std::min(board.size(piece.space)[0], board.size(piece.space)[1]) * layout.scale * theme.piece_size, theme);
     }
 
-    for (const SceneSpace& space : scene.spaces)
+    for (SpaceId space = 0; space < board.space_count(); ++space)
     {
-        if (has_highlight(space.highlight, SpaceHighlight::Target))
+        if (has_highlight(scene.highlights[space], SpaceHighlight::Target))
         {
-            Vec2f centre = board_to_world(layout, { space.space.position[0], space.space.position[1] });
-            Renderer::draw_circle(centre, std::min(space.space.size[0], space.space.size[1]) * layout.scale * k_target_dot, theme.target);
+            Vec2f centre = board_to_world(layout, board.position(space));
+            Renderer::draw_circle(centre, std::min(board.size(space)[0], board.size(space)[1]) * layout.scale * k_target_dot, theme.target);
         }
     }
 
-    draw_axis_labels(scene, layout, theme, font);
+    draw_axis_labels(board, layout, theme, font);
 
-    std::vector<OptionButton2D> buttons;
-    option_buttons_2d(layout, scene.options.size(), buttons);
-    for (size_t index = 0; index < buttons.size(); ++index)
+    for (size_t index = 0; index < scene.options.size(); ++index)
     {
-        Renderer::draw_rect(buttons[index].centre, buttons[index].size, theme.button);
-        draw_text_centred(font, buttons[index].centre, scene.options[index].label, k_option_height, theme.status);
+        OptionButton2D button = option_button_2d(layout, scene.options.size(), index);
+        Renderer::draw_rect(button.centre, button.size, theme.button);
+        draw_text_centred(font, button.centre, scene.options[index].label, k_option_height, theme.status);
     }
 
     draw_text_centred(font, { layout.viewport[0] * 0.5f, layout.viewport[1] - k_board_status_band * 0.5f }, status.empty() ? scene.status : status, k_status_height, theme.status);

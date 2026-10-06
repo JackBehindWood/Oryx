@@ -13,7 +13,7 @@
 #include "Support/PySchema.h"
 #include "Support/PyTypeHints.h"
 #include "Support/PyUtil.h"
-#include "Oryx/Board/ConsoleGame.h"
+#include "Oryx/Board/Console/ConsoleGame.h"
 #include "Oryx/Scripting/Registry/ScriptRegistry.h"
 
 namespace py = pybind11;

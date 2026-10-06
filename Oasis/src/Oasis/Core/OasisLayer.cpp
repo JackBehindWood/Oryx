@@ -77,7 +77,7 @@ void OasisLayer::start_play(const LaunchPlan& plan)
 {
     oryx::Application& app = oryx::Application::Get();
     app.push_layer<oryx::SimulationLayer>();
-    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ oryx::selection::FrontEnd::Console, plan.game, m_options.opponent });
+    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent });
 }
 
 bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
@@ -95,9 +95,18 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
         return false;
     }
 
+    oryx::GraphicsLayer& graphics = app.push_overlay<oryx::GraphicsLayer>();
     app.push_layer<oryx::SimulationLayer>();
-    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ oryx::selection::FrontEnd::Graphical, plan.game, m_options.opponent, oryx::create_graphics_board });
-    app.push_overlay<oryx::GraphicsLayer>();
+    oryx::BoardFactory create_board = [&graphics](const std::string& game, oryx::PlayerId seat) -> oryx::SharedPtr<oryx::IBoard>
+    {
+        oryx::SharedPtr<oryx::IGraphicsBoard> board = oryx::create_graphics_board(game, seat);
+        if (board != nullptr)
+        {
+            graphics.add_client(*board);
+        }
+        return board;
+    };
+    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent, create_board, false });
     return true;
 #else
     return false;

@@ -3,7 +3,7 @@
 namespace oasis
 {
 
-bool plan_launch(const Options& options, bool graphics_built, LaunchPlan& out_plan)
+bool plan_launch(const Options& options, [[maybe_unused]] bool graphics_built, LaunchPlan& out_plan)
 {
     out_plan = {};
     out_plan.game = options.game;
@@ -13,12 +13,16 @@ bool plan_launch(const Options& options, bool graphics_built, LaunchPlan& out_pl
         return true;
     }
 
+#ifdef OX_ENABLE_GRAPHICS
     oryx::selection::FrontEnd front_end = oryx::selection::FrontEnd::Console;
     if (!oryx::selection::choose_front_end(options.game, options.headless, graphics_built, front_end, out_plan.game))
     {
         return false;
     }
     out_plan.mode = front_end == oryx::selection::FrontEnd::Graphical ? LaunchMode::Graphical : LaunchMode::Console;
+#else
+    out_plan.mode = LaunchMode::Console;
+#endif
     return true;
 }
 

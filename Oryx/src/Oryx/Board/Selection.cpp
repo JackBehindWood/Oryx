@@ -1,8 +1,6 @@
 #include "Selection.h"
 
-#include "Oryx/Board/ConsoleGame.h"
-#include "Oryx/Board/IBoardPresenter.h"
-#include "Oryx/Board/IGraphicsBoard.h"
+#include "Oryx/Board/Console/ConsoleGame.h"
 #include "Oryx/Core/Log.h"
 #include <iostream>
 
@@ -241,33 +239,6 @@ bool choose_opponent(const std::string& game, const std::string& requested, bool
     {
         OX_INFO("Input closed before an opponent was chosen - exiting.");
         return false;
-    }
-    return true;
-}
-
-bool choose_front_end(const std::string& requested_game, bool headless, bool graphics_built, FrontEnd& out_front_end, std::string& out_game)
-{
-    out_front_end = FrontEnd::Console;
-    out_game = requested_game;
-    if (headless || !graphics_built)
-    {
-        return true;
-    }
-
-    std::string game;
-    if (!choose_game(requested_game, false, game))
-    {
-        return false;
-    }
-
-    out_game = game;
-    if (GraphicsBoardRegistry::has(game) || BoardPresenterRegistry::has(game))
-    {
-        out_front_end = FrontEnd::Graphical;
-    }
-    else
-    {
-        OX_INFO("No graphics board or presenter for '{}' - playing in the terminal.", game);
     }
     return true;
 }

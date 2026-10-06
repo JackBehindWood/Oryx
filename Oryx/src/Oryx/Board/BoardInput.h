@@ -17,13 +17,18 @@ struct BoardInput
     Vec2f cursor;
     // Left click.
     bool select = false;
-    // Right click or Backspace: take back the last pick of a move being built.
+    // Left button held, and released this frame: with `select` they carry a click or a drag.
+    bool select_down = false;
+    bool select_released = false;
+    // Right click, Backspace, or Escape while the left button is held: take back the last pick of a move being built.
     bool back = false;
+    // Enter: play a move that is legal but could continue.
+    bool confirm = false;
     // U: take back the last move.
     bool undo = false;
     // R or left click; BoardLayer honours it only on a finished game.
     bool restart = false;
-    // Escape.
+    // Escape with no button held.
     bool quit = false;
 };
 

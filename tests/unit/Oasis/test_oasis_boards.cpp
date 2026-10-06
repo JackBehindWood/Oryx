@@ -26,7 +26,8 @@ TicTacToeState play(std::initializer_list<ActionId> moves)
 BoardView describe(const IBoardPresenter& presenter, const IState& state)
 {
     BoardView view;
-    presenter.describe(state, 0, view);
+    view.layout = presenter.layout(state);
+    presenter.describe_pieces(state, 0, view);
     return view;
 }
 
@@ -37,9 +38,9 @@ TEST_CASE("TicTacToePresenter shows each mark on its cell and names the side to 
     TicTacToePresenter presenter;
     BoardView view = describe(presenter, play({ 4, 0 }));
 
-    REQUIRE(view.spaces.size() == 9);
-    CHECK(view.spaces[0].label == "a3");
-    CHECK(view.spaces[8].label == "c1");
+    REQUIRE(view.layout->space_count() == 9);
+    CHECK(view.layout->label(0) == "a3");
+    CHECK(view.layout->label(8) == "c1");
     CHECK(view.pieces == std::vector<BoardPiece>{ { TicTacToePresenter::k_mark, 1, 0 }, { TicTacToePresenter::k_mark, 0, 4 } });
     CHECK(view.status == "X to move");
 
@@ -64,7 +65,7 @@ TEST_CASE("HexapawnPresenter picks a move as the pawn, then its target")
     HexapawnState state;
     BoardView view = describe(presenter, state);
     CHECK(view.pieces.size() == 6);
-    CHECK(view.spaces[0].tone != view.spaces[1].tone);
+    CHECK(view.layout->tone(0) != view.layout->tone(1));
     CHECK(view.status == "White to move");
 
     PickList picks;
@@ -90,12 +91,14 @@ TEST_CASE("plan_launch lets --simulate win, then picks the front-end once")
     CHECK(plan_launch(options, false, plan));
     CHECK(plan.mode == LaunchMode::Console);
 
+#ifdef OX_ENABLE_GRAPHICS
     CHECK(plan_launch(options, true, plan));
     CHECK(plan.mode == LaunchMode::Graphical);
     CHECK(plan.game == "tictactoe");
 
     options.game = "no-such-game";
     CHECK_FALSE(plan_launch(options, true, plan));
+#endif
 }
 
 TEST_CASE("read_options takes Oasis' own and the board options from parsed arguments")

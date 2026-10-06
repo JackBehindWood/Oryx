@@ -17,8 +17,14 @@ BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
     layout.viewport = viewport;
     layout.scale = 0.0f;
 
-    float board_width = scene.max[0] - scene.min[0];
-    float board_height = scene.max[1] - scene.min[1];
+    if (scene.layout == nullptr || !std::isfinite(viewport[0]) || !std::isfinite(viewport[1]))
+    {
+        return layout;
+    }
+    const Vec2f& min = scene.layout->min();
+    const Vec2f& max = scene.layout->max();
+    float board_width = max[0] - min[0];
+    float board_height = max[1] - min[1];
     float left = k_board_gutter;
     float bottom = k_board_menu_band + k_board_gutter;
     float width = viewport[0] - 2.0f * k_board_gutter;
@@ -30,8 +36,8 @@ BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
 
     layout.scale = std::min(width / board_width, height / board_height);
     layout.origin = {
-        left + (width - board_width * layout.scale) * 0.5f - scene.min[0] * layout.scale,
-        bottom + (height - board_height * layout.scale) * 0.5f - scene.min[1] * layout.scale,
+        left + (width - board_width * layout.scale) * 0.5f - min[0] * layout.scale,
+        bottom + (height - board_height * layout.scale) * 0.5f - min[1] * layout.scale,
     };
     return layout;
 }
@@ -56,16 +62,20 @@ Vec2f cursor_to_board(const BoardProjection2D& layout, const Vec2f& cursor)
     return { (world[0] - layout.origin[0]) / layout.scale, (world[1] - layout.origin[1]) / layout.scale };
 }
 
+OptionButton2D option_button_2d(const BoardProjection2D& layout, size_t count, size_t index)
+{
+    float step = k_option_button_size[0] + k_option_button_gap;
+    float total = static_cast<float>(count) * k_option_button_size[0] + static_cast<float>(count > 0 ? count - 1 : 0) * k_option_button_gap;
+    float x = (layout.viewport[0] - total) * 0.5f + k_option_button_size[0] * 0.5f + static_cast<float>(index) * step;
+    return { { x, k_board_menu_band * 0.5f }, k_option_button_size };
+}
+
 void option_buttons_2d(const BoardProjection2D& layout, size_t count, std::vector<OptionButton2D>& out)
 {
     out.clear();
-    float total = static_cast<float>(count) * k_option_button_size[0] + static_cast<float>(count > 0 ? count - 1 : 0) * k_option_button_gap;
-    float x = (layout.viewport[0] - total) * 0.5f + k_option_button_size[0] * 0.5f;
-    float y = k_board_menu_band * 0.5f;
     for (size_t index = 0; index < count; ++index)
     {
-        out.push_back({ { x, y }, k_option_button_size });
-        x += k_option_button_size[0] + k_option_button_gap;
+        out.push_back(option_button_2d(layout, count, index));
     }
 }
 

@@ -46,7 +46,7 @@ TEST_CASE("board_text marks picked spaces in parentheses")
 {
     BoardPresentation presentation(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
     presentation.update(HexapawnState());
-    CHECK(presentation.builder().pick({ PickKind::Space, 6, {} }) == PENDING_ACTION);
+    CHECK(presentation.builder().pick({ PickKind::Space, 6, {} }).status == PickStatus::Pending);
 
     BoardScene scene;
     presentation.build_scene(k_no_space, scene);
@@ -121,4 +121,20 @@ TEST_CASE("create_console_board prefers a registered board, then a presenter, th
     ConsoleBoardRegistry::register_factory("tictactoe", [](const Params&) -> UniquePtr<IConsoleBoard> { return create_unique<ConsoleBoard>(); });
     CHECK_FALSE(create_console_board("tictactoe", k_all_seats)->shows_moves());
     ConsoleBoardRegistry::unregister_factory("tictactoe");
+}
+
+TEST_CASE("board_text lists the spaces of a layout that is not a text grid")
+{
+    BoardLayout2D builder;
+    builder.add_space("low", { 0.0f, 0.0f }, { 1.0f, 1.0f }, SpaceShape::Square);
+    builder.add_space("high", { 0.0f, 0.0f }, { 1.0f, 1.0f }, SpaceShape::Square);
+
+    BoardView view;
+    view.layout = builder.finish();
+    view.pieces = { { 0, 0, 1 } };
+    view.status = "over";
+    std::vector<SpaceId> unchanged;
+    BoardScene scene;
+    build_board_scene(view, FakePresenter(), MoveBuilder(), { unchanged }, scene);
+    CHECK(board_text(scene) == "low: .\nhigh: o\nover\n");
 }

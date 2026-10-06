@@ -2,6 +2,7 @@
 #include "NullWindow.h"
 
 #include "Oryx/Core/Application.h"
+#include "Oryx/Core/Error.h"
 #include "Oryx/Events/KeyEvent.h"
 #include "Oryx/Events/MouseEvent.h"
 #include "Oryx/Events/WindowEvent.h"
@@ -17,6 +18,11 @@ void post(Event&& event)
     Application::Get().post_event(event);
 }
 
+int32_t scaled(int32_t points, float scale)
+{
+    return static_cast<int32_t>(std::lround(static_cast<float>(points) * scale));
+}
+
 } // namespace
 
 NullWindow::NullWindow(WindowDesc desc)
@@ -28,7 +34,7 @@ NullWindow::NullWindow(WindowDesc desc)
 
 NativeWindowHandle NullWindow::native_handle() const
 {
-    return { nullptr, m_width, m_height, m_width, m_height, 1.0f };
+    return { nullptr, m_width, m_height, scaled(m_width, m_scale), scaled(m_height, m_scale), m_scale };
 }
 
 void NullWindow::inject_key(KeyCode key, bool down)
@@ -74,6 +80,16 @@ void NullWindow::inject_resize(int32_t width, int32_t height)
     m_width = width;
     m_height = height;
     post(WindowResizeEvent(width, height));
+}
+
+void NullWindow::inject_scale(float scale)
+{
+    if (!(scale > 0.0f))
+    {
+        throw Error("NullWindow scale must be positive");
+    }
+    m_scale = scale;
+    post(WindowResizeEvent(m_width, m_height));
 }
 
 void NullWindow::inject_focus(bool focused)

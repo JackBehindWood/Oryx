@@ -21,19 +21,6 @@ struct ExtraGame
     ~ExtraGame() { GameRegistry::unregister_factory("zz-extra"); }
 };
 
-struct FakeGraphicsBoardRegistration
-{
-    explicit FakeGraphicsBoardRegistration(std::string game)
-        : m_game(std::move(game))
-    {
-        GraphicsBoardRegistry::register_factory(m_game, [](const Params&) -> UniquePtr<IGraphicsBoard> { return create_unique<FakeGraphicsBoard>(); });
-    }
-
-    ~FakeGraphicsBoardRegistration() { GraphicsBoardRegistry::unregister_factory(m_game); }
-
-    std::string m_game;
-};
-
 } // namespace
 
 TEST_CASE("choose_game accepts a registered game and rejects an unknown one")
@@ -86,43 +73,4 @@ TEST_CASE("choose_opponent offers human and the game's strategies")
     ConsoleScope console("random\n");
     CHECK(choose_opponent("tictactoe", "", true, name));
     CHECK(name == "random");
-}
-
-TEST_CASE("choose_front_end is Console when headless or graphics are not built")
-{
-    FakeGraphicsBoardRegistration board("tictactoe");
-    FrontEnd front_end = FrontEnd::Graphical;
-    std::string game;
-
-    CHECK(choose_front_end("", true, true, front_end, game));
-    CHECK(front_end == FrontEnd::Console);
-
-    CHECK(choose_front_end("", false, false, front_end, game));
-    CHECK(front_end == FrontEnd::Console);
-}
-
-TEST_CASE("choose_front_end is Graphical only for a game with a graphics board or a presenter, and resolves the game")
-{
-    ExtraGame extra;
-    FrontEnd front_end = FrontEnd::Graphical;
-    std::string game;
-
-    CHECK(choose_front_end("zz-extra", false, true, front_end, game));
-    CHECK(front_end == FrontEnd::Console);
-    CHECK(game == "zz-extra");
-
-    {
-        FakeGraphicsBoardRegistration board("zz-extra");
-        CHECK(choose_front_end("zz-extra", false, true, front_end, game));
-        CHECK(front_end == FrontEnd::Graphical);
-    }
-
-    BoardPresenterRegistry::register_factory("zz-extra", [](const Params&) -> UniquePtr<IBoardPresenter> { return create_unique<FakePresenter>(); });
-    CHECK(choose_front_end("zz-extra", false, true, front_end, game));
-    CHECK(front_end == FrontEnd::Graphical);
-    BoardPresenterRegistry::unregister_factory("zz-extra");
-
-    CHECK(choose_front_end("", false, true, front_end, game));
-    CHECK(game == "tictactoe");
-    CHECK_FALSE(choose_front_end("no-such-game", false, true, front_end, game));
 }

@@ -70,14 +70,14 @@ rules = [
   { rule = "** !-> backends", why = "public headers must not include backends/" },
   { rule = "backend-header <-only- Core/Window.cpp Graphics/RHI/RHI.cpp", why = "only the backend factories Core/Window.cpp, Graphics/RHI/RHI.cpp may include a backend header" },
   { rule = "Assets !-> Core/Window.h Core/Input.h Events/WindowEvent.h except Assets/**/Gpu*", why = "CPU assets must stay headless" },
-  "headless !-> graphics",
+  { rule = "headless !-> graphics except Board/Graphics", why = "{module} must not include {target}; only Board/Graphics sits above the renderer" },
   { rule = "Assets !-> graphics except Assets/**/Gpu*", why = "only the Gpu* bridges may include {target}" },
   { rule = "graphics Text !-> Assets", why = "{module} must not include Assets; fonts reach the renderer through Text/IFontSource" },
-  "Graphics < Shaders < Renderer < BoardGraphics",
+  "Graphics < Shaders < Renderer < Board/Graphics",
 ]
 
 [boundaries.sets]
-graphics = ["Graphics", "Shaders", "Renderer", "BoardGraphics"]
+graphics = ["Graphics", "Shaders", "Renderer", "Board/Graphics"]
 headless = ["Game", "Strategy", "Simulation", "Core", "Text", "Board"]
 backends = ["**/backends/**"]
 backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']

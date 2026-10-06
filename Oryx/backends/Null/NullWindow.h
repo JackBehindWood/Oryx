@@ -24,6 +24,8 @@ public:
     void inject_cursor(float x, float y);
     void inject_scroll(float dx, float dy);
     void inject_resize(int32_t width, int32_t height);
+    // A display change (e.g. dragging the window to a HiDPI screen): logical size stays, the framebuffer becomes size * scale.
+    void inject_scale(float scale);
     void inject_focus(bool focused);
     void inject_close();
 
@@ -31,6 +33,7 @@ private:
     PolledInput m_input;
     int32_t m_width;
     int32_t m_height;
+    float m_scale = 1.0f;
     bool m_should_close = false;
 };
 

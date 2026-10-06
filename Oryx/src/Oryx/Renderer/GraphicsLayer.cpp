@@ -42,6 +42,7 @@ void GraphicsLayer::attach()
 
 void GraphicsLayer::detach()
 {
+    m_clients.clear();
     if (Renderer::initialised())
     {
         Renderer::set_viewport({});
@@ -49,13 +50,44 @@ void GraphicsLayer::detach()
     m_viewport.reset();
 }
 
+void GraphicsLayer::add_client(IFrameClient& client)
+{
+    m_clients.push_back(&client);
+}
+
+void GraphicsLayer::remove_client(IFrameClient& client)
+{
+    m_clients.erase(std::remove(m_clients.begin(), m_clients.end(), &client), m_clients.end());
+}
+
 void GraphicsLayer::set_clear_colour(const Colour& colour)
 {
     m_clear = colour;
 }
 
-void GraphicsLayer::update(double)
+void GraphicsLayer::update(double delta_time)
 {
+    NativeWindowHandle handle = m_window->native_handle();
+    FrameInfo info{ m_window->input(),
+                    { static_cast<float>(handle.width), static_cast<float>(handle.height) },
+                    { static_cast<float>(handle.framebuffer_width), static_cast<float>(handle.framebuffer_height) },
+                    handle.content_scale,
+                    delta_time };
+    for (size_t index = 0; index < m_clients.size();)
+    {
+        try
+        {
+            m_clients[index]->frame(info);
+            ++index;
+        }
+        catch (const Error& error)
+        {
+            error.log();
+            OX_CORE_ERROR("GraphicsLayer: dropped a frame client after an error.");
+            m_clients.erase(m_clients.begin() + static_cast<std::ptrdiff_t>(index));
+        }
+    }
+
     if (m_viewport)
     {
         Renderer::set_clear_colour(m_clear);

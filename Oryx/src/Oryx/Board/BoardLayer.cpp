@@ -1,44 +1,23 @@
 #include "BoardLayer.h"
 
 #include "Oryx/Board/BoardPresentation.h"
-#include "Oryx/Board/ConsoleBoard.h"
+
+#include "Oryx/Board/Console/ConsoleBoard.h"
 #include "Oryx/Core/Application.h"
 #include "Oryx/Core/Log.h"
 #include "Oryx/Core/Random.h"
-#include "Oryx/Core/Window.h"
 #include "Oryx/Events/SimulationEvent.h"
 #include "Oryx/Strategy/ExternalStrategy.h"
 
 namespace oryx
 {
 
-namespace
-{
-
-BoardInput capture_input()
-{
-    Window* window = Application::Get().window();
-    if (window == nullptr)
-    {
-        return {};
-    }
-    NativeWindowHandle handle = window->native_handle();
-    return read_board_input(window->input(), { static_cast<float>(handle.width), static_cast<float>(handle.height) });
-}
-
-UniquePtr<IGraphicsBoard> registered_graphics_board(const std::string& game, PlayerId)
-{
-    return GraphicsBoardRegistry::create(game);
-}
-
-} // namespace
-
 BoardLayer::BoardLayer(BoardLayerDesc desc)
     : Layer("BoardLayer")
-    , m_front_end(desc.front_end)
     , m_requested_game(std::move(desc.game))
     , m_requested_opponent(std::move(desc.opponent))
-    , m_create_graphics_board(desc.create_graphics_board ? std::move(desc.create_graphics_board) : GraphicsBoardFactory(registered_graphics_board))
+    , m_create_board(std::move(desc.create_board))
+    , m_terminal(desc.terminal)
 {
 }
 
@@ -62,7 +41,7 @@ void BoardLayer::update(double delta_time)
         return;
     }
 
-    if (m_front_end == selection::FrontEnd::Console)
+    if (m_terminal)
     {
         // failbit, not eofbit: an unterminated last line sets eofbit but still yields a move.
         if (std::cin.fail())
@@ -72,31 +51,21 @@ void BoardLayer::update(double delta_time)
         return;
     }
 
-    BoardInput input = capture_input();
-    if (input.quit)
-    {
-        Application::Get().close();
-        return;
-    }
-
     m_session->advance(delta_time);
-    if (m_session->restart_ready() && input.restart)
+    bool restart_requested = m_session->board().take_restart_request();
+    if (restart_requested && m_session->restart_ready())
     {
         m_session->restart();
         RestartSimulationEvent restart;
         Application::Get().post_event(restart);
     }
-    m_graphics_board->update(input, delta_time);
-    m_graphics_board->render(input);
 }
 
 void BoardLayer::start()
 {
-    bool graphical = m_front_end == selection::FrontEnd::Graphical;
-
     std::string game_name;
     std::string opponent_name;
-    if (!selection::choose_game(m_requested_game, !graphical, game_name) || !selection::choose_opponent(game_name, m_requested_opponent, !graphical, opponent_name))
+    if (!selection::choose_game(m_requested_game, m_terminal, game_name) || !selection::choose_opponent(game_name, m_requested_opponent, m_terminal, opponent_name))
     {
         Application::Get().close(1);
         return;
@@ -114,22 +83,12 @@ void BoardLayer::start()
         human_seat = static_cast<PlayerId>(random.get_int(0, static_cast<int64_t>(seat_count) - 1));
     }
 
-    SharedPtr<IBoard> board;
-    if (graphical)
+    SharedPtr<IBoard> board = m_create_board ? m_create_board(game_name, human_seat) : SharedPtr<IBoard>(create_console_board(game_name, human_seat));
+    if (board == nullptr)
     {
-        UniquePtr<IGraphicsBoard> graphics_board = m_create_graphics_board(game_name, human_seat);
-        if (graphics_board == nullptr)
-        {
-            throw Error("No graphics board is registered for '" + game_name + "'");
-        }
-        m_graphics_board = graphics_board.get();
-        board = SharedPtr<IBoard>(std::move(graphics_board));
+        throw Error("No board is available for '" + game_name + "'");
     }
-    else
-    {
-        board = SharedPtr<IBoard>(create_console_board(game_name, human_seat));
-    }
-    m_session = create_shared<BoardSession>(board, !graphical);
+    m_session = create_shared<BoardSession>(board, m_terminal);
 
     SmallVector<UniquePtr<IStrategy>, 2> strategies(seat_count);
     for (size_t seat = 0; seat < seat_count; ++seat)
@@ -146,7 +105,7 @@ void BoardLayer::start()
         OX_INFO("You are player {} against '{}'.", human_seat + 1, opponent_name);
     }
 
-    StartSimulationEvent event(std::move(game), std::move(strategies), 1, m_session, false, graphical);
+    StartSimulationEvent event(std::move(game), std::move(strategies), 1, m_session, false, !m_terminal);
     Application::Get().post_event(event);
 }
 

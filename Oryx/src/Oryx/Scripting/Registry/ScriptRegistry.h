@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Board/IConsoleBoard.h"
+#include "Oryx/Board/Console/IConsoleBoard.h"
 #include "Oryx/Game/IGame.h"
 #include "Oryx/Scripting/Support/ScriptError.h"
 #include "Oryx/Scripting/Support/ScriptOrigin.h"

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Oryx/BoardGraphics/BoardProjection2D.h"
+#include "Oryx/Board/Layout/BoardLayout2D.h"
+#include "Oryx/Board/Graphics/BoardProjection2D.h"
 #include "Oryx/Renderer/Font.h"
 
 namespace oryx

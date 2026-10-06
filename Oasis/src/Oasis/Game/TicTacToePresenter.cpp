@@ -15,10 +15,19 @@ const char* mark_name(oryx::PlayerId player)
 
 } // namespace
 
-void TicTacToePresenter::describe(const oryx::IState& state, oryx::PlayerId, oryx::BoardView& out) const
+TicTacToePresenter::TicTacToePresenter()
+    : m_layout(oryx::make_grid_layout(k_size, k_size, false))
+{
+}
+
+oryx::SharedPtr<const oryx::BoardLayout> TicTacToePresenter::layout(const oryx::IState&) const
+{
+    return m_layout;
+}
+
+void TicTacToePresenter::describe_pieces(const oryx::IState& state, oryx::PlayerId, oryx::BoardContent& out) const
 {
     const TicTacToeState& board = static_cast<const TicTacToeState&>(state);
-    oryx::grid_spaces(k_size, k_size, false, out);
 
     for (uint32_t row = 0; row < k_size; ++row)
     {
