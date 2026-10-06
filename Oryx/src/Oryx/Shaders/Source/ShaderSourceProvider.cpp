@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderSourceProvider.h"
+#include "Oryx/Shaders/Source/ShaderSourceProvider.h"
 
 #include "Oryx/Core/Error.h"
 #include "Oryx/Core/Log.h"
@@ -26,6 +26,10 @@ ShaderLanguage shader_language_for_path(std::string_view virtual_path)
     if (dot != std::string_view::npos && virtual_path.substr(dot) == ".msl")
     {
         return ShaderLanguage::MSL;
+    }
+    if (dot != std::string_view::npos && virtual_path.substr(dot) == ".slang")
+    {
+        return ShaderLanguage::Slang;
     }
     throw Error("cannot infer a shader language from '" + std::string(virtual_path) + "'");
 }

@@ -18,6 +18,28 @@ console = Console()
 __all__ = ["PythonEnvError"]
 
 
+def cook_shaders(ctx):
+    """Compile every registered shader after a graphics build, so a broken shader fails the build and the store is warm."""
+    import subprocess
+    import sys
+
+    from pyforge import workspace
+
+    if not ctx.options.get("graphics", False) or ctx.dry_run:
+        return
+    ws = workspace.load(ctx.project)
+    target = ctx.config.targets.get(ctx.config.project.default_target)
+    if ws is None or target is None:
+        return
+    binary = ws.target_path(target.project, ctx.profile)
+    console.print("[bold blue]🎨 Cooking shaders...[/bold blue]")
+    result = subprocess.run([str(binary), "--cook-shaders"], cwd=ctx.project.root, capture_output=True, text=True)
+    if result.returncode != 0:
+        console.print(f"[bold red]✗ Shader cook failed:[/bold red]\n{result.stdout}{result.stderr}")
+        sys.exit(1)
+    console.print("[bold green]✓ Shaders cooked[/bold green]\n")
+
+
 @hookimpl
 def forge_commands(app):
     app.add_typer(commands.app, name="python", help=commands.GROUP_HELP)
@@ -46,6 +68,8 @@ def forge_post_compile(ctx):
         # A sanitized oryx.so needs the ASan runtime preloaded, which a plain `python` never has.
         reason = "a --sanitize extension can't be imported by plain python" if python_enabled else "this build has no Python extension"
         console.print(f"[dim]Removed the venv's `import oryx` path: {reason}; a normal build restores it.[/dim]\n")
+
+    cook_shaders(ctx)
 
 
 @hookimpl

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Assets/Import/CompiledAssetStore.h"
-#include "Oryx/Shaders/ShaderBinaryStore.h"
+#include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
 
 namespace oryx
 {

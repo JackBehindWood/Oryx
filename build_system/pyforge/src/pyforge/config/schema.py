@@ -22,6 +22,7 @@ class FetchMode(StrEnum):
 class DependencyKind(StrEnum):
     STATIC = "static"
     HEADER = "header"
+    TOOL = "tool"
 
 
 class Debugger(StrEnum):
@@ -117,6 +118,12 @@ class TestsTable:
 
 
 @dataclass(frozen=True)
+class PlatformArchive:
+    url: str
+    sha256: str
+
+
+@dataclass(frozen=True)
 class Dependency:
     kind: DependencyKind = DependencyKind.HEADER
     source: str = _open(DEPENDENCY_SOURCES, "submodule")
@@ -131,6 +138,8 @@ class Dependency:
     commit: str = ""
     pkg_config: str = ""
     lib: str = ""
+    binary: str = ""
+    platforms: dict[str, PlatformArchive] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

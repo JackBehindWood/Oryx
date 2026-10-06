@@ -7,7 +7,7 @@ namespace oryx
 namespace
 {
 
-constexpr const char* SOURCE = "/Oryx/Builtin/Solid.msl";
+constexpr const char* SOURCE = "/Oryx/Builtin/Solid.slang";
 
 } // namespace
 

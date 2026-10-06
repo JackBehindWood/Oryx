@@ -1,7 +1,7 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderSerialisation.h"
+#include "Oryx/Shaders/Cache/ShaderSerialisation.h"
 
-#include "Oryx/Shaders/ShaderBinaryStore.h"
+#include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
 
 namespace oryx
 {

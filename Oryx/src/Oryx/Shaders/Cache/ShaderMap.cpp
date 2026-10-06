@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderMap.h"
+#include "Oryx/Shaders/Cache/ShaderMap.h"
 
 #include "Oryx/Core/Fnv.h"
 
@@ -70,7 +70,7 @@ uint64_t shader_map_id(const std::vector<ShaderType>& types)
                 continue;
             }
             hash.mix_value(permutation);
-            std::vector<ShaderDefine> defines = type->defines_for(permutation);
+            std::vector<ShaderDefine> defines = shader_defines(*type, permutation);
             std::sort(defines.begin(), defines.end(), [](const ShaderDefine& a, const ShaderDefine& b) { return a.name < b.name; });
             for (const ShaderDefine& define : defines)
             {

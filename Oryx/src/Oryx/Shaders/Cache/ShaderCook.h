@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Oryx/Shaders/ShaderCache.h"
-#include "Oryx/Shaders/ShaderSourceProvider.h"
+#include "Oryx/Shaders/Cache/ShaderCache.h"
+#include "Oryx/Shaders/Source/ShaderSourceProvider.h"
 
 namespace oryx
 {

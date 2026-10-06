@@ -9,7 +9,7 @@
 #include "Oryx/Graphics/Resources/VertexBuffer.h"
 #include "Oryx/Math/Colour.h"
 #include "Oryx/Renderer/BatchRenderer.h"
-#include "Oryx/Shaders/ShaderBinaryStore.h"
+#include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
 #include "Oryx/Math/Vector2.h"
 #include "Oryx/Renderer/DebugRenderer.h"

@@ -1,7 +1,7 @@
 #include "oxpch.h"
 #include "Oryx/Shaders/ShaderReflection.h"
 
-#include "Oryx/Shaders/ShaderSource.h"
+#include "Oryx/Shaders/Source/ShaderSource.h"
 
 namespace oryx
 {
@@ -61,6 +61,7 @@ const char* shader_language_name(ShaderLanguage language)
     switch (language)
     {
     case ShaderLanguage::MSL: return "msl";
+    case ShaderLanguage::Slang: return "slang";
     }
     return "unknown";
 }

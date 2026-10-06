@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderInclude.h"
+#include "Oryx/Shaders/Compiler/ShaderInclude.h"
 
 namespace oryx
 {

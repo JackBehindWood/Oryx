@@ -10,9 +10,9 @@
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Renderer/Renderer.h"
-#include "Oryx/Shaders/ShaderCache.h"
+#include "Oryx/Shaders/Cache/ShaderCache.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
-#include "Oryx/Shaders/ShaderSettings.h"
+#include "Oryx/Shaders/Source/ShaderSettings.h"
 
 namespace oryx
 {

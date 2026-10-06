@@ -1,8 +1,8 @@
 #include "doctest.h"
 
 #include "Oryx/Assets/GpuShaderStore.h"
-#include "Oryx/Shaders/ShaderCache.h"
-#include "Oryx/Shaders/ShaderCook.h"
+#include "Oryx/Shaders/Cache/ShaderCache.h"
+#include "Oryx/Shaders/Cache/ShaderCook.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
 
 #include "NullRHI.h"

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/CommandLine.h"
-#include "Oryx/Shaders/ShaderCook.h"
+#include "Oryx/Shaders/Cache/ShaderCook.h"
 
 namespace oryx
 {

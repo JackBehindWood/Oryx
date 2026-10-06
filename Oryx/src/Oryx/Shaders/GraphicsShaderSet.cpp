@@ -92,7 +92,19 @@ GraphicsPipeline make_graphics_pipeline(IRHI& rhi, const GraphicsShaderSet& set,
     desc.sample_count = state.sample_count;
     desc.bindings = layout.bindings.data();
     desc.binding_count = static_cast<uint32_t>(layout.bindings.size());
-    return GraphicsPipeline(rhi.create_graphics_pipeline(desc), layout.names);
+    try
+    {
+        return GraphicsPipeline(rhi.create_graphics_pipeline(desc), layout.names);
+    }
+    catch (const RHIInterfaceMismatch& mismatch)
+    {
+        const std::string where = " (shaders '" + set.vertex->reflection().entry_point + "' + '" + set.pixel->reflection().entry_point + "')";
+        if (mismatch.binding() < layout.names.size())
+        {
+            throw Error("shader parameter '" + layout.names[mismatch.binding()] + "': " + mismatch.what() + where);
+        }
+        throw Error(std::string(mismatch.what()) + where);
+    }
 }
 
 } // namespace oryx

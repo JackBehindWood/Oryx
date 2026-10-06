@@ -3,7 +3,7 @@
 
 #include "Oryx/Assets/GpuShaderStore.h"
 #include "Oryx/Core/Log.h"
-#include "Oryx/Shaders/ShaderSettings.h"
+#include "Oryx/Shaders/Source/ShaderSettings.h"
 
 namespace oryx
 {
@@ -38,6 +38,7 @@ ShaderCookResult run_shader_cook()
     }
     const ShaderSourceResolver sources(settings);
     ShaderCache cache;
+    cache.set_slang_options({ settings.slangc });
     const ShaderCookResult result = cook_shaders(cache, sources.provider(), gpu_shader_store());
     OX_CORE_INFO("cooked {} shaders (map {:016x})", result.shaders, result.map_id);
     return result;

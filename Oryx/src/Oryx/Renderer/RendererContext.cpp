@@ -39,7 +39,9 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->rhi = create_rhi(desc.backend);
     context->back_buffer_format = desc.back_buffer_format;
     context->items.reserve(INITIAL_ITEM_CAPACITY);
-    context->shader_sources = create_unique<ShaderSourceResolver>(settings_of<ShaderSettings>());
+    const ShaderSettings& shader_settings = settings_of<ShaderSettings>();
+    context->shader_sources = create_unique<ShaderSourceResolver>(shader_settings);
+    context->shader_cache.set_slang_options({ shader_settings.slangc });
     context->shader_store = desc.shader_store;
     context->shader_cache.set_store(desc.shader_store);
     load_shaders(*context, false);

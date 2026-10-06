@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Shaders/ShaderCompiler.h"
+#include "Oryx/Shaders/Compiler/ShaderCompiler.h"
 
 namespace oryx
 {

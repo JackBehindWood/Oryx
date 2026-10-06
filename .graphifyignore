@@ -1,1 +1,10 @@
 vendor/
+tests/
+build_system/pyforge/
+build/
+site/
+bin/
+bin-int/
+.venv/
+__pycache__/
+uv.lock

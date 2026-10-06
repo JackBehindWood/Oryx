@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderSettings.h"
+#include "Oryx/Shaders/Source/ShaderSettings.h"
 
 #include "Oryx/Core/Error.h"
 
@@ -33,6 +33,7 @@ ShaderSourceMode parse_mode(const std::string& text)
 void read_settings(ShaderSettings& settings, const SettingsNode& node)
 {
     settings.root = node.path("root", settings.root);
+    settings.slangc = node.path("slangc", settings.slangc);
     if (node.has("source_mode"))
     {
         settings.source_mode = parse_mode(node.string("source_mode"));

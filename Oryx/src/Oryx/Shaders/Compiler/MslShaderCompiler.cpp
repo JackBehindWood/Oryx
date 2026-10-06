@@ -1,9 +1,9 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/MslShaderCompiler.h"
+#include "Oryx/Shaders/Compiler/MslShaderCompiler.h"
 
 #include "Oryx/Core/Error.h"
-#include "Oryx/Shaders/ShaderHash.h"
-#include "Oryx/Shaders/ShaderInclude.h"
+#include "Oryx/Shaders/Cache/ShaderHash.h"
+#include "Oryx/Shaders/Compiler/ShaderInclude.h"
 
 namespace oryx
 {
@@ -737,7 +737,7 @@ private:
             const uint32_t member_alignment = shader_type_alignment(member.type);
             member.size = shader_type_size(member.type);
             member.offset = align_up(offset, member_alignment);
-            offset = member.offset + member.size;
+            offset = member.offset + (member.type.columns == 1 && member.type.rows == 3 ? member_alignment : member.size); // MSL sizeof(float3) is 16
             alignment = std::max(alignment, member_alignment);
             info.members.push_back(member);
         }

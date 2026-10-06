@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Core/Settings.h"
-#include "Oryx/Shaders/ShaderSourceProvider.h"
+#include "Oryx/Shaders/Source/ShaderSourceProvider.h"
 
 namespace oryx
 {
@@ -23,6 +23,8 @@ struct ShaderSettings
     // Directory the "/Oryx/" mount maps to; a relative root is relative to the settings file.
     std::filesystem::path root;
     ShaderSourceMode source_mode = ShaderSourceMode::Auto;
+    // slangc binary; relative to the settings file. OX_SLANGC overrides it; empty falls back to the build-time path, then PATH.
+    std::filesystem::path slangc;
 };
 
 void read_settings(ShaderSettings& settings, const SettingsNode& node);

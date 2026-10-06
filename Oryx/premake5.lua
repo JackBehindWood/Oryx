@@ -36,12 +36,15 @@ project "Oryx"
     filter {}
 
     -- Dev builds read loose shaders from here; Dist uses the embedded copy.
-    filter "files:src/Oryx/Shaders/ShaderSettings.cpp"
+    filter "files:src/Oryx/Shaders/Source/ShaderSettings.cpp"
         defines { 'OX_SHADER_ROOT="' .. path.getabsolute("shaders") .. '"' }
     filter {}
 
-    -- Keep the embedded copy in step with shaders/ whenever the workspace is regenerated; tests also fail when it is stale.
-    os.execute('python3 "' .. path.getabsolute("tools/embed_shaders.py") .. '" "' .. path.getabsolute("shaders") .. '" "' .. path.getabsolute("src/Oryx/Shaders/Generated/EmbeddedShaders.cpp") .. '"')
+    if graphicsEnabled() then
+        filter "files:src/Oryx/Shaders/Compiler/SlangCompiler.cpp"
+            defines { 'OX_SLANGC_PATH="' .. forge.dependency("slang").binary .. '"' }
+        filter {}
+    end
 
     useOryxPythonPIC()
 
@@ -66,6 +69,11 @@ project "Oryx"
     includedirs { "backends/Null" }
 
     if graphicsEnabled() then
+        -- Regenerated whenever the workspace is, so the embedded copy follows shaders/; a unit test fails when it is stale.
+        local embedded = path.join(_MAIN_SCRIPT_DIR, "build", "generated", "EmbeddedShaders.cpp")
+        os.execute('python3 "' .. path.getabsolute("tools/embed_shaders.py") .. '" "' .. path.getabsolute("shaders") .. '" "' .. embedded .. '"')
+        files { embedded }
+
         files {
             "backends/Null/NullRHI.h",
             "backends/Null/NullRHI.cpp"

@@ -48,6 +48,14 @@ jobs:
       with:
         enable-cache: true
 
+    - name: Cache slangc
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pyforge/deps/slang
+          ~/Library/Caches/pyforge/deps/slang
+        key: slangc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('forge.toml') }}
+
     - name: Set up build environment (Ubuntu)
       if: runner.os == 'Linux'
       run: |

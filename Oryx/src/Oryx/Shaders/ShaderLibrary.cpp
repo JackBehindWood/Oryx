@@ -2,8 +2,8 @@
 #include "Oryx/Shaders/ShaderLibrary.h"
 
 #include "Oryx/Core/Error.h"
-#include "Oryx/Shaders/ShaderInclude.h"
-#include "Oryx/Shaders/ShaderMap.h"
+#include "Oryx/Shaders/Compiler/ShaderInclude.h"
+#include "Oryx/Shaders/Cache/ShaderMap.h"
 
 namespace oryx
 {
@@ -61,7 +61,7 @@ void ShaderLibrary::compile(IRHI& rhi, ShaderCache& cache, const ShaderType& typ
         try
         {
             ShaderCompilerInput input = load_shader_input(type, sources);
-            input.defines = type.defines_for(permutation);
+            input.defines = shader_defines(type, permutation);
             const ShaderCompilerOutput& output = cache.get_or_compile(input);
             built[{ type.type, permutation }] = type.create(rhi, output, permutation);
         }

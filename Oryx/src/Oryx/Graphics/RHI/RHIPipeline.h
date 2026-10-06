@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Core/Error.h"
 #include "Oryx/Graphics/RHI/RHIDeclarations.h"
 #include "Oryx/Graphics/RHI/RHIBinding.h"
 #include "Oryx/Graphics/RHI/RHIFormat.h"
@@ -9,6 +10,23 @@
 
 namespace oryx
 {
+
+// A backend's reflection of the created pipeline disagrees with what the layout or vertex input claims; `binding` is the layout index,
+// or RHI_INVALID_BINDING for a vertex input, so callers holding the shader-side names can say which one.
+class RHIInterfaceMismatch : public Error
+{
+public:
+    RHIInterfaceMismatch(const std::string& message, RHIBindingId binding, std::string detail = "")
+        : Error(message, std::move(detail))
+        , m_binding(binding)
+    {
+    }
+
+    [[nodiscard]] RHIBindingId binding() const { return m_binding; }
+
+private:
+    RHIBindingId m_binding;
+};
 
 // Shaders, attributes and bindings are only read during creation; the pipeline retains no shaders and copies the binding table.
 struct RHIGraphicsPipelineDesc

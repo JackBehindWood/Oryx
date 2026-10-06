@@ -1,7 +1,9 @@
 """forge.toml [dependencies] → resolved paths, requirement filtering, and build/forge/config.json for Premake."""
 
 import json
-from dataclasses import dataclass
+import platform
+import sys
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable
 
@@ -39,6 +41,10 @@ class ResolvedDependency:
         return self.dir / self.spec.sources if self.dir is not None and self.spec.sources else None
 
     @property
+    def binary(self) -> Path | None:
+        return self.dir / self.spec.binary if self.dir is not None and self.spec.binary else None
+
+    @property
     def present(self) -> bool:
         if self.dir is None:
             return self.flags() is not None
@@ -52,6 +58,23 @@ class ResolvedDependency:
             return SystemSource().probe(self.root or Path.cwd(), self)
         except DependencyError:
             return None
+
+
+def host_platform() -> str:
+    """`macos-aarch64`, `linux-x86_64`: the key a `platforms` table is looked up by."""
+    system = {"darwin": "macos", "win32": "windows"}.get(sys.platform, "linux")
+    machine = {"arm64": "aarch64", "amd64": "x86_64"}.get(platform.machine().lower(), platform.machine().lower())
+    return f"{system}-{machine}"
+
+
+def for_host(spec: Dependency) -> Dependency:
+    """The spec with the host's archive url/sha256 filled in from `platforms`."""
+    if not spec.platforms:
+        return spec
+    archive = spec.platforms.get(host_platform())
+    if archive is None:
+        return spec
+    return replace(spec, url=archive.url, sha256=archive.sha256)
 
 
 def cache_pin(spec: Dependency) -> str:
@@ -80,7 +103,7 @@ def requirements_met(requires: list[str], options: dict[str, bool]) -> bool:
 
 
 def resolve_all(project: Project, cfg: ForgeConfig) -> list[ResolvedDependency]:
-    return [ResolvedDependency(name, spec, dependency_dir(project, cfg, name, spec), project.root) for name, spec in cfg.dependencies.items()]
+    return [ResolvedDependency(name, host_spec, dependency_dir(project, cfg, name, host_spec), project.root) for name, spec in cfg.dependencies.items() for host_spec in [for_host(spec)]]
 
 
 def required(run: RunContext) -> list[ResolvedDependency]:
@@ -97,6 +120,8 @@ def _premake_entry(dep: ResolvedDependency) -> dict:
         cflags, libs = dep.flags() or ([], [])
         return {"kind": "system", "cflags": cflags, "libs": libs, "defines": list(dep.spec.defines)}
     entry = {"kind": str(dep.spec.kind), "dir": dep.dir.as_posix(), "include": dep.include.as_posix(), "defines": list(dep.spec.defines)}
+    if dep.binary:
+        entry["binary"] = dep.binary.as_posix()
     if dep.sources:
         entry["sources"] = dep.sources.as_posix()
     return entry

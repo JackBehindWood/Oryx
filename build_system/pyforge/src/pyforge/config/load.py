@@ -47,7 +47,9 @@ def validate(cfg: ForgeConfig) -> ForgeConfig:
     options = cfg.options.keys()
     for name, dependency in cfg.dependencies.items():
         _check_requires(f"dependencies.{name}", dependency.requires, options)
-        if dependency.source in URL_SOURCES and not (dependency.url and dependency.sha256):
+        if dependency.kind == "tool" and not dependency.binary:
+            raise SchemaError(f"forge.toml: 'dependencies.{name}' (kind = 'tool') needs 'binary', the executable's path inside the archive")
+        if dependency.source in URL_SOURCES and not dependency.platforms and not (dependency.url and dependency.sha256):
             raise SchemaError(f"forge.toml: 'dependencies.{name}' (source = {dependency.source!r}) needs both 'url' and 'sha256'")
         if dependency.source == "system" and not (dependency.pkg_config or dependency.include):
             raise SchemaError(f"forge.toml: 'dependencies.{name}' (source = 'system') needs 'pkg-config' or an explicit 'include' path")

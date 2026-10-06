@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Oryx/Shaders/ShaderBinaryStore.h"
-#include "Oryx/Shaders/ShaderCompiler.h"
+#include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
+#include "Oryx/Shaders/Compiler/ShaderCompiler.h"
+#include "Oryx/Shaders/Compiler/SlangCompiler.h"
 
 namespace oryx
 {
@@ -22,8 +23,12 @@ public:
     void set_store(const IShaderBinaryStore* store) { m_store = store; }
     [[nodiscard]] const IShaderBinaryStore* store() const { return m_store; }
 
+    // Where the Slang compiler finds slangc; only a compile on a miss reads it.
+    void set_slang_options(SlangCompilerOptions options) { m_slang = std::move(options); }
+    [[nodiscard]] const SlangCompilerOptions& slang_options() const { return m_slang; }
+
     [[nodiscard]] const ShaderCompilerOutput* find(ShaderHash hash) const;
-    // Compiles with the compiler for input.source.language on a miss; a failed compile throws and is not cached.
+    // Compiles with the compiler for input.source.language (Slang uses set_slang_options) on a miss; a failed compile throws and is not cached.
     const ShaderCompilerOutput& get_or_compile(const ShaderCompilerInput& input);
     // Same with an explicit compiler (tests, tools); a store hit never calls it beyond id/version/dependencies.
     const ShaderCompilerOutput& get_or_compile(const ShaderCompilerInput& input, const IShaderCompiler& compiler);
@@ -36,6 +41,7 @@ private:
     uint32_t m_misses = 0;
     uint32_t m_store_hits = 0;
     const IShaderBinaryStore* m_store = nullptr;
+    SlangCompilerOptions m_slang;
 };
 
 } // namespace oryx

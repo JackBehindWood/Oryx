@@ -2,7 +2,7 @@
 
 #include "ShaderTestSupport.h"
 
-#include "Oryx/Shaders/ShaderSettings.h"
+#include "Oryx/Shaders/Source/ShaderSettings.h"
 
 using namespace oryx;
 using namespace oryx::test;
@@ -113,13 +113,13 @@ TEST_CASE("Embedded built-in shaders match the loose files")
     size_t checked = 0;
     for (const std::string& path : embedded_shader_paths())
     {
-        if (path.rfind("/Oryx/Builtin/", 0) != 0 && path != "/Oryx/Common.msl")
+        if (path.rfind("/Oryx/Builtin/", 0) != 0 && path != "/Oryx/Common.slang")
         {
             continue;
         }
         const std::optional<ShaderSource> loose = files.provider().load(path);
         REQUIRE_MESSAGE(loose.has_value(), path);
-        CHECK_MESSAGE(loose->text == embedded.load(path)->text, "stale embedded copy of " << path << "; run Oryx/tools/embed_shaders.py");
+        CHECK_MESSAGE(loose->text == embedded.load(path)->text, "stale embedded copy of " << path << "; run forge configure");
         ++checked;
     }
     CHECK(checked >= 5);
@@ -165,4 +165,21 @@ TEST_CASE("A missing source names the path")
         message = error.what();
     }
     CHECK(message.find("/Oryx/Test/Provider.msl") != std::string::npos);
+}
+
+TEST_CASE("shaders.slangc is read and a relative path resolves against the settings file")
+{
+    const std::filesystem::path root = make_temp_root();
+    const std::filesystem::path file = root / "oryx.yaml";
+    write_file(file, "shaders:\n  slangc: tools/slangc\n");
+    const std::string arg = "--settings=" + file.string();
+    std::string program = "app";
+    std::string option = arg;
+    char* argv[] = { program.data(), option.data() };
+
+    reset_settings();
+    CHECK(settings_of<ShaderSettings>().slangc.empty());
+    load_settings(ApplicationCommandLineArgs{ 2, argv });
+    CHECK(settings_of<ShaderSettings>().slangc == (root / "tools/slangc").lexically_normal());
+    reset_settings();
 }

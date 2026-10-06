@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Shaders/ShaderBinaryStore.h"
+#include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
 #include "Oryx/Shaders/ShaderType.h"
 
 namespace oryx

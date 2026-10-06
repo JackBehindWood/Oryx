@@ -1,9 +1,9 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderCook.h"
+#include "Oryx/Shaders/Cache/ShaderCook.h"
 
 #include "Oryx/Core/Error.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
-#include "Oryx/Shaders/ShaderMap.h"
+#include "Oryx/Shaders/Cache/ShaderMap.h"
 
 namespace oryx
 {
@@ -23,7 +23,7 @@ ShaderCookResult cook_shaders(ShaderCache& cache, const IShaderSourceProvider& s
             try
             {
                 ShaderCompilerInput input = load_shader_input(type, sources);
-                input.defines = type.defines_for(permutation);
+                input.defines = shader_defines(type, permutation);
                 const ShaderCompilerOutput& output = cache.get_or_compile(input);
                 write_shader_output(store, output.hash, output);
                 map.entries.push_back({ type.name, permutation, output.hash });

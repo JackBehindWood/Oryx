@@ -1,8 +1,8 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderHash.h"
+#include "Oryx/Shaders/Cache/ShaderHash.h"
 
 #include "Oryx/Core/Fnv.h"
-#include "Oryx/Shaders/ShaderInclude.h"
+#include "Oryx/Shaders/Compiler/ShaderInclude.h"
 
 namespace oryx
 {

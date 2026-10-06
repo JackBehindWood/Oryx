@@ -48,7 +48,7 @@ void set_blend(MTL::RenderPipelineColorAttachmentDescriptor& attachment, const R
     attachment.setAlphaBlendOperation(to_mtl(blend.alpha_op));
 }
 
-#ifdef OX_DEBUG
+#ifndef OX_DIST
 
 MTL::BindingType binding_type(RHIBindingKind kind)
 {
@@ -57,6 +57,59 @@ MTL::BindingType binding_type(RHIBindingKind kind)
         return MTL::BindingTypeTexture;
     }
     return kind == RHIBindingKind::Sampler ? MTL::BindingTypeSampler : MTL::BindingTypeBuffer;
+}
+
+MTL::TextureType texture_type(RHITextureDimension dimension)
+{
+    switch (dimension)
+    {
+    case RHITextureDimension::Tex2D: return MTL::TextureType2D;
+    case RHITextureDimension::Tex2DArray: return MTL::TextureType2DArray;
+    case RHITextureDimension::Cube: return MTL::TextureTypeCube;
+    case RHITextureDimension::Tex3D: return MTL::TextureType3D;
+    case RHITextureDimension::Tex2DMultisample: return MTL::TextureType2DMultisample;
+    }
+    return MTL::TextureType2D;
+}
+
+// Depth reads as float; only the sampled scalar class is checked.
+MTL::DataType texture_data_type(RHIDataType type)
+{
+    switch (type)
+    {
+    case RHIDataType::Int: return MTL::DataTypeInt;
+    case RHIDataType::UInt: return MTL::DataTypeUInt;
+    default: return MTL::DataTypeFloat;
+    }
+}
+
+// The type a vertex function declares for an attribute a format feeds; half and normalised formats are read as float.
+MTL::DataType shader_input_type(RHIVertexFormat format)
+{
+    switch (format)
+    {
+    case RHIVertexFormat::Float: return MTL::DataTypeFloat;
+    case RHIVertexFormat::Float2:
+    case RHIVertexFormat::Half2: return MTL::DataTypeFloat2;
+    case RHIVertexFormat::Float3: return MTL::DataTypeFloat3;
+    case RHIVertexFormat::Float4:
+    case RHIVertexFormat::Half4:
+    case RHIVertexFormat::UByte4Norm: return MTL::DataTypeFloat4;
+    case RHIVertexFormat::UInt: return MTL::DataTypeUInt;
+    case RHIVertexFormat::UInt2: return MTL::DataTypeUInt2;
+    case RHIVertexFormat::UInt3: return MTL::DataTypeUInt3;
+    case RHIVertexFormat::UInt4: return MTL::DataTypeUInt4;
+    case RHIVertexFormat::Int: return MTL::DataTypeInt;
+    case RHIVertexFormat::Int2: return MTL::DataTypeInt2;
+    case RHIVertexFormat::Int3: return MTL::DataTypeInt3;
+    case RHIVertexFormat::Int4: return MTL::DataTypeInt4;
+    }
+    return MTL::DataTypeFloat;
+}
+
+std::string at_binding(const RHIBindingDesc& layout, RHIBindingId id, const char* stage_name)
+{
+    return std::string(stage_name) + " binding " + std::to_string(id) + " (slot " + std::to_string(layout.slot) + ")";
 }
 
 void check_stage_bindings(NS::Array* reflected, const RHIGraphicsPipelineDesc& desc, RHIShaderStageMask stage, const char* stage_name)
@@ -69,7 +122,7 @@ void check_stage_bindings(NS::Array* reflected, const RHIGraphicsPipelineDesc& d
             continue;
         }
         const MTL::Binding* found = nullptr;
-        for (NS::UInteger j = 0; j < reflected->count(); ++j)
+        for (NS::UInteger j = 0; reflected != nullptr && j < reflected->count(); ++j)
         {
             const MTL::Binding* candidate = static_cast<const MTL::Binding*>(reflected->object(j));
             if (candidate->type() == binding_type(layout.kind) && candidate->index() == layout.slot)
@@ -80,14 +133,14 @@ void check_stage_bindings(NS::Array* reflected, const RHIGraphicsPipelineDesc& d
         }
         if (found == nullptr)
         {
-            throw Error("Metal reflection mismatch: no " + std::string(stage_name) + " binding at the layout's slot and kind", "binding id " + std::to_string(i) + ", slot " + std::to_string(layout.slot));
+            throw RHIInterfaceMismatch("Metal reflection mismatch: no " + at_binding(layout, i, stage_name) + " of the layout's kind", i);
         }
         if (layout.kind == RHIBindingKind::Constants)
         {
             const MTL::BufferBinding* buffer = static_cast<const MTL::BufferBinding*>(found);
             if (buffer->bufferDataSize() != layout.size)
             {
-                throw Error("Metal reflection mismatch: constants size differs from the layout", "binding id " + std::to_string(i) + ", reflected " + std::to_string(buffer->bufferDataSize()) + " bytes, layout " + std::to_string(layout.size));
+                throw RHIInterfaceMismatch("Metal reflection mismatch: " + at_binding(layout, i, stage_name) + " is " + std::to_string(buffer->bufferDataSize()) + " bytes in the shader, " + std::to_string(layout.size) + " in the layout", i);
             }
         }
         else if (rhi_binding_is_texture(layout.kind))
@@ -95,7 +148,15 @@ void check_stage_bindings(NS::Array* reflected, const RHIGraphicsPipelineDesc& d
             const MTL::TextureBinding* texture = static_cast<const MTL::TextureBinding*>(found);
             if (texture->arrayLength() != layout.array_count)
             {
-                throw Error("Metal reflection mismatch: texture array length differs from the layout", "binding id " + std::to_string(i));
+                throw RHIInterfaceMismatch("Metal reflection mismatch: " + at_binding(layout, i, stage_name) + " is an array of " + std::to_string(texture->arrayLength()) + " in the shader, " + std::to_string(layout.array_count) + " in the layout", i);
+            }
+            if (texture->textureType() != texture_type(layout.texture_dimension))
+            {
+                throw RHIInterfaceMismatch("Metal reflection mismatch: " + at_binding(layout, i, stage_name) + " has a different texture dimension in the shader than in the layout", i);
+            }
+            if (layout.data_type != RHIDataType::Depth && texture->textureDataType() != texture_data_type(layout.data_type))
+            {
+                throw RHIInterfaceMismatch("Metal reflection mismatch: " + at_binding(layout, i, stage_name) + " samples a different scalar type in the shader than in the layout", i);
             }
         }
     }
@@ -111,14 +172,22 @@ void check_vertex_attributes(MTL::Function& vertex, const RHIVertexInput& input)
         {
             continue;
         }
-        bool provided = false;
+        const std::string where = "vertex attribute " + std::to_string(attribute->attributeIndex());
+        const RHIVertexAttribute* provided = nullptr;
         for (uint32_t j = 0; j < input.attribute_count; ++j)
         {
-            provided = provided || input.attributes[j].location == attribute->attributeIndex();
+            if (input.attributes[j].location == attribute->attributeIndex())
+            {
+                provided = &input.attributes[j];
+            }
         }
-        if (!provided)
+        if (provided == nullptr)
         {
-            throw Error("Metal reflection mismatch: the vertex shader reads an attribute the vertex input does not provide", "attribute " + std::to_string(attribute->attributeIndex()));
+            throw RHIInterfaceMismatch("Metal reflection mismatch: the vertex shader reads " + where + ", which the vertex input does not provide", RHI_INVALID_BINDING);
+        }
+        if (attribute->attributeType() != shader_input_type(provided->format))
+        {
+            throw RHIInterfaceMismatch("Metal reflection mismatch: " + where + " has a different type in the shader than the vertex input provides", RHI_INVALID_BINDING);
         }
     }
 }
@@ -163,7 +232,7 @@ Ref<MetalPipeline> create_metal_pipeline(const MetalDevice& device, const RHIGra
 
     NS::Error* error = nullptr;
     NS::SharedPtr<MTL::RenderPipelineState> state;
-#ifdef OX_DEBUG
+#ifndef OX_DIST
     MTL::RenderPipelineReflection* reflection = nullptr;
     state = NS::TransferPtr(device.device()->newRenderPipelineState(descriptor.get(), MTL::PipelineOptionBindingInfo, &reflection, &error));
 #else
@@ -173,7 +242,7 @@ Ref<MetalPipeline> create_metal_pipeline(const MetalDevice& device, const RHIGra
     {
         throw Error("Metal pipeline creation failed", error != nullptr ? to_string(error->localizedDescription()) : std::string("unknown error"));
     }
-#ifdef OX_DEBUG
+#ifndef OX_DIST
     if (reflection != nullptr)
     {
         check_stage_bindings(reflection->vertexBindings(), desc, RHIShaderStageMask::Vertex, "vertex");

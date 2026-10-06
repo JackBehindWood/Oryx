@@ -54,6 +54,9 @@ MetalDevice::MetalDevice()
     m_capabilities.frames_in_flight = METAL_FRAMES_IN_FLIGHT;
     const bool large_argument_table = m_device->supportsFamily(MTL::GPUFamilyApple4) || m_device->supportsFamily(MTL::GPUFamilyMac2);
     m_capabilities.max_texture_bindings = std::min(RHI_MAX_TEXTURE_BINDINGS, large_argument_table ? 128u : 31u);
+#ifndef OX_DIST
+    m_capabilities.validates_shader_interface = true;
+#endif
 }
 
 void MetalDevice::upload_buffer(MTL::Buffer& destination, uint32_t offset, const uint8_t* data, uint32_t size) const

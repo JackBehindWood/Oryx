@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Memory/RefCounted.h"
-#include "Oryx/Shaders/ShaderCompiler.h"
+#include "Oryx/Shaders/Compiler/ShaderCompiler.h"
 
 namespace oryx
 {

@@ -7,13 +7,13 @@ namespace oryx
 namespace
 {
 
-constexpr const char* SOURCE = "/Oryx/Builtin/Quad.msl";
+constexpr const char* SOURCE = "/Oryx/Builtin/Quad.slang";
 
 } // namespace
 
 std::vector<ShaderDefine> QuadPS::defines_for(uint32_t permutation)
 {
-    return { { "MAX_TEXTURES", std::to_string(texture_count(permutation)) } };
+    return { { "OX_MAX_TEXTURES", std::to_string(texture_count(permutation)) } };
 }
 
 OX_REGISTER_SHADER(QuadVS, SOURCE, "quad_vs", ShaderStage::Vertex)

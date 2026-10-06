@@ -1,7 +1,7 @@
 #include "oxpch.h"
-#include "Oryx/Shaders/ShaderCache.h"
+#include "Oryx/Shaders/Cache/ShaderCache.h"
 
-#include "Oryx/Shaders/ShaderHash.h"
+#include "Oryx/Shaders/Cache/ShaderHash.h"
 
 namespace oryx
 {
@@ -14,6 +14,10 @@ const ShaderCompilerOutput* ShaderCache::find(ShaderHash hash) const
 
 const ShaderCompilerOutput& ShaderCache::get_or_compile(const ShaderCompilerInput& input)
 {
+    if (input.source.language == ShaderLanguage::Slang)
+    {
+        return get_or_compile(input, SlangCompiler(m_slang));
+    }
     return get_or_compile(input, shader_compiler_for(input.source.language));
 }
 

@@ -2,10 +2,10 @@
 
 #include "ShaderTestSupport.h"
 
-#include "Oryx/Shaders/ShaderBinaryStore.h"
-#include "Oryx/Shaders/ShaderCook.h"
-#include "Oryx/Shaders/ShaderMap.h"
-#include "Oryx/Shaders/ShaderSerialisation.h"
+#include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
+#include "Oryx/Shaders/Cache/ShaderCook.h"
+#include "Oryx/Shaders/Cache/ShaderMap.h"
+#include "Oryx/Shaders/Cache/ShaderSerialisation.h"
 
 using namespace oryx;
 using namespace oryx::test;
@@ -75,7 +75,7 @@ TEST_CASE("Compiled shader output round-trips, reflection included")
     for (const ShaderType& type : registered_shader_types())
     {
         ShaderCompilerInput input = load_shader_input(type, sources);
-        input.defines = type.defines_for(0);
+        input.defines = shader_defines(type, 0);
         ShaderCompilerOutput output = shader_compiler_for(input.source.language).compile(input);
         output.compiler_id = "oryx-msl";
         output.compiler_version = 1;

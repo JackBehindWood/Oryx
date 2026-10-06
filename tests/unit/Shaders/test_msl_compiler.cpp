@@ -69,7 +69,7 @@ TEST_CASE("MslShaderCompiler reflects a vertex entry point")
     CHECK(frame.name == "frame");
     CHECK(frame.kind == ShaderBindingKind::Constants);
     CHECK(frame.slot == 0);
-    CHECK(frame.size == 80);
+    CHECK(frame.size == 96);
     REQUIRE(frame.members.size() == 3);
     CHECK(frame.members[0].offset == 0);
     CHECK(frame.members[0].size == 64);
@@ -77,7 +77,7 @@ TEST_CASE("MslShaderCompiler reflects a vertex entry point")
     CHECK(frame.members[1].offset == 64);
     CHECK(frame.members[1].size == 12);
     CHECK(frame.members[2].name == "scale");
-    CHECK(frame.members[2].offset == 76);
+    CHECK(frame.members[2].offset == 80);
     CHECK(reflection.thread_group_size[0] == 0);
 }
 
@@ -309,4 +309,15 @@ TEST_CASE("MslShaderCompiler rejects invalid shaders")
     {
         CHECK(contains(compile_error(ShaderStage::Pixel, "f", "struct S { float a;"), "unterminated struct"));
     }
+}
+
+TEST_CASE("MslShaderCompiler does not pack a scalar into a 3-vector's padding")
+{
+    const ShaderReflection reflection = compile_msl(ShaderStage::Pixel, "f",
+        "struct S { float4x4 m; float3 tint; float scale; };\n"
+        + fragment_with_params("constant S& s [[buffer(0)]]")).reflection;
+    const ShaderBinding& binding = reflection.parameters[0];
+    REQUIRE(binding.members.size() == 3);
+    CHECK(binding.members[2].offset == 80);
+    CHECK(binding.size == 96);
 }
