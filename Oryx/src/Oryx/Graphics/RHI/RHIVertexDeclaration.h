@@ -48,4 +48,8 @@ private:
     RHIVertexStream m_streams[RHI_MAX_VERTEX_SLOTS];
 };
 
+// Specialised for each vertex type; the declaration is built once.
+template<typename T>
+[[nodiscard]] const RHIVertexDeclaration& vertex_declaration();
+
 } // namespace oryx

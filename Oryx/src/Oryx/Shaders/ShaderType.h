@@ -27,7 +27,7 @@ struct ShaderType
 // Every registered type, in registration order; filled by static registrars, never a central list.
 [[nodiscard]] const std::vector<ShaderType>& registered_shader_types();
 
-// The defines every shader is compiled with (OX_MAX_TEXTURES), overridden by the type's own for `permutation`.
+// The defines `type` is compiled with for `permutation`.
 [[nodiscard]] std::vector<ShaderDefine> shader_defines(const ShaderType& type, uint32_t permutation);
 
 struct ShaderTypeRegistrar

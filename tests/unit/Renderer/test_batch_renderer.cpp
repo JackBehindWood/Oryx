@@ -30,7 +30,7 @@ class ExtraStreamBatcher : public BatchRenderer
 public:
     explicit ExtraStreamBatcher(const BatchRendererDesc& desc)
         : BatchRenderer(desc)
-        , m_stream(register_stream({ sizeof(Vertex2DLine), 2, 0, false, BuiltinPipeline::SolidLines }))
+        , m_stream(register_stream({ sizeof(Vertex2DLine), 2, 0, false, &pipeline_def(Primitive2D::Line) }))
     {
     }
 
@@ -115,8 +115,8 @@ TEST_CASE("BatchRenderer2D: a stream or sampler change flushes in submission ord
     batcher.end();
 
     REQUIRE(f.sink.size() == 6);
-    const GraphicsPipelineHandle quad = f.context->builtin_pipelines.get(*f.context->rhi, f.context->pipelines, f.context->shaders, f.context->back_buffer_format, BuiltinPipeline::Quad, 1);
-    const GraphicsPipelineHandle circle = f.context->builtin_pipelines.get(*f.context->rhi, f.context->pipelines, f.context->shaders, f.context->back_buffer_format, BuiltinPipeline::Circle);
+    const GraphicsPipelineHandle quad = f.context->pipeline_memo.get(*f.context->rhi, f.context->pipelines, f.context->shaders, f.context->back_buffer_format, pipeline_def(Primitive2D::Quad), 1);
+    const GraphicsPipelineHandle circle = f.context->pipeline_memo.get(*f.context->rhi, f.context->pipelines, f.context->shaders, f.context->back_buffer_format, pipeline_def(Primitive2D::Circle));
     CHECK(f.sink[0].pipeline == quad);
     CHECK(f.sink[0].index_count == 12);
     CHECK(f.sink[1].pipeline == circle);
@@ -163,7 +163,7 @@ TEST_CASE("BatchRenderer2D: texture slots are shared, and exhaustion flushes (32
         desc.max_texture_bindings = bindings;
         BatchRenderer2D batcher(desc);
         const uint32_t slots = batcher.texture_slot_count();
-        CHECK(slots == (bindings == 0 ? QuadPS::MAX_TEXTURES : QuadPS::DEFAULT_TEXTURES));
+        CHECK(slots == (bindings == 0 ? TextureArrayPermutations::MAX_TEXTURES : TextureArrayPermutations::DEFAULT_TEXTURES));
 
         const Texture2D first = f.texture();
         std::vector<Texture2D> textures;
@@ -340,9 +340,9 @@ TEST_CASE("BatchRenderer: invalid stream descriptions throw")
     };
     BatchFixture f;
     Probe probe(f.desc());
-    CHECK_THROWS_AS(probe.add({ 0, 2, 0, false, BuiltinPipeline::SolidLines }), Error);
-    CHECK_THROWS_AS(probe.add({ 28, 3, 6, false, BuiltinPipeline::SolidLines }), Error);
-    CHECK_NOTHROW(probe.add({ 28, 4, 6, false, BuiltinPipeline::SolidLines }));
+    CHECK_THROWS_AS(probe.add({ 0, 2, 0, false, &pipeline_def(Primitive2D::Line) }), Error);
+    CHECK_THROWS_AS(probe.add({ 28, 3, 6, false, &pipeline_def(Primitive2D::Line) }), Error);
+    CHECK_NOTHROW(probe.add({ 28, 4, 6, false, &pipeline_def(Primitive2D::Line) }));
 }
 
 TEST_CASE("BatchRenderer2D: pipelines are acquired again after release_pipelines")

@@ -14,8 +14,7 @@ constexpr uint32_t VERTEX_ALIGNMENT = 16;
 
 uint32_t texture_permutation(const BatchRendererDesc& desc)
 {
-    const uint32_t bindings = desc.max_texture_bindings != 0 ? desc.max_texture_bindings : desc.rhi.capabilities().max_texture_bindings;
-    return bindings >= QuadPS::texture_count(1) ? 1 : 0;
+    return TextureArrayPermutations::fitting(desc.max_texture_bindings != 0 ? desc.max_texture_bindings : desc.rhi.capabilities().max_texture_bindings);
 }
 
 uint32_t align_up(uint32_t value, uint32_t alignment)
@@ -28,11 +27,11 @@ uint32_t align_up(uint32_t value, uint32_t alignment)
 BatchRenderer::BatchRenderer(const BatchRendererDesc& desc)
     : m_rhi(desc.rhi)
     , m_pipelines(desc.pipelines)
-    , m_builtin(desc.builtin)
+    , m_memo(desc.memo)
     , m_shaders(desc.shaders)
     , m_defaults(desc.defaults)
     , m_sink(desc.sink)
-    , m_slots(desc.defaults.white_texture, QuadPS::texture_count(texture_permutation(desc)))
+    , m_slots(desc.defaults.white_texture, TextureArrayPermutations::value(texture_permutation(desc)))
     , m_format(desc.colour_format)
     , m_page_bytes(align_up(desc.page_bytes, TransientAllocator::REGION_ALIGNMENT))
     , m_max_indexed_primitives(desc.max_indexed_primitives)
@@ -179,7 +178,7 @@ void BatchRenderer::flush_batch(FlushReason reason)
         std::memcpy(allocation.data, m_staging.data(), bytes);
 
         DrawItem item;
-        item.pipeline = m_builtin.get(m_rhi, m_pipelines, m_shaders, m_format, stream.pipeline, stream.textured ? m_permutation : 0);
+        item.pipeline = m_memo.get(m_rhi, m_pipelines, m_shaders, m_format, *stream.pipeline, stream.textured ? m_permutation : 0);
         item.vertex_buffers[0] = allocation.buffer;
         item.vertex_offsets[0] = allocation.offset;
         item.vertex_count = primitives * stream.vertices_per_primitive;

@@ -47,7 +47,7 @@ TEST_CASE("draw_text: one indexed quad per glyph in a single text draw")
     CHECK(f.sink[0].vertex_count == 12);
     CHECK(f.sink[0].index_count == 18);
     CHECK(f.sink[0].index_buffer == f.context->defaults.quad_indices);
-    CHECK(f.sink[0].pipeline == f.context->builtin_pipelines.get(*f.context->rhi, f.context->pipelines, f.context->shaders, f.context->back_buffer_format, BuiltinPipeline::Text, 1));
+    CHECK(f.sink[0].pipeline == f.context->pipeline_memo.get(*f.context->rhi, f.context->pipelines, f.context->shaders, f.context->back_buffer_format, pipeline_def(Primitive2D::Text), 1));
     CHECK(batcher.stats().primitives == 3);
     CHECK(batcher.stats().triangles == 6);
     CHECK(batcher.stats().texture_slots_used == 2);

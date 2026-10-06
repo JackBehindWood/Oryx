@@ -55,7 +55,7 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
 
 BatchRendererDesc batch_renderer_desc(RendererContext& context, std::vector<DrawItem>& sink)
 {
-    return { *context.rhi, context.pipelines, context.builtin_pipelines, context.shaders, context.defaults, sink, context.back_buffer_format };
+    return { *context.rhi, context.pipelines, context.pipeline_memo, context.shaders, context.defaults, sink, context.back_buffer_format };
 }
 
 void shutdown_renderer_context(UniquePtr<RendererContext>& context)
@@ -78,7 +78,7 @@ void release_pipelines(RendererContext& context)
 {
     context.rhi->wait_idle();
     context.pipelines.clear();
-    context.builtin_pipelines.reset();
+    context.pipeline_memo.reset();
 }
 
 void release_shader_cache(RendererContext& context)

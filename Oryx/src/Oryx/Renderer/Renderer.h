@@ -10,7 +10,7 @@
 #include "Oryx/Math/Colour.h"
 #include "Oryx/Renderer/BatchRenderer.h"
 #include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
-#include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Renderer/PipelineDef.h"
 #include "Oryx/Math/Vector2.h"
 #include "Oryx/Renderer/DebugRenderer.h"
 #include "Oryx/Renderer/DrawItem.h"
@@ -48,8 +48,8 @@ public:
     [[nodiscard]] static const ShaderLibrary& shaders();
     // Returns the cached pipeline for the description, creating it on first use. The handle stays valid until release_pipelines or trim.
     [[nodiscard]] static GraphicsPipelineHandle pipeline(const GraphicsPipelineDesc& desc);
-    // The engine's own pipeline for the back-buffer format; same lifetime as pipeline().
-    [[nodiscard]] static GraphicsPipelineHandle builtin(BuiltinPipeline pipeline, uint32_t permutation = 0);
+    // The pipeline of a pass definition for the back-buffer format, memoised; same lifetime as pipeline().
+    [[nodiscard]] static GraphicsPipelineHandle pipeline(const PipelineDef& def, uint32_t permutation = 0);
     // Throws Error for an invalid or stale handle.
     [[nodiscard]] static const GraphicsPipeline& resolve_pipeline(GraphicsPipelineHandle handle);
     [[nodiscard]] static GraphicsPipelineCacheStats pipeline_cache_stats();

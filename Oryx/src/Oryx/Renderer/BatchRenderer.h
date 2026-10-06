@@ -2,7 +2,7 @@
 
 #include "Oryx/Graphics/RHI/IRHI.h"
 #include "Oryx/Graphics/Resources/TransientAllocator.h"
-#include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Renderer/PipelineDef.h"
 #include "Oryx/Renderer/Camera.h"
 #include "Oryx/Renderer/DefaultResources.h"
 #include "Oryx/Renderer/DrawItem.h"
@@ -49,7 +49,7 @@ struct BatchStreamDesc
     uint32_t vertices_per_primitive = 0;
     uint32_t indices_per_primitive = 0;
     bool textured = false;
-    BuiltinPipeline pipeline = BuiltinPipeline::Quad;
+    const PipelineDef* pipeline = nullptr;
     uint32_t triangles_per_primitive = 0;
 };
 
@@ -61,7 +61,7 @@ struct BatchRendererDesc
 {
     IRHI& rhi;
     GraphicsPipelineCache& pipelines;
-    BuiltinPipelines& builtin;
+    PipelineMemo& memo;
     const ShaderLibrary& shaders;
     const DefaultResources& defaults;
     std::vector<DrawItem>& sink;
@@ -114,7 +114,7 @@ private:
 
     IRHI& m_rhi;
     GraphicsPipelineCache& m_pipelines;
-    BuiltinPipelines& m_builtin;
+    PipelineMemo& m_memo;
     const ShaderLibrary& m_shaders;
     const DefaultResources& m_defaults;
     std::vector<DrawItem>& m_sink;

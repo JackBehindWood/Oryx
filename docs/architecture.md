@@ -919,6 +919,8 @@ The following should **not** be considered settled yet:
   intended format. Phase 8 settles it for experiment results only (YAML summary
   plus CSV rows, versioned); game/state serialisation is undecided
 * Graphics abstraction
+* Graphics: pipeline lookup by name — pipelines are `PipelineDef` values owned by the pass that draws with them, so nothing is looked up; a name-keyed registry waits for a user (config or scripting referencing pipelines) and would follow `Registry<T>`
+* Graphics: shader parameter structs — bindings are string constants checked by reflection at pipeline creation; whether a per-shader or per-pass parameter struct (Unreal's `SHADER_PARAMETER_STRUCT`) replaces them waits for several passes with many bindings or compute shaders
 * Multi-threaded simulation model — explicitly deferred rather than merely
   unaddressed: Phase 5's batch runner is single-threaded by design
   ([Design: Parallelism](design/quality.md#parallelism)/[Decision Log](design/decision-log.md)), not pending a decision

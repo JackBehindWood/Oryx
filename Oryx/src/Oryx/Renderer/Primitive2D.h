@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Graphics/RHI/RHIRenderState.h"
-#include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Renderer/PipelineDef.h"
 
 namespace oryx
 {
@@ -24,11 +24,13 @@ struct PrimitiveTraits
     uint32_t vertices_per_primitive = 0;
     uint32_t indices_per_primitive = 0;
     RHITopology topology = RHITopology::Triangles;
-    BuiltinPipeline pipeline = BuiltinPipeline::Quad;
+    bool textured = false;
     bool indexed = false;
     bool instanced = false;
 };
 
 [[nodiscard]] PrimitiveTraits primitive_traits(Primitive2D primitive);
+// The pipeline each primitive draws with; built on first use because shader types register during static initialisation.
+[[nodiscard]] const PipelineDef& pipeline_def(Primitive2D primitive);
 
 } // namespace oryx

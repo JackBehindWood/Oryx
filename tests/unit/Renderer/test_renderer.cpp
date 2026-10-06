@@ -28,8 +28,8 @@ struct DrawFixture
 
     ~DrawFixture() { Renderer::set_viewport({}); }
 
-    GraphicsPipelineHandle solid() { return Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), Renderer::back_buffer_format())); }
-    GraphicsPipelineHandle quad() { return Renderer::pipeline(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format())); }
+    GraphicsPipelineHandle solid() { return Renderer::pipeline(pipeline_desc(pipeline_def(Primitive2D::Triangle), Renderer::shaders(), Renderer::back_buffer_format())); }
+    GraphicsPipelineHandle quad() { return Renderer::pipeline(pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format())); }
 
     DrawItem solid_item(GraphicsPipelineHandle pipeline)
     {
@@ -137,7 +137,7 @@ TEST_CASE("Renderer: indexed and textured items record their binds")
     item.index_count = 6;
     const float matrix[16] = {};
     draw_item_set_constants(item, matrix);
-    for (uint32_t i = 0; i < QuadPS::DEFAULT_TEXTURES; ++i)
+    for (uint32_t i = 0; i < TextureArrayPermutations::DEFAULT_TEXTURES; ++i)
     {
         draw_item_add_texture(item, fixture.rhi.create_texture({ .width = 1, .height = 1 }));
     }
@@ -180,7 +180,7 @@ TEST_CASE("Renderer: shaders are compiled by init")
 {
     RendererGuard guard;
     CHECK_THROWS_AS(Renderer::shaders(), Error);
-    CHECK_THROWS_AS(Renderer::pipeline({}), Error);
+    CHECK_THROWS_AS(Renderer::pipeline(GraphicsPipelineDesc{}), Error);
 
     Renderer::init({ RHIBackend::Null });
     const ShaderLibrary& shaders = Renderer::shaders();
@@ -276,7 +276,7 @@ TEST_CASE("record_draw_item fills unset texture slots with the white default")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    const GraphicsPipelineDesc quad = builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format());
+    const GraphicsPipelineDesc quad = pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format());
 
     DrawItem item = fixture.item(quad);
     RHITexturePtr own = fixture.rhi.create_texture({ .width = 2, .height = 2 });
@@ -299,7 +299,7 @@ TEST_CASE("record_draw_item fills every slot when the item has no textures")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    record_draw_item(fixture.commands, fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
+    record_draw_item(fixture.commands, fixture.item(pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
     CHECK(fixture.texture_binds().size() == 16);
 }
 
@@ -308,7 +308,7 @@ TEST_CASE("record_draw_item sizes the fill from the pipeline's texture array")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    record_draw_item(fixture.commands, fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format(), 1)), fixture.cache, fixture.defaults);
+    record_draw_item(fixture.commands, fixture.item(pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format(), 1)), fixture.cache, fixture.defaults);
     CHECK(fixture.texture_binds().size() == 32);
 }
 
@@ -317,11 +317,11 @@ TEST_CASE("record_draw_item leaves pipelines without texture bindings alone")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    record_draw_item(fixture.commands, fixture.item(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
+    record_draw_item(fixture.commands, fixture.item(pipeline_desc(pipeline_def(Primitive2D::Triangle), Renderer::shaders(), Renderer::back_buffer_format())), fixture.cache, fixture.defaults);
     CHECK(fixture.count(RHICommandType::BindTexture) == 0);
     CHECK(fixture.count(RHICommandType::BindSampler) == 0);
 
-    DrawItem textured = fixture.item(builtin_pipeline_desc(BuiltinPipeline::SolidTriangles, Renderer::shaders(), Renderer::back_buffer_format()));
+    DrawItem textured = fixture.item(pipeline_desc(pipeline_def(Primitive2D::Triangle), Renderer::shaders(), Renderer::back_buffer_format()));
     draw_item_add_texture(textured, fixture.defaults.white_texture);
     CHECK_THROWS_AS(record_draw_item(fixture.commands, textured, fixture.cache, fixture.defaults), Error);
 }
@@ -331,7 +331,7 @@ TEST_CASE("record_draw_item binds the default sampler only when the item has non
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    const GraphicsPipelineDesc quad = builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format());
+    const GraphicsPipelineDesc quad = pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format());
 
     record_draw_item(fixture.commands, fixture.item(quad), fixture.cache, fixture.defaults);
     RHISamplerPtr own = fixture.rhi.create_sampler({});
@@ -357,7 +357,7 @@ TEST_CASE("record_draw_item rejects more textures than the pipeline has slots")
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     RecordFixture fixture;
-    DrawItem item = fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format(), 1));
+    DrawItem item = fixture.item(pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format(), 1));
     item.texture_count = DRAW_ITEM_MAX_TEXTURES;
     for (uint32_t i = 0; i < DRAW_ITEM_MAX_TEXTURES; ++i)
     {
@@ -365,11 +365,11 @@ TEST_CASE("record_draw_item rejects more textures than the pipeline has slots")
     }
     CHECK_NOTHROW(record_draw_item(fixture.commands, item, fixture.cache, fixture.defaults));
 
-    DrawItem narrow = fixture.item(builtin_pipeline_desc(BuiltinPipeline::Quad, Renderer::shaders(), Renderer::back_buffer_format()));
-    narrow.texture_count = QuadPS::DEFAULT_TEXTURES + 1;
+    DrawItem narrow = fixture.item(pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format()));
+    narrow.texture_count = TextureArrayPermutations::DEFAULT_TEXTURES + 1;
     CHECK_THROWS_AS(record_draw_item(fixture.commands, narrow, fixture.cache, fixture.defaults), Error);
 
-    DrawItem circle = fixture.item(builtin_pipeline_desc(BuiltinPipeline::Circle, Renderer::shaders(), Renderer::back_buffer_format()));
+    DrawItem circle = fixture.item(pipeline_desc(pipeline_def(Primitive2D::Circle), Renderer::shaders(), Renderer::back_buffer_format()));
     draw_item_add_texture(circle, fixture.defaults.white_texture);
     CHECK_THROWS_AS(record_draw_item(fixture.commands, circle, fixture.cache, fixture.defaults), Error);
 }

@@ -42,7 +42,8 @@ TEST_CASE("primitive_traits: agree with the vertex formats and effects")
     CHECK(primitive_traits(Primitive2D::Triangle).vertex_size == vertex_declaration<Vertex2DLine>().stride());
 
     CHECK(primitive_traits(Primitive2D::Text).vertex_size == vertex_declaration<Vertex2DText>().stride());
-    CHECK(primitive_traits(Primitive2D::Text).pipeline == BuiltinPipeline::Text);
+    CHECK(primitive_traits(Primitive2D::Text).textured);
+    CHECK_FALSE(primitive_traits(Primitive2D::Circle).textured);
     CHECK(primitive_traits(Primitive2D::Text).indices_per_primitive == 6);
 
     CHECK(primitive_traits(Primitive2D::Quad).indexed);

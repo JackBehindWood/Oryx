@@ -54,13 +54,12 @@ BatchRenderer2D::BatchRenderer2D(const BatchRendererDesc& desc)
     for (uint32_t i = 0; i < PRIMITIVE_2D_COUNT; ++i)
     {
         const PrimitiveTraits traits = primitive_traits(static_cast<Primitive2D>(i));
-        const bool textured = traits.pipeline == BuiltinPipeline::Quad || traits.pipeline == BuiltinPipeline::Text;
         uint32_t triangles = 0;
         if (traits.topology == RHITopology::Triangles)
         {
             triangles = (traits.indexed ? traits.indices_per_primitive : traits.vertices_per_primitive) / 3;
         }
-        m_streams[i] = register_stream({ traits.vertex_size, traits.vertices_per_primitive, traits.indices_per_primitive, textured, traits.pipeline, triangles });
+        m_streams[i] = register_stream({ traits.vertex_size, traits.vertices_per_primitive, traits.indices_per_primitive, traits.textured, &pipeline_def(static_cast<Primitive2D>(i)), triangles });
     }
 }
 

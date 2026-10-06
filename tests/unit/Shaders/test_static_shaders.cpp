@@ -95,7 +95,7 @@ TEST_CASE("Quad vertex and pixel shaders reflect the texture array")
         const ShaderBinding& textures = pixel->binding("textures");
         CHECK(textures.kind == ShaderBindingKind::SampledTexture);
         CHECK(textures.slot == 0);
-        CHECK(textures.array_count == QuadPS::texture_count(permutation));
+        CHECK(textures.array_count == TextureArrayPermutations::value(permutation));
         CHECK(textures.texture_dimension == ShaderTextureDimension::Tex2D);
         CHECK(pixel->binding("smp").kind == ShaderBindingKind::Sampler);
         CHECK(pixel->permutation() == permutation);

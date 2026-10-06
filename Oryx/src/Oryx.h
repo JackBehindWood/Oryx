@@ -130,7 +130,7 @@
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/GraphicsPipelineHandle.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
-#include "Oryx/Renderer/BuiltinPipelines.h"
+#include "Oryx/Renderer/PipelineDef.h"
 #include "Oryx/Renderer/TextureSlotTable.h"
 #include "Oryx/Renderer/GlyphAtlas.h"
 #include "Oryx/Renderer/Font.h"

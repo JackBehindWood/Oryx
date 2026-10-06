@@ -119,7 +119,7 @@ TEST_CASE("RHICapabilities reports a texture-binding limit within the compile-ti
     CHECK(rhi.capabilities().max_texture_bindings > 0);
     CHECK(rhi.capabilities().max_texture_bindings <= RHI_MAX_TEXTURE_BINDINGS);
     CHECK(DRAW_ITEM_MAX_TEXTURES == RHI_MAX_TEXTURE_BINDINGS);
-    CHECK(QuadPS::MAX_TEXTURES == RHI_MAX_TEXTURE_BINDINGS);
+    CHECK(TextureArrayPermutations::MAX_TEXTURES == RHI_MAX_TEXTURE_BINDINGS);
 }
 
 TEST_CASE("TransientAllocator hands out aligned, non-overlapping ranges per frame slot")

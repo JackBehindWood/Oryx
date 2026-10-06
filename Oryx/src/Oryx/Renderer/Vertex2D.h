@@ -52,10 +52,6 @@ static_assert(sizeof(Vertex2DQuad) == 40 && offsetof(Vertex2DQuad, uv) == 28 && 
 static_assert(sizeof(Vertex2DText) == 44 && offsetof(Vertex2DText, uv) == 28 && offsetof(Vertex2DText, tex_index) == 36 && offsetof(Vertex2DText, px_range) == 40);
 static_assert(sizeof(Vertex2DCircle) == 44 && offsetof(Vertex2DCircle, local_position) == 28 && offsetof(Vertex2DCircle, thickness) == 36 && offsetof(Vertex2DCircle, fade) == 40);
 
-// Specialised for each Vertex2D* type; the declaration is built once.
-template<typename T>
-[[nodiscard]] const RHIVertexDeclaration& vertex_declaration();
-
 template<>
 [[nodiscard]] const RHIVertexDeclaration& vertex_declaration<Vertex2DLine>();
 template<>

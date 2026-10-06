@@ -22,13 +22,16 @@ fragment float4 test_ps(array<texture2d<float>, N> t [[texture(0)]])
 }
 )msl";
 
-class LibraryTestPS : public StaticShader<PixelShader>
+struct LibraryTestDimension
+{
+    static constexpr const char* NAME = "N";
+    static constexpr uint32_t VALUES[] = { 1, 2, 3 };
+};
+
+class LibraryTestPS : public StaticShader<PixelShader, ShaderPermutationDomain<LibraryTestDimension>>
 {
 public:
     using StaticShader::StaticShader;
-
-    static std::vector<ShaderDefine> defines_for(uint32_t permutation) { return { { "N", std::to_string(permutation + 1) } }; }
-    static bool should_compile(uint32_t permutation) { return permutation < 3; }
 };
 
 const EmbeddedShaderRegistrar library_test_source("/Test/Library.msl", TEST_SOURCE, std::strlen(TEST_SOURCE));
