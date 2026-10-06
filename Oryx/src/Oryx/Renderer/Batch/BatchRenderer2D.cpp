@@ -1,7 +1,7 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/BatchRenderer2D.h"
+#include "Oryx/Renderer/Batch/BatchRenderer2D.h"
 
-#include "Oryx/Renderer/Vertex2D.h"
+#include "Oryx/Renderer/Batch/Vertex2D.h"
 
 namespace oryx
 {

@@ -3,10 +3,10 @@
 #include "Oryx/Graphics/RHI/IRHI.h"
 #include "Oryx/Graphics/Resources/TransientAllocator.h"
 #include "Oryx/Renderer/PipelineDef.h"
-#include "Oryx/Renderer/Camera.h"
+#include "Oryx/Renderer/Scene/Camera.h"
 #include "Oryx/Renderer/DefaultResources.h"
 #include "Oryx/Renderer/DrawItem.h"
-#include "Oryx/Renderer/TextureSlotTable.h"
+#include "Oryx/Renderer/Batch/TextureSlotTable.h"
 
 namespace oryx
 {
@@ -72,6 +72,13 @@ struct BatchRendererDesc
     uint32_t max_texture_bindings = 0;
 };
 
+// Where one scene's draws go: the sink of the pass it draws into and that pass's attachment formats.
+struct BatchTarget
+{
+    std::vector<DrawItem>& sink;
+    PassFormats formats;
+};
+
 // Accumulates transient primitives on the CPU and turns each run of identical state into one DrawItem pushed to the sink, in submission order.
 // An ordinary instance class: scenes may nest no deeper than one begin/end, but any number of batchers may share a sink.
 class BatchRenderer
@@ -82,8 +89,9 @@ public:
     BatchRenderer(const BatchRenderer&) = delete;
     BatchRenderer& operator=(const BatchRenderer&) = delete;
 
-    // Throws Error if a scene is already open.
+    // Throws Error if a scene is already open. Without a target the scene draws into the descriptor's sink and colour format.
     void begin(const Camera& camera);
+    void begin(const Camera& camera, const BatchTarget& target);
     // Throws Error outside a scene.
     void flush(FlushReason reason = FlushReason::Explicit);
     void end();
@@ -117,7 +125,8 @@ private:
     PipelineMemo& m_memo;
     const ShaderLibrary& m_shaders;
     const DefaultResources& m_defaults;
-    std::vector<DrawItem>& m_sink;
+    std::vector<DrawItem>& m_default_sink;
+    std::vector<DrawItem>* m_sink;
     std::vector<BatchStreamDesc> m_streams;
     std::vector<TransientAllocator> m_pages;
     std::vector<uint8_t> m_staging;
@@ -125,7 +134,8 @@ private:
     BatchConstants m_constants = {};
     BatchStats m_stats;
     RHISamplerPtr m_sampler;
-    RHIFormat m_format;
+    PassFormats m_default_formats;
+    PassFormats m_formats;
     uint32_t m_page_bytes;
     uint32_t m_page = 0;
     uint32_t m_max_indexed_primitives;

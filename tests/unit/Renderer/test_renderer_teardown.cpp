@@ -2,6 +2,7 @@
 
 #include "Oryx.h"
 #include "NullRHI.h"
+#include "unit/Renderer/RenderTestSupport.h"
 #include "unit/TestLogCapture.h"
 
 using namespace oryx;
@@ -14,13 +15,13 @@ void run_frames(NullRHI& rhi, uint32_t frames)
     Texture2D sprite = Texture2D::create(rhi, { .width = 2, .height = 2 });
     for (uint32_t frame = 0; frame < frames; ++frame)
     {
+        test::render_2d(Camera2D::screen_space(64.0f, 64.0f), [&sprite](BatchRenderer2D& batcher)
         {
-            ScreenScene scene(64.0f, 64.0f);
-            Renderer::draw_rect({ 4.0f, 4.0f }, { 8.0f, 8.0f }, { 1.0f, 0.0f, 0.0f, 1.0f });
-            Renderer::draw_circle({ 32.0f, 32.0f }, 6.0f, { 0.0f, 1.0f, 0.0f, 1.0f });
-            Renderer::draw_sprite({ 20.0f, 20.0f }, { 8.0f, 8.0f }, sprite);
-            Renderer::draw_text({ 2.0f, 50.0f }, "Oryx", Renderer::default_font());
-        }
+            batcher.draw_rect({ 4.0f, 4.0f }, { 8.0f, 8.0f }, { 1.0f, 0.0f, 0.0f, 1.0f });
+            batcher.draw_circle({ 32.0f, 32.0f }, 6.0f, { 0.0f, 1.0f, 0.0f, 1.0f });
+            batcher.draw_sprite({ 20.0f, 20.0f }, { 8.0f, 8.0f }, sprite);
+            batcher.draw_text({ 2.0f, 50.0f }, "Oryx", Renderer::default_font());
+        });
         Renderer::end_frame();
     }
     (void)rhi;

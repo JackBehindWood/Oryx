@@ -40,18 +40,18 @@ private:
 class ClearOnExit
 {
 public:
-    explicit ClearOnExit(std::vector<DrawItem>& items)
-        : m_items(items)
+    explicit ClearOnExit(SceneRenderer& scene)
+        : m_scene(scene)
     {
     }
 
-    ~ClearOnExit() { m_items.clear(); }
+    ~ClearOnExit() { m_scene.clear_items(); }
 
     ClearOnExit(const ClearOnExit&) = delete;
     ClearOnExit& operator=(const ClearOnExit&) = delete;
 
 private:
-    std::vector<DrawItem>& m_items;
+    SceneRenderer& m_scene;
 };
 
 const uint8_t k_zero_constants[RHI_MAX_CONSTANTS_SIZE] = {};
@@ -138,16 +138,62 @@ void record_draw_item(RHICommandList& commands, const DrawItem& item, const Grap
     }
 }
 
-bool record_frame(RendererContext& context)
+namespace
 {
-    for (const BatchRenderer* batcher : context.batchers)
+
+RHIRenderPassDesc make_pass_desc(const RenderPass& pass, RHIRenderTarget* back_buffer, const Colour& main_clear)
+{
+    const RenderPassDesc& desc = pass.desc;
+    RHIRenderPassDesc out;
+    out.colour_count = 1;
+    out.colour[0].target = desc.colour ? desc.colour.get() : back_buffer;
+    out.colour[0].load = desc.colour_load;
+    out.colour[0].store = desc.colour_store;
+    out.colour[0].clear_colour = pass.id == RENDER_PASS_MAIN ? main_clear : desc.clear_colour;
+    if (desc.depth)
     {
-        if (batcher->open())
+        out.depth = { desc.depth.get(), desc.depth_load, desc.depth_store, desc.clear_depth };
+    }
+    return out;
+}
+
+void record_pass(RendererContext& context, const RenderPass& pass, RHIRenderTarget* back_buffer)
+{
+    context.commands.begin_pass(make_pass_desc(pass, back_buffer, context.clear_colour));
+    {
+        RHIDebugScope scope(context.commands, pass.desc.name.c_str());
+        uint32_t batch = 0;
+        for (const DrawItem& item : pass.items)
         {
-            throw Error("A batcher scene is still open at the end of the frame", "call end_scene before the frame is recorded");
+            try
+            {
+                record_draw_item(context.commands, item, context.pipelines, context.defaults);
+            }
+            catch (const Error& error)
+            {
+                if (typeid(error) != typeid(Error))
+                {
+                    throw;
+                }
+                const std::string where = pass.id == RENDER_PASS_MAIN ? "Draw Batch " : "Pass '" + pass.desc.name + "', Draw Batch ";
+                throw Error(std::string(error.what()) + " [" + where + std::to_string(batch) + "]", error.detail());
+            }
+            ++batch;
         }
     }
-    ClearOnExit clear_items(context.items);
+    context.commands.end_pass();
+}
+
+} // namespace
+
+bool record_frame(RendererContext& context)
+{
+    SceneRenderer& scene = *context.scene;
+    if (scene.open() || scene.batcher_2d().open())
+    {
+        throw Error("A scene is still open at the end of the frame", "call end_scene before the frame is recorded");
+    }
+    ClearOnExit clear_items(scene);
 
     RHIRenderTargetPtr back_buffer;
     if (context.viewport)
@@ -161,38 +207,28 @@ bool record_frame(RendererContext& context)
         context.commands.clear();
         {
             RHIDebugScope frame(context.commands, "Frame");
-            context.commands.begin_pass(back_buffer.get(), { context.clear_colour, true });
+            bool main_recorded = false;
+            for (const RenderPass* pass : scene.ordered_passes())
             {
-                RHIDebugScope pass(context.commands, "BackBuffer Pass");
-                uint32_t batch = 0;
-                for (const DrawItem& item : context.items)
+                const bool is_main = pass->id == RENDER_PASS_MAIN;
+                main_recorded = main_recorded || is_main;
+                if (pass->items.empty() && !is_main)
                 {
-                    try
-                    {
-                        record_draw_item(context.commands, item, context.pipelines, context.defaults);
-                    }
-                    catch (const Error& error)
-                    {
-                        if (typeid(error) != typeid(Error))
-                        {
-                            throw;
-                        }
-                        throw Error(std::string(error.what()) + " [Draw Batch " + std::to_string(batch) + "]", error.detail());
-                    }
-                    ++batch;
+                    continue;
                 }
+                record_pass(context, *pass, back_buffer.get());
             }
-            context.commands.end_pass();
+            if (!main_recorded)
+            {
+                record_pass(context, scene.pass(RENDER_PASS_MAIN), back_buffer.get());
+            }
         }
         context.rhi->submit(context.commands);
         guard.dismiss();
         context.rhi->present(context.viewport.get());
     }
     context.rhi->end_frame();
-    for (BatchRenderer* batcher : context.batchers)
-    {
-        batcher->recycle(context.rhi->frame_slot());
-    }
+    scene.finish_frame(context.rhi->frame_slot());
     context.debug.end_frame();
     return presented;
 }

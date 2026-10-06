@@ -2,8 +2,9 @@
 
 #include "Oryx.h"
 #include "NullRHI.h"
+#include "unit/Renderer/RenderTestSupport.h"
 #include "Oryx/Renderer/RendererContext.h"
-#include "FakeFontSource.h"
+#include "../FakeFontSource.h"
 
 using namespace oryx;
 
@@ -117,16 +118,14 @@ TEST_CASE("DebugRenderer: refuses shapes beyond the cap and counts them")
     CHECK(debug.dropped() == 1);
 }
 
-TEST_CASE("Renderer: debug shapes are replayed into the scene and age with the frame")
+TEST_CASE("Renderer: the scene replays debug shapes once in Scene2D and they age with the frame")
 {
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     Renderer::debug().line({ 0.0f, 0.0f }, { 1.0f, 1.0f }, RED, 2);
-    CHECK_THROWS_AS(Renderer::draw_debug(), Error);
+    Camera2D camera(10.0f, 10.0f);
 
-    Renderer::begin_scene(Camera2D(10.0f, 10.0f));
-    Renderer::draw_debug();
-    Renderer::end_scene();
+    test::render_2d(camera, [](BatchRenderer2D&) {});
     CHECK(Renderer::batch_stats().primitives == 1);
     Renderer::end_frame();
     CHECK(Renderer::debug().size() == 1);
@@ -134,17 +133,28 @@ TEST_CASE("Renderer: debug shapes are replayed into the scene and age with the f
     CHECK(Renderer::debug().size() == 0);
 }
 
-TEST_CASE("Renderer: draw_text goes through the facade's batcher")
+TEST_CASE("Renderer: the scene replays debug shapes even when no source draws")
+{
+    RendererGuard guard;
+    Renderer::init({ RHIBackend::Null });
+    Renderer::debug().rect({ 0.0f, 0.0f }, { 1.0f, 1.0f }, RED);
+    Camera2D camera(10.0f, 10.0f);
+    Renderer::scene().begin_scene(test::view_over(camera));
+    Renderer::scene().end_scene();
+    CHECK(Renderer::batch_stats().primitives == 1);
+    Renderer::end_frame();
+}
+
+TEST_CASE("Renderer: draw_text batches one glyph quad per character through the scene")
 {
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
     test::FakeFontSource* source = nullptr;
     Font font = test::make_fake_font(source);
+    Camera2D camera(10.0f, 10.0f);
 
-    CHECK_THROWS_AS(Renderer::draw_text({ 0.0f, 0.0f }, "A", font), Error);
-    Renderer::begin_scene(Camera2D(10.0f, 10.0f));
-    Renderer::draw_text({ 0.0f, 0.0f }, "AB", font);
-    Renderer::end_scene();
+    CHECK_THROWS_AS(Renderer::scene().batcher_2d().draw_text({ 0.0f, 0.0f }, "A", font), Error);
+    test::render_2d(camera, [&font](BatchRenderer2D& batcher) { batcher.draw_text({ 0.0f, 0.0f }, "AB", font); });
     CHECK(Renderer::batch_stats().primitives == 2);
     Renderer::end_frame();
     font.release_atlases();

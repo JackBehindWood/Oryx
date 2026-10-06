@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/DebugRenderer.h"
+#include "Oryx/Renderer/Batch/DebugRenderer.h"
 
 namespace oryx
 {

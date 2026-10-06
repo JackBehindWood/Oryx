@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/TextureSlotTable.h"
+#include "Oryx/Renderer/Batch/TextureSlotTable.h"
 
 #include "Oryx/Core/Error.h"
 

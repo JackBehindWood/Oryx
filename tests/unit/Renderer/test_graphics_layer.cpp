@@ -285,3 +285,78 @@ TEST_CASE("GraphicsLayer is disabled and shuts down cleanly when the device fail
     }
     CHECK(RHIResource::live_count() == 0);
 }
+
+namespace
+{
+
+class SceneClient : public IFrameClient, public RenderSource
+{
+public:
+    void frame(const FrameInfo&) override
+    {
+        scene_open = Renderer::scene().open();
+        Renderer::scene().submit(*this);
+    }
+
+    void render_stage(RenderStage stage, StageContext& context) override
+    {
+        if (stage == RenderStage::Scene2D)
+        {
+            ++drawn;
+            logical = context.view.logical;
+            if (fail)
+            {
+                throw Error("stage failed");
+            }
+        }
+    }
+
+    bool scene_open = false;
+    bool fail = false;
+    int32_t drawn = 0;
+    Vec2f logical;
+};
+
+} // namespace
+
+TEST_CASE("GraphicsLayer opens one scene around its clients and ends it before the frame is recorded")
+{
+    RendererScope renderer;
+    GraphicsApp app(true);
+    SceneClient client;
+    app.layer->add_client(client);
+
+    app.layer->update(0.016);
+    CHECK(client.scene_open);
+    CHECK(client.drawn == 1);
+    CHECK(client.logical == Vec2f(320.0f, 200.0f));
+    CHECK_FALSE(Renderer::scene().open());
+}
+
+TEST_CASE("GraphicsLayer drops its clients when a scene stage fails and keeps running")
+{
+    RendererScope renderer;
+    GraphicsApp app(true);
+    SceneClient client;
+    client.fail = true;
+    app.layer->add_client(client);
+
+    CHECK_NOTHROW(app.layer->update(0.016));
+    CHECK(client.drawn == 1);
+    CHECK_FALSE(Renderer::scene().open());
+    CHECK(app.disabled == 0);
+
+    CHECK_NOTHROW(app.layer->update(0.016));
+    CHECK(client.drawn == 1);
+}
+
+TEST_CASE("GraphicsLayer keeps a scene valid for a zero-sized window")
+{
+    RendererScope renderer;
+    GraphicsApp app(true);
+    SceneClient client;
+    app.layer->add_client(client);
+    app.window->inject_resize(0, 0);
+    CHECK_NOTHROW(app.layer->update(0.016));
+    CHECK_FALSE(Renderer::scene().open());
+}

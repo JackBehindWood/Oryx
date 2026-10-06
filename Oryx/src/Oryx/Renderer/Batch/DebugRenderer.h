@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Renderer/BatchRenderer2D.h"
+#include "Oryx/Renderer/Batch/BatchRenderer2D.h"
 
 namespace oryx
 {

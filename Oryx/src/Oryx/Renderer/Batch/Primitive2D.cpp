@@ -1,8 +1,8 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/Primitive2D.h"
+#include "Oryx/Renderer/Batch/Primitive2D.h"
 
 #include "Oryx/Core/Error.h"
-#include "Oryx/Renderer/Vertex2D.h"
+#include "Oryx/Renderer/Batch/Vertex2D.h"
 #include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
 namespace oryx

@@ -4,6 +4,7 @@
 #include "unit/MemoryTestSupport.h"
 
 #include "NullRHI.h"
+#include "unit/Renderer/RenderTestSupport.h"
 
 using namespace oryx;
 using namespace oryx::test;
@@ -103,12 +104,12 @@ TEST_CASE("A windowed board frame over an unchanged state allocates nothing once
     // The board itself allocates nothing in render; the few that remain are inside the Renderer, so only per-frame growth is ruled out.
     for (uint32_t warm = 0; warm < 5; ++warm)
     {
-        board.render(input_over(scene, warm));
+        render_board(board, input_over(scene, warm));
     }
     before = all_allocations();
     for (uint32_t frame = 0; frame < 100; ++frame)
     {
-        board.render(input_over(scene, frame % 361));
+        render_board(board, input_over(scene, frame % 361));
     }
     delta = memory_delta(before, all_allocations());
     CHECK(delta.allocation_count < 100);

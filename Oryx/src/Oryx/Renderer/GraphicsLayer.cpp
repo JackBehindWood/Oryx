@@ -125,19 +125,26 @@ void GraphicsLayer::update(double delta_time)
                     { static_cast<float>(handle.framebuffer_width), static_cast<float>(handle.framebuffer_height) },
                     handle.content_scale,
                     delta_time };
-    for (size_t index = 0; index < m_clients.size();)
+    if (m_viewport)
     {
+        const Camera2D camera = Camera2D::screen_space(std::max(info.logical[0], 1.0f), std::max(info.logical[1], 1.0f));
+        SceneRenderer& scene = Renderer::scene();
+        scene.begin_scene(make_render_view(camera, info));
+        run_clients(info);
         try
         {
-            m_clients[index]->frame(info);
-            ++index;
+            scene.end_scene();
         }
         catch (const Error& error)
         {
             error.log();
-            OX_CORE_ERROR("GraphicsLayer: dropped a frame client after an error.");
-            m_clients.erase(m_clients.begin() + static_cast<std::ptrdiff_t>(index));
+            OX_CORE_ERROR("GraphicsLayer: dropped every frame client after a scene error.");
+            m_clients.clear();
         }
+    }
+    else
+    {
+        run_clients(info);
     }
 
     bool idle = false;
@@ -160,6 +167,24 @@ void GraphicsLayer::update(double delta_time)
     else if (m_frame_period.count() > 0)
     {
         pace_frame();
+    }
+}
+
+void GraphicsLayer::run_clients(const FrameInfo& info)
+{
+    for (size_t index = 0; index < m_clients.size();)
+    {
+        try
+        {
+            m_clients[index]->frame(info);
+            ++index;
+        }
+        catch (const Error& error)
+        {
+            error.log();
+            OX_CORE_ERROR("GraphicsLayer: dropped a frame client after an error.");
+            m_clients.erase(m_clients.begin() + static_cast<std::ptrdiff_t>(index));
+        }
     }
 }
 

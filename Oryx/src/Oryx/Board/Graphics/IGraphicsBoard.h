@@ -16,7 +16,7 @@ class IGraphicsBoard : public IBoard, public IFrameClient
 public:
     // Reacts to the frame's input and queues any move for poll_action.
     virtual void update(const BoardInput& input, double delta_time) = 0;
-    // Draws from what on_turn captured; runs after update.
+    // Submits what on_turn captured to the frame's open scene (the board is a RenderSource); runs after update.
     virtual void render(const BoardInput& input) = 0;
 
     void frame(const FrameInfo& info) final;

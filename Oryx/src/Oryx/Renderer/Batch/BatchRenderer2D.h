@@ -3,9 +3,9 @@
 #include "Oryx/Graphics/Resources/Texture2D.h"
 #include "Oryx/Math/Colour.h"
 #include "Oryx/Math/Vector2.h"
-#include "Oryx/Renderer/BatchRenderer.h"
+#include "Oryx/Renderer/Batch/BatchRenderer.h"
 #include "Oryx/Renderer/Font.h"
-#include "Oryx/Renderer/Primitive2D.h"
+#include "Oryx/Renderer/Batch/Primitive2D.h"
 
 namespace oryx
 {

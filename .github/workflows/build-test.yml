@@ -101,8 +101,8 @@ jobs:
     - name: Test (unit, integration, python when enabled)
       run: uv run forge $BUILD_FLAGS test
 
-    - name: Run Oasis sandbox
-      run: uv run forge $BUILD_FLAGS run -- --no-window
+    - name: Run Oasis sandbox (headless, non-interactive)
+      run: uv run forge $BUILD_FLAGS run -- --no-window --simulate=random,first-legal,10
 
     - name: Benchmark smoke run
       run: |

@@ -1,6 +1,5 @@
 #include "PresentedGraphicsBoard2D.h"
 
-#include "Oryx/Renderer/ScreenScene.h"
 #include "Oryx/Renderer/Renderer.h"
 
 namespace oryx
@@ -80,8 +79,8 @@ void PresentedGraphicsBoard2D::update(const BoardInput& input, double)
 void PresentedGraphicsBoard2D::render(const BoardInput& input)
 {
     const BoardScene& scene = m_interaction.scene();
-    BoardProjection2D current = fit_board_2d(scene, input.viewport);
-    if (current.scale <= 0.0f)
+    m_projection = fit_board_2d(scene, input.viewport);
+    if (m_projection.scale <= 0.0f)
     {
         return;
     }
@@ -93,9 +92,20 @@ void PresentedGraphicsBoard2D::render(const BoardInput& input)
         m_status_source = scene.status;
         m_status = terminal ? scene.status + " - " + k_restart_hint : std::string();
     }
+    Renderer::scene().submit(*this);
+}
 
-    ScreenScene screen(input.viewport[0], input.viewport[1]);
-    draw_board_2d(scene, current, m_theme, m_theme.font != nullptr ? *m_theme.font : Renderer::default_font(), m_status);
+void PresentedGraphicsBoard2D::render_stage(RenderStage stage, StageContext& context)
+{
+    Font& font = m_theme.font != nullptr ? *m_theme.font : Renderer::default_font();
+    if (stage == RenderStage::Scene2D)
+    {
+        draw_board_2d(context.batcher_2d, m_interaction.scene(), m_projection, m_theme, font);
+    }
+    else if (stage == RenderStage::Overlay)
+    {
+        draw_board_overlay_2d(context.batcher_2d, m_interaction.scene(), m_projection, m_theme, font, m_status);
+    }
 }
 
 } // namespace oryx

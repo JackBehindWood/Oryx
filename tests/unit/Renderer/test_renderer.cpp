@@ -2,6 +2,7 @@
 
 #include "Oryx.h"
 #include "NullRHI.h"
+#include "unit/Renderer/RenderTestSupport.h"
 #include "Oryx/Renderer/FrameRecorder.h"
 
 using namespace oryx;
@@ -95,7 +96,7 @@ TEST_CASE("Renderer: init, frame and shutdown")
     Renderer::shutdown();
 }
 
-TEST_CASE("Renderer: a presented frame is bracketed by balanced Frame and BackBuffer Pass debug groups")
+TEST_CASE("Renderer: a presented frame is bracketed by balanced Frame and Main pass debug groups")
 {
     RendererGuard guard;
     Renderer::init({ RHIBackend::Null });
@@ -502,25 +503,26 @@ TEST_CASE("Renderer: a draw item binds every vertex stream it fills")
     CHECK_THROWS_AS(draw_item_set_vertex_stream(staged, buffer, 0, RHI_MAX_VERTEX_SLOTS), Error);
 }
 
-TEST_CASE("Renderer: begin_scene, draw and end_scene record one pass of batched draws")
+TEST_CASE("Renderer: a scene's Scene2D stage records one pass of batched draws")
 {
     RendererGuard guard;
-    CHECK_THROWS_AS(Renderer::begin_scene(Camera2D(2.0f, 2.0f)), Error);
+    Camera2D camera(2.0f, 2.0f);
+    CHECK_THROWS_AS(Renderer::scene(), Error);
     Renderer::init({ RHIBackend::Null });
     DrawFixture fixture;
     const Colour red = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-    CHECK_THROWS_AS(Renderer::draw_rect({}, { 1.0f, 1.0f }, red), Error);
-    CHECK_THROWS_AS(Renderer::end_scene(), Error);
+    CHECK_THROWS_AS(Renderer::scene().batcher_2d().draw_rect({}, { 1.0f, 1.0f }, red), Error);
+    CHECK_THROWS_AS(Renderer::scene().end_scene(), Error);
 
-    Renderer::begin_scene(Camera2D(2.0f, 2.0f));
-    CHECK_THROWS_AS(Renderer::begin_scene(Camera2D(2.0f, 2.0f)), Error);
-    Renderer::draw_rect({ 0.0f, 0.0f }, { 1.0f, 1.0f }, red);
-    Renderer::draw_rect({ 0.5f, 0.0f }, { 1.0f, 1.0f }, red);
-    Renderer::draw_circle({ 0.0f, 0.0f }, 0.5f, red);
-    Renderer::draw_line({ -1.0f, 0.0f }, { 1.0f, 0.0f }, red);
-    Renderer::draw_triangle({ 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f }, red);
-    Renderer::end_scene();
+    test::render_2d(camera, [&](BatchRenderer2D& batcher)
+    {
+        batcher.draw_rect({ 0.0f, 0.0f }, { 1.0f, 1.0f }, red);
+        batcher.draw_rect({ 0.5f, 0.0f }, { 1.0f, 1.0f }, red);
+        batcher.draw_circle({ 0.0f, 0.0f }, 0.5f, red);
+        batcher.draw_line({ -1.0f, 0.0f }, { 1.0f, 0.0f }, red);
+        batcher.draw_triangle({ 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f }, red);
+    });
     CHECK(Renderer::batch_stats().draws == 4);
 
     Renderer::end_frame();
@@ -531,12 +533,18 @@ TEST_CASE("Renderer: begin_scene, draw and end_scene record one pass of batched 
     CHECK(std::count(submission.begin(), submission.end(), "Draw") == 2);
     CHECK(Renderer::batch_stats().draws == 0);
 
-    Renderer::begin_scene(Camera2D(2.0f, 2.0f));
-    Renderer::draw_rect({}, { 1.0f, 1.0f }, red);
-    Renderer::flush();
+    BatchRenderer2D& batcher = Renderer::scene().batcher_2d();
+    batcher.begin(camera);
+    batcher.draw_rect({}, { 1.0f, 1.0f }, red);
+    batcher.flush();
     CHECK(Renderer::batch_stats().draws == 1);
     CHECK_THROWS_AS(Renderer::end_frame(), Error);
-    Renderer::end_scene();
+    batcher.end();
+    Renderer::end_frame();
+
+    Renderer::scene().begin_scene(test::view_over(camera));
+    CHECK_THROWS_AS(Renderer::end_frame(), Error);
+    Renderer::scene().end_scene();
     Renderer::end_frame();
 }
 

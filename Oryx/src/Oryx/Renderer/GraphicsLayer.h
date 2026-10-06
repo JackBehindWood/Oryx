@@ -33,6 +33,7 @@ public:
 
 private:
     void apply_settings(const GraphicsSettings& settings);
+    void run_clients(const FrameInfo& info);
     void pace_frame();
 
     Window* m_window = nullptr;

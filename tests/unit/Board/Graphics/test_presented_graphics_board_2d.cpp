@@ -3,6 +3,7 @@
 #include "unit/Board/BoardTestSupport.h"
 
 #include "NullRHI.h"
+#include "unit/Renderer/RenderTestSupport.h"
 #include "Oasis/Game/HexapawnPresenter.h"
 #include "Oasis/Game/TicTacToePresenter.h"
 
@@ -147,13 +148,13 @@ TEST_CASE("PresentedGraphicsBoard2D draws the scene through the renderer, and no
     board.on_turn(state);
     board.update(click(board, 6), 0.016);
 
-    board.render(hover(board, 3));
+    render_board(board, hover(board, 3));
     CHECK(Renderer::batch_stats().primitives > 9);
 
     uint32_t before = Renderer::batch_stats().primitives;
     BoardInput tiny;
     tiny.viewport = { 4.0f, 4.0f };
-    board.render(tiny);
+    render_board(board, tiny);
     CHECK(Renderer::batch_stats().primitives == before);
 }
 

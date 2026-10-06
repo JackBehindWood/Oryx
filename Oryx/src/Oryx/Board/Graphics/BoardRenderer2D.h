@@ -2,6 +2,7 @@
 
 #include "Oryx/Board/Layout/BoardLayout2D.h"
 #include "Oryx/Board/Graphics/BoardProjection2D.h"
+#include "Oryx/Renderer/Batch/BatchRenderer2D.h"
 #include "Oryx/Renderer/Font.h"
 
 namespace oryx
@@ -26,8 +27,9 @@ struct BoardTheme2D
     Font* font = nullptr;
 };
 
-// Draws a scene through the Renderer facade; the caller opens and closes the scene with a pixel-unit Camera2D over layout.viewport.
-// `status` replaces scene.status when not empty (e.g. with a restart hint).
-void draw_board_2d(const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const std::string& status = {});
+// The board proper (spaces, pieces, targets, axis labels) through `batcher`, whose scene the caller has open under a pixel-unit Camera2D over layout.viewport.
+void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font);
+// The UI over the board (option buttons, status line) in the same pixel units; `status` replaces scene.status when not empty (e.g. with a restart hint).
+void draw_board_overlay_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const std::string& status = {});
 
 } // namespace oryx

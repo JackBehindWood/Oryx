@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/Camera.h"
+#include "Oryx/Renderer/Scene/Camera.h"
 
 #include "Oryx/Core/Error.h"
 

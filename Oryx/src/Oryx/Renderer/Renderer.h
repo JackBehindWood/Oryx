@@ -8,11 +8,12 @@
 #include "Oryx/Graphics/Resources/UniformBuffer.h"
 #include "Oryx/Graphics/Resources/VertexBuffer.h"
 #include "Oryx/Math/Colour.h"
-#include "Oryx/Renderer/BatchRenderer.h"
+#include "Oryx/Renderer/Batch/BatchRenderer.h"
+#include "Oryx/Renderer/Scene/SceneRenderer.h"
 #include "Oryx/Shaders/Cache/ShaderBinaryStore.h"
 #include "Oryx/Renderer/PipelineDef.h"
 #include "Oryx/Math/Vector2.h"
-#include "Oryx/Renderer/DebugRenderer.h"
+#include "Oryx/Renderer/Batch/DebugRenderer.h"
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/Font.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
@@ -50,6 +51,8 @@ public:
     [[nodiscard]] static GraphicsPipelineHandle pipeline(const GraphicsPipelineDesc& desc);
     // The pipeline of a pass definition for the back-buffer format, memoised; same lifetime as pipeline().
     [[nodiscard]] static GraphicsPipelineHandle pipeline(const PipelineDef& def, uint32_t permutation = 0);
+    // The same for a pass with its own attachment formats (an offscreen target, a depth attachment).
+    [[nodiscard]] static GraphicsPipelineHandle pipeline(const PipelineDef& def, const PassFormats& formats, uint32_t permutation = 0);
     // Throws Error for an invalid or stale handle.
     [[nodiscard]] static const GraphicsPipeline& resolve_pipeline(GraphicsPipelineHandle handle);
     [[nodiscard]] static GraphicsPipelineCacheStats pipeline_cache_stats();
@@ -69,31 +72,16 @@ public:
     [[nodiscard]] static const Colour& clear_colour();
     static void set_viewport(RHIViewportPtr viewport);
 
-    // Queues a draw for this frame; GraphicsLayer's end_frame records every queued item into the back-buffer pass, in submission order.
+    // Queues a draw for this frame into the Main pass, ahead of the scene's own stage output; end_frame records every queued item in submission order.
     static void submit(DrawItem item);
 
-    // The batcher behind the facade's begin_scene/draw_* calls; ScreenScene scopes its scenes.
-    [[nodiscard]] static BatchRenderer2D& batcher_2d();
+    // The frame's scene: begin_scene, submit sources, end_scene (SceneScope for RAII). GraphicsLayer opens one per frame around its clients.
+    [[nodiscard]] static SceneRenderer& scene();
 
-    // Immediate-mode 2D drawing: primitives between begin_scene and end_scene are batched into DrawItems and submitted in call order.
-    // draw_* outside a scene, a nested begin_scene and end_frame with a scene still open all throw Error. See BatchRenderer2D for the coordinate conventions.
-    static void begin_scene(const Camera& camera);
-    static void end_scene();
-    static void flush();
-    static void draw_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour);
-    static void draw_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour_a, const Colour& colour_b, const Colour& colour_c);
-    static void draw_line(const Vec2f& a, const Vec2f& b, const Colour& colour);
-    static void draw_line(const Vec2f& a, const Vec2f& b, const Colour& colour_a, const Colour& colour_b);
-    static void draw_quad(const Vec2f (&corners)[4], const Colour& colour);
-    static void draw_rect(const Vec2f& position, const Vec2f& size, const Colour& colour, float rotation = 0.0f);
-    static void draw_sprite(const Vec2f& position, const Vec2f& size, const Texture2D& texture, const Colour& tint = { 1.0f, 1.0f, 1.0f, 1.0f }, float rotation = 0.0f, const Vec2f& uv_min = { 0.0f, 0.0f }, const Vec2f& uv_max = { 1.0f, 1.0f });
-    static void draw_circle(const Vec2f& centre, float radius, const Colour& colour, float thickness = 1.0f, float fade = 0.005f);
-    static void draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style = {});
-    // Records shapes from anywhere, between scenes too; draw_debug replays them into the open scene and record_frame ages them.
+    // Records shapes from anywhere, between scenes too; the scene replays them at the end of its Scene2D stage and record_frame ages them.
     [[nodiscard]] static DebugRenderer& debug();
     // The built-in 8x8 bitmap font (see BuiltinFontSource); the debug renderer draws text with it until set_font replaces it.
     [[nodiscard]] static Font& default_font();
-    static void draw_debug();
     // Counters of the frame being recorded; reset when the frame ring advances.
     [[nodiscard]] static const BatchStats& batch_stats();
 

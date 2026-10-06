@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/BatchRenderer.h"
+#include "Oryx/Renderer/Batch/BatchRenderer.h"
 
 #include "Oryx/Core/Error.h"
 #include "Oryx/Shaders/Builtin/BuiltinShaders.h"
@@ -30,9 +30,11 @@ BatchRenderer::BatchRenderer(const BatchRendererDesc& desc)
     , m_memo(desc.memo)
     , m_shaders(desc.shaders)
     , m_defaults(desc.defaults)
-    , m_sink(desc.sink)
+    , m_default_sink(desc.sink)
+    , m_sink(&desc.sink)
     , m_slots(desc.defaults.white_texture, TextureArrayPermutations::value(texture_permutation(desc)))
-    , m_format(desc.colour_format)
+    , m_default_formats{ desc.colour_format, RHIFormat::Undefined }
+    , m_formats(m_default_formats)
     , m_page_bytes(align_up(desc.page_bytes, TransientAllocator::REGION_ALIGNMENT))
     , m_max_indexed_primitives(desc.max_indexed_primitives)
     , m_permutation(texture_permutation(desc))
@@ -68,10 +70,17 @@ void BatchRenderer::require_open() const
 
 void BatchRenderer::begin(const Camera& camera)
 {
+    begin(camera, BatchTarget{ m_default_sink, m_default_formats });
+}
+
+void BatchRenderer::begin(const Camera& camera, const BatchTarget& target)
+{
     if (m_open)
     {
         throw Error("BatchRenderer scene is already open", "call end first");
     }
+    m_sink = &target.sink;
+    m_formats = target.formats;
     camera.to_gpu(m_constants.view_projection);
     m_staging.clear();
     m_slots.reset();
@@ -178,7 +187,7 @@ void BatchRenderer::flush_batch(FlushReason reason)
         std::memcpy(allocation.data, m_staging.data(), bytes);
 
         DrawItem item;
-        item.pipeline = m_memo.get(m_rhi, m_pipelines, m_shaders, m_format, *stream.pipeline, stream.textured ? m_permutation : 0);
+        item.pipeline = m_memo.get(m_rhi, m_pipelines, m_shaders, m_formats, *stream.pipeline, stream.textured ? m_permutation : 0);
         item.vertex_buffers[0] = allocation.buffer;
         item.vertex_offsets[0] = allocation.offset;
         item.vertex_count = primitives * stream.vertices_per_primitive;
@@ -197,7 +206,7 @@ void BatchRenderer::flush_batch(FlushReason reason)
             }
         }
         item.sampler = m_sampler;
-        m_sink.push_back(std::move(item));
+        m_sink->push_back(std::move(item));
 
         ++m_stats.draws;
         m_stats.primitives += primitives;

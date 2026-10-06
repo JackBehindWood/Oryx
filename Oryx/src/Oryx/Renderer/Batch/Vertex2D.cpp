@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Renderer/Vertex2D.h"
+#include "Oryx/Renderer/Batch/Vertex2D.h"
 
 namespace oryx
 {

@@ -9,8 +9,6 @@ namespace oryx
 namespace
 {
 
-constexpr size_t INITIAL_ITEM_CAPACITY = 64;
-
 void load_shaders(RendererContext& context, bool reload)
 {
     if (context.shader_sources->mode() == ShaderSourceMode::Cooked)
@@ -38,7 +36,6 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     UniquePtr<RendererContext> context = create_unique<RendererContext>();
     context->rhi = create_rhi(desc.backend);
     context->back_buffer_format = desc.back_buffer_format;
-    context->items.reserve(INITIAL_ITEM_CAPACITY);
     const ShaderSettings& shader_settings = settings_of<ShaderSettings>();
     context->shader_sources = create_unique<ShaderSourceResolver>(shader_settings);
     context->shader_cache.set_slang_options({ shader_settings.slangc });
@@ -47,10 +44,11 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->shaders.set_error_fallback(shader_settings.error_fallback && context->shader_sources->mode() != ShaderSourceMode::Cooked);
     load_shaders(*context, false);
     context->defaults = create_default_resources(*context->rhi);
-    context->batcher = create_unique<BatchRenderer2D>(batch_renderer_desc(*context, context->items));
-    context->batchers.push_back(context->batcher.get());
     context->default_font = create_unique<Font>(Font::create(create_unique<BuiltinFontSource>()));
     context->debug.set_font(context->default_font.get());
+    // The scene redirects its batcher into the Main pass, so the descriptor's sink is only a placeholder.
+    std::vector<DrawItem> placeholder;
+    context->scene = create_unique<SceneRenderer>(SceneRendererDesc{ batch_renderer_desc(*context, placeholder), &context->debug });
     return context;
 }
 
@@ -66,7 +64,10 @@ void shutdown_renderer_context(UniquePtr<RendererContext>& context)
         return;
     }
     context->commands.clear();
-    context->items.clear();
+    if (context->scene)
+    {
+        context->scene->clear_items();
+    }
     context->viewport.reset();
     context->debug.clear();
     context->debug.set_font(nullptr);
