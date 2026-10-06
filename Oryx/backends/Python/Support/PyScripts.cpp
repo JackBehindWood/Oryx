@@ -116,7 +116,7 @@ void load_configured_scripts(const std::filesystem::path& settings_file)
     }
 
     std::string flag = "--settings=" + file.string();
-    std::array<char*, 2> argv = { const_cast<char*>(kModuleName), flag.data() };
+    std::array<char*, 2> argv = { const_cast<char*>(k_module_name), flag.data() };
     load_settings(ApplicationCommandLineArgs{ static_cast<int32_t>(argv.size()), argv.data() });
 
     const ScriptSettings& scripting = settings_of<ScriptSettings>();
@@ -132,7 +132,7 @@ void load_configured_scripts(const std::filesystem::path& settings_file)
         options.roots.push_back(root.string());
     }
 
-    for (const ScriptSource& source : discover_scripts(options, { ScriptFileExtension{ kLanguage, ".py" } }))
+    for (const ScriptSource& source : discover_scripts(options, { ScriptFileExtension{ k_language, ".py" } }))
     {
         try
         {

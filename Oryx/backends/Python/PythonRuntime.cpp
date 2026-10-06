@@ -23,7 +23,7 @@ namespace oryx
 namespace
 {
 
-constexpr char kPathSeparator = std::filesystem::path::preferred_separator == '/' ? ':' : ';';
+constexpr char k_path_separator = std::filesystem::path::preferred_separator == '/' ? ':' : ';';
 
 void set_config_string(PyConfig& config, wchar_t** field, const char* value)
 {
@@ -41,7 +41,7 @@ std::vector<std::string> split_search_path(std::string_view search_path)
     size_t start = 0;
     while (start <= search_path.size())
     {
-        size_t end = search_path.find(kPathSeparator, start);
+        size_t end = search_path.find(k_path_separator, start);
         if (end == std::string_view::npos)
         {
             end = search_path.size();
@@ -129,7 +129,7 @@ PythonRuntime::~PythonRuntime()
 
 std::string PythonRuntime::language() const
 {
-    return python::kLanguage;
+    return python::k_language;
 }
 
 std::vector<std::string> PythonRuntime::file_extensions() const
@@ -244,7 +244,7 @@ void PythonRuntime::reload(const ScriptSource& source)
 
 void PythonRuntime::unload()
 {
-    unregister_scripted(python::kLanguage);
+    unregister_scripted(python::k_language);
     if (!m_running)
     {
         return;

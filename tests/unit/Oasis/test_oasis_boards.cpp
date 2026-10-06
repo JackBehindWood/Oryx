@@ -40,15 +40,15 @@ TEST_CASE("TicTacToePresenter shows each mark on its cell and names the side to 
     REQUIRE(view.spaces.size() == 9);
     CHECK(view.spaces[0].label == "a3");
     CHECK(view.spaces[8].label == "c1");
-    CHECK(view.pieces == std::vector<BoardPiece>{ { TicTacToePresenter::kMark, 1, 0 }, { TicTacToePresenter::kMark, 0, 4 } });
+    CHECK(view.pieces == std::vector<BoardPiece>{ { TicTacToePresenter::k_mark, 1, 0 }, { TicTacToePresenter::k_mark, 0, 4 } });
     CHECK(view.status == "X to move");
 
     PickList picks;
     presenter.action_picks(play({}), 7, picks);
     CHECK(picks == PickList{ { PickKind::Space, 7, {} } });
 
-    CHECK(presenter.piece_style(TicTacToePresenter::kMark, 0).shape == PieceShape::Cross);
-    CHECK(presenter.piece_style(TicTacToePresenter::kMark, 1).glyph == "O");
+    CHECK(presenter.piece_style(TicTacToePresenter::k_mark, 0).shape == PieceShape::Cross);
+    CHECK(presenter.piece_style(TicTacToePresenter::k_mark, 1).glyph == "O");
 }
 
 TEST_CASE("TicTacToePresenter reports a win and a draw")

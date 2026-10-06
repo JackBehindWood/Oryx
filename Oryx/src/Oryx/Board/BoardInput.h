@@ -7,7 +7,7 @@ namespace oryx
 {
 
 // Shown on a finished windowed game; read_board_input maps exactly these inputs to `restart`.
-constexpr const char* kRestartHint = "click or press R to play again";
+constexpr const char* k_restart_hint = "click or press R to play again";
 
 // One frame of what a windowed board may react to, captured once by BoardLayer so boards never read Input or the window themselves.
 // Positions are logical window points with the origin top left, the units of NativeWindowHandle's width and height.

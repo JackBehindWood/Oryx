@@ -103,7 +103,7 @@ BatchResult run_interruptible(BatchRunner& runner, int32_t match_count, bool hol
     BatchResult total = runner.run(0); // sized, zero matches - also match_count == 0's whole answer
     int32_t remaining = match_count;
     int32_t chunk = std::min(remaining, 1);
-    constexpr double kTargetSeconds = 0.05;
+    constexpr double k_target_seconds = 0.05;
 
     while (remaining > 0)
     {
@@ -132,7 +132,7 @@ BatchResult run_interruptible(BatchRunner& runner, int32_t match_count, bool hol
         }
 
         double per_match = elapsed / chunk;
-        int32_t estimated = per_match > 0.0 ? static_cast<int32_t>(kTargetSeconds / per_match) : chunk * 2;
+        int32_t estimated = per_match > 0.0 ? static_cast<int32_t>(k_target_seconds / per_match) : chunk * 2;
         chunk = std::clamp(estimated, 1, chunk * 2);
     }
     return total;

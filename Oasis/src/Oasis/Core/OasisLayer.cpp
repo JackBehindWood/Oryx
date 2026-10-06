@@ -15,9 +15,9 @@ namespace
 {
 
 #ifdef OX_ENABLE_GRAPHICS
-constexpr bool kGraphicsBuilt = true;
+constexpr bool k_graphics_built = true;
 #else
-constexpr bool kGraphicsBuilt = false;
+constexpr bool k_graphics_built = false;
 #endif
 
 } // namespace
@@ -31,7 +31,7 @@ OasisLayer::OasisLayer(Options options)
 void OasisLayer::attach()
 {
     LaunchPlan plan;
-    if (!plan_launch(m_options, kGraphicsBuilt, plan))
+    if (!plan_launch(m_options, k_graphics_built, plan))
     {
         oryx::Application::Get().close(1);
         return;
@@ -47,7 +47,7 @@ void OasisLayer::attach()
     {
         OX_INFO("Graphics unavailable - running in the terminal.");
         m_options.headless = true;
-        if (!plan_launch(m_options, kGraphicsBuilt, plan))
+        if (!plan_launch(m_options, k_graphics_built, plan))
         {
             oryx::Application::Get().close(1);
             return;

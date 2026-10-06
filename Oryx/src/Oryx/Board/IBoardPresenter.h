@@ -32,8 +32,7 @@ constexpr bool operator==(const Pick& a, const Pick& b)
 
 using PickList = std::vector<Pick>;
 
-// Plays a game through the generic front ends: describes states as BoardViews and moves as picks. Registered per game name, like boards,
-// so a game's rules never depend on how it is shown. Must be stateless: front ends may call it at any time and in any order.
+// Plays a game through the generic front ends: describes states as BoardViews and moves as picks. Must be stateless; front ends call it in any order.
 class IBoardPresenter
 {
 public:

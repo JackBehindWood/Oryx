@@ -106,8 +106,8 @@ void BoardLayer::start()
     OX_INFO("Playing {}.", game->name());
 
     size_t seat_count = static_cast<size_t>(game->num_players());
-    bool hot_seat = opponent_name == selection::kHumanOpponent;
-    PlayerId human_seat = kAllSeats;
+    bool hot_seat = opponent_name == selection::k_human_opponent;
+    PlayerId human_seat = k_all_seats;
     if (!hot_seat)
     {
         Random random;

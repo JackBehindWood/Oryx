@@ -9,8 +9,8 @@ namespace oryx
 class PolledInput final : public IInput
 {
 public:
-    static constexpr int32_t kKeyCount = 512;
-    static constexpr int32_t kMouseButtonCount = 8;
+    static constexpr int32_t k_key_count = 512;
+    static constexpr int32_t k_mouse_button_count = 8;
 
     void begin_frame();
     void set_key(KeyCode key, bool down);
@@ -37,8 +37,8 @@ private:
 
     static void apply(Edge& edge, bool down);
 
-    std::array<Edge, kKeyCount> m_keys{};
-    std::array<Edge, kMouseButtonCount> m_buttons{};
+    std::array<Edge, k_key_count> m_keys{};
+    std::array<Edge, k_mouse_button_count> m_buttons{};
     float m_cursor_x = 0.0f;
     float m_cursor_y = 0.0f;
     float m_scroll_x = 0.0f;

@@ -7,12 +7,11 @@
 namespace oryx
 {
 
-// The 2D windowed front end for any game with an IBoardPresenter: clicks become picks, picks become a move, and the board is drawn
-// from the scene through the Renderer. A 3D front end would reuse everything here but the layout and draw_board_2d.
-class PresentedGraphicsBoard : public IGraphicsBoard
+// The 2D windowed front end for any game with an IBoardPresenter: clicks become picks, picks become a move, the scene is drawn through the Renderer.
+class PresentedGraphicsBoard2D : public IGraphicsBoard
 {
 public:
-    PresentedGraphicsBoard(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat, BoardTheme2D theme = {});
+    PresentedGraphicsBoard2D(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat, BoardTheme2D theme = {});
 
     void on_turn(const IState& state) override;
     ActionId poll_action(const IState& state) override;
@@ -25,13 +24,13 @@ public:
 
 private:
     void refresh(const IState& state);
-    [[nodiscard]] BoardLayout2D layout(const BoardInput& input);
+    [[nodiscard]] BoardProjection2D layout(const BoardInput& input);
 
     BoardPresentation m_presentation;
     BoardTheme2D m_theme;
     BoardScene m_scene;
     ActionId m_queued = PENDING_ACTION;
-    SpaceId m_hovered = kNoSpace;
+    SpaceId m_hovered = k_no_space;
 };
 
 } // namespace oryx

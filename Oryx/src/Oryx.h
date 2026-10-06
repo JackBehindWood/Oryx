@@ -139,8 +139,8 @@
 #include "Oryx/Renderer/DebugRenderer.h"
 #include "Oryx/Renderer/GraphicsLayer.h"
 #include "Oryx/Renderer/Renderer.h"
-#include "Oryx/BoardGraphics/BoardLayout2D.h"
+#include "Oryx/BoardGraphics/BoardProjection2D.h"
 #include "Oryx/BoardGraphics/BoardRenderer2D.h"
-#include "Oryx/BoardGraphics/PresentedGraphicsBoard.h"
+#include "Oryx/BoardGraphics/PresentedGraphicsBoard2D.h"
 #include "Oryx/BoardGraphics/GraphicsBoards.h"
 #endif

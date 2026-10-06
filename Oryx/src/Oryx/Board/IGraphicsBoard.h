@@ -20,8 +20,7 @@ public:
 
 using GraphicsBoardRegistry = Registry<IGraphicsBoard>;
 
-// Makes the windowed board for a game and seat (a player, or kAllSeats for hot-seat). The application hands one to BoardLayer because
-// the generic presented board draws, so it lives above this headless module (BoardGraphics/create_graphics_board).
+// Makes the windowed board for a game and seat (a player, or k_all_seats for hot-seat); the application supplies it because Board/ is headless.
 using GraphicsBoardFactory = std::function<UniquePtr<IGraphicsBoard>(const std::string& game, PlayerId seat)>;
 
 } // namespace oryx

@@ -78,7 +78,7 @@ TEST_CASE("choose_opponent offers human and the game's strategies")
 
     std::string name;
     CHECK(choose_opponent("tictactoe", "human", false, name));
-    CHECK(name == kHumanOpponent);
+    CHECK(name == k_human_opponent);
     CHECK_FALSE(choose_opponent("tictactoe", "no-such-strategy", false, name));
     CHECK(choose_opponent("tictactoe", "", false, name));
     CHECK(name == "minimax");

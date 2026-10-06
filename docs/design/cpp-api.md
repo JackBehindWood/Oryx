@@ -23,6 +23,7 @@ Likewise, advanced metaprogramming should not become a prerequisite for understa
 
 * Functions and methods: `snake_case` (e.g. `legal_actions()`)
 * Classes: `PascalCase` (e.g. `class Rewards`)
+* File-scope and namespace-scope `constexpr` constants: `k_snake_case` (e.g. `k_restart_hint`, `k_board_gutter`, `k_action_list_inline_capacity`). Real macro and system constants keep `UPPER_SNAKE` (`PENDING_ACTION`, `INVALID_ACTION`, `UNDO_ACTION`, `RHI_MAX_*`, `MAX_TEXTURES`).
 * Interfaces (no data members; every method pure virtual, apart from optional
   capability hooks that default to "not provided" — `IGame::action_features()`
   returns `nullptr`, `IStrategy::required_capabilities()` returns `{}`)

@@ -12,9 +12,9 @@ namespace oryx
 namespace
 {
 
-constexpr const char* kSeedParam = "seed";
+constexpr const char* k_seed_param = "seed";
 // Seed params are Int, and script seeds (oryx.Random) reject negatives.
-constexpr uint64_t kMaxInt64 = 0x7FFFFFFFFFFFFFFFULL;
+constexpr uint64_t k_max_int64 = 0x7FFFFFFFFFFFFFFFULL;
 
 bool declares_seed(const EntryInfo* info)
 {
@@ -24,7 +24,7 @@ bool declares_seed(const EntryInfo* info)
     }
     for (const ParamSpec& spec : info->schema)
     {
-        if (spec.name == kSeedParam)
+        if (spec.name == k_seed_param)
         {
             return true;
         }
@@ -34,9 +34,9 @@ bool declares_seed(const EntryInfo* info)
 
 Params with_derived_seed(const EntryInfo* info, Params params, uint64_t seed)
 {
-    if (declares_seed(info) && !has_param(params, kSeedParam))
+    if (declares_seed(info) && !has_param(params, k_seed_param))
     {
-        params[kSeedParam] = static_cast<int64_t>(seed & kMaxInt64);
+        params[k_seed_param] = static_cast<int64_t>(seed & k_max_int64);
     }
     return params;
 }

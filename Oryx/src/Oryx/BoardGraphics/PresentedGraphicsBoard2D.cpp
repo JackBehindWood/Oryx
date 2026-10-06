@@ -1,4 +1,4 @@
-#include "PresentedGraphicsBoard.h"
+#include "PresentedGraphicsBoard2D.h"
 
 #include "Oryx/Renderer/Camera.h"
 #include "Oryx/Renderer/Renderer.h"
@@ -6,13 +6,13 @@
 namespace oryx
 {
 
-PresentedGraphicsBoard::PresentedGraphicsBoard(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat, BoardTheme2D theme)
+PresentedGraphicsBoard2D::PresentedGraphicsBoard2D(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat, BoardTheme2D theme)
     : m_presentation(std::move(presenter), std::move(game), seat)
     , m_theme(theme)
 {
 }
 
-void PresentedGraphicsBoard::refresh(const IState& state)
+void PresentedGraphicsBoard2D::refresh(const IState& state)
 {
     if (m_presentation.update(state))
     {
@@ -20,12 +20,12 @@ void PresentedGraphicsBoard::refresh(const IState& state)
     }
 }
 
-void PresentedGraphicsBoard::on_turn(const IState& state)
+void PresentedGraphicsBoard2D::on_turn(const IState& state)
 {
     refresh(state);
 }
 
-ActionId PresentedGraphicsBoard::poll_action(const IState& state)
+ActionId PresentedGraphicsBoard2D::poll_action(const IState& state)
 {
     refresh(state);
     ActionId action = m_queued;
@@ -33,15 +33,15 @@ ActionId PresentedGraphicsBoard::poll_action(const IState& state)
     return action;
 }
 
-BoardLayout2D PresentedGraphicsBoard::layout(const BoardInput& input)
+BoardProjection2D PresentedGraphicsBoard2D::layout(const BoardInput& input)
 {
     m_presentation.build_scene(m_hovered, m_scene);
     return fit_board_2d(m_scene, input.viewport);
 }
 
-void PresentedGraphicsBoard::update(const BoardInput& input, double)
+void PresentedGraphicsBoard2D::update(const BoardInput& input, double)
 {
-    BoardLayout2D current = layout(input);
+    BoardProjection2D current = layout(input);
     m_hovered = space_at(m_presentation.view(), cursor_to_board(current, input.cursor));
     if (!m_presentation.accepts_moves())
     {
@@ -73,7 +73,7 @@ void PresentedGraphicsBoard::update(const BoardInput& input, double)
     {
         action = builder.pick(m_scene.options[option]);
     }
-    else if (m_hovered != kNoSpace)
+    else if (m_hovered != k_no_space)
     {
         action = builder.pick({ PickKind::Space, m_hovered, {} });
     }
@@ -88,9 +88,9 @@ void PresentedGraphicsBoard::update(const BoardInput& input, double)
     }
 }
 
-void PresentedGraphicsBoard::render(const BoardInput& input)
+void PresentedGraphicsBoard2D::render(const BoardInput& input)
 {
-    BoardLayout2D current = layout(input);
+    BoardProjection2D current = layout(input);
     if (current.scale <= 0.0f)
     {
         return;
@@ -99,7 +99,7 @@ void PresentedGraphicsBoard::render(const BoardInput& input)
     std::string status;
     if (m_presentation.terminal())
     {
-        status = m_scene.status + " - " + kRestartHint;
+        status = m_scene.status + " - " + k_restart_hint;
     }
 
     Camera2D camera(input.viewport[0], input.viewport[1]);

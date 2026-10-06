@@ -21,14 +21,14 @@ Interval wilson_interval(int64_t successes, int64_t trials, double z)
 
 double t_critical_95(int64_t degrees_of_freedom)
 {
-    constexpr double kTable[] = { 12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.160, 2.145, 2.131,
+    constexpr double k_table[] = { 12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.160, 2.145, 2.131,
                                   2.120, 2.110, 2.101, 2.093, 2.086, 2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042 };
-    constexpr int64_t kTableSize = static_cast<int64_t>(sizeof(kTable) / sizeof(kTable[0]));
+    constexpr int64_t k_table_size = static_cast<int64_t>(sizeof(k_table) / sizeof(k_table[0]));
     if (degrees_of_freedom < 1)
     {
-        return kTable[0];
+        return k_table[0];
     }
-    return degrees_of_freedom <= kTableSize ? kTable[degrees_of_freedom - 1] : kZ95;
+    return degrees_of_freedom <= k_table_size ? k_table[degrees_of_freedom - 1] : k_z95;
 }
 
 Summary summarize(const std::vector<double>& samples)
@@ -222,9 +222,9 @@ std::vector<double> bradley_terry(const CrossTable& table)
         }
     }
 
-    constexpr int32_t kMaxIterations = 10000;
-    constexpr double kTolerance = 1e-12;
-    for (int32_t iteration = 0; iteration < kMaxIterations; ++iteration)
+    constexpr int32_t k_max_iterations = 10000;
+    constexpr double k_tolerance = 1e-12;
+    for (int32_t iteration = 0; iteration < k_max_iterations; ++iteration)
     {
         std::vector<double> next(count, 1.0);
         double change = 0.0;
@@ -255,7 +255,7 @@ std::vector<double> bradley_terry(const CrossTable& table)
             change = std::max(change, std::abs(next[i] - strength[i]));
         }
         strength = std::move(next);
-        if (change < kTolerance)
+        if (change < k_tolerance)
         {
             break;
         }

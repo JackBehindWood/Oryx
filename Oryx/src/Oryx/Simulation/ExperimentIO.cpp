@@ -11,7 +11,7 @@ namespace oryx
 namespace
 {
 
-constexpr const char* kCsvHeader = "matchup,repeat,metric,value";
+constexpr const char* k_csv_header = "matchup,repeat,metric,value";
 
 uint64_t parse_unsigned(const std::string& text, const char* what)
 {
@@ -42,7 +42,7 @@ int32_t parse_repeat(const std::string& text)
     catch (const std::logic_error&)
     {
     }
-    throw ExperimentError(std::string(kTrialsFileName) + ": repeat '" + text + "' is not an integer");
+    throw ExperimentError(std::string(k_trials_file_name) + ": repeat '" + text + "' is not an integer");
 }
 
 double parse_value(const std::string& text)
@@ -59,7 +59,7 @@ double parse_value(const std::string& text)
     catch (const std::logic_error&)
     {
     }
-    throw ExperimentError(std::string(kTrialsFileName) + ": value '" + text + "' is not a number");
+    throw ExperimentError(std::string(k_trials_file_name) + ": value '" + text + "' is not a number");
 }
 
 YAML::Node empty_map()
@@ -270,9 +270,9 @@ std::vector<TrialResult> read_trials_csv(std::istream& in, const ExperimentSpec&
     };
 
     std::string line;
-    if (!next_line(line) || line != kCsvHeader)
+    if (!next_line(line) || line != k_csv_header)
     {
-        throw ExperimentError(std::string(kTrialsFileName) + ": missing or unrecognised header");
+        throw ExperimentError(std::string(k_trials_file_name) + ": missing or unrecognised header");
     }
 
     std::map<std::string, int32_t> repeats_of;
@@ -292,22 +292,22 @@ std::vector<TrialResult> read_trials_csv(std::istream& in, const ExperimentSpec&
         std::vector<std::string> fields = split_csv_line(line);
         if (fields.size() != 4)
         {
-            throw ExperimentError(std::string(kTrialsFileName) + ": malformed row '" + line + "'");
+            throw ExperimentError(std::string(k_trials_file_name) + ": malformed row '" + line + "'");
         }
         int32_t repeat = parse_repeat(fields[1]);
         if (trials.empty() || trials.back().matchup != fields[0] || trials.back().repeat != repeat)
         {
             if (repeats_of.find(fields[0]) == repeats_of.end())
             {
-                throw ExperimentError(std::string(kTrialsFileName) + ": matchup '" + fields[0] + "' is not in the spec");
+                throw ExperimentError(std::string(k_trials_file_name) + ": matchup '" + fields[0] + "' is not in the spec");
             }
             if (repeat < 0 || repeat >= spec.repeats)
             {
-                throw ExperimentError(std::string(kTrialsFileName) + ": repeat " + fields[1] + " of '" + fields[0] + "' is outside 0.." + std::to_string(spec.repeats - 1));
+                throw ExperimentError(std::string(k_trials_file_name) + ": repeat " + fields[1] + " of '" + fields[0] + "' is outside 0.." + std::to_string(spec.repeats - 1));
             }
             if (!seen.emplace(fields[0], repeat).second)
             {
-                throw ExperimentError(std::string(kTrialsFileName) + ": trial '" + fields[0] + "' repeat " + fields[1] + " appears in more than one block");
+                throw ExperimentError(std::string(k_trials_file_name) + ": trial '" + fields[0] + "' repeat " + fields[1] + " appears in more than one block");
             }
             TrialResult trial;
             trial.matchup = fields[0];
@@ -316,7 +316,7 @@ std::vector<TrialResult> read_trials_csv(std::istream& in, const ExperimentSpec&
         }
         if (!trials.back().metrics.values.emplace(fields[2], parse_value(fields[3])).second)
         {
-            throw ExperimentError(std::string(kTrialsFileName) + ": metric '" + fields[2] + "' is listed twice for '" + fields[0] + "' repeat " + fields[1]);
+            throw ExperimentError(std::string(k_trials_file_name) + ": metric '" + fields[2] + "' is listed twice for '" + fields[0] + "' repeat " + fields[1]);
         }
     }
     return trials;
@@ -347,7 +347,7 @@ std::filesystem::path require_file(const std::filesystem::path& directory, const
 
 void write_trials_csv(const ExperimentResult& result, std::ostream& out)
 {
-    out << kCsvHeader << '\n';
+    out << k_csv_header << '\n';
     for (const TrialResult& trial : result.trials)
     {
         std::string prefix = csv_field(trial.matchup) + "," + std::to_string(trial.repeat) + ",";
@@ -361,7 +361,7 @@ void write_trials_csv(const ExperimentResult& result, std::ostream& out)
 void save_result(const ExperimentResult& result, const std::filesystem::path& directory)
 {
     YAML::Node root = empty_map();
-    root["schema_version"] = kResultSchemaVersion;
+    root["schema_version"] = k_result_schema_version;
     root["spec"] = spec_node(result.spec);
     root["metadata"] = metadata_node(result.metadata);
     root["trial_count"] = static_cast<int64_t>(result.trials.size());
@@ -378,14 +378,14 @@ void save_result(const ExperimentResult& result, const std::filesystem::path& di
     {
         throw ExperimentError("could not create '" + directory.string() + "': " + error.message());
     }
-    write_file(directory / kResultFileName, yaml.str());
-    write_file(directory / kTrialsFileName, csv.str());
+    write_file(directory / k_result_file_name, yaml.str());
+    write_file(directory / k_trials_file_name, csv.str());
 }
 
 ExperimentResult load_result(const std::filesystem::path& directory)
 {
-    std::filesystem::path yaml_path = require_file(directory, kResultFileName);
-    std::filesystem::path csv_path = require_file(directory, kTrialsFileName);
+    std::filesystem::path yaml_path = require_file(directory, k_result_file_name);
+    std::filesystem::path csv_path = require_file(directory, k_trials_file_name);
 
     ExperimentResult result;
     int64_t expected_trials = 0;
@@ -393,9 +393,9 @@ ExperimentResult load_result(const std::filesystem::path& directory)
     {
         YAML::Node root = YAML::LoadFile(yaml_path.string());
         int32_t version = root["schema_version"].as<int32_t>();
-        if (version != kResultSchemaVersion)
+        if (version != k_result_schema_version)
         {
-            throw ExperimentError("result schema_version " + std::to_string(version) + " is not supported (this build reads " + std::to_string(kResultSchemaVersion) + ")");
+            throw ExperimentError("result schema_version " + std::to_string(version) + " is not supported (this build reads " + std::to_string(k_result_schema_version) + ")");
         }
         result.spec = read_spec(root["spec"]);
         result.metadata = read_metadata(root["metadata"]);

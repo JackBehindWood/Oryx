@@ -6,7 +6,7 @@ namespace oasis
 namespace
 {
 
-constexpr uint32_t kSize = 3;
+constexpr uint32_t k_size = 3;
 
 const char* mark_name(oryx::PlayerId player)
 {
@@ -18,16 +18,16 @@ const char* mark_name(oryx::PlayerId player)
 void TicTacToePresenter::describe(const oryx::IState& state, oryx::PlayerId, oryx::BoardView& out) const
 {
     const TicTacToeState& board = static_cast<const TicTacToeState&>(state);
-    oryx::grid_spaces(kSize, kSize, false, out);
+    oryx::grid_spaces(k_size, k_size, false, out);
 
-    for (uint32_t row = 0; row < kSize; ++row)
+    for (uint32_t row = 0; row < k_size; ++row)
     {
-        for (uint32_t col = 0; col < kSize; ++col)
+        for (uint32_t col = 0; col < k_size; ++col)
         {
             Mark mark = board.mark_at(row, col);
             if (mark != Mark::Empty)
             {
-                out.pieces.push_back({ kMark, mark == Mark::X ? 0 : 1, row * kSize + col });
+                out.pieces.push_back({ k_mark, mark == Mark::X ? 0 : 1, row * k_size + col });
             }
         }
     }

@@ -52,12 +52,12 @@ py::object registry_name_of(const py::object& spec)
     }
 
     py::object own = spec.attr("__dict__");
-    if (!own.contains(kRegisteredIdAttribute))
+    if (!own.contains(k_registered_id_attribute))
     {
         std::string name = spec.attr("__name__").cast<std::string>();
         throw Error("the class " + name + " is not registered; give it an id (`class " + name + "(..., id=\"...\")`) to pass the class itself");
     }
-    return own[kRegisteredIdAttribute];
+    return own[k_registered_id_attribute];
 }
 
 py::list strategy_specs(const py::object& spec, int32_t seats)

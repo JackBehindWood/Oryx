@@ -14,7 +14,7 @@ struct BoardLayerDesc
     selection::FrontEnd front_end = selection::FrontEnd::Console;
     // Empty picks the default (the terminal asks when it can).
     std::string game;
-    // A strategy name, kHumanOpponent for hot-seat, or empty to pick the default (the terminal asks when it can).
+    // A strategy name, k_human_opponent for hot-seat, or empty to pick the default (the terminal asks when it can).
     std::string opponent;
     // Graphical only: makes the windowed board. Empty uses GraphicsBoardRegistry alone; applications pass BoardGraphics' create_graphics_board,
     // which also serves games that register only a presenter.

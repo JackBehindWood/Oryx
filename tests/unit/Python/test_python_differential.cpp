@@ -10,7 +10,7 @@ using namespace oryx::test;
 namespace
 {
 
-constexpr const char* kCppNim = "nim-cpp";
+constexpr const char* k_cpp_nim = "nim-cpp";
 
 class CppNimState : public IState
 {
@@ -91,7 +91,7 @@ class ScopedCppNim
 public:
     ScopedCppNim()
     {
-        GameRegistry::register_factory(kCppNim,
+        GameRegistry::register_factory(k_cpp_nim,
             [](const Params& params) -> UniquePtr<IGame>
             {
                 return create_unique<CppNimGame>(get_param<int64_t>(params, "stones"), get_param<int64_t>(params, "max_take"));
@@ -99,7 +99,7 @@ public:
             EntryInfo{ { int_param("stones", 21), int_param("max_take", 3) }, "Nim ported to C++" });
     }
 
-    ~ScopedCppNim() { GameRegistry::unregister_factory(kCppNim); }
+    ~ScopedCppNim() { GameRegistry::unregister_factory(k_cpp_nim); }
 
     ScopedCppNim(const ScopedCppNim&) = delete;
     ScopedCppNim& operator=(const ScopedCppNim&) = delete;
@@ -186,7 +186,7 @@ TEST_CASE("a Python Nim and its C++ port produce identical batch results under i
 
         Params params = nim_params(config.stones, config.max_take);
         BatchResult from_python = run_batch("nim", params, config.strategy_a, config.strategy_b, config.games);
-        BatchResult from_cpp = run_batch(kCppNim, params, config.strategy_a, config.strategy_b, config.games);
+        BatchResult from_cpp = run_batch(k_cpp_nim, params, config.strategy_a, config.strategy_b, config.games);
 
         CHECK(from_python.matches == config.games);
         CHECK(from_python.decisions > 0);
@@ -211,7 +211,7 @@ TEST_CASE("a Python Nim and its C++ port stay in lockstep through random play, a
     for (int64_t max_take : { 2, 3, 5 })
     {
         UniquePtr<IGame> python_game = create_game("nim", nim_params(17, max_take));
-        UniquePtr<IGame> cpp_game = create_game(kCppNim, nim_params(17, max_take));
+        UniquePtr<IGame> cpp_game = create_game(k_cpp_nim, nim_params(17, max_take));
         UniquePtr<IState> python_state = python_game->new_initial_state();
         UniquePtr<IState> cpp_state = cpp_game->new_initial_state();
         Random random(static_cast<uint64_t>(max_take));

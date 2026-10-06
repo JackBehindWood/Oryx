@@ -1,6 +1,6 @@
 #include "GraphicsBoards.h"
 
-#include "Oryx/BoardGraphics/PresentedGraphicsBoard.h"
+#include "Oryx/BoardGraphics/PresentedGraphicsBoard2D.h"
 
 namespace oryx
 {
@@ -13,7 +13,7 @@ UniquePtr<IGraphicsBoard> create_graphics_board(const std::string& game, PlayerI
     }
     if (UniquePtr<IBoardPresenter> presenter = BoardPresenterRegistry::create(game))
     {
-        return create_unique<PresentedGraphicsBoard>(std::move(presenter), game, seat);
+        return create_unique<PresentedGraphicsBoard2D>(std::move(presenter), game, seat);
     }
     return nullptr;
 }

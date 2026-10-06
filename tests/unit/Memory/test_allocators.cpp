@@ -37,12 +37,12 @@ TEST_CASE("HeapAllocator honours default and over-alignment")
 TEST_CASE("PoolAllocator picks the smallest class that fits the size and the alignment")
 {
     CHECK(PoolAllocator::class_index(1, 1) == 0);
-    CHECK(PoolAllocator::kClassSizes[PoolAllocator::class_index(17, 8)] == 24);
-    CHECK(PoolAllocator::kClassSizes[PoolAllocator::class_index(17, 16)] == 32);
-    CHECK(PoolAllocator::kClassSizes[PoolAllocator::class_index(40, 16)] == 48);
-    CHECK(PoolAllocator::kClassSizes[PoolAllocator::class_index(512, 16)] == 512);
-    CHECK(PoolAllocator::class_index(513, 8) == PoolAllocator::kClassSizes.size());
-    CHECK(PoolAllocator::class_index(8, 32) == PoolAllocator::kClassSizes.size());
+    CHECK(PoolAllocator::k_class_sizes[PoolAllocator::class_index(17, 8)] == 24);
+    CHECK(PoolAllocator::k_class_sizes[PoolAllocator::class_index(17, 16)] == 32);
+    CHECK(PoolAllocator::k_class_sizes[PoolAllocator::class_index(40, 16)] == 48);
+    CHECK(PoolAllocator::k_class_sizes[PoolAllocator::class_index(512, 16)] == 512);
+    CHECK(PoolAllocator::class_index(513, 8) == PoolAllocator::k_class_sizes.size());
+    CHECK(PoolAllocator::class_index(8, 32) == PoolAllocator::k_class_sizes.size());
 }
 
 TEST_CASE("PoolAllocator hands out aligned, distinct blocks for every size and reuses freed ones")
@@ -81,7 +81,7 @@ TEST_CASE("PoolAllocator takes whole chunks from upstream and sends large or ove
     void* small = pool.allocate(40, 8);
     MemoryStats after_first = upstream.counters().snapshot();
     CHECK(after_first.allocation_count == 1);
-    CHECK(after_first.bytes_allocated == PoolAllocator::kChunkSize);
+    CHECK(after_first.bytes_allocated == PoolAllocator::k_chunk_size);
 
     void* second_small = pool.allocate(40, 8);
     CHECK(upstream.counters().snapshot().allocation_count == 1);
@@ -91,13 +91,13 @@ TEST_CASE("PoolAllocator takes whole chunks from upstream and sends large or ove
     CHECK(is_aligned(over_aligned, 64));
     MemoryStats after_bypass = upstream.counters().snapshot();
     CHECK(after_bypass.allocation_count == 3);
-    CHECK(after_bypass.bytes_allocated == PoolAllocator::kChunkSize + 1000 + 64);
+    CHECK(after_bypass.bytes_allocated == PoolAllocator::k_chunk_size + 1000 + 64);
 
     pool.deallocate(large, 1000, 8);
     pool.deallocate(over_aligned, 64, 64);
     pool.deallocate(second_small, 40, 8);
     pool.deallocate(small, 40, 8);
-    CHECK(upstream.counters().snapshot().live_bytes == PoolAllocator::kChunkSize);
+    CHECK(upstream.counters().snapshot().live_bytes == PoolAllocator::k_chunk_size);
 }
 
 TEST_CASE("CountingAllocator over a pool balances counts and bytes and tracks the peak")

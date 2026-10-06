@@ -167,17 +167,17 @@ TEST_CASE("Perfect play by MinimaxStrategy on both seats draws Tic-Tac-Toe")
 
 TEST_CASE("ActionHistory's inline capacity holds the longest Tic-Tac-Toe game (9 plies) without touching the heap")
 {
-    constexpr size_t kMaxPlies = 9;
-    static_assert(kActionHistoryInlineCapacity >= kMaxPlies);
+    constexpr size_t k_max_plies = 9;
+    static_assert(k_action_history_inline_capacity >= k_max_plies);
 
     MemoryStats before = oryx::test::all_allocations();
     ActionHistory history;
-    for (ActionId action = 0; action < kMaxPlies; ++action)
+    for (ActionId action = 0; action < k_max_plies; ++action)
     {
         history.record(action);
     }
     MemoryStats delta = memory_delta(before, oryx::test::all_allocations());
 
-    CHECK(history.size() == kMaxPlies);
+    CHECK(history.size() == k_max_plies);
     CHECK(delta.allocation_count == 0);
 }

@@ -32,11 +32,11 @@ TEST_CASE("space_at finds the space under a point by its footprint and shape")
     grid_spaces(3, 3, false, view);
     CHECK(space_at(view, { 0.0f, 2.0f }) == 0);
     CHECK(space_at(view, { 2.4f, -0.4f }) == 8);
-    CHECK(space_at(view, { 3.6f, 0.0f }) == kNoSpace);
+    CHECK(space_at(view, { 3.6f, 0.0f }) == k_no_space);
 
     view.spaces[4].shape = SpaceShape::Circle;
     CHECK(space_at(view, { 1.0f, 1.0f }) == 4);
-    CHECK(space_at(view, { 1.45f, 1.45f }) == kNoSpace);
+    CHECK(space_at(view, { 1.45f, 1.45f }) == k_no_space);
 }
 
 TEST_CASE("changed_spaces lists the spaces whose pieces differ")

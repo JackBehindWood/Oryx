@@ -6,14 +6,14 @@ namespace oryx
 {
 
 // The seat a board plays for in hot-seat games: every seat, each shown from its own side on its turn.
-constexpr PlayerId kAllSeats = -1;
+constexpr PlayerId k_all_seats = -1;
 
 // What every presented front end shares, kept apart from how it draws or reads input: the current view, what the last move changed,
 // and the move being built. Front ends own one and feed it each turn.
 class BoardPresentation
 {
 public:
-    // `seat` is the local human's player, or kAllSeats; it decides whose view is shown and when moves are accepted.
+    // `seat` is the local human's player, or k_all_seats; it decides whose view is shown and when moves are accepted.
     BoardPresentation(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat);
 
     // Describes the state again. True when anything shown or playable changed, which also drops a half-built move.

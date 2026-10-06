@@ -6,12 +6,12 @@ namespace oryx
 namespace
 {
 
-constexpr float kAxisTolerance = 1e-3f;
+constexpr float k_axis_tolerance = 1e-3f;
 
 std::vector<float> distinct(std::vector<float> values)
 {
     std::sort(values.begin(), values.end());
-    values.erase(std::unique(values.begin(), values.end(), [](float a, float b) { return std::abs(a - b) <= kAxisTolerance; }), values.end());
+    values.erase(std::unique(values.begin(), values.end(), [](float a, float b) { return std::abs(a - b) <= k_axis_tolerance; }), values.end());
     return values;
 }
 
@@ -31,7 +31,7 @@ void build_board_scene(const BoardView& view, const IBoardPresenter& presenter, 
     for (size_t index = 0; index < view.spaces.size(); ++index)
     {
         const BoardSpace& space = view.spaces[index];
-        out.spaces.push_back({ space, kHighlightNone });
+        out.spaces.push_back({ space, SpaceHighlight::None });
 
         Vec2f low = { space.position[0] - space.size[0] * 0.5f, space.position[1] - space.size[1] * 0.5f };
         Vec2f high = { space.position[0] + space.size[0] * 0.5f, space.position[1] + space.size[1] * 0.5f };
@@ -44,7 +44,7 @@ void build_board_scene(const BoardView& view, const IBoardPresenter& presenter, 
         out.pieces.push_back({ presenter.piece_style(piece.kind, piece.owner), piece.space });
     }
 
-    auto mark = [&](SpaceId space, uint8_t bit)
+    auto mark = [&](SpaceId space, SpaceHighlight bit)
     {
         if (space < out.spaces.size())
         {
@@ -54,14 +54,14 @@ void build_board_scene(const BoardView& view, const IBoardPresenter& presenter, 
 
     for (SpaceId space : state.changed)
     {
-        mark(space, kHighlightChanged);
+        mark(space, SpaceHighlight::Changed);
     }
 
     for (const Pick& pick : builder.picked())
     {
         if (pick.kind == PickKind::Space)
         {
-            mark(pick.value, kHighlightPicked);
+            mark(pick.value, SpaceHighlight::Picked);
         }
     }
 
@@ -73,13 +73,13 @@ void build_board_scene(const BoardView& view, const IBoardPresenter& presenter, 
         }
         else if (!builder.picked().empty())
         {
-            mark(pick.value, kHighlightTarget);
+            mark(pick.value, SpaceHighlight::Target);
         }
     }
 
-    if (state.hovered != kNoSpace && builder.can_pick({ PickKind::Space, state.hovered, {} }))
+    if (state.hovered != k_no_space && builder.can_pick({ PickKind::Space, state.hovered, {} }))
     {
-        mark(state.hovered, kHighlightHover);
+        mark(state.hovered, SpaceHighlight::Hover);
     }
 }
 
@@ -109,7 +109,7 @@ size_t axis_index(const std::vector<float>& axis, float value)
 {
     for (size_t index = 0; index < axis.size(); ++index)
     {
-        if (std::abs(axis[index] - value) <= kAxisTolerance)
+        if (std::abs(axis[index] - value) <= k_axis_tolerance)
         {
             return index;
         }

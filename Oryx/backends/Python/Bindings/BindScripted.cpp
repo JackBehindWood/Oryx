@@ -90,7 +90,7 @@ ScriptOrigin origin_of_caller()
 {
     py::dict globals = py::globals();
     ScriptOrigin origin;
-    origin.language = kLanguage;
+    origin.language = k_language;
     origin.module = globals.contains("__name__") ? globals["__name__"].cast<std::string>() : "__main__";
     if (globals.contains("__file__"))
     {
@@ -201,7 +201,7 @@ void register_class(Kind kind, const py::object& cls, const py::object& id, bool
         throw ScriptError("class " + owner + ": " + key + " cannot be empty");
     }
     register_from(kind, name, cls, true, schema_of_class(cls), description_of(cls), origin_of_class(cls), overwrite);
-    cls.attr(kRegisteredIdAttribute) = name;
+    cls.attr(k_registered_id_attribute) = name;
 }
 
 py::object init_subclass_for(Kind kind)

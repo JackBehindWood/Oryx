@@ -5,34 +5,49 @@
 namespace oryx
 {
 
-// Bits of SceneSpace::highlight.
-enum SpaceHighlight : uint8_t
+// Bit flags of SceneSpace::highlight.
+enum class SpaceHighlight : uint8_t
 {
-    kHighlightNone = 0,
+    None = 0,
     // Can be picked next while a move is being built.
-    kHighlightTarget = 1 << 0,
+    Target = 1 << 0,
     // Picked as part of the move being built.
-    kHighlightPicked = 1 << 1,
+    Picked = 1 << 1,
     // Its pieces changed with the last move or undo.
-    kHighlightChanged = 1 << 2,
+    Changed = 1 << 2,
     // Under the cursor and pickable.
-    kHighlightHover = 1 << 3,
+    Hover = 1 << 3,
 };
+
+constexpr SpaceHighlight operator|(SpaceHighlight a, SpaceHighlight b)
+{
+    return static_cast<SpaceHighlight>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+
+constexpr SpaceHighlight& operator|=(SpaceHighlight& a, SpaceHighlight b)
+{
+    a = a | b;
+    return a;
+}
+
+constexpr bool has_highlight(SpaceHighlight set, SpaceHighlight flag)
+{
+    return (static_cast<uint8_t>(set) & static_cast<uint8_t>(flag)) != 0;
+}
 
 struct SceneSpace
 {
     BoardSpace space;
-    uint8_t highlight = kHighlightNone;
+    SpaceHighlight highlight = SpaceHighlight::None;
 };
 
 struct ScenePiece
 {
     PieceStyle style;
-    SpaceId space = kNoSpace;
+    SpaceId space = k_no_space;
 };
 
-// What a front end draws for one frame: the view resolved to styles and highlights, still in board units and free of any rendering type.
-// It is the seam between presentation and rendering: the terminal prints it, BoardGraphics draws it in 2D, and a 3D renderer would draw it as models.
+// What a front end draws for one frame: the view resolved to styles and highlights, in board units and free of rendering types.
 struct BoardScene
 {
     std::vector<SceneSpace> spaces;
@@ -51,7 +66,7 @@ struct SceneState
 {
     // Spaces to mark as changed by the last move.
     std::vector<SpaceId> changed;
-    SpaceId hovered = kNoSpace;
+    SpaceId hovered = k_no_space;
 };
 
 void build_board_scene(const BoardView& view, const IBoardPresenter& presenter, const MoveBuilder& builder, const SceneState& state, BoardScene& out);

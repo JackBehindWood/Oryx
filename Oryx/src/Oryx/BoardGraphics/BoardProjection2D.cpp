@@ -1,4 +1,4 @@
-#include "BoardLayout2D.h"
+#include "BoardProjection2D.h"
 
 namespace oryx
 {
@@ -6,23 +6,23 @@ namespace oryx
 namespace
 {
 
-constexpr Vec2f kOptionButtonSize = { 120.0f, 36.0f };
-constexpr float kOptionButtonGap = 12.0f;
+constexpr Vec2f k_option_button_size = { 120.0f, 36.0f };
+constexpr float k_option_button_gap = 12.0f;
 
 } // namespace
 
-BoardLayout2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
+BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
 {
-    BoardLayout2D layout;
+    BoardProjection2D layout;
     layout.viewport = viewport;
     layout.scale = 0.0f;
 
     float board_width = scene.max[0] - scene.min[0];
     float board_height = scene.max[1] - scene.min[1];
-    float left = kBoardGutter;
-    float bottom = kBoardMenuBand + kBoardGutter;
-    float width = viewport[0] - 2.0f * kBoardGutter;
-    float height = viewport[1] - kBoardStatusBand - bottom;
+    float left = k_board_gutter;
+    float bottom = k_board_menu_band + k_board_gutter;
+    float width = viewport[0] - 2.0f * k_board_gutter;
+    float height = viewport[1] - k_board_status_band - bottom;
     if (board_width <= 0.0f || board_height <= 0.0f || width <= 0.0f || height <= 0.0f)
     {
         return layout;
@@ -36,17 +36,17 @@ BoardLayout2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
     return layout;
 }
 
-Vec2f board_to_world(const BoardLayout2D& layout, const Vec2f& board)
+Vec2f board_to_world(const BoardProjection2D& layout, const Vec2f& board)
 {
     return { layout.origin[0] + board[0] * layout.scale, layout.origin[1] + board[1] * layout.scale };
 }
 
-Vec2f cursor_to_world(const BoardLayout2D& layout, const Vec2f& cursor)
+Vec2f cursor_to_world(const BoardProjection2D& layout, const Vec2f& cursor)
 {
     return { cursor[0], layout.viewport[1] - cursor[1] };
 }
 
-Vec2f cursor_to_board(const BoardLayout2D& layout, const Vec2f& cursor)
+Vec2f cursor_to_board(const BoardProjection2D& layout, const Vec2f& cursor)
 {
     if (layout.scale <= 0.0f)
     {
@@ -56,20 +56,20 @@ Vec2f cursor_to_board(const BoardLayout2D& layout, const Vec2f& cursor)
     return { (world[0] - layout.origin[0]) / layout.scale, (world[1] - layout.origin[1]) / layout.scale };
 }
 
-void option_buttons_2d(const BoardLayout2D& layout, size_t count, std::vector<OptionButton2D>& out)
+void option_buttons_2d(const BoardProjection2D& layout, size_t count, std::vector<OptionButton2D>& out)
 {
     out.clear();
-    float total = static_cast<float>(count) * kOptionButtonSize[0] + static_cast<float>(count > 0 ? count - 1 : 0) * kOptionButtonGap;
-    float x = (layout.viewport[0] - total) * 0.5f + kOptionButtonSize[0] * 0.5f;
-    float y = kBoardMenuBand * 0.5f;
+    float total = static_cast<float>(count) * k_option_button_size[0] + static_cast<float>(count > 0 ? count - 1 : 0) * k_option_button_gap;
+    float x = (layout.viewport[0] - total) * 0.5f + k_option_button_size[0] * 0.5f;
+    float y = k_board_menu_band * 0.5f;
     for (size_t index = 0; index < count; ++index)
     {
-        out.push_back({ { x, y }, kOptionButtonSize });
-        x += kOptionButtonSize[0] + kOptionButtonGap;
+        out.push_back({ { x, y }, k_option_button_size });
+        x += k_option_button_size[0] + k_option_button_gap;
     }
 }
 
-size_t option_at(const std::vector<OptionButton2D>& buttons, const BoardLayout2D& layout, const Vec2f& cursor)
+size_t option_at(const std::vector<OptionButton2D>& buttons, const BoardProjection2D& layout, const Vec2f& cursor)
 {
     Vec2f world = cursor_to_world(layout, cursor);
     for (size_t index = 0; index < buttons.size(); ++index)

@@ -13,7 +13,7 @@ int32_t play_console_game(const std::string& input, std::string& out_output)
     ConsoleScope console(input);
     Application app({ 0, nullptr });
     app.push_layer<SimulationLayer>();
-    app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Console, "tictactoe", selection::kHumanOpponent });
+    app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Console, "tictactoe", selection::k_human_opponent });
     app.run();
     out_output = console.output();
     return app.exit_code();
@@ -69,7 +69,7 @@ TEST_CASE("BoardLayer fails with an error for an unknown game")
 namespace
 {
 
-constexpr Vec2f kWindow = { 800.0f, 600.0f };
+constexpr Vec2f k_window = { 800.0f, 600.0f };
 
 struct WindowedGame
 {
@@ -77,15 +77,15 @@ struct WindowedGame
         : app({ 0, nullptr })
     {
         Renderer::init({ RHIBackend::Null });
-        window = static_cast<NullWindow*>(&app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", static_cast<int32_t>(kWindow[0]), static_cast<int32_t>(kWindow[1]) })));
+        window = static_cast<NullWindow*>(&app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", static_cast<int32_t>(k_window[0]), static_cast<int32_t>(k_window[1]) })));
         simulation = &app.push_layer<SimulationLayer>();
         GraphicsBoardFactory factory = [this](const std::string& game, PlayerId seat)
         {
             UniquePtr<IGraphicsBoard> created = create_graphics_board(game, seat);
-            board = dynamic_cast<PresentedGraphicsBoard*>(created.get());
+            board = dynamic_cast<PresentedGraphicsBoard2D*>(created.get());
             return created;
         };
-        layer = &app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Graphical, "hexapawn", selection::kHumanOpponent, factory });
+        layer = &app.push_layer<BoardLayer>(BoardLayerDesc{ selection::FrontEnd::Graphical, "hexapawn", selection::k_human_opponent, factory });
     }
 
     ~WindowedGame() { Renderer::shutdown(); }
@@ -100,11 +100,11 @@ struct WindowedGame
     void click(SpaceId space)
     {
         BoardScene scene;
-        board->presentation().build_scene(kNoSpace, scene);
-        BoardLayout2D layout = fit_board_2d(scene, kWindow);
+        board->presentation().build_scene(k_no_space, scene);
+        BoardProjection2D layout = fit_board_2d(scene, k_window);
         const Vec3f& position = scene.spaces[space].space.position;
         Vec2f world = board_to_world(layout, { position[0], position[1] });
-        window->inject_cursor(world[0], kWindow[1] - world[1]);
+        window->inject_cursor(world[0], k_window[1] - world[1]);
         window->inject_mouse_button(MouseCode::Left, true);
         frame();
         window->inject_mouse_button(MouseCode::Left, false);
@@ -115,7 +115,7 @@ struct WindowedGame
     NullWindow* window = nullptr;
     SimulationLayer* simulation = nullptr;
     BoardLayer* layer = nullptr;
-    PresentedGraphicsBoard* board = nullptr;
+    PresentedGraphicsBoard2D* board = nullptr;
 };
 
 } // namespace

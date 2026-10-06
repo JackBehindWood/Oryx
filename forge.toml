@@ -84,7 +84,7 @@ backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']
 
 [[boundaries.artifacts]]
 path = "build/bin/**/libOryx.a"
-deny = '\boryx::(?:Graphics|Shaders|Renderer|PresentedGraphicsBoard)::'
+deny = '\boryx::(?:Graphics|Shaders|Renderer|PresentedGraphicsBoard2D)::'
 requires = ["!graphics"]
 why = "graphics-off library must not export graphics symbols"
 

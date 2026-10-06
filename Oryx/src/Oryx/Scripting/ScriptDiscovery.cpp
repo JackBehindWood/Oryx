@@ -7,18 +7,18 @@ namespace oryx
 namespace
 {
 
-constexpr const char* kScriptOption = "script";
-constexpr const char* kModuleOption = "module";
-constexpr const char* kRootOption = "script-root";
+constexpr const char* k_script_option = "script";
+constexpr const char* k_module_option = "module";
+constexpr const char* k_root_option = "script-root";
 
 class ScriptingCommandLine : public ICommandLineContributor
 {
 public:
     void declare(CommandLine& command_line) const override
     {
-        command_line.option(kScriptOption, "FILE", "Script to load (repeatable)")
-            .option(kModuleOption, "NAME", "Module to import (repeatable)")
-            .option(kRootOption, "DIR", "Directory searched for scripts (repeatable)");
+        command_line.option(k_script_option, "FILE", "Script to load (repeatable)")
+            .option(k_module_option, "NAME", "Module to import (repeatable)")
+            .option(k_root_option, "DIR", "Directory searched for scripts (repeatable)");
     }
 };
 
@@ -106,9 +106,9 @@ void add_file(std::vector<ScriptSource>& sources, const std::filesystem::path& f
 ScriptDiscoveryOptions script_options(const ParsedArgs& args)
 {
     ScriptDiscoveryOptions options;
-    options.script_files = args.values(kScriptOption);
-    options.modules = args.values(kModuleOption);
-    options.roots = args.values(kRootOption);
+    options.script_files = args.values(k_script_option);
+    options.modules = args.values(k_module_option);
+    options.roots = args.values(k_root_option);
 
     std::error_code error;
     options.root = std::filesystem::current_path(error);

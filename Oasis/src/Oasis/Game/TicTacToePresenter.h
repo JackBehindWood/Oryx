@@ -9,7 +9,7 @@ namespace oasis
 class TicTacToePresenter : public oryx::IBoardPresenter
 {
 public:
-    static constexpr oryx::PieceKind kMark = 0;
+    static constexpr oryx::PieceKind k_mark = 0;
 
     void describe(const oryx::IState& state, oryx::PlayerId viewer, oryx::BoardView& out) const override;
     void action_picks(const oryx::IState& state, oryx::ActionId action, oryx::PickList& out) const override;

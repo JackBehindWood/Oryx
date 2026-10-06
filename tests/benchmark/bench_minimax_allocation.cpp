@@ -15,9 +15,9 @@ namespace
 {
 
 // A search tree about the size of Tic-Tac-Toe's (~5x10^5 nodes).
-constexpr uint32_t kPileSize = 20;
+constexpr uint32_t k_pile_size = 20;
 
-constexpr int32_t kAllocIterations = 2'000'000;
+constexpr int32_t k_alloc_iterations = 2'000'000;
 
 using Clock = std::chrono::steady_clock;
 
@@ -34,7 +34,7 @@ TEST_SUITE("benchmark")
 
 TEST_CASE("Benchmark: MinimaxStrategy exhaustive search allocation cost (DummyGame)")
 {
-    DummyGame game(kPileSize);
+    DummyGame game(k_pile_size);
     MinimaxStrategy strategy;
     UniquePtr<IState> state = game.new_initial_state();
     Context context(*state);
@@ -76,7 +76,7 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
 
     MemoryStats vector_before = MemoryTracker::snapshot();
     Clock::time_point vector_start = Clock::now();
-    for (int32_t i = 0; i < kAllocIterations; ++i)
+    for (int32_t i = 0; i < k_alloc_iterations; ++i)
     {
         std::vector<ActionId> actions;
         actions.push_back(1);
@@ -88,7 +88,7 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
     MemoryStats vector_memory = memory_delta(vector_before, MemoryTracker::snapshot());
 
     Clock::time_point array_start = Clock::now();
-    for (int32_t i = 0; i < kAllocIterations; ++i)
+    for (int32_t i = 0; i < k_alloc_iterations; ++i)
     {
         ActionId actions[3] = { 1, 2, 3 };
         sink += actions[0] + actions[1] + actions[2];
@@ -97,7 +97,7 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
 
     MemoryStats action_list_before = MemoryTracker::snapshot();
     Clock::time_point action_list_start = Clock::now();
-    for (int32_t i = 0; i < kAllocIterations; ++i)
+    for (int32_t i = 0; i < k_alloc_iterations; ++i)
     {
         ActionList actions;
         actions.push_back(1);
@@ -108,12 +108,12 @@ TEST_CASE("Benchmark: heap vector vs. fixed-size array for a legal_actions()-sha
     double action_list_ms = milliseconds_since(action_list_start);
     MemoryStats action_list_memory = memory_delta(action_list_before, MemoryTracker::snapshot());
 
-    MESSAGE("std::vector<ActionId> (3 elements) x", kAllocIterations, ": ", vector_ms, " ms");
-    MESSAGE("fixed ActionId[3] x", kAllocIterations, ": ", array_ms, " ms");
-    MESSAGE("ActionList (3 elements) x", kAllocIterations, ": ", action_list_ms, " ms");
-    MESSAGE("ns/call heap vector: ", (vector_ms * 1'000'000.0) / kAllocIterations);
-    MESSAGE("ns/call fixed array: ", (array_ms * 1'000'000.0) / kAllocIterations);
-    MESSAGE("ns/call ActionList: ", (action_list_ms * 1'000'000.0) / kAllocIterations);
+    MESSAGE("std::vector<ActionId> (3 elements) x", k_alloc_iterations, ": ", vector_ms, " ms");
+    MESSAGE("fixed ActionId[3] x", k_alloc_iterations, ": ", array_ms, " ms");
+    MESSAGE("ActionList (3 elements) x", k_alloc_iterations, ": ", action_list_ms, " ms");
+    MESSAGE("ns/call heap vector: ", (vector_ms * 1'000'000.0) / k_alloc_iterations);
+    MESSAGE("ns/call fixed array: ", (array_ms * 1'000'000.0) / k_alloc_iterations);
+    MESSAGE("ns/call ActionList: ", (action_list_ms * 1'000'000.0) / k_alloc_iterations);
 
     MESSAGE("heap allocations, std::vector: ", vector_memory.allocation_count);
     MESSAGE("heap allocations, ActionList: ", action_list_memory.allocation_count);

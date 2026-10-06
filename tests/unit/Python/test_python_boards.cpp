@@ -12,7 +12,7 @@ using namespace oryx::test;
 namespace
 {
 
-const char* kPileGame =
+const char* k_pile_game =
     "class PileState(oryx.State):\n"
     "    def __init__(self):\n"
     "        self.stones = 3\n"
@@ -75,7 +75,7 @@ TEST_CASE("a board reads game-specific fields of a scripted state through native
 {
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
-    std::filesystem::path script = dir.write("native.py", marker_prelude(marker) + "import oryx\n" + kPileGame +
+    std::filesystem::path script = dir.write("native.py", marker_prelude(marker) + "import oryx\n" + k_pile_game +
         "class PileBoard(oryx.ConsoleBoard, game='pile-board-game'):\n"
         "    def on_turn(self, state):\n"
         "        mark('stones=' + str(state.native.stones) + ';')\n");

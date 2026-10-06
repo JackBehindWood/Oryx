@@ -14,18 +14,18 @@ using InfoLookup = std::function<const EntryInfo*(const std::string&)>;
 namespace
 {
 
-constexpr const char* kDefaultGame = "tictactoe";
-constexpr const char* kDefaultOpponent = "minimax";
-constexpr const char* kGameOption = "game";
-constexpr const char* kOpponentOption = "opponent";
+constexpr const char* k_default_game = "tictactoe";
+constexpr const char* k_default_opponent = "minimax";
+constexpr const char* k_game_option = "game";
+constexpr const char* k_opponent_option = "opponent";
 
 class BoardCommandLine : public ICommandLineContributor
 {
 public:
     void declare(CommandLine& command_line) const override
     {
-        command_line.option(kGameOption, "NAME", "Game to play (default: tictactoe)")
-            .option(kOpponentOption, "NAME", "Opponent strategy, or 'human' for hot-seat");
+        command_line.option(k_game_option, "NAME", "Game to play (default: tictactoe)")
+            .option(k_opponent_option, "NAME", "Opponent strategy, or 'human' for hot-seat");
     }
 };
 
@@ -121,7 +121,7 @@ bool prompt_for_choice(const std::string& what, const std::vector<std::string>& 
 
 BoardOptions board_options(const ParsedArgs& args)
 {
-    return { args.value(kGameOption), args.value(kOpponentOption) };
+    return { args.value(k_game_option), args.value(k_opponent_option) };
 }
 
 std::vector<std::string> sorted(std::vector<std::string> names)
@@ -197,7 +197,7 @@ bool choose_game(const std::string& requested, bool prompt, std::string& out_nam
 
     if (names.size() == 1 || !prompt)
     {
-        out_name = GameRegistry::has(kDefaultGame) ? kDefaultGame : names.front();
+        out_name = GameRegistry::has(k_default_game) ? k_default_game : names.front();
         if (names.size() > 1)
         {
             OX_INFO("Playing '{}' (default). Games: {}. Pick one with --game=NAME.", out_name, joined(names));
@@ -216,7 +216,7 @@ bool choose_game(const std::string& requested, bool prompt, std::string& out_nam
 bool choose_opponent(const std::string& game, const std::string& requested, bool prompt, std::string& out_name)
 {
     std::vector<std::string> opponents = strategies_for(game);
-    opponents.insert(opponents.begin(), kHumanOpponent);
+    opponents.insert(opponents.begin(), k_human_opponent);
 
     if (!requested.empty())
     {
@@ -232,8 +232,8 @@ bool choose_opponent(const std::string& game, const std::string& requested, bool
 
     if (!prompt)
     {
-        bool has_default = std::find(opponents.begin(), opponents.end(), kDefaultOpponent) != opponents.end();
-        out_name = has_default ? kDefaultOpponent : opponents.back();
+        bool has_default = std::find(opponents.begin(), opponents.end(), k_default_opponent) != opponents.end();
+        out_name = has_default ? k_default_opponent : opponents.back();
         return true;
     }
 

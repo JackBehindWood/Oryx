@@ -174,8 +174,8 @@ std::vector<std::filesystem::path> SettingsNode::paths(std::string_view key) con
 namespace
 {
 
-constexpr const char* kSettingsOption = "settings";
-constexpr const char* kDefaultFileName = "oryx.yaml";
+constexpr const char* k_settings_option = "settings";
+constexpr const char* k_default_file_name = "oryx.yaml";
 
 struct Section
 {
@@ -310,9 +310,9 @@ void load_settings(const ApplicationCommandLineArgs& args)
 
 void load_settings(const ParsedArgs& args)
 {
-    if (args.has(kSettingsOption))
+    if (args.has(k_settings_option))
     {
-        apply(std::filesystem::absolute(args.value(kSettingsOption)), true);
+        apply(std::filesystem::absolute(args.value(k_settings_option)), true);
         return;
     }
 
@@ -326,7 +326,7 @@ void load_settings(const ParsedArgs& args)
             return;
         }
     }
-    apply(std::filesystem::absolute(kDefaultFileName), false);
+    apply(std::filesystem::absolute(k_default_file_name), false);
 }
 
 void register_default_settings_file(std::filesystem::path file)
@@ -364,7 +364,7 @@ class SettingsCommandLine : public ICommandLineContributor
 public:
     void declare(CommandLine& command_line) const override
     {
-        command_line.option(kSettingsOption, "FILE", "Settings file to load instead of the default oryx.yaml");
+        command_line.option(k_settings_option, "FILE", "Settings file to load instead of the default oryx.yaml");
     }
 };
 

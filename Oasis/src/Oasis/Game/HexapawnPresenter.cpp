@@ -6,7 +6,7 @@ namespace oasis
 namespace
 {
 
-constexpr uint32_t kSize = HexapawnState::kSize;
+constexpr uint32_t k_size = HexapawnState::k_size;
 
 const char* side_name(oryx::PlayerId player)
 {
@@ -18,14 +18,14 @@ const char* side_name(oryx::PlayerId player)
 void HexapawnPresenter::describe(const oryx::IState& state, oryx::PlayerId, oryx::BoardView& out) const
 {
     const HexapawnState& board = static_cast<const HexapawnState&>(state);
-    oryx::grid_spaces(kSize, kSize, true, out);
+    oryx::grid_spaces(k_size, k_size, true, out);
 
-    for (uint32_t square = 0; square < kSize * kSize; ++square)
+    for (uint32_t square = 0; square < k_size * k_size; ++square)
     {
         int8_t owner = board.owner_at(square);
-        if (owner != HexapawnState::kEmpty)
+        if (owner != HexapawnState::k_empty)
         {
-            out.pieces.push_back({ kPawn, owner, square });
+            out.pieces.push_back({ k_pawn, owner, square });
         }
     }
 

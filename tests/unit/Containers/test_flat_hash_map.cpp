@@ -41,14 +41,14 @@ TEST_CASE("FlatHashMap grows past inline capacity via rehash without losing or c
 {
     FlatHashMap<std::string, int32_t, 4> map; // small N to force multiple rehashes below
 
-    constexpr int32_t kEntryCount = 100;
-    for (int32_t i = 0; i < kEntryCount; ++i)
+    constexpr int32_t k_entry_count = 100;
+    for (int32_t i = 0; i < k_entry_count; ++i)
     {
         map.insert_or_assign("key" + oryx::to_string(static_cast<ActionId>(i)), i);
     }
 
-    CHECK(map.size() == static_cast<size_t>(kEntryCount));
-    for (int32_t i = 0; i < kEntryCount; ++i)
+    CHECK(map.size() == static_cast<size_t>(k_entry_count));
+    for (int32_t i = 0; i < k_entry_count; ++i)
     {
         const std::string key = "key" + oryx::to_string(static_cast<ActionId>(i));
         REQUIRE(map.find(key) != nullptr);
@@ -110,15 +110,15 @@ TEST_CASE("FlatHashMap::erase keeps colliding keys reachable, including across t
 TEST_CASE("FlatHashMap::erase leaves every surviving key intact after many shuffled erases")
 {
     FlatHashMap<int32_t, int32_t, 4> map;
-    constexpr int32_t kEntryCount = 200;
-    for (int32_t key = 0; key < kEntryCount; ++key)
+    constexpr int32_t k_entry_count = 200;
+    for (int32_t key = 0; key < k_entry_count; ++key)
     {
         map.insert_or_assign(key * 7, key);
     }
 
     Random random(3);
     std::vector<int32_t> erased;
-    for (int32_t key = 0; key < kEntryCount; ++key)
+    for (int32_t key = 0; key < k_entry_count; ++key)
     {
         if (random.get_bool())
         {
@@ -127,8 +127,8 @@ TEST_CASE("FlatHashMap::erase leaves every surviving key intact after many shuff
         }
     }
 
-    CHECK(map.size() == static_cast<size_t>(kEntryCount) - erased.size());
-    for (int32_t key = 0; key < kEntryCount; ++key)
+    CHECK(map.size() == static_cast<size_t>(k_entry_count) - erased.size());
+    for (int32_t key = 0; key < k_entry_count; ++key)
     {
         bool was_erased = std::find(erased.begin(), erased.end(), key) != erased.end();
         CHECK((map.find(key * 7) == nullptr) == was_erased);

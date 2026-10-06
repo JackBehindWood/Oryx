@@ -8,9 +8,9 @@ namespace oryx
 using ActionId = uint32_t;
 
 // Sized to the largest measured legal_actions() count (TicTacToe: 9, docs/design/quality.md); bigger games spill to the heap - re-measure when adding one.
-constexpr size_t kActionListInlineCapacity = 9;
+constexpr size_t k_action_list_inline_capacity = 9;
 
-using ActionList = SmallVector<ActionId, kActionListInlineCapacity>;
+using ActionList = SmallVector<ActionId, k_action_list_inline_capacity>;
 
 constexpr ActionId INVALID_ACTION = static_cast<ActionId>(-1);
 

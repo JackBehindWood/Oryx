@@ -79,10 +79,10 @@ TEST_CASE("MemoryTracker honours over-aligned allocations")
 
 TEST_CASE("MemoryTracker balances counts and bytes across every new/delete form")
 {
-    constexpr int32_t kRounds = 64;
+    constexpr int32_t k_rounds = 64;
 
     MemoryStats before = MemoryTracker::snapshot();
-    for (int32_t round = 0; round < kRounds; ++round)
+    for (int32_t round = 0; round < k_rounds; ++round)
     {
         int64_t* scalar = new int64_t(round);
         escape(scalar);
@@ -114,16 +114,16 @@ TEST_CASE("MemoryTracker balances counts and bytes across every new/delete form"
 
 TEST_CASE("MemoryTracker reports peak growth above the starting live bytes after reset_peak")
 {
-    constexpr size_t kBlockBytes = 4096;
+    constexpr size_t k_block_bytes = 4096;
 
     MemoryTracker::reset_peak();
     MemoryStats before = MemoryTracker::snapshot();
-    char* block = new char[kBlockBytes];
+    char* block = new char[k_block_bytes];
     escape(block);
     delete[] block;
     MemoryStats delta = memory_delta(before, MemoryTracker::snapshot());
 
-    CHECK(delta.peak_live_bytes >= static_cast<int64_t>(kBlockBytes));
+    CHECK(delta.peak_live_bytes >= static_cast<int64_t>(k_block_bytes));
     CHECK(delta.live_bytes == 0);
 }
 
@@ -131,13 +131,13 @@ TEST_CASE("Allocation budget: ActionList within its inline capacity never touche
 {
     MemoryStats before = all_allocations();
     ActionList actions;
-    for (ActionId action = 0; action < kActionListInlineCapacity; ++action)
+    for (ActionId action = 0; action < k_action_list_inline_capacity; ++action)
     {
         actions.push_back(action);
     }
     MemoryStats inline_delta = memory_delta(before, all_allocations());
 
-    actions.push_back(kActionListInlineCapacity);
+    actions.push_back(k_action_list_inline_capacity);
     MemoryStats spilled_delta = memory_delta(before, all_allocations());
 
     CHECK(inline_delta.allocation_count == 0);

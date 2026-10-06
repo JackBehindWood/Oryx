@@ -72,12 +72,12 @@ std::string board_text(const BoardScene& scene)
         const SceneSpace& space = scene.spaces[index];
         std::string open = " ";
         std::string close = " ";
-        if ((space.highlight & kHighlightPicked) != 0)
+        if (has_highlight(space.highlight, SpaceHighlight::Picked))
         {
             open = "(";
             close = ")";
         }
-        else if ((space.highlight & kHighlightChanged) != 0)
+        else if (has_highlight(space.highlight, SpaceHighlight::Changed))
         {
             open = "[";
             close = "]";
@@ -150,7 +150,7 @@ void PresentedConsoleBoard::on_turn(const IState& state)
 void PresentedConsoleBoard::print() const
 {
     BoardScene scene;
-    m_presentation.build_scene(kNoSpace, scene);
+    m_presentation.build_scene(k_no_space, scene);
     std::cout << board_text(scene);
 }
 

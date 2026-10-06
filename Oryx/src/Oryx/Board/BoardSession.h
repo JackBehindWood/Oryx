@@ -12,7 +12,7 @@ namespace oryx
 class BoardSession : public ITurnObserver, public IActionSource
 {
 public:
-    static constexpr double kRestartDelaySeconds = 0.4;
+    static constexpr double k_restart_delay_seconds = 0.4;
 
     // `announce_outcome` prints the result on the terminal the first time the game is seen finished.
     BoardSession(SharedPtr<IBoard> board, bool announce_outcome);
@@ -25,7 +25,7 @@ public:
 
     void advance(double delta_time);
     // The finished game has been on screen long enough that a restart input should be honoured.
-    [[nodiscard]] bool restart_ready() const { return m_game_over && m_seconds_over >= kRestartDelaySeconds; }
+    [[nodiscard]] bool restart_ready() const { return m_game_over && m_seconds_over >= k_restart_delay_seconds; }
     void restart();
 
 private:

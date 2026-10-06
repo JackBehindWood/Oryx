@@ -26,23 +26,23 @@ std::string typed_param_value_text(const ParamValue& value)
 
 Params& params_at_path(Matchup& matchup, const std::string& path, std::string& key)
 {
-    constexpr std::string_view kGame = "game.";
-    constexpr std::string_view kSeats = "seats.";
-    if (path.compare(0, kGame.size(), kGame) == 0 && path.size() > kGame.size())
+    constexpr std::string_view k_game = "game.";
+    constexpr std::string_view k_seats = "seats.";
+    if (path.compare(0, k_game.size(), k_game) == 0 && path.size() > k_game.size())
     {
-        key = path.substr(kGame.size());
+        key = path.substr(k_game.size());
         return matchup.game_params;
     }
-    if (path.compare(0, kSeats.size(), kSeats) == 0)
+    if (path.compare(0, k_seats.size(), k_seats) == 0)
     {
-        size_t dot = path.find('.', kSeats.size());
-        if (dot != std::string::npos && dot > kSeats.size() && dot + 1 < path.size())
+        size_t dot = path.find('.', k_seats.size());
+        if (dot != std::string::npos && dot > k_seats.size() && dot + 1 < path.size())
         {
-            std::string index_text = path.substr(kSeats.size(), dot - kSeats.size());
+            std::string index_text = path.substr(k_seats.size(), dot - k_seats.size());
             if (index_text.find_first_not_of("0123456789") == std::string::npos)
             {
-                constexpr size_t kMaxIndexDigits = 9;
-                if (index_text.size() <= kMaxIndexDigits && std::stoul(index_text) < matchup.seats.size())
+                constexpr size_t k_max_index_digits = 9;
+                if (index_text.size() <= k_max_index_digits && std::stoul(index_text) < matchup.seats.size())
                 {
                     key = path.substr(dot + 1);
                     return matchup.seats[std::stoul(index_text)].params;

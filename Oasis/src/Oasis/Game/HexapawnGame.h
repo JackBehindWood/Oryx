@@ -11,8 +11,8 @@ namespace oasis
 class HexapawnState : public oryx::IState
 {
 public:
-    static constexpr uint32_t kSize = 3;
-    static constexpr int8_t kEmpty = -1;
+    static constexpr uint32_t k_size = 3;
+    static constexpr int8_t k_empty = -1;
 
     // How a pawn moves, as seen from the board: towards column - 1, straight, or towards column + 1.
     enum Direction : uint32_t
@@ -36,11 +36,11 @@ public:
 
     std::string action_to_string(oryx::ActionId action) const override;
 
-    // The owner of the pawn on a square, or kEmpty.
+    // The owner of the pawn on a square, or k_empty.
     [[nodiscard]] int8_t owner_at(uint32_t square) const { return m_squares[square]; }
 
-    [[nodiscard]] static oryx::ActionId action_for(uint32_t from, Direction direction) { return from * kSize + direction; }
-    [[nodiscard]] static uint32_t from_square(oryx::ActionId action) { return action / kSize; }
+    [[nodiscard]] static oryx::ActionId action_for(uint32_t from, Direction direction) { return from * k_size + direction; }
+    [[nodiscard]] static uint32_t from_square(oryx::ActionId action) { return action / k_size; }
     // The square `action` moves to when played by `player`.
     [[nodiscard]] static uint32_t to_square(oryx::ActionId action, oryx::PlayerId player);
     [[nodiscard]] static std::string square_name(uint32_t square);
@@ -51,7 +51,7 @@ private:
     [[nodiscard]] bool reached_far_row(oryx::PlayerId player) const;
     void generate(oryx::ActionList& out) const;
 
-    std::array<int8_t, kSize * kSize> m_squares;
+    std::array<int8_t, k_size * k_size> m_squares;
     oryx::PlayerId m_current_player = 0;
 };
 

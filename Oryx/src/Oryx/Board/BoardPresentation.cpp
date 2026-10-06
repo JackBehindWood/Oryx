@@ -33,7 +33,7 @@ bool BoardPresentation::update(const IState& state)
     ActionList legal = terminal ? ActionList{} : state.legal_actions();
 
     m_next = BoardView{};
-    m_presenter->describe(state, m_seat == kAllSeats ? to_move : m_seat, m_next);
+    m_presenter->describe(state, m_seat == k_all_seats ? to_move : m_seat, m_next);
 
     if (m_described && same_view(m_view, m_next) && to_move == m_to_move && terminal == m_terminal && legal == m_legal)
     {
@@ -54,7 +54,7 @@ bool BoardPresentation::update(const IState& state)
 
 bool BoardPresentation::accepts_moves() const
 {
-    return m_described && !m_terminal && (m_seat == kAllSeats || m_seat == m_to_move);
+    return m_described && !m_terminal && (m_seat == k_all_seats || m_seat == m_to_move);
 }
 
 void BoardPresentation::build_scene(SpaceId hovered, BoardScene& out) const

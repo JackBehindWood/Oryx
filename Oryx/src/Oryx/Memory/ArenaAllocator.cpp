@@ -9,12 +9,12 @@ namespace oryx
 namespace
 {
 
-constexpr size_t kBlockHeaderSize = 16;
-constexpr size_t kBlockAlignment = 16;
+constexpr size_t k_block_header_size = 16;
+constexpr size_t k_block_alignment = 16;
 
 std::byte* data_of(void* block)
 {
-    return static_cast<std::byte*>(block) + kBlockHeaderSize;
+    return static_cast<std::byte*>(block) + k_block_header_size;
 }
 
 } // namespace
@@ -27,7 +27,7 @@ ArenaAllocator::~ArenaAllocator()
         Block* next = block->next;
         size_t capacity = block->capacity;
         OX_ASAN_UNPOISON(data_of(block), capacity);
-        m_upstream.deallocate(block, kBlockHeaderSize + capacity, kBlockAlignment);
+        m_upstream.deallocate(block, k_block_header_size + capacity, k_block_alignment);
         block = next;
     }
 }
@@ -78,7 +78,7 @@ void ArenaAllocator::rewind(const Mark& mark)
 
 ArenaAllocator::Block* ArenaAllocator::add_block_after_current(size_t capacity)
 {
-    Block* block = static_cast<Block*>(m_upstream.allocate(kBlockHeaderSize + capacity, kBlockAlignment));
+    Block* block = static_cast<Block*>(m_upstream.allocate(k_block_header_size + capacity, k_block_alignment));
     block->capacity = capacity;
     if (m_current != nullptr)
     {

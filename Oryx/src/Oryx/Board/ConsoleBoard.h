@@ -15,7 +15,7 @@ public:
 };
 
 // The game's registered console board, else a PresentedConsoleBoard over its registered presenter, else the generic ConsoleBoard.
-// `seat` is the local human's player, or kAllSeats for hot-seat.
+// `seat` is the local human's player, or k_all_seats for hot-seat.
 [[nodiscard]] UniquePtr<IConsoleBoard> create_console_board(const std::string& game, PlayerId seat);
 
 } // namespace oryx

@@ -36,10 +36,10 @@ struct CrossTable
     std::vector<double> games;
 };
 
-constexpr double kZ95 = 1.959963984540054;
+constexpr double k_z95 = 1.959963984540054;
 
 // Wilson score interval for a rate; {0, 0} for no trials.
-[[nodiscard]] Interval wilson_interval(int64_t successes, int64_t trials, double z = kZ95);
+[[nodiscard]] Interval wilson_interval(int64_t successes, int64_t trials, double z = k_z95);
 // Two-sided 95% Student-t critical value; the normal one beyond 30 degrees of freedom.
 [[nodiscard]] double t_critical_95(int64_t degrees_of_freedom);
 // Sample stddev (n - 1) and a Student-t CI of the mean.

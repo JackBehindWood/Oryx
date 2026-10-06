@@ -53,9 +53,9 @@ TEST_CASE("BoardSession is ready to restart only after the finished game has bee
 
     session.on_turn(*finished_dummy_state());
     CHECK_FALSE(session.restart_ready());
-    session.advance(BoardSession::kRestartDelaySeconds * 0.5);
+    session.advance(BoardSession::k_restart_delay_seconds * 0.5);
     CHECK_FALSE(session.restart_ready());
-    session.advance(BoardSession::kRestartDelaySeconds);
+    session.advance(BoardSession::k_restart_delay_seconds);
     CHECK(session.restart_ready());
 
     session.restart();

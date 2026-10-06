@@ -8,9 +8,9 @@ using namespace oryx::test;
 namespace
 {
 
-const ScriptOrigin kNim{ "fake", "nim", "scripts/nim.fake" };
-const ScriptOrigin kOther{ "fake", "other", "scripts/other.fake" };
-const ScriptOrigin kLua{ "lua", "nim", "scripts/nim.lua" };
+const ScriptOrigin k_nim{ "fake", "nim", "scripts/nim.fake" };
+const ScriptOrigin k_other{ "fake", "other", "scripts/other.fake" };
+const ScriptOrigin k_lua{ "lua", "nim", "scripts/nim.lua" };
 
 class LabelledGame : public IGame
 {
@@ -56,12 +56,12 @@ TEST_CASE("register_scripted_game adds a game to the registry and remembers its 
 {
     ScriptRegistryCleanup cleanup;
 
-    register_scripted_game("test-nim", kNim, labelled("v4"), EntryInfo{ { int_param("stones", 4) }, "A test game" });
+    register_scripted_game("test-nim", k_nim, labelled("v4"), EntryInfo{ { int_param("stones", 4) }, "A test game" });
 
     REQUIRE(GameRegistry::has("test-nim"));
     CHECK(GameRegistry::info("test-nim")->description == "A test game");
     REQUIRE(scripted_game_origin("test-nim") != nullptr);
-    CHECK(*scripted_game_origin("test-nim") == kNim);
+    CHECK(*scripted_game_origin("test-nim") == k_nim);
 }
 
 TEST_CASE("a C++ entry has no script origin")
@@ -76,9 +76,9 @@ TEST_CASE("a C++ entry has no script origin")
 TEST_CASE("re-registering under the same origin replaces the entry")
 {
     ScriptRegistryCleanup cleanup;
-    register_scripted_game("test-nim", kNim, labelled("v3"), {});
+    register_scripted_game("test-nim", k_nim, labelled("v3"), {});
 
-    register_scripted_game("test-nim", kNim, labelled("v5"), {});
+    register_scripted_game("test-nim", k_nim, labelled("v5"), {});
 
     CHECK(label_of("test-nim") == "v5");
 }
@@ -86,33 +86,33 @@ TEST_CASE("re-registering under the same origin replaces the entry")
 TEST_CASE("a clash with another origin or with C++ throws ScriptError unless overwrite is set")
 {
     ScriptRegistryCleanup cleanup;
-    register_scripted_game("test-nim", kNim, labelled("v3"), {});
+    register_scripted_game("test-nim", k_nim, labelled("v3"), {});
     GameRegistry::register_factory("test-cpp-game", labelled("v1"));
 
-    CHECK_THROWS_AS(register_scripted_game("test-nim", kOther, labelled("v9"), {}), ScriptError);
-    CHECK_THROWS_AS(register_scripted_game("test-nim", kLua, labelled("v9"), {}), ScriptError);
-    CHECK_THROWS_AS(register_scripted_game("test-cpp-game", kNim, labelled("v9"), {}), ScriptError);
+    CHECK_THROWS_AS(register_scripted_game("test-nim", k_other, labelled("v9"), {}), ScriptError);
+    CHECK_THROWS_AS(register_scripted_game("test-nim", k_lua, labelled("v9"), {}), ScriptError);
+    CHECK_THROWS_AS(register_scripted_game("test-cpp-game", k_nim, labelled("v9"), {}), ScriptError);
     CHECK(label_of("test-nim") == "v3");
     CHECK(label_of("test-cpp-game") == "v1");
 
-    register_scripted_game("test-nim", kOther, labelled("v9"), {}, true);
+    register_scripted_game("test-nim", k_other, labelled("v9"), {}, true);
     CHECK(label_of("test-nim") == "v9");
-    CHECK(*scripted_game_origin("test-nim") == kOther);
+    CHECK(*scripted_game_origin("test-nim") == k_other);
 
-    register_scripted_game("test-cpp-game", kNim, labelled("v7"), {}, true);
+    register_scripted_game("test-cpp-game", k_nim, labelled("v7"), {}, true);
     CHECK(label_of("test-cpp-game") == "v7");
-    CHECK(*scripted_game_origin("test-cpp-game") == kNim);
+    CHECK(*scripted_game_origin("test-cpp-game") == k_nim);
     GameRegistry::unregister_factory("test-cpp-game");
 }
 
 TEST_CASE("the clash error names the entry and the origin that owns it")
 {
     ScriptRegistryCleanup cleanup;
-    register_scripted_game("test-nim", kNim, labelled("v3"), {});
+    register_scripted_game("test-nim", k_nim, labelled("v3"), {});
 
     try
     {
-        register_scripted_game("test-nim", kOther, labelled("v9"), {});
+        register_scripted_game("test-nim", k_other, labelled("v9"), {});
         FAIL("should have thrown");
     }
     catch (const ScriptError& error)
@@ -127,7 +127,7 @@ TEST_CASE("strategies are registered and tracked separately from games")
 {
     ScriptRegistryCleanup cleanup;
 
-    register_scripted_strategy("test-greedy", kNim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, {});
+    register_scripted_strategy("test-greedy", k_nim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, {});
 
     CHECK(StrategyRegistry::has("test-greedy"));
     CHECK(scripted_strategy_origin("test-greedy") != nullptr);
@@ -139,7 +139,7 @@ TEST_CASE("overwriting a C++ entry restores it once the scripted runtime unregis
     ScriptRegistryCleanup cleanup;
     StrategyRegistry::register_factory("test-cpp-strategy", [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "original C++" });
 
-    register_scripted_strategy("test-cpp-strategy", kNim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "scripted" }, true);
+    register_scripted_strategy("test-cpp-strategy", k_nim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "scripted" }, true);
     CHECK(StrategyRegistry::info("test-cpp-strategy")->description == "scripted");
     CHECK(scripted_strategy_origin("test-cpp-strategy") != nullptr);
 
@@ -157,8 +157,8 @@ TEST_CASE("a same-language chain of overwrites restores the C++ entry")
     ScriptRegistryCleanup cleanup;
     GameRegistry::register_factory("test-chain", labelled("cpp"));
 
-    register_scripted_game("test-chain", kNim, labelled("a"), {}, true);
-    register_scripted_game("test-chain", kOther, labelled("b"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("a"), {}, true);
+    register_scripted_game("test-chain", k_other, labelled("b"), {}, true);
     unregister_scripted("fake");
 
     CHECK(label_of("test-chain") == "cpp");
@@ -171,15 +171,15 @@ TEST_CASE("a mixed chain of overwrites restores the immediately-clobbered entry"
     ScriptRegistryCleanup cleanup;
     StrategyRegistry::register_factory("test-chain", [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "original C++" });
 
-    register_scripted_strategy("test-chain", kNim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "fake" }, true);
-    register_scripted_strategy("test-chain", kLua, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "lua" }, true);
+    register_scripted_strategy("test-chain", k_nim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "fake" }, true);
+    register_scripted_strategy("test-chain", k_lua, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, EntryInfo{ {}, "lua" }, true);
 
     unregister_scripted("lua");
 
     REQUIRE(StrategyRegistry::has("test-chain"));
     CHECK(StrategyRegistry::info("test-chain")->description == "fake");
     REQUIRE(scripted_strategy_origin("test-chain") != nullptr);
-    CHECK(*scripted_strategy_origin("test-chain") == kNim);
+    CHECK(*scripted_strategy_origin("test-chain") == k_nim);
 
     unregister_scripted("fake");
 
@@ -194,14 +194,14 @@ TEST_CASE("unregistering a language leaves none of its layers under another lang
     ScriptRegistryCleanup cleanup;
     GameRegistry::register_factory("test-chain", labelled("cpp"));
 
-    register_scripted_game("test-chain", kNim, labelled("fake-1"), {}, true);
-    register_scripted_game("test-chain", kLua, labelled("lua"), {}, true);
-    register_scripted_game("test-chain", kOther, labelled("fake-2"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("fake-1"), {}, true);
+    register_scripted_game("test-chain", k_lua, labelled("lua"), {}, true);
+    register_scripted_game("test-chain", k_other, labelled("fake-2"), {}, true);
 
     unregister_scripted("fake");
     CHECK(label_of("test-chain") == "lua");
     REQUIRE(scripted_game_origin("test-chain") != nullptr);
-    CHECK(*scripted_game_origin("test-chain") == kLua);
+    CHECK(*scripted_game_origin("test-chain") == k_lua);
 
     unregister_scripted("lua");
     CHECK(label_of("test-chain") == "cpp");
@@ -214,9 +214,9 @@ TEST_CASE("an origin re-registering over its own clobberer never restores its ea
     ScriptRegistryCleanup cleanup;
     GameRegistry::register_factory("test-chain", labelled("cpp"));
 
-    register_scripted_game("test-chain", kNim, labelled("fake-old"), {}, true);
-    register_scripted_game("test-chain", kLua, labelled("lua"), {}, true);
-    register_scripted_game("test-chain", kNim, labelled("fake-new"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("fake-old"), {}, true);
+    register_scripted_game("test-chain", k_lua, labelled("lua"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("fake-new"), {}, true);
 
     unregister_scripted("lua");
     CHECK(label_of("test-chain") == "fake-new");
@@ -230,12 +230,12 @@ TEST_CASE("reloading and then deleting the scripts of an overwrite chain brings 
 {
     ScriptRegistryCleanup cleanup;
     GameRegistry::register_factory("test-chain", labelled("cpp"));
-    register_scripted_game("test-chain", kNim, labelled("a"), {}, true);
-    register_scripted_game("test-chain", kOther, labelled("b"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("a"), {}, true);
+    register_scripted_game("test-chain", k_other, labelled("b"), {}, true);
 
     unregister_scripted("fake");
-    register_scripted_game("test-chain", kNim, labelled("a"), {}, true);
-    register_scripted_game("test-chain", kOther, labelled("b"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("a"), {}, true);
+    register_scripted_game("test-chain", k_other, labelled("b"), {}, true);
     CHECK(label_of("test-chain") == "b");
 
     unregister_scripted("fake");
@@ -249,7 +249,7 @@ TEST_CASE("a scripted entry removed directly from the registry leaves no origin 
 {
     ScriptRegistryCleanup cleanup;
     GameRegistry::register_factory("test-chain", labelled("cpp"));
-    register_scripted_game("test-chain", kNim, labelled("a"), {}, true);
+    register_scripted_game("test-chain", k_nim, labelled("a"), {}, true);
 
     GameRegistry::unregister_factory("test-chain");
     CHECK(scripted_game_origin("test-chain") == nullptr);
@@ -258,16 +258,16 @@ TEST_CASE("a scripted entry removed directly from the registry leaves no origin 
     CHECK_FALSE(GameRegistry::has("test-chain"));
 
     GameRegistry::register_factory("test-chain", labelled("cpp-2"));
-    CHECK_THROWS_AS(register_scripted_game("test-chain", kNim, labelled("a"), {}), ScriptError);
+    CHECK_THROWS_AS(register_scripted_game("test-chain", k_nim, labelled("a"), {}), ScriptError);
     GameRegistry::unregister_factory("test-chain");
 }
 
 TEST_CASE("unregister_scripted drops only the entries of one language")
 {
     ScriptRegistryCleanup cleanup;
-    register_scripted_game("test-fake-game", kNim, labelled("v3"), {});
-    register_scripted_strategy("test-fake-strategy", kNim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, {});
-    register_scripted_game("test-lua-game", kLua, labelled("v3"), {});
+    register_scripted_game("test-fake-game", k_nim, labelled("v3"), {});
+    register_scripted_strategy("test-fake-strategy", k_nim, [](const Params&) -> UniquePtr<IStrategy> { return create_unique<DummyGreedyStrategy>(); }, {});
+    register_scripted_game("test-lua-game", k_lua, labelled("v3"), {});
 
     unregister_scripted("fake");
 
@@ -314,12 +314,12 @@ TEST_CASE("register_scripted_console_board adds a board for a game and remembers
 {
     ScriptRegistryCleanup cleanup;
 
-    register_scripted_console_board("test-board", kNim, board_showing(true), {});
+    register_scripted_console_board("test-board", k_nim, board_showing(true), {});
     CHECK(shows_moves_of("test-board"));
     REQUIRE(scripted_console_board_origin("test-board") != nullptr);
-    CHECK(*scripted_console_board_origin("test-board") == kNim);
+    CHECK(*scripted_console_board_origin("test-board") == k_nim);
 
-    register_scripted_console_board("test-board", kNim, board_showing(false), {});
+    register_scripted_console_board("test-board", k_nim, board_showing(false), {});
     CHECK_FALSE(shows_moves_of("test-board"));
 
     unregister_scripted("fake");
@@ -332,13 +332,13 @@ TEST_CASE("a console board from another origin needs overwrite=True, and unregis
     ScriptRegistryCleanup cleanup;
 
     ConsoleBoardRegistry::register_factory("test-board-cpp", board_showing(true));
-    CHECK_THROWS_AS(register_scripted_console_board("test-board-cpp", kNim, board_showing(false), {}), ScriptError);
+    CHECK_THROWS_AS(register_scripted_console_board("test-board-cpp", k_nim, board_showing(false), {}), ScriptError);
     CHECK(shows_moves_of("test-board-cpp"));
 
-    register_scripted_console_board("test-board-cpp", kNim, board_showing(false), {}, true);
+    register_scripted_console_board("test-board-cpp", k_nim, board_showing(false), {}, true);
     CHECK_FALSE(shows_moves_of("test-board-cpp"));
 
-    CHECK_THROWS_AS(register_scripted_console_board("test-board-cpp", kOther, board_showing(true), {}), ScriptError);
+    CHECK_THROWS_AS(register_scripted_console_board("test-board-cpp", k_other, board_showing(true), {}), ScriptError);
 
     unregister_scripted("fake");
     CHECK(shows_moves_of("test-board-cpp"));

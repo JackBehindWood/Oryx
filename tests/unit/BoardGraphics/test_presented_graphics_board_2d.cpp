@@ -13,23 +13,23 @@ using namespace oasis;
 namespace
 {
 
-constexpr Vec2f kViewport = { 800.0f, 600.0f };
+constexpr Vec2f k_viewport = { 800.0f, 600.0f };
 
-BoardInput hover(const PresentedGraphicsBoard& board, SpaceId space)
+BoardInput hover(const PresentedGraphicsBoard2D& board, SpaceId space)
 {
     BoardScene scene;
-    board.presentation().build_scene(kNoSpace, scene);
-    BoardLayout2D layout = fit_board_2d(scene, kViewport);
+    board.presentation().build_scene(k_no_space, scene);
+    BoardProjection2D layout = fit_board_2d(scene, k_viewport);
     const Vec3f& position = scene.spaces[space].space.position;
     Vec2f world = board_to_world(layout, { position[0], position[1] });
 
     BoardInput input;
-    input.viewport = kViewport;
-    input.cursor = { world[0], kViewport[1] - world[1] };
+    input.viewport = k_viewport;
+    input.cursor = { world[0], k_viewport[1] - world[1] };
     return input;
 }
 
-BoardInput click(const PresentedGraphicsBoard& board, SpaceId space)
+BoardInput click(const PresentedGraphicsBoard2D& board, SpaceId space)
 {
     BoardInput input = hover(board, space);
     input.select = true;
@@ -50,9 +50,9 @@ struct RendererGuard
 
 } // namespace
 
-TEST_CASE("PresentedGraphicsBoard turns a click on a cell into its move, once")
+TEST_CASE("PresentedGraphicsBoard2D turns a click on a cell into its move, once")
 {
-    PresentedGraphicsBoard board(create_unique<TicTacToePresenter>(), "tictactoe", kAllSeats);
+    PresentedGraphicsBoard2D board(create_unique<TicTacToePresenter>(), "tictactoe", k_all_seats);
     TicTacToeState state;
     board.on_turn(state);
 
@@ -63,9 +63,9 @@ TEST_CASE("PresentedGraphicsBoard turns a click on a cell into its move, once")
     CHECK(board.shows_moves());
 }
 
-TEST_CASE("PresentedGraphicsBoard builds a two-click move and tracks the hovered space")
+TEST_CASE("PresentedGraphicsBoard2D builds a two-click move and tracks the hovered space")
 {
-    PresentedGraphicsBoard board(create_unique<HexapawnPresenter>(), "hexapawn", kAllSeats);
+    PresentedGraphicsBoard2D board(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
     HexapawnState state;
     board.on_turn(state);
 
@@ -79,9 +79,9 @@ TEST_CASE("PresentedGraphicsBoard builds a two-click move and tracks the hovered
     CHECK(board.poll_action(state) == pawn(6, HexapawnState::Forward));
 }
 
-TEST_CASE("PresentedGraphicsBoard takes back a pick, drops it on a click that fits no move, and queues undo")
+TEST_CASE("PresentedGraphicsBoard2D takes back a pick, drops it on a click that fits no move, and queues undo")
 {
-    PresentedGraphicsBoard board(create_unique<HexapawnPresenter>(), "hexapawn", kAllSeats);
+    PresentedGraphicsBoard2D board(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
     HexapawnState state;
     board.on_turn(state);
 
@@ -102,15 +102,15 @@ TEST_CASE("PresentedGraphicsBoard takes back a pick, drops it on a click that fi
     CHECK(board.poll_action(state) == UNDO_ACTION);
 }
 
-TEST_CASE("PresentedGraphicsBoard ignores clicks on another seat's turn and forgets a queued move when the state changes")
+TEST_CASE("PresentedGraphicsBoard2D ignores clicks on another seat's turn and forgets a queued move when the state changes")
 {
     HexapawnState state;
-    PresentedGraphicsBoard black(create_unique<HexapawnPresenter>(), "hexapawn", 1);
+    PresentedGraphicsBoard2D black(create_unique<HexapawnPresenter>(), "hexapawn", 1);
     black.on_turn(state);
     black.update(click(black, 6), 0.016);
     CHECK(black.presentation().builder().picked().empty());
 
-    PresentedGraphicsBoard board(create_unique<TicTacToePresenter>(), "tictactoe", kAllSeats);
+    PresentedGraphicsBoard2D board(create_unique<TicTacToePresenter>(), "tictactoe", k_all_seats);
     TicTacToeState tic_tac_toe;
     board.on_turn(tic_tac_toe);
     board.update(click(board, 4), 0.016);
@@ -119,31 +119,31 @@ TEST_CASE("PresentedGraphicsBoard ignores clicks on another seat's turn and forg
     CHECK(board.poll_action(tic_tac_toe) == PENDING_ACTION);
 }
 
-TEST_CASE("PresentedGraphicsBoard picks menu options with the buttons")
+TEST_CASE("PresentedGraphicsBoard2D picks menu options with the buttons")
 {
-    PresentedGraphicsBoard board(create_unique<FakePresenter>(), "dummy", kAllSeats);
+    PresentedGraphicsBoard2D board(create_unique<FakePresenter>(), "dummy", k_all_seats);
     UniquePtr<IState> state = DummyGame(5).new_initial_state();
     board.on_turn(*state);
 
     BoardScene scene;
-    board.presentation().build_scene(kNoSpace, scene);
-    BoardLayout2D layout = fit_board_2d(scene, kViewport);
+    board.presentation().build_scene(k_no_space, scene);
+    BoardProjection2D layout = fit_board_2d(scene, k_viewport);
     std::vector<OptionButton2D> buttons;
     option_buttons_2d(layout, scene.options.size(), buttons);
     REQUIRE(buttons.size() == 3);
 
     BoardInput input;
-    input.viewport = kViewport;
-    input.cursor = { buttons[1].centre[0], kViewport[1] - buttons[1].centre[1] };
+    input.viewport = k_viewport;
+    input.cursor = { buttons[1].centre[0], k_viewport[1] - buttons[1].centre[1] };
     input.select = true;
     board.update(input, 0.016);
     CHECK(board.poll_action(*state) == 2);
 }
 
-TEST_CASE("PresentedGraphicsBoard draws the scene through the renderer, and nothing into a degenerate window")
+TEST_CASE("PresentedGraphicsBoard2D draws the scene through the renderer, and nothing into a degenerate window")
 {
     RendererGuard renderer;
-    PresentedGraphicsBoard board(create_unique<HexapawnPresenter>(), "hexapawn", kAllSeats);
+    PresentedGraphicsBoard2D board(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
     HexapawnState state;
     board.on_turn(state);
     board.update(click(board, 6), 0.016);

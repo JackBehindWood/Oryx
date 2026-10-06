@@ -9,9 +9,9 @@ namespace oryx
 class PoolAllocator final : public IAllocator
 {
 public:
-    static constexpr std::array<size_t, 11> kClassSizes = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512 };
-    static constexpr size_t kMaxAlignment = 16;
-    static constexpr size_t kChunkSize = 64 * 1024;
+    static constexpr std::array<size_t, 11> k_class_sizes = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512 };
+    static constexpr size_t k_max_alignment = 16;
+    static constexpr size_t k_chunk_size = 64 * 1024;
 
     explicit PoolAllocator(IAllocator& upstream)
         : m_upstream(upstream)
@@ -26,7 +26,7 @@ public:
     [[nodiscard]] void* allocate(size_t size, size_t alignment) override;
     void deallocate(void* pointer, size_t size, size_t alignment) noexcept override;
 
-    // kClassSizes.size() when the request bypasses the pool.
+    // k_class_sizes.size() when the request bypasses the pool.
     [[nodiscard]] static size_t class_index(size_t size, size_t alignment);
 
 private:
@@ -52,7 +52,7 @@ private:
     void refill(SizeClass& size_class, size_t block_size);
 
     IAllocator& m_upstream;
-    std::array<SizeClass, kClassSizes.size()> m_classes{};
+    std::array<SizeClass, k_class_sizes.size()> m_classes{};
 };
 
 } // namespace oryx

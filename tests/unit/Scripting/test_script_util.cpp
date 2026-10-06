@@ -8,13 +8,13 @@ using namespace oryx::test;
 namespace
 {
 
-const ScriptOrigin kOrigin{ "lang", "mod", "" };
+const ScriptOrigin k_origin{ "lang", "mod", "" };
 
 class ScriptedStrategyStub : public IScriptedStrategy
 {
 public:
     ActionId decide(const Context&) override { return INVALID_ACTION; }
-    const ScriptOrigin& origin() const override { return kOrigin; }
+    const ScriptOrigin& origin() const override { return k_origin; }
 };
 
 class ScriptedGameFake : public IScriptedGame
@@ -23,7 +23,7 @@ public:
     UniquePtr<IState> new_initial_state() const override { return create_unique<DummyState>(5); }
     std::string name() const override { return "fake"; }
     int32_t num_players() const override { return 2; }
-    const ScriptOrigin& origin() const override { return kOrigin; }
+    const ScriptOrigin& origin() const override { return k_origin; }
     const ParamSchema& param_schema() const override { return m_schema; }
 
 private:

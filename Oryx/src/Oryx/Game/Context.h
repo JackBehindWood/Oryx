@@ -7,7 +7,7 @@
 namespace oryx
 {
 
-constexpr size_t kContextInlineCapabilities = 4;
+constexpr size_t k_context_inline_capabilities = 4;
 
 class Context
 {
@@ -71,7 +71,7 @@ private:
     }
 
     IState& m_state;
-    SmallVector<Entry, kContextInlineCapabilities> m_capabilities;
+    SmallVector<Entry, k_context_inline_capabilities> m_capabilities;
 };
 
 } // namespace oryx

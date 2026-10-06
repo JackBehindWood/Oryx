@@ -13,7 +13,7 @@ extern "C" int PyGILState_Check(void);
 namespace
 {
 
-const char* const kNim =
+const char* const k_nim =
     "import oryx\n"
     "\n"
     "class NimState:\n"
@@ -52,7 +52,7 @@ const char* const kNim =
     "    def new_initial_state(self):\n"
     "        return NimState(self.stones, self.max_take)\n";
 
-const char* const kMonteCarlo =
+const char* const k_monte_carlo =
     "class MonteCarlo(oryx.Strategy, id='monte-carlo'):\n"
     "    '''Flat Monte Carlo: random playouts for every legal action.'''\n"
     "    playouts: int = 30\n"
@@ -95,7 +95,7 @@ std::string run_script(const std::string& body, const std::string& file_name = "
 
 std::string with_nim(const std::string& body)
 {
-    return std::string(kNim) + body;
+    return std::string(k_nim) + body;
 }
 
 bool g_probe_saw_gil = false;
@@ -130,7 +130,7 @@ TEST_CASE("a Python strategy plays a C++ game and is described with its descript
 
 TEST_CASE("one Python Monte Carlo strategy beats a naive C++ strategy at both a C++ game and a Python game")
 {
-    std::string output = run_script(with_nim(std::string(kMonteCarlo) +
+    std::string output = run_script(with_nim(std::string(k_monte_carlo) +
         "tictactoe = oryx.simulate('tictactoe', ['monte-carlo', 'first-legal'], games=10)\n"
         "nim = oryx.simulate('nim', ['monte-carlo', 'first-legal'], games=10)\n"
         "mark(f'{tictactoe.wins[0]}|{nim.wins[0]}')\n"));
@@ -170,13 +170,13 @@ TEST_CASE("re-running the same script replaces its entries; another origin needs
     TempDir dir;
     std::filesystem::path marker = dir.path() / "marker.txt";
     std::string report = "mark(str(oryx.describe_game('nim')['params'][0]['default']) + ';')\n";
-    std::filesystem::path script = dir.write("nim.py", marker_prelude(marker) + kNim + report);
+    std::filesystem::path script = dir.write("nim.py", marker_prelude(marker) + k_nim + report);
 
     RunningPython python;
     python.load(script);
     CHECK(read_file(marker) == "21;");
 
-    std::string edited = kNim;
+    std::string edited = k_nim;
     edited.replace(edited.find("stones: int = 21"), std::string("stones: int = 21").size(), "stones: int = 5");
     dir.write("nim.py", marker_prelude(marker) + edited + report);
     python.reload(script);
@@ -364,7 +364,7 @@ TEST_CASE("a typed field without a class value is a required parameter that make
 TEST_CASE("script entries are removed when the runtime stops, and come back on the next start")
 {
     TempDir dir;
-    std::filesystem::path script = dir.write("nim.py", kNim);
+    std::filesystem::path script = dir.write("nim.py", k_nim);
 
     {
         RunningPython python;

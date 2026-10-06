@@ -51,7 +51,7 @@ std::string number(double value)
 JsonLinesWriter::JsonLinesWriter(std::ostream& out)
     : m_out(out)
 {
-    m_out << "{\"schema_version\":" << std::to_string(kTraceSchemaVersion) << "}\n";
+    m_out << "{\"schema_version\":" << std::to_string(k_trace_schema_version) << "}\n";
 }
 
 void JsonLinesWriter::on_decision(const IState& state, const Decision& decision)

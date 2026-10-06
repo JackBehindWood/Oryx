@@ -7,7 +7,7 @@ namespace oryx
 {
 
 // Sized above Tic-Tac-Toe's 9 plies; longer games spill to the heap.
-constexpr size_t kActionHistoryInlineCapacity = 16;
+constexpr size_t k_action_history_inline_capacity = 16;
 
 class ActionHistory
 {
@@ -26,7 +26,7 @@ public:
     [[nodiscard]] bool empty() const { return m_cursor == 0; }
 
 private:
-    SmallVector<ActionId, kActionHistoryInlineCapacity> m_actions;
+    SmallVector<ActionId, k_action_history_inline_capacity> m_actions;
     size_t m_cursor = 0;
 };
 

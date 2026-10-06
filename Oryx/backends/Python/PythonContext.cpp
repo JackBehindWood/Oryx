@@ -24,7 +24,7 @@ bool g_shut_down = false;
 
 PythonContext::PythonContext(Token)
 {
-    PyRef module = PyRef::steal(PyImport_ImportModule(kModuleName));
+    PyRef module = PyRef::steal(PyImport_ImportModule(k_module_name));
     if (!module)
     {
         throw_python_error("could not import the native oryx module");

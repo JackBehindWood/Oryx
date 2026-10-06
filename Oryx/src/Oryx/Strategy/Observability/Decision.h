@@ -32,7 +32,7 @@ struct Decision
 {
     PlayerId player = 0;
     ActionId chosen = INVALID_ACTION;
-    SmallVector<ActionScore, kActionListInlineCapacity> scores;
+    SmallVector<ActionScore, k_action_list_inline_capacity> scores;
     Diagnostics extra;
     std::vector<SearchNode> tree;
 };

@@ -9,7 +9,7 @@
 namespace oryx::selection
 {
 
-constexpr const char* kHumanOpponent = "human";
+constexpr const char* k_human_opponent = "human";
 
 // What --game and --opponent asked for; empty means "pick the default (the terminal asks when it can)".
 struct BoardOptions
@@ -35,7 +35,7 @@ void require_creatable(const char* what, const std::string& name, const EntryInf
 
 // A non-empty request must name a creatable entry. Otherwise the choice is prompted on stdin when `prompt` is set, else defaulted. False means exit.
 [[nodiscard]] bool choose_game(const std::string& requested, bool prompt, std::string& out_name);
-// Candidates are the game's strategies plus kHumanOpponent.
+// Candidates are the game's strategies plus k_human_opponent.
 [[nodiscard]] bool choose_opponent(const std::string& game, const std::string& requested, bool prompt, std::string& out_name);
 
 // Graphical only when graphics are built and wanted and the game has a graphics board or a presenter; otherwise Console.

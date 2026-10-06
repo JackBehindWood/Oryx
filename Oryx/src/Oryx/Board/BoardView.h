@@ -11,7 +11,7 @@ namespace oryx
 
 // An index into BoardView::spaces.
 using SpaceId = uint32_t;
-constexpr SpaceId kNoSpace = static_cast<SpaceId>(-1);
+constexpr SpaceId k_no_space = static_cast<SpaceId>(-1);
 
 // What a piece is, numbered by the game (pawn, king, card...); IBoardPresenter::piece_style says how it looks.
 using PieceKind = uint32_t;
@@ -23,7 +23,6 @@ enum class SpaceShape : uint8_t
 };
 
 // A place a piece can stand, in board units: +x right, +y away from the first player, +z up off the table (0 for flat boards).
-// A front end chooses how board units reach the screen, so the same view serves the terminal, a 2D window and a 3D table.
 struct BoardSpace
 {
     Vec3f position;
@@ -40,7 +39,7 @@ struct BoardPiece
 {
     PieceKind kind = 0;
     PlayerId owner = 0;
-    SpaceId space = kNoSpace;
+    SpaceId space = k_no_space;
 };
 
 // Everything one seat sees of a state, as plain data; no front end ever reads the state itself.
@@ -63,7 +62,6 @@ enum class PieceShape : uint8_t
 };
 
 // How a piece looks to each front end: the terminal prints `glyph`, a 2D window draws `shape` in `colour`.
-// A 3D front end will add a model here; games never name a rendering technique.
 struct PieceStyle
 {
     std::string glyph;
@@ -80,7 +78,7 @@ constexpr bool operator==(const BoardPiece& a, const BoardPiece& b)
 // Labels are chess-style ("a1" is the bottom-left space) and the axis labels are filled to match; `checkered` alternates tone.
 void grid_spaces(uint32_t columns, uint32_t rows, bool checkered, BoardView& out);
 
-// The space whose footprint contains `point` (board units, z ignored), or kNoSpace.
+// The space whose footprint contains `point` (board units, z ignored), or k_no_space.
 [[nodiscard]] SpaceId space_at(const BoardView& view, const Vec2f& point);
 
 // The spaces whose pieces differ between two views of the same board, in ascending order; empty when the space layouts differ.

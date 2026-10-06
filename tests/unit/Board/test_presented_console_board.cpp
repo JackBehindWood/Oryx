@@ -14,7 +14,7 @@ namespace
 
 PresentedConsoleBoard hexapawn_board()
 {
-    return PresentedConsoleBoard(create_unique<HexapawnPresenter>(), "hexapawn", kAllSeats);
+    return PresentedConsoleBoard(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
 }
 
 ActionId pawn(uint32_t from, HexapawnState::Direction direction)
@@ -26,14 +26,14 @@ ActionId pawn(uint32_t from, HexapawnState::Direction direction)
 
 TEST_CASE("board_text draws a grid with axis labels, the last move in brackets and the status")
 {
-    BoardPresentation presentation(create_unique<TicTacToePresenter>(), "tictactoe", kAllSeats);
+    BoardPresentation presentation(create_unique<TicTacToePresenter>(), "tictactoe", k_all_seats);
     TicTacToeState state;
     presentation.update(state);
     state.apply(4);
     presentation.update(state);
 
     BoardScene scene;
-    presentation.build_scene(kNoSpace, scene);
+    presentation.build_scene(k_no_space, scene);
     CHECK(board_text(scene) ==
           "3  .  .  .\n"
           "2  . [X] .\n"
@@ -44,12 +44,12 @@ TEST_CASE("board_text draws a grid with axis labels, the last move in brackets a
 
 TEST_CASE("board_text marks picked spaces in parentheses")
 {
-    BoardPresentation presentation(create_unique<HexapawnPresenter>(), "hexapawn", kAllSeats);
+    BoardPresentation presentation(create_unique<HexapawnPresenter>(), "hexapawn", k_all_seats);
     presentation.update(HexapawnState());
     CHECK(presentation.builder().pick({ PickKind::Space, 6, {} }) == PENDING_ACTION);
 
     BoardScene scene;
-    presentation.build_scene(kNoSpace, scene);
+    presentation.build_scene(k_no_space, scene);
     CHECK(board_text(scene) ==
           "3  B  B  B\n"
           "2  .  .  .\n"
@@ -61,7 +61,7 @@ TEST_CASE("board_text marks picked spaces in parentheses")
 TEST_CASE("PresentedConsoleBoard prints the board once per change and reads a move by its label")
 {
     ConsoleScope console("B2\n");
-    PresentedConsoleBoard board(create_unique<TicTacToePresenter>(), "tictactoe", kAllSeats);
+    PresentedConsoleBoard board(create_unique<TicTacToePresenter>(), "tictactoe", k_all_seats);
     TicTacToeState state;
 
     board.on_turn(state);
@@ -114,11 +114,11 @@ TEST_CASE("PresentedConsoleBoard re-asks after an unknown word, takes back picks
 
 TEST_CASE("create_console_board prefers a registered board, then a presenter, then the generic board")
 {
-    UniquePtr<IConsoleBoard> presented = create_console_board("tictactoe", kAllSeats);
+    UniquePtr<IConsoleBoard> presented = create_console_board("tictactoe", k_all_seats);
     REQUIRE(presented != nullptr);
     CHECK(presented->shows_moves());
 
     ConsoleBoardRegistry::register_factory("tictactoe", [](const Params&) -> UniquePtr<IConsoleBoard> { return create_unique<ConsoleBoard>(); });
-    CHECK_FALSE(create_console_board("tictactoe", kAllSeats)->shows_moves());
+    CHECK_FALSE(create_console_board("tictactoe", k_all_seats)->shows_moves());
     ConsoleBoardRegistry::unregister_factory("tictactoe");
 }

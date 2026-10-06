@@ -29,7 +29,7 @@ TEST_CASE("Hexapawn starts with three pawns a side and only forward steps")
     CHECK(state.current_player() == 0);
     CHECK(state.owner_at(0) == 1);
     CHECK(state.owner_at(8) == 0);
-    CHECK(state.owner_at(4) == HexapawnState::kEmpty);
+    CHECK(state.owner_at(4) == HexapawnState::k_empty);
     CHECK(state.legal_actions() == ActionList{ move(6, HexapawnState::Forward), move(7, HexapawnState::Forward), move(8, HexapawnState::Forward) });
     CHECK(state.action_to_string(move(6, HexapawnState::Forward)) == "a1-a2");
 }
@@ -45,7 +45,7 @@ TEST_CASE("Hexapawn pawns capture diagonally, cannot step onto a pawn, and undo 
 
     state.apply(move(0, HexapawnState::Right));
     CHECK(state.owner_at(4) == 1);
-    CHECK(state.owner_at(0) == HexapawnState::kEmpty);
+    CHECK(state.owner_at(0) == HexapawnState::k_empty);
 
     state.undo(move(0, HexapawnState::Right));
     CHECK(state.current_player() == 1);

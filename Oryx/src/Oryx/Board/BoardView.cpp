@@ -85,7 +85,7 @@ SpaceId space_at(const BoardView& view, const Vec2f& point)
             return static_cast<SpaceId>(index);
         }
     }
-    return kNoSpace;
+    return k_no_space;
 }
 
 std::vector<SpaceId> changed_spaces(const BoardView& before, const BoardView& after)
