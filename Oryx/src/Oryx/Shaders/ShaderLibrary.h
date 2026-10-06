@@ -9,6 +9,10 @@ namespace oryx
 
 class IRHI;
 
+// Loads the type's source and the closure of its includes through `sources`; throws Error naming the missing path.
+// The caller sets the permutation's defines.
+[[nodiscard]] ShaderCompilerInput load_shader_input(const ShaderType& type, const IShaderSourceProvider& sources);
+
 // Holds the compiled instance of every registered shader permutation; an owned value, never global.
 class ShaderLibrary
 {
@@ -19,6 +23,10 @@ public:
     void compile(IRHI& rhi, ShaderCache& cache, const ShaderType& type);
     void compile_all(IRHI& rhi, ShaderCache& cache, const IShaderSourceProvider& sources);
     void compile_all(IRHI& rhi, ShaderCache& cache);
+
+    // Builds every shader from a cooked store with no sources or compiler: the shader map for the registered types names each binary.
+    // Throws Error naming the type when the map is missing or stale or an entry is absent; the library is unchanged then.
+    void load_cooked(IRHI& rhi, const IShaderBinaryStore& store);
 
     // Recompiles the type from `sources`; on any failure the previous shaders stay in place and the Error propagates.
     void reload(IRHI& rhi, ShaderCache& cache, const ShaderType& type, const IShaderSourceProvider& sources);

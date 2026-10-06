@@ -11,6 +11,26 @@ namespace
 
 constexpr size_t INITIAL_ITEM_CAPACITY = 64;
 
+void load_shaders(RendererContext& context, bool reload)
+{
+    if (context.shader_sources->mode() == ShaderSourceMode::Cooked)
+    {
+        if (context.shader_store == nullptr)
+        {
+            throw Error("cooked shaders need RendererDesc::shader_store");
+        }
+        context.shaders.load_cooked(*context.rhi, *context.shader_store);
+    }
+    else if (reload)
+    {
+        context.shaders.reload_all(*context.rhi, context.shader_cache, context.shader_sources->provider());
+    }
+    else
+    {
+        context.shaders.compile_all(*context.rhi, context.shader_cache, context.shader_sources->provider());
+    }
+}
+
 } // namespace
 
 UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
@@ -20,7 +40,9 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->back_buffer_format = desc.back_buffer_format;
     context->items.reserve(INITIAL_ITEM_CAPACITY);
     context->shader_sources = create_unique<ShaderSourceResolver>(settings_of<ShaderSettings>());
-    context->shaders.compile_all(*context->rhi, context->shader_cache, context->shader_sources->provider());
+    context->shader_store = desc.shader_store;
+    context->shader_cache.set_store(desc.shader_store);
+    load_shaders(*context, false);
     context->defaults = create_default_resources(*context->rhi);
     context->batcher = create_unique<BatchRenderer2D>(batch_renderer_desc(*context, context->items));
     context->batchers.push_back(context->batcher.get());
@@ -64,7 +86,7 @@ void release_shader_cache(RendererContext& context)
 
 void reload_shaders(RendererContext& context)
 {
-    context.shaders.reload_all(*context.rhi, context.shader_cache, context.shader_sources->provider());
+    load_shaders(context, true);
     release_pipelines(context);
 }
 

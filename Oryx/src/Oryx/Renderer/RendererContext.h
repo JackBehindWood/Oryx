@@ -31,6 +31,7 @@ struct RendererContext
     ShaderLibrary shaders;
     ShaderCache shader_cache;
     UniquePtr<ShaderSourceResolver> shader_sources;
+    const IShaderBinaryStore* shader_store = nullptr;
     DefaultResources defaults;
     RHIFormat back_buffer_format = RHIFormat::BGRA8Unorm;
     // Batchers recycled once per frame by record_frame; the first is the facade's own.

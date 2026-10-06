@@ -11,6 +11,7 @@ class MslShaderCompiler final : public IShaderCompiler
 public:
     [[nodiscard]] const char* id() const override { return "oryx-msl"; }
     [[nodiscard]] uint32_t version() const override { return 1; }
+    [[nodiscard]] std::vector<std::string> dependencies(const ShaderSource& source) const override;
     [[nodiscard]] ShaderCompilerOutput compile(const ShaderCompilerInput& input) const override;
 };
 

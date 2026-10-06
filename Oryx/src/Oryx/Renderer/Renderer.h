@@ -9,6 +9,7 @@
 #include "Oryx/Graphics/Resources/VertexBuffer.h"
 #include "Oryx/Math/Colour.h"
 #include "Oryx/Renderer/BatchRenderer.h"
+#include "Oryx/Shaders/ShaderBinaryStore.h"
 #include "Oryx/Renderer/BuiltinPipelines.h"
 #include "Oryx/Math/Vector2.h"
 #include "Oryx/Renderer/DebugRenderer.h"
@@ -26,6 +27,8 @@ struct RendererDesc
 {
     RHIBackend backend = default_rhi_backend();
     RHIFormat back_buffer_format = RHIFormat::BGRA8Unorm;
+    // Persistent compiled-shader store, borrowed and required to outlive the renderer; null compiles every run and cannot load cooked shaders.
+    const IShaderBinaryStore* shader_store = nullptr;
 };
 
 // The only static renderer state: it forwards to one RendererContext that owns the device, shaders, pipelines and default resources. Main thread only.

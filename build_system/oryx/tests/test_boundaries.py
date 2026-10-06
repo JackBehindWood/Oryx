@@ -43,6 +43,15 @@ def test_only_gpu_asset_cache_may_reach_graphics(tmp_path):
     assert len(check_includes(src)) == 1
 
 
+def test_gpu_shader_bridges_may_reach_shaders_but_shaders_may_not_reach_assets(tmp_path):
+    src = _tree(tmp_path, {
+        "Assets/GpuShaderStore.h": '#include "Oryx/Shaders/ShaderBinaryStore.h"\n',
+        "Assets/ShaderAsset.h": '#include "Oryx/Shaders/ShaderBinaryStore.h"\n',
+        "Shaders/ShaderCache.h": '#include "Oryx/Assets/GpuShaderStore.h"\n',
+    })
+    assert len(check_includes(src)) == 2
+
+
 def test_public_header_including_backend_is_flagged(tmp_path):
     src = _tree(tmp_path, {"Core/X.h": '#include "backends/Null/NullRHI.h"\n'})
     assert len(check_includes(src)) == 1

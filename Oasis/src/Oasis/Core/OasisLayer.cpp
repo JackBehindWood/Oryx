@@ -4,6 +4,9 @@
 
 #include "Oryx/Benchmark/BenchmarkReport.h"
 #include "Oryx/Events/SimulationEvent.h"
+#ifdef OX_ENABLE_GRAPHICS
+#include "Oryx/Assets/GpuShaderStore.h"
+#endif
 
 namespace oasis
 {
@@ -84,7 +87,7 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
     try
     {
         app.create_window({ "Oasis" });
-        oryx::Renderer::init({ .backend = m_options.rhi.empty() ? oryx::default_rhi_backend() : oryx::parse_rhi_backend(m_options.rhi) });
+        oryx::Renderer::init({ .backend = m_options.rhi.empty() ? oryx::default_rhi_backend() : oryx::parse_rhi_backend(m_options.rhi), .shader_store = &oryx::gpu_shader_store() });
     }
     catch (const oryx::Error& error)
     {

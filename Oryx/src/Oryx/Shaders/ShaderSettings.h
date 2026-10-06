@@ -11,11 +11,13 @@ enum class ShaderSourceMode : uint8_t
     Auto,
     File,
     Embedded,
-    FileThenEmbedded
+    FileThenEmbedded,
+    // Binaries from a cooked store named by the shader map; no sources and no compiler, and a missing entry is an error.
+    Cooked
 };
 
 // The `shaders:` section. Auto reads loose files in Debug and Release, warning once per path that falls back to the embedded copy (test and
-// application shader types live only there), and the embedded copy alone in Dist. `file` is strict: a missing file is an error.
+// application shader types live only there), and the cooked store alone in Dist. `file` is strict: a missing file is an error.
 struct ShaderSettings
 {
     // Directory the "/Oryx/" mount maps to; a relative root is relative to the settings file.

@@ -24,7 +24,8 @@ ShaderSourceMode parse_mode(const std::string& text)
     if (text == "file") return ShaderSourceMode::File;
     if (text == "embedded") return ShaderSourceMode::Embedded;
     if (text == "file_then_embedded") return ShaderSourceMode::FileThenEmbedded;
-    throw SettingsError("shaders.source_mode must be auto, file, embedded or file_then_embedded, got '" + text + "'");
+    if (text == "cooked") return ShaderSourceMode::Cooked;
+    throw SettingsError("shaders.source_mode must be auto, file, embedded, file_then_embedded or cooked, got '" + text + "'");
 }
 
 } // namespace
@@ -45,7 +46,7 @@ ShaderSourceMode effective_source_mode(const ShaderSettings& settings)
         return settings.source_mode;
     }
 #ifdef OX_DIST
-    return ShaderSourceMode::Embedded;
+    return ShaderSourceMode::Cooked;
 #else
     return ShaderSourceMode::FileThenEmbedded;
 #endif

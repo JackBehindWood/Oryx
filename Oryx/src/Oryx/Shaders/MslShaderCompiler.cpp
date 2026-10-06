@@ -1229,8 +1229,17 @@ std::string stage_define(ShaderStage stage)
 
 } // namespace
 
+std::vector<std::string> MslShaderCompiler::dependencies(const ShaderSource& source) const
+{
+    return shader_include_closure(source.text, [](const std::string&) { return nullptr; });
+}
+
 ShaderCompilerOutput MslShaderCompiler::compile(const ShaderCompilerInput& input) const
 {
+    if (input.target != ShaderBinaryFormat::MslSource)
+    {
+        throw Error(input.source.name + ": the MSL compiler only emits MSL source");
+    }
     MacroMap macros;
     macros["ORYX_MSL"] = "1";
     macros[stage_define(input.stage)] = "1";
@@ -1269,7 +1278,7 @@ ShaderCompilerOutput MslShaderCompiler::compile(const ShaderCompilerInput& input
         text += line.text + "\n";
     }
     output.binary.assign(text.begin(), text.end());
-    output.hash = hash_shader_input(input, id(), version());
+    output.hash = hash_shader_input(input, *this);
     return output;
 }
 

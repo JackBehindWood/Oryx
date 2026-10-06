@@ -108,6 +108,6 @@ project "Oryx"
             "src/Oryx/Shaders/**",
             "src/Oryx/Renderer/**",
             "src/Oryx/BoardGraphics/**",
-            "src/Oryx/Assets/GpuAssetCache*"
+            "src/Oryx/Assets/Gpu*"
         }
     end
