@@ -109,6 +109,11 @@ void Renderer::release_shader_cache()
     oryx::release_shader_cache(require_context());
 }
 
+void Renderer::reload_shaders()
+{
+    oryx::reload_shaders(require_context());
+}
+
 void Renderer::trim()
 {
     oryx::trim(require_context());

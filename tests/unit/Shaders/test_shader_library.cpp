@@ -31,7 +31,9 @@ public:
     static bool should_compile(uint32_t permutation) { return permutation < 3; }
 };
 
-OX_REGISTER_SHADER(LibraryTestPS, TEST_SOURCE, "test_ps", ShaderStage::Pixel)
+const EmbeddedShaderRegistrar library_test_source("/Test/Library.msl", TEST_SOURCE, std::strlen(TEST_SOURCE));
+
+OX_REGISTER_SHADER(LibraryTestPS, "/Test/Library.msl", "test_ps", ShaderStage::Pixel)
 
 } // namespace
 

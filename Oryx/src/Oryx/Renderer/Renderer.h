@@ -65,6 +65,8 @@ public:
     static void release_pipelines();
     static void release_shader_cache();
     static void trim();
+    // Recompiles every shader from its source (loose files in dev builds); a failure throws Error and keeps the running shaders. Makes pipeline handles stale on success.
+    static void reload_shaders();
 
     static void set_clear_colour(const Colour& colour);
     [[nodiscard]] static const Colour& clear_colour();

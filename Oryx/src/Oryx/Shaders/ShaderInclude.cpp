@@ -13,7 +13,7 @@ std::map<std::string, std::string>& includes()
     return map;
 }
 
-void collect(const std::string& text, std::set<std::string>& names)
+void collect(const std::string& text, std::set<std::string>& names, const ShaderIncludeLookup& lookup)
 {
     std::istringstream stream(text);
     std::string line;
@@ -40,9 +40,9 @@ void collect(const std::string& text, std::set<std::string>& names)
         {
             continue;
         }
-        if (const std::string* included = find_shader_include(name))
+        if (const std::string* included = lookup(name))
         {
-            collect(*included, names);
+            collect(*included, names, lookup);
         }
     }
 }
@@ -62,8 +62,13 @@ const std::string* find_shader_include(const std::string& name)
 
 std::vector<std::string> shader_include_closure(const std::string& text)
 {
+    return shader_include_closure(text, [](const std::string& name) { return find_shader_include(name); });
+}
+
+std::vector<std::string> shader_include_closure(const std::string& text, const ShaderIncludeLookup& lookup)
+{
     std::set<std::string> names;
-    collect(text, names);
+    collect(text, names, lookup);
     return std::vector<std::string>(names.begin(), names.end());
 }
 

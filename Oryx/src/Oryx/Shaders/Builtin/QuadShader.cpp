@@ -7,45 +7,7 @@ namespace oryx
 namespace
 {
 
-constexpr const char* SOURCE = R"msl(
-#include "Oryx/Common.msl"
-
-#ifndef MAX_TEXTURES
-#define MAX_TEXTURES 16
-#endif
-
-struct QuadIn
-{
-    float3 position [[attribute(0)]];
-    float4 colour [[attribute(1)]];
-    float2 uv [[attribute(2)]];
-    float tex_index [[attribute(3)]];
-};
-
-struct QuadOut
-{
-    float4 position [[position]];
-    float4 colour;
-    float2 uv;
-    float tex_index;
-};
-
-vertex QuadOut quad_vs(QuadIn in [[stage_in]], constant Frame& frame [[buffer(0)]])
-{
-    QuadOut out;
-    out.position = frame.view_projection * float4(in.position, 1.0);
-    out.colour = in.colour;
-    out.uv = in.uv;
-    out.tex_index = in.tex_index;
-    return out;
-}
-
-fragment float4 quad_ps(QuadOut in [[stage_in]], array<texture2d<float>, MAX_TEXTURES> textures [[texture(0)]], sampler smp [[sampler(0)]])
-{
-    uint index = min(uint(in.tex_index + 0.5), uint(MAX_TEXTURES - 1));
-    return in.colour * textures[index].sample(smp, in.uv);
-}
-)msl";
+constexpr const char* SOURCE = "/Oryx/Builtin/Quad.msl";
 
 } // namespace
 

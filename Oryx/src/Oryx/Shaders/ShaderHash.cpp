@@ -12,10 +12,14 @@ ShaderHash hash_shader_input(const ShaderCompilerInput& input, const char* compi
     Fnv1a hash;
     hash.mix_value(static_cast<uint64_t>(input.source.language));
     hash.mix_string(input.source.text);
-    for (const std::string& name : shader_include_closure(input.source.text))
+    const ShaderIncludeLookup lookup = [&input](const std::string& name) -> const std::string* {
+        const std::map<std::string, std::string>::const_iterator it = input.includes.find(name);
+        return it != input.includes.end() ? &it->second : find_shader_include(name);
+    };
+    for (const std::string& name : shader_include_closure(input.source.text, lookup))
     {
         hash.mix_string(name);
-        const std::string* text = find_shader_include(name);
+        const std::string* text = lookup(name);
         hash.mix_string(text != nullptr ? *text : std::string());
     }
     hash.mix_string(input.entry_point);

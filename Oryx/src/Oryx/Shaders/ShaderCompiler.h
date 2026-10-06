@@ -25,6 +25,8 @@ struct ShaderCompilerInput
     ShaderStage stage = ShaderStage::Vertex;
     std::string entry_point = "main";
     std::vector<ShaderDefine> defines;
+    // Resolved include texts by name, ahead of the process-wide registry; filled by ShaderLibrary from its source provider.
+    std::map<std::string, std::string> includes;
 };
 
 struct ShaderCompilerOutput

@@ -75,7 +75,7 @@ bool starts_with(const std::string& text, const char* prefix)
 }
 
 // Quoted includes are inlined once each; `<...>` includes and everything else stay for the Metal compiler.
-void expand_includes(const std::string& file, const std::string& text, std::vector<SourceLine>& out, std::vector<std::string>& stack, std::set<std::string>& included)
+void expand_includes(const std::string& file, const std::string& text, std::vector<SourceLine>& out, std::vector<std::string>& stack, std::set<std::string>& included, const ShaderCompilerInput& input)
 {
     uint32_t number = 0;
     for (const std::string& raw : split_lines(text))
@@ -107,7 +107,8 @@ void expand_includes(const std::string& file, const std::string& text, std::vect
         {
             fail(file, number, "includes nested too deeply");
         }
-        const std::string* source = find_shader_include(name);
+        const std::map<std::string, std::string>::const_iterator resolved = input.includes.find(name);
+        const std::string* source = resolved != input.includes.end() ? &resolved->second : find_shader_include(name);
         if (source == nullptr)
         {
             fail(file, number, "include '" + name + "' not found");
@@ -117,7 +118,7 @@ void expand_includes(const std::string& file, const std::string& text, std::vect
             continue;
         }
         stack.push_back(name);
-        expand_includes(name, *source, out, stack, included);
+        expand_includes(name, *source, out, stack, included, input);
         stack.pop_back();
     }
 }
@@ -1241,7 +1242,7 @@ ShaderCompilerOutput MslShaderCompiler::compile(const ShaderCompilerInput& input
     std::vector<SourceLine> lines;
     std::vector<std::string> stack;
     std::set<std::string> included;
-    expand_includes(input.source.name, input.source.text, lines, stack, included);
+    expand_includes(input.source.name, input.source.text, lines, stack, included, input);
 
     const std::vector<SourceLine> live = evaluate_conditionals(lines, macros);
     const std::vector<Token> tokens = tokenize(live, macros);

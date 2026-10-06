@@ -7,34 +7,7 @@ namespace oryx
 namespace
 {
 
-constexpr const char* SOURCE = R"msl(
-#include "Oryx/Common.msl"
-
-struct SolidIn
-{
-    float3 position [[attribute(0)]];
-    float4 colour [[attribute(1)]];
-};
-
-struct SolidOut
-{
-    float4 position [[position]];
-    float4 colour;
-};
-
-vertex SolidOut solid_vs(SolidIn in [[stage_in]], constant Frame& frame [[buffer(0)]])
-{
-    SolidOut out;
-    out.position = frame.view_projection * float4(in.position, 1.0);
-    out.colour = in.colour;
-    return out;
-}
-
-fragment float4 solid_ps(SolidOut in [[stage_in]])
-{
-    return in.colour;
-}
-)msl";
+constexpr const char* SOURCE = "/Oryx/Builtin/Solid.msl";
 
 } // namespace
 

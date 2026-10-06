@@ -12,6 +12,7 @@
 #include "Oryx/Renderer/Renderer.h"
 #include "Oryx/Shaders/ShaderCache.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
+#include "Oryx/Shaders/ShaderSettings.h"
 
 namespace oryx
 {
@@ -29,6 +30,7 @@ struct RendererContext
     BuiltinPipelines builtin_pipelines;
     ShaderLibrary shaders;
     ShaderCache shader_cache;
+    UniquePtr<ShaderSourceResolver> shader_sources;
     DefaultResources defaults;
     RHIFormat back_buffer_format = RHIFormat::BGRA8Unorm;
     // Batchers recycled once per frame by record_frame; the first is the facade's own.
@@ -49,6 +51,9 @@ void shutdown_renderer_context(UniquePtr<RendererContext>& context);
 // Both wait for the device to go idle first; every GraphicsPipelineHandle issued before release_pipelines becomes stale.
 void release_pipelines(RendererContext& context);
 void release_shader_cache(RendererContext& context);
+
+// Recompiles every shader from the configured sources and rebuilds the pipelines; a failed compile throws Error and leaves the running shaders and pipelines untouched.
+void reload_shaders(RendererContext& context);
 void trim(RendererContext& context);
 
 // Records the queued items into the back-buffer pass, submits and presents, then advances the frame ring and recycles the batchers; clears the queue.

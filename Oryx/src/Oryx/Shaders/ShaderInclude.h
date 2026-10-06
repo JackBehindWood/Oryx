@@ -13,6 +13,9 @@ void register_shader_include(const std::string& name, std::string text);
 // Names of every quoted `#include "name"` reachable from `text`, sorted and unique; unknown names are listed but not followed.
 [[nodiscard]] std::vector<std::string> shader_include_closure(const std::string& text);
 
+using ShaderIncludeLookup = std::function<const std::string*(const std::string&)>;
+[[nodiscard]] std::vector<std::string> shader_include_closure(const std::string& text, const ShaderIncludeLookup& lookup);
+
 struct ShaderIncludeRegistrar
 {
     ShaderIncludeRegistrar(const char* name, const char* text) { register_shader_include(name, text); }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Shaders/ShaderCache.h"
+#include "Oryx/Shaders/ShaderSourceProvider.h"
 #include "Oryx/Shaders/ShaderType.h"
 
 namespace oryx
@@ -12,9 +13,16 @@ class IRHI;
 class ShaderLibrary
 {
 public:
-    // Compiles every permutation the type accepts; throws Error naming the type when a compile fails.
+    // Compiles every permutation the type accepts, loading type.source (a virtual path) and its includes through `sources`; the
+    // overloads without one read the embedded copies. Throws Error naming the type when a load or compile fails.
+    void compile(IRHI& rhi, ShaderCache& cache, const ShaderType& type, const IShaderSourceProvider& sources);
     void compile(IRHI& rhi, ShaderCache& cache, const ShaderType& type);
+    void compile_all(IRHI& rhi, ShaderCache& cache, const IShaderSourceProvider& sources);
     void compile_all(IRHI& rhi, ShaderCache& cache);
+
+    // Recompiles the type from `sources`; on any failure the previous shaders stay in place and the Error propagates.
+    void reload(IRHI& rhi, ShaderCache& cache, const ShaderType& type, const IShaderSourceProvider& sources);
+    void reload_all(IRHI& rhi, ShaderCache& cache, const IShaderSourceProvider& sources);
 
     // Throws Error when the permutation was not compiled.
     template<typename T>

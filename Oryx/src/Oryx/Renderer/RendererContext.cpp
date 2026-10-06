@@ -19,7 +19,8 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->rhi = create_rhi(desc.backend);
     context->back_buffer_format = desc.back_buffer_format;
     context->items.reserve(INITIAL_ITEM_CAPACITY);
-    context->shaders.compile_all(*context->rhi, context->shader_cache);
+    context->shader_sources = create_unique<ShaderSourceResolver>(settings_of<ShaderSettings>());
+    context->shaders.compile_all(*context->rhi, context->shader_cache, context->shader_sources->provider());
     context->defaults = create_default_resources(*context->rhi);
     context->batcher = create_unique<BatchRenderer2D>(batch_renderer_desc(*context, context->items));
     context->batchers.push_back(context->batcher.get());
@@ -59,6 +60,12 @@ void release_pipelines(RendererContext& context)
 void release_shader_cache(RendererContext& context)
 {
     context.shader_cache.clear();
+}
+
+void reload_shaders(RendererContext& context)
+{
+    context.shaders.reload_all(*context.rhi, context.shader_cache, context.shader_sources->provider());
+    release_pipelines(context);
 }
 
 void trim(RendererContext& context)

@@ -35,6 +35,14 @@ project "Oryx"
         end
     filter {}
 
+    -- Dev builds read loose shaders from here; Dist uses the embedded copy.
+    filter "files:src/Oryx/Shaders/ShaderSettings.cpp"
+        defines { 'OX_SHADER_ROOT="' .. path.getabsolute("shaders") .. '"' }
+    filter {}
+
+    -- Keep the embedded copy in step with shaders/ whenever the workspace is regenerated; tests also fail when it is stale.
+    os.execute('python3 "' .. path.getabsolute("tools/embed_shaders.py") .. '" "' .. path.getabsolute("shaders") .. '" "' .. path.getabsolute("src/Oryx/Shaders/Generated/EmbeddedShaders.cpp") .. '"')
+
     useOryxPythonPIC()
 
     if pythonEnabled() then
