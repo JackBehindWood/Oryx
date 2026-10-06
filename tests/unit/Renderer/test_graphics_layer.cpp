@@ -1,12 +1,34 @@
 #include "doctest.h"
 
 #include "Oryx.h"
+#include "NullRHI.h"
 #include "NullWindow.h"
 
 using namespace oryx;
 
 namespace
 {
+
+struct RendererScope
+{
+    RendererScope() { Renderer::init({ RHIBackend::Null }); }
+    ~RendererScope() { Renderer::shutdown(); }
+};
+
+struct GraphicsSettingsScope
+{
+    GraphicsSettings saved = settings_of<GraphicsSettings>();
+
+    ~GraphicsSettingsScope()
+    {
+        update_settings<GraphicsSettings>([this](GraphicsSettings& settings) { settings = saved; });
+    }
+};
+
+void edit_graphics(const std::function<void(GraphicsSettings&)>& edit)
+{
+    update_settings<GraphicsSettings>(edit);
+}
 
 class GraphicsApp : public Application
 {
@@ -42,15 +64,17 @@ TEST_CASE("GraphicsLayer without a window is disabled")
     CHECK(app.exit_code() == 1);
 }
 
-TEST_CASE("GraphicsLayer takes its size from the window and follows resizes")
+TEST_CASE("GraphicsLayer's viewport takes its size from the window and follows resizes")
 {
+    RendererScope renderer;
     GraphicsApp app(true);
-    CHECK(app.layer->width() == 320);
-    CHECK(app.layer->height() == 200);
+    REQUIRE(app.layer->viewport());
+    CHECK(app.layer->viewport()->width() == 320);
+    CHECK(app.layer->viewport()->height() == 200);
 
     app.window->inject_resize(640, 400);
-    CHECK(app.layer->width() == 640);
-    CHECK(app.layer->height() == 400);
+    CHECK(app.layer->viewport()->width() == 640);
+    CHECK(app.layer->viewport()->height() == 400);
 }
 
 TEST_CASE("GraphicsLayer closes the application on window close")
@@ -147,4 +171,117 @@ TEST_CASE("GraphicsLayer drops a frame client that throws and keeps pumping the 
     CHECK(bad.frames == 1);
     CHECK(good.frames == 2);
     CHECK_FALSE(app.layer->is_disabled());
+}
+
+TEST_CASE("GraphicsLayer applies vsync from the settings at attach and when they change")
+{
+    GraphicsSettingsScope scope;
+    RendererScope renderer;
+    edit_graphics([](GraphicsSettings& settings) { settings.vsync = false; });
+    GraphicsApp app(true);
+    REQUIRE(app.layer->viewport());
+    NullViewport& viewport = static_cast<NullViewport&>(*app.layer->viewport());
+    CHECK_FALSE(viewport.vsync());
+
+    edit_graphics([](GraphicsSettings& settings) { settings.vsync = true; });
+    CHECK(viewport.vsync());
+    edit_graphics([](GraphicsSettings& settings) { settings.vsync = false; });
+    CHECK_FALSE(viewport.vsync());
+}
+
+TEST_CASE("GraphicsLayer stops following the settings once detached")
+{
+    GraphicsSettingsScope scope;
+    RendererScope renderer;
+    {
+        GraphicsApp app(true);
+    }
+    CHECK_NOTHROW(edit_graphics([](GraphicsSettings& settings) { settings.vsync = !settings.vsync; }));
+}
+
+TEST_CASE("GraphicsLayer sleeps idle_sleep_ms when the frame was not presented")
+{
+    GraphicsSettingsScope scope;
+    RendererScope renderer;
+    GraphicsApp app(true);
+    edit_graphics([](GraphicsSettings& settings) { settings.idle_sleep_ms = 40; });
+
+    using clock = std::chrono::steady_clock;
+    clock::time_point start = clock::now();
+    app.layer->update(0.016);
+    CHECK(clock::now() - start < std::chrono::milliseconds(40));
+
+    app.window->inject_resize(0, 0);
+    start = clock::now();
+    app.layer->update(0.016);
+    CHECK(clock::now() - start >= std::chrono::milliseconds(40));
+
+    edit_graphics([](GraphicsSettings& settings) { settings.idle_sleep_ms = 0; });
+    start = clock::now();
+    app.layer->update(0.016);
+    CHECK(clock::now() - start < std::chrono::milliseconds(40));
+}
+
+TEST_CASE("GraphicsLayer holds frames to max_fps and leaves them uncapped at 0")
+{
+    GraphicsSettingsScope scope;
+    RendererScope renderer;
+    GraphicsApp app(true);
+    edit_graphics([](GraphicsSettings& settings) { settings.max_fps = 50; });
+
+    using clock = std::chrono::steady_clock;
+    app.layer->update(0.016);
+    const clock::time_point start = clock::now();
+    for (int32_t i = 0; i < 5; ++i)
+    {
+        app.layer->update(0.016);
+    }
+    CHECK(clock::now() - start >= std::chrono::milliseconds(95));
+
+    edit_graphics([](GraphicsSettings& settings) { settings.max_fps = 0; });
+    const clock::time_point uncapped = clock::now();
+    for (int32_t i = 0; i < 5; ++i)
+    {
+        app.layer->update(0.016);
+    }
+    CHECK(clock::now() - uncapped < std::chrono::milliseconds(80));
+}
+
+TEST_CASE("GraphicsLayer reloads shaders on the reload key and keeps running when the reload fails")
+{
+    GraphicsSettingsScope scope;
+    RendererScope renderer;
+    GraphicsApp app(true);
+    const GraphicsPipelineDesc quad = pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format());
+
+    GraphicsPipelineHandle before = Renderer::pipeline(quad);
+    app.layer->update(0.016);
+    CHECK_NOTHROW((void)Renderer::resolve_pipeline(before));
+
+    app.window->inject_key(KeyCode::F5, true);
+    app.layer->update(0.016);
+    CHECK_THROWS_AS((void)Renderer::resolve_pipeline(before), Error);
+    CHECK_FALSE(app.layer->is_disabled());
+
+    GraphicsPipelineHandle after = Renderer::pipeline(pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format()));
+    app.window->inject_key(KeyCode::F5, false);
+    app.layer->update(0.016);
+    edit_graphics([](GraphicsSettings& settings) { settings.reload_key = ""; });
+    app.window->inject_key(KeyCode::F5, true);
+    app.layer->update(0.016);
+    CHECK_NOTHROW((void)Renderer::resolve_pipeline(after));
+}
+
+TEST_CASE("GraphicsLayer is disabled and shuts down cleanly when the device fails to end a frame")
+{
+    {
+        RendererScope renderer;
+        GraphicsApp app(true);
+        static_cast<NullRHI&>(Renderer::rhi()).fail_next_end_frame();
+        app.run();
+        CHECK(app.disabled == 1);
+        CHECK(app.layer->is_disabled());
+        CHECK(app.exit_code() == 1);
+    }
+    CHECK(RHIResource::live_count() == 0);
 }

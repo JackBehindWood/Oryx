@@ -25,6 +25,13 @@ struct ShaderSettings
     ShaderSourceMode source_mode = ShaderSourceMode::Auto;
     // slangc binary; relative to the settings file. OX_SLANGC overrides it; empty falls back to the build-time path, then PATH.
     std::filesystem::path slangc;
+    // A pixel shader that fails its first compile is replaced by the magenta ErrorPS and the error is logged instead of thrown; reloads still throw.
+    // Off by default in Dist, where a broken shader must fail the build.
+#ifdef OX_DIST
+    bool error_fallback = false;
+#else
+    bool error_fallback = true;
+#endif
 };
 
 void read_settings(ShaderSettings& settings, const SettingsNode& node);

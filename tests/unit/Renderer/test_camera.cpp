@@ -172,3 +172,13 @@ TEST_CASE("Camera2D rejects a non-positive viewport or zoom")
     CHECK_THROWS_AS(camera.set_zoom(0.0f), Error);
     CHECK_THROWS_AS(camera.set_viewport(10.0f, -1.0f), Error);
 }
+
+TEST_CASE("Camera2D::screen_space puts the origin at the bottom left with y up, in logical points")
+{
+    const Camera2D camera = Camera2D::screen_space(800.0f, 600.0f);
+    check_near(camera.view_projection() * Vec4f(0.0f, 0.0f, 0.0f, 1.0f), -1.0f, -1.0f, 0.5f);
+    check_near(camera.view_projection() * Vec4f(800.0f, 600.0f, 0.0f, 1.0f), 1.0f, 1.0f, 0.5f);
+    check_near(camera.view_projection() * Vec4f(400.0f, 300.0f, 0.0f, 1.0f), 0.0f, 0.0f, 0.5f);
+    CHECK(camera.viewport_width() == 800.0f);
+    CHECK_THROWS_AS(Camera2D::screen_space(0.0f, 10.0f), Error);
+}

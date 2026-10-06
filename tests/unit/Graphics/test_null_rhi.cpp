@@ -64,7 +64,7 @@ TEST_CASE("NullRHI submit rejects an unfinished pass and records nothing")
 
 TEST_CASE("NullRHI retains submitted resources until end_frame")
 {
-    NullRHI rhi;
+    NullRHI rhi({ .simulate_latency = false });
     RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
     RHIRenderTargetPtr back_buffer = viewport->acquire_back_buffer();
     RHIBufferPtr buffer = rhi.create_buffer({ .size = 16 });
@@ -124,7 +124,7 @@ TEST_CASE("NullRHI rejects mismatched shader stages and unsupported render targe
 
 TEST_CASE("NullRHI collects released resources on the next end_frame")
 {
-    NullRHI rhi;
+    NullRHI rhi({ .simulate_latency = false });
     RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
     {
         RHIBufferPtr buffer = rhi.create_buffer({ .size = 4 });
@@ -172,10 +172,13 @@ TEST_CASE("NullRHI frame slots do not grow over many frames")
         rhi.submit(list);
         rhi.present(viewport.get());
         rhi.end_frame();
-        CHECK(RHIResource::retired_pending() <= 1);
+        CHECK(RHIResource::retired_pending() <= 2 * rhi.capabilities().frames_in_flight);
     }
     rhi.wait_idle();
-    CHECK(rhi.live_resources() == 3);
+    back_buffer.reset();
+    viewport->discard_back_buffer();
+    rhi.wait_idle();
+    CHECK(rhi.live_resources() == 1);
 }
 
 TEST_CASE("NullRHI present without a back buffer does not advance the frame, end_frame does")
@@ -194,7 +197,7 @@ TEST_CASE("NullRHI present without a back buffer does not advance the frame, end
 
 TEST_CASE("NullRHI end_frame without present still retires submitted resources")
 {
-    NullRHI rhi;
+    NullRHI rhi({ .simulate_latency = false });
     RHITexturePtr texture = rhi.create_texture({ .width = 2, .height = 2, .usage = RHITextureUsage::RenderTarget });
     RHIRenderTargetPtr target = rhi.create_render_target({ .colour = texture });
     const size_t baseline = rhi.live_resources();
@@ -239,8 +242,8 @@ TEST_CASE("NullRHI present rejects a mismatched or unsampled source")
 
 TEST_CASE("Two NullRHI devices can be alive at once")
 {
-    NullRHI first;
-    NullRHI second;
+    NullRHI first({ .simulate_latency = false });
+    NullRHI second({ .simulate_latency = false });
     RHIBufferPtr buffer = first.create_buffer({ .size = 4 });
     RHIViewportPtr viewport = second.create_viewport(viewport_desc());
     buffer.reset();
@@ -476,4 +479,124 @@ TEST_CASE("NullRHI submit rejects an unbalanced debug group")
     RHICommandList list;
     list.push_debug_group("open");
     CHECK_THROWS_AS(rhi.submit(list), Error);
+}
+
+namespace
+{
+
+void run_empty_frame(NullRHI& rhi, RHIViewport& viewport, RHICommandList& list)
+{
+    RHIRenderTargetPtr back_buffer = viewport.acquire_back_buffer();
+    list.clear();
+    list.begin_pass(back_buffer.get());
+    list.end_pass();
+    rhi.submit(list);
+    rhi.present(&viewport);
+    rhi.end_frame();
+}
+
+} // namespace
+
+TEST_CASE("NullRHI keeps a frame's resources alive until its ring slot comes round again")
+{
+    NullRHI rhi;
+    RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
+    RHICommandList list;
+    const uint32_t frames_in_flight = rhi.capabilities().frames_in_flight;
+
+    RHIBufferPtr buffer = rhi.create_buffer({ .size = 32 });
+    RHIRenderTargetPtr back_buffer = viewport->acquire_back_buffer();
+    list.begin_pass(back_buffer.get());
+    list.set_vertex_buffer(0, buffer.get());
+    list.end_pass();
+    rhi.submit(list);
+    rhi.present(viewport.get());
+    list.clear();
+    back_buffer.reset();
+    buffer.reset();
+    const size_t live_before = RHIResource::live_count();
+
+    rhi.end_frame();
+    for (uint32_t frame = 1; frame < frames_in_flight; ++frame)
+    {
+        CHECK(RHIResource::live_count() == live_before);
+        run_empty_frame(rhi, *viewport, list);
+    }
+    for (uint32_t frame = 0; frame < 2 * frames_in_flight; ++frame)
+    {
+        run_empty_frame(rhi, *viewport, list);
+    }
+    CHECK(RHIResource::live_count() < live_before);
+}
+
+TEST_CASE("NullRHI without simulated latency retires a frame's resources at end_frame")
+{
+    NullRHI rhi({ .simulate_latency = false });
+    RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
+    RHICommandList list;
+
+    RHIBufferPtr buffer = rhi.create_buffer({ .size = 32 });
+    RHIRenderTargetPtr back_buffer = viewport->acquire_back_buffer();
+    list.begin_pass(back_buffer.get());
+    list.set_vertex_buffer(0, buffer.get());
+    list.end_pass();
+    rhi.submit(list);
+    rhi.present(viewport.get());
+    list.clear();
+    back_buffer.reset();
+    viewport->discard_back_buffer();
+    buffer.reset();
+    CHECK(RHIResource::live_count() > 1);
+    rhi.end_frame();
+    CHECK(RHIResource::live_count() == 1);
+}
+
+TEST_CASE("NullRHI wait_idle releases everything still held for in-flight frames")
+{
+    NullRHI rhi;
+    RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
+    RHICommandList list;
+    run_empty_frame(rhi, *viewport, list);
+    viewport->discard_back_buffer();
+    rhi.wait_idle();
+    CHECK(RHIResource::live_count() == 1);
+}
+
+TEST_CASE("NullRHI fails the next end_frame once, without advancing the frame ring")
+{
+    NullRHI rhi;
+    RHIViewportPtr viewport = rhi.create_viewport(viewport_desc());
+    RHICommandList list;
+    run_empty_frame(rhi, *viewport, list);
+    const uint32_t slot = rhi.frame_slot();
+    const size_t frames = rhi.frame_count();
+
+    rhi.fail_next_end_frame();
+    std::string detail;
+    try
+    {
+        rhi.end_frame();
+    }
+    catch (const Error& error)
+    {
+        detail = error.detail();
+    }
+    CHECK(detail.find("frame serial") != std::string::npos);
+    CHECK(rhi.frame_slot() == slot);
+    CHECK(rhi.frame_count() == frames);
+    CHECK_NOTHROW(rhi.end_frame());
+    CHECK(rhi.frame_count() == frames + 1);
+}
+
+TEST_CASE("NullRHI can be set to report a viewport's vsync")
+{
+    NullRHI rhi;
+    RHIViewportDesc desc = viewport_desc();
+    desc.vsync = false;
+    RHIViewportPtr viewport = rhi.create_viewport(desc);
+    NullViewport& null_viewport = static_cast<NullViewport&>(*viewport);
+    CHECK_FALSE(null_viewport.vsync());
+    rhi.set_viewport_vsync(viewport.get(), true);
+    CHECK(null_viewport.vsync());
+    CHECK_THROWS_AS(rhi.set_viewport_vsync(nullptr, true), Error);
 }

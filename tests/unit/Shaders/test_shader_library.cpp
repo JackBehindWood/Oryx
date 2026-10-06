@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "ShaderTestSupport.h"
+#include "unit/TestLogCapture.h"
 
 using namespace oryx;
 using namespace oryx::test;
@@ -117,4 +118,72 @@ TEST_CASE("ShaderLibrary compile_all builds every registered type and clear empt
     CHECK(library.contains<LibraryTestPS>(2));
     library.clear();
     CHECK(library.size() == 0);
+}
+
+TEST_CASE("ShaderLibrary falls back to the magenta pixel shader when a pixel shader fails its first compile")
+{
+    NullRHI rhi;
+    ShaderCache cache;
+    ShaderLibrary library;
+    library.set_error_fallback(true);
+    ShaderType broken = shader_type_of<LibraryTestPS>();
+    broken.source = "garbage here";
+
+    LogCapture capture(Log::get_core_logger());
+    library.compile(rhi, cache, broken);
+    CHECK(library.size() == 3);
+    for (uint32_t permutation = 0; permutation < 3; ++permutation)
+    {
+        CHECK(library.get<LibraryTestPS>(permutation)->is_fallback());
+    }
+    const std::vector<std::string> lines = capture.lines();
+    CHECK(std::count_if(lines.begin(), lines.end(), [](const std::string& line) { return line.find("LibraryTestPS (permutation 1)") != std::string::npos; }) == 1);
+}
+
+TEST_CASE("ShaderLibrary keeps the previous shader when a later compile fails, fallback or not")
+{
+    NullRHI rhi;
+    ShaderCache cache;
+    ShaderLibrary library;
+    library.set_error_fallback(true);
+    library.compile(rhi, cache, shader_type_of<LibraryTestPS>());
+    const ShaderHash good = library.get<LibraryTestPS>(0)->hash();
+
+    ShaderType broken = shader_type_of<LibraryTestPS>();
+    broken.source = "garbage here";
+    CHECK_THROWS_AS(library.compile(rhi, cache, broken), Error);
+    CHECK_FALSE(library.get<LibraryTestPS>(0)->is_fallback());
+    CHECK(library.get<LibraryTestPS>(0)->hash() == good);
+}
+
+TEST_CASE("ShaderLibrary never falls back for a vertex shader or with the fallback off")
+{
+    NullRHI rhi;
+    ShaderCache cache;
+    ShaderType broken_vertex = shader_type_of<SolidVS>();
+    broken_vertex.source = "garbage here";
+    ShaderType broken_pixel = shader_type_of<LibraryTestPS>();
+    broken_pixel.source = "garbage here";
+
+    ShaderLibrary on;
+    on.set_error_fallback(true);
+    CHECK_THROWS_AS(on.compile(rhi, cache, broken_vertex), Error);
+    CHECK(on.size() == 0);
+
+    ShaderLibrary off;
+    CHECK_THROWS_AS(off.compile(rhi, cache, broken_pixel), Error);
+    CHECK(off.size() == 0);
+}
+
+TEST_CASE("The built-in shaders compile for real in the test build, never as fallbacks")
+{
+    NullRHI rhi;
+    ShaderCache cache;
+    ShaderLibrary library;
+    library.set_error_fallback(true);
+    library.compile_all(rhi, cache);
+    CHECK_FALSE(library.get<SolidPS>()->is_fallback());
+    CHECK_FALSE(library.get<QuadPS>(0)->is_fallback());
+    CHECK_FALSE(library.get<CirclePS>()->is_fallback());
+    CHECK_FALSE(library.get<TextPS>(1)->is_fallback());
 }

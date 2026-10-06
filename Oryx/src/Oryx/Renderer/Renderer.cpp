@@ -16,6 +16,13 @@ UniquePtr<RendererContext>& context_storage()
     return instance;
 }
 
+// Application's shutdown consumes the hooks, a direct Renderer::shutdown() does not; the flag follows whichever is still pending.
+bool& shutdown_hook_registered()
+{
+    static bool registered = false;
+    return registered;
+}
+
 } // namespace
 
 RendererContext& Renderer::require_context()
@@ -34,7 +41,15 @@ void Renderer::init(const RendererDesc& desc)
         throw Error("Renderer is already initialised");
     }
     context_storage() = create_renderer_context(desc);
-    register_shutdown_hook([] { Renderer::shutdown(); });
+    if (!shutdown_hook_registered())
+    {
+        shutdown_hook_registered() = true;
+        register_shutdown_hook([]
+        {
+            shutdown_hook_registered() = false;
+            Renderer::shutdown();
+        });
+    }
 }
 
 void Renderer::shutdown()
@@ -139,6 +154,11 @@ void Renderer::submit(DrawItem item)
     require_context().items.push_back(std::move(item));
 }
 
+BatchRenderer2D& Renderer::batcher_2d()
+{
+    return *require_context().batcher;
+}
+
 void Renderer::begin_scene(const Camera& camera)
 {
     require_context().batcher->begin(camera);
@@ -220,9 +240,9 @@ const BatchStats& Renderer::batch_stats()
     return require_context().batcher->stats();
 }
 
-void Renderer::end_frame()
+bool Renderer::end_frame()
 {
-    record_frame(require_context());
+    return record_frame(require_context());
 }
 
 } // namespace oryx

@@ -1,6 +1,6 @@
 #include "PresentedGraphicsBoard2D.h"
 
-#include "Oryx/Renderer/Camera.h"
+#include "Oryx/Renderer/ScreenScene.h"
 #include "Oryx/Renderer/Renderer.h"
 
 namespace oryx
@@ -94,11 +94,8 @@ void PresentedGraphicsBoard2D::render(const BoardInput& input)
         m_status = terminal ? scene.status + " - " + k_restart_hint : std::string();
     }
 
-    Camera2D camera(input.viewport[0], input.viewport[1]);
-    camera.set_position({ input.viewport[0] * 0.5f, input.viewport[1] * 0.5f });
-    Renderer::begin_scene(camera);
-    draw_board_2d(scene, current, m_theme, Renderer::default_font(), m_status);
-    Renderer::end_scene();
+    ScreenScene screen(input.viewport[0], input.viewport[1]);
+    draw_board_2d(scene, current, m_theme, m_theme.font != nullptr ? *m_theme.font : Renderer::default_font(), m_status);
 }
 
 } // namespace oryx

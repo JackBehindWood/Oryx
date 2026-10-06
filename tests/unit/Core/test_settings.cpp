@@ -292,3 +292,80 @@ TEST_CASE("a failed first load leaves the defaults untouched")
     CHECK_THROWS_AS(load_from(dir.write("broken.yaml", "fake:\n  count: no\n")), SettingsError);
     CHECK(settings_of<FakeSettings>().count == 1);
 }
+
+TEST_CASE("a subscriber hears about loads, reloads, updates and resets until its token is released")
+{
+    TempDir dir;
+    std::filesystem::path file = dir.write("watch.yaml", "fake:\n  count: 1\n");
+    std::vector<int32_t> seen;
+    SettingsSubscription token = on_settings_changed<FakeSettings>([&seen](const FakeSettings& settings) { seen.push_back(static_cast<int32_t>(settings.count)); });
+
+    load_from(file);
+    dir.write("watch.yaml", "fake:\n  count: 2\n");
+    reload_settings();
+    update_settings<FakeSettings>([](FakeSettings& settings) { settings.count = 3; });
+    CHECK(settings_of<FakeSettings>().count == 3);
+    reset_settings();
+    CHECK(seen == std::vector<int32_t>{ 1, 2, 3, 7 });
+
+    token.reset();
+    update_settings<FakeSettings>([](FakeSettings& settings) { settings.count = 4; });
+    CHECK(seen.size() == 4);
+    reset_settings();
+}
+
+TEST_CASE("a failed reload notifies nobody, and a subscriber that throws does not stop the others")
+{
+    TempDir dir;
+    std::filesystem::path file = dir.write("fail.yaml", "fake:\n  count: 1\n");
+    load_from(file);
+
+    int32_t calls = 0;
+    SettingsSubscription thrower = on_settings_changed<FakeSettings>([](const FakeSettings&) { throw Error("subscriber failed"); });
+    SettingsSubscription counter = on_settings_changed<FakeSettings>([&calls](const FakeSettings&) { ++calls; });
+
+    dir.write("fail.yaml", "fake:\n  count: [broken\n");
+    CHECK_THROWS_AS(reload_settings(), SettingsError);
+    CHECK(calls == 0);
+
+    dir.write("fail.yaml", "fake:\n  count: 2\n");
+    CHECK_NOTHROW(reload_settings());
+    CHECK(calls == 1);
+    reset_settings();
+}
+
+TEST_CASE("a token moved to another owner keeps the subscription alive once")
+{
+    int32_t calls = 0;
+    SettingsSubscription first = on_settings_changed<FakeSettings>([&calls](const FakeSettings&) { ++calls; });
+    {
+        SettingsSubscription second = std::move(first);
+        update_settings<FakeSettings>([](FakeSettings& settings) { ++settings.count; });
+        CHECK(calls == 1);
+    }
+    update_settings<FakeSettings>([](FakeSettings& settings) { ++settings.count; });
+    CHECK(calls == 1);
+    reset_settings();
+}
+
+#ifdef OX_ENABLE_GRAPHICS
+TEST_CASE("graphics settings read their keys and reject bad values")
+{
+    TempDir dir;
+    load_from(dir.write("g.yaml", "graphics:\n  vsync: false\n  max_fps: 60\n  idle_sleep_ms: 10\n  reload_key: f6\n"));
+    const GraphicsSettings& graphics = settings_of<GraphicsSettings>();
+    CHECK_FALSE(graphics.vsync);
+    CHECK(graphics.max_fps == 60);
+    CHECK(graphics.idle_sleep_ms == 10);
+    CHECK(graphics.reload_key == "f6");
+
+    CHECK_THROWS_AS(load_from(dir.write("neg.yaml", "graphics:\n  max_fps: -1\n")), SettingsError);
+    CHECK_THROWS_AS(load_from(dir.write("key.yaml", "graphics:\n  reload_key: Enter\n")), SettingsError);
+    CHECK_NOTHROW(load_from(dir.write("off.yaml", "graphics:\n  reload_key: ''\n")));
+    CHECK(key_from_name("F12") == KeyCode::F12);
+    CHECK(key_from_name("g") == KeyCode::G);
+    CHECK(key_from_name("F13") == KeyCode::Unknown);
+    CHECK(key_from_name("") == KeyCode::Unknown);
+    reset_settings();
+}
+#endif

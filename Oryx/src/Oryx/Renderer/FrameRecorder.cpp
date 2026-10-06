@@ -61,7 +61,7 @@ void bind_textures(RHICommandList& commands, const GraphicsPipeline& pipeline, c
     const RHIBindingId binding = pipeline.try_binding(SHADER_TEXTURES_BINDING);
     if (binding == RHI_INVALID_BINDING)
     {
-        if (item.texture_count > 0)
+        if (item.texture_count > 0 && !pipeline.is_fallback())
         {
             throw Error("DrawItem has textures but its pipeline has no texture binding");
         }
@@ -138,7 +138,7 @@ void record_draw_item(RHICommandList& commands, const DrawItem& item, const Grap
     }
 }
 
-void record_frame(RendererContext& context)
+bool record_frame(RendererContext& context)
 {
     for (const BatchRenderer* batcher : context.batchers)
     {
@@ -154,6 +154,7 @@ void record_frame(RendererContext& context)
     {
         back_buffer = context.viewport->acquire_back_buffer();
     }
+    const bool presented = static_cast<bool>(back_buffer);
     if (back_buffer)
     {
         BackBufferGuard guard(*context.viewport);
@@ -193,6 +194,7 @@ void record_frame(RendererContext& context)
         batcher->recycle(context.rhi->frame_slot());
     }
     context.debug.end_frame();
+    return presented;
 }
 
 } // namespace oryx

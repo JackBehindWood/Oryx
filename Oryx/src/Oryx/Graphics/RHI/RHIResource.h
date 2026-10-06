@@ -13,6 +13,8 @@ public:
     ~RHIResource() override;
 
     [[nodiscard]] static size_t live_count();
+    // The live resources grouped by type, "3 x NullBuffer, 1 x NullTexture"; empty when none are live.
+    [[nodiscard]] static std::string live_report();
     [[nodiscard]] static size_t retired_pending();
     [[nodiscard]] static uint64_t frame_serial();
 

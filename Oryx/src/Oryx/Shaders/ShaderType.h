@@ -42,7 +42,7 @@ struct ShaderTypeRegistrar
     {                                                                                                                                                        \
     ::oryx::ShaderPtr create_##Class(::oryx::IRHI& rhi, const ::oryx::ShaderCompilerOutput& output, uint32_t permutation)                          \
     {                                                                                                                                                        \
-        return ::oryx::make_ref<Class>(output, permutation, Class::create_rhi_shader(rhi, output, Entry));                                                    \
+        return ::oryx::make_ref<Class>(output, permutation, Class::create_rhi_shader(rhi, output, output.reflection.entry_point.c_str()));                                                    \
     }                                                                                                                                                        \
     const ::oryx::ShaderTypeRegistrar registrar_##Class({ #Class, Source, Entry, Stage, typeid(Class), &create_##Class, &Class::defines_for, &Class::should_compile }); \
     }

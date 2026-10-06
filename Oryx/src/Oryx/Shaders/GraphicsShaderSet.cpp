@@ -94,7 +94,7 @@ GraphicsPipeline make_graphics_pipeline(IRHI& rhi, const GraphicsShaderSet& set,
     desc.binding_count = static_cast<uint32_t>(layout.bindings.size());
     try
     {
-        return GraphicsPipeline(rhi.create_graphics_pipeline(desc), layout.names);
+        return GraphicsPipeline(rhi.create_graphics_pipeline(desc), layout.names, set.pixel->is_fallback());
     }
     catch (const RHIInterfaceMismatch& mismatch)
     {

@@ -28,11 +28,15 @@ protected:
     Mat4f m_view = Mat4f::identity();
 };
 
-// Orthographic, left-handed (x right, y up, z into the screen), centred on `position`; the visible world is viewport size / zoom. Screen space is pixels with the origin top left, y down.
+// Orthographic, left-handed (x right, y up, z into the screen), centred on `position`; the visible world is viewport size / zoom.
+// screen_to_world/world_to_screen use pixels with the origin top left, y down.
 class Camera2D : public Camera
 {
 public:
     Camera2D(float viewport_width, float viewport_height);
+
+    // World units are the viewport's logical points with the origin at the bottom left and y up, so draws land where the window shows them.
+    [[nodiscard]] static Camera2D screen_space(float width, float height);
 
     void set_position(const Vec2f& position);
     void set_rotation(float radians);

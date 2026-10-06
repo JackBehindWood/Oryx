@@ -145,6 +145,18 @@ void MetalRHI::resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t h
     metal_viewport->resize(width, height, scale);
 }
 
+void MetalRHI::set_viewport_vsync(RHIViewport* viewport, bool vsync)
+{
+    rhi_require_non_null(viewport, "set_viewport_vsync");
+    MetalViewport* metal_viewport = dynamic_cast<MetalViewport*>(viewport);
+    if (metal_viewport == nullptr)
+    {
+        throw Error("RHI set_viewport_vsync received a viewport from a different backend");
+    }
+    OX_METAL_AUTORELEASE_SCOPE;
+    metal_viewport->set_vsync(vsync);
+}
+
 void MetalRHI::submit(RHICommandList& commands)
 {
     if (commands.in_pass())

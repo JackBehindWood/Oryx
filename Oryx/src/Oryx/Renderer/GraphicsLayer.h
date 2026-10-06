@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Oryx/Core/Layer.h"
+#include "Oryx/Core/Settings.h"
 #include "Oryx/Core/Window.h"
 #include "Oryx/Graphics/RHI/RHIViewport.h"
 #include "Oryx/Math/Colour.h"
 #include "Oryx/Renderer/FrameClient.h"
+#include "Oryx/Renderer/GraphicsSettings.h"
 
 namespace oryx
 {
@@ -26,17 +28,24 @@ public:
 
     void set_clear_colour(const Colour& colour);
     [[nodiscard]] const Colour& clear_colour() const { return m_clear; }
-    [[nodiscard]] int32_t width() const { return m_width; }
-    [[nodiscard]] int32_t height() const { return m_height; }
+    // Null when no Renderer existed at attach time.
+    [[nodiscard]] const RHIViewportPtr& viewport() const { return m_viewport; }
 
 private:
+    void apply_settings(const GraphicsSettings& settings);
+    void pace_frame();
+
     Window* m_window = nullptr;
     // Created only when a Renderer exists at attach time; released in detach, before the device goes away.
     RHIViewportPtr m_viewport;
     std::vector<IFrameClient*> m_clients;
     Colour m_clear = { 0.08f, 0.08f, 0.1f, 1.0f };
-    int32_t m_width = 0;
-    int32_t m_height = 0;
+    SettingsSubscription m_settings_subscription;
+    bool m_applied_vsync = true;
+    std::chrono::milliseconds m_idle_sleep{ 50 };
+    std::chrono::nanoseconds m_frame_period{ 0 };
+    KeyCode m_reload_key = KeyCode::Unknown;
+    std::chrono::steady_clock::time_point m_next_frame;
 };
 
 } // namespace oryx

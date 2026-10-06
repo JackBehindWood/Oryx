@@ -23,7 +23,7 @@ struct GraphicsPipelineState
 class GraphicsPipeline
 {
 public:
-    GraphicsPipeline(RHIGraphicsPipelinePtr pipeline, std::vector<std::string> names);
+    GraphicsPipeline(RHIGraphicsPipelinePtr pipeline, std::vector<std::string> names, bool fallback = false);
 
     [[nodiscard]] RHIGraphicsPipeline& rhi() const { return *m_pipeline; }
     [[nodiscard]] const RHIGraphicsPipelinePtr& rhi_ptr() const { return m_pipeline; }
@@ -32,10 +32,13 @@ public:
     // Returns RHI_INVALID_BINDING for an unknown name.
     [[nodiscard]] RHIBindingId try_binding(std::string_view name) const;
     [[nodiscard]] uint32_t binding_count() const { return static_cast<uint32_t>(m_names.size()); }
+    // Built with a fallback pixel shader, which declares none of the resources the draws were written for.
+    [[nodiscard]] bool is_fallback() const { return m_fallback; }
 
 private:
     RHIGraphicsPipelinePtr m_pipeline;
     std::vector<std::string> m_names;
+    bool m_fallback;
 };
 
 } // namespace oryx

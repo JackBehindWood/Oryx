@@ -61,6 +61,14 @@ uint32_t MetalViewport::height() const
     return m_surface ? m_surface->height_px() : m_height;
 }
 
+void MetalViewport::set_vsync(bool vsync)
+{
+    if (m_surface)
+    {
+        m_surface->set_vsync(vsync);
+    }
+}
+
 void MetalViewport::resize(uint32_t width, uint32_t height, float scale)
 {
     if (m_surface)

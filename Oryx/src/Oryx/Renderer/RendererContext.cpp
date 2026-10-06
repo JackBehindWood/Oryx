@@ -44,6 +44,7 @@ UniquePtr<RendererContext> create_renderer_context(const RendererDesc& desc)
     context->shader_cache.set_slang_options({ shader_settings.slangc });
     context->shader_store = desc.shader_store;
     context->shader_cache.set_store(desc.shader_store);
+    context->shaders.set_error_fallback(shader_settings.error_fallback && context->shader_sources->mode() != ShaderSourceMode::Cooked);
     load_shaders(*context, false);
     context->defaults = create_default_resources(*context->rhi);
     context->batcher = create_unique<BatchRenderer2D>(batch_renderer_desc(*context, context->items));

@@ -21,6 +21,7 @@ struct RHIRetireState
     uint64_t serial = 0;
     std::vector<RHIDeviceLease*> leases;
     std::atomic<size_t> live{ 0 };
+    std::unordered_set<const RHIResource*> live_set;
 
     RHIRetireState() { entries.reserve(64); }
 
@@ -118,12 +119,18 @@ RHIRetireState& state()
 
 RHIResource::RHIResource()
 {
-    state().live.fetch_add(1, std::memory_order_relaxed);
+    RHIRetireState& queue = state();
+    std::lock_guard<std::mutex> lock(queue.mutex);
+    queue.live_set.insert(this);
+    queue.live.fetch_add(1, std::memory_order_relaxed);
 }
 
 RHIResource::~RHIResource()
 {
-    state().live.fetch_sub(1, std::memory_order_relaxed);
+    RHIRetireState& queue = state();
+    std::lock_guard<std::mutex> lock(queue.mutex);
+    queue.live_set.erase(this);
+    queue.live.fetch_sub(1, std::memory_order_relaxed);
 }
 
 void RHIResource::on_last_release() noexcept
@@ -143,6 +150,25 @@ void RHIResource::on_last_release() noexcept
 size_t RHIResource::live_count()
 {
     return state().live.load(std::memory_order_relaxed);
+}
+
+std::string RHIResource::live_report()
+{
+    RHIRetireState& queue = state();
+    std::map<std::string, size_t> counts;
+    {
+        std::lock_guard<std::mutex> lock(queue.mutex);
+        for (const RHIResource* resource : queue.live_set)
+        {
+            ++counts[typeid(*resource).name()];
+        }
+    }
+    std::string report;
+    for (const std::pair<const std::string, size_t>& entry : counts)
+    {
+        report += (report.empty() ? "" : ", ") + std::to_string(entry.second) + " x " + entry.first;
+    }
+    return report;
 }
 
 size_t RHIResource::retired_pending()
@@ -179,6 +205,10 @@ RHIDeviceLease::~RHIDeviceLease()
     if (last)
     {
         queue.drain();
+        if (queue.live.load() != 0)
+        {
+            OX_CORE_ERROR("RHI device destroyed with {} live resources: {}", queue.live.load(), RHIResource::live_report());
+        }
         OX_ASSERT(queue.live.load() == 0, "RHI device destroyed while RHI resources are still referenced");
     }
     else

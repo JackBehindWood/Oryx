@@ -22,6 +22,8 @@ struct BoardTheme2D
     float space_gap = 0.06f;
     // A piece's size as a fraction of its space's footprint.
     float piece_size = 0.64f;
+    // Null draws with Renderer::default_font().
+    Font* font = nullptr;
 };
 
 // Draws a scene through the Renderer facade; the caller opens and closes the scene with a pixel-unit Camera2D over layout.viewport.

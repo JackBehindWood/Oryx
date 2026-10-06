@@ -72,6 +72,9 @@ public:
     // Queues a draw for this frame; GraphicsLayer's end_frame records every queued item into the back-buffer pass, in submission order.
     static void submit(DrawItem item);
 
+    // The batcher behind the facade's begin_scene/draw_* calls; ScreenScene scopes its scenes.
+    [[nodiscard]] static BatchRenderer2D& batcher_2d();
+
     // Immediate-mode 2D drawing: primitives between begin_scene and end_scene are batched into DrawItems and submitted in call order.
     // draw_* outside a scene, a nested begin_scene and end_frame with a scene still open all throw Error. See BatchRenderer2D for the coordinate conventions.
     static void begin_scene(const Camera& camera);
@@ -94,8 +97,8 @@ public:
     // Counters of the frame being recorded; reset when the frame ring advances.
     [[nodiscard]] static const BatchStats& batch_stats();
 
-    // Called only by GraphicsLayer: records, submits and presents the frame, then advances the frame ring.
-    static void end_frame();
+    // Called only by GraphicsLayer: records, submits and presents the frame, then advances the frame ring. Returns whether anything was presented.
+    static bool end_frame();
 
 private:
     [[nodiscard]] static RendererContext& require_context();

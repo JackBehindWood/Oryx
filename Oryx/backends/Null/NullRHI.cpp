@@ -251,6 +251,7 @@ NullViewport::NullViewport(const RHIViewportDesc& desc)
     : m_format(desc.format)
     , m_width(desc.width)
     , m_height(desc.height)
+    , m_vsync(desc.vsync)
 {
 }
 
@@ -283,13 +284,15 @@ RHIRenderTargetPtr NullViewport::acquire_back_buffer()
     return m_back_buffer;
 }
 
-NullRHI::NullRHI()
+NullRHI::NullRHI(NullRHIOptions options)
+    : m_options(options)
 {
     m_capabilities.name = "Null";
     m_capabilities.max_texture_size = NULL_MAX_TEXTURE_SIZE;
     m_capabilities.frames_in_flight = NULL_FRAMES_IN_FLIGHT;
     m_capabilities.max_texture_bindings = RHI_MAX_TEXTURE_BINDINGS;
     m_frame_slots.resize(NULL_FRAMES_IN_FLIGHT);
+    m_slot_serials.assign(NULL_FRAMES_IN_FLIGHT, 0);
 }
 
 NullRHI::~NullRHI()
@@ -409,6 +412,17 @@ void NullRHI::resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t he
     null_viewport->resize(width, height);
 }
 
+void NullRHI::set_viewport_vsync(RHIViewport* viewport, bool vsync)
+{
+    rhi_require_non_null(viewport, "set_viewport_vsync");
+    NullViewport* null_viewport = dynamic_cast<NullViewport*>(viewport);
+    if (null_viewport == nullptr)
+    {
+        throw Error("RHI set_viewport_vsync received a viewport from a different backend");
+    }
+    null_viewport->set_vsync(vsync);
+}
+
 void NullRHI::submit(RHICommandList& commands)
 {
     if (commands.in_pass())
@@ -453,11 +467,31 @@ void NullRHI::present(RHIViewport* viewport, RHITexture* source)
 
 void NullRHI::end_frame()
 {
-    m_frame_slots[m_slot].clear();
+    if (m_fail_next_end_frame)
+    {
+        m_fail_next_end_frame = false;
+        const std::string group = m_stats.debug_events.empty() ? std::string("none") : m_stats.debug_events.back();
+        throw Error("NullRHI: injected command buffer failure", "frame serial " + std::to_string(RHIResource::frame_serial()) + ", last debug event " + group);
+    }
+    if (!m_options.simulate_latency)
+    {
+        m_frame_slots[m_slot].clear();
+        m_slot = (m_slot + 1) % m_frame_slots.size();
+        ++m_frame_count;
+        m_lease.end_frame();
+        m_lease.set_idle();
+        return;
+    }
+
+    m_slot_serials[m_slot] = m_lease.end_frame();
     m_slot = (m_slot + 1) % m_frame_slots.size();
     ++m_frame_count;
-    m_lease.end_frame();
-    m_lease.set_idle();
+    m_lease.begin_work();
+    if (m_frame_count >= m_frame_slots.size())
+    {
+        m_frame_slots[m_slot].clear();
+        m_lease.complete(m_slot_serials[m_slot]);
+    }
 }
 
 void NullRHI::wait_idle()

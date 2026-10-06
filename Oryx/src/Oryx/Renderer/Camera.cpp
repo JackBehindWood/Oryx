@@ -22,6 +22,13 @@ Camera2D::Camera2D(float viewport_width, float viewport_height)
     rebuild();
 }
 
+Camera2D Camera2D::screen_space(float width, float height)
+{
+    Camera2D camera(width, height);
+    camera.set_position({ width * 0.5f, height * 0.5f });
+    return camera;
+}
+
 void Camera2D::set_position(const Vec2f& position)
 {
     m_position = position;

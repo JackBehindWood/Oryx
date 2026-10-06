@@ -71,11 +71,49 @@ using SettingsAssigner = void (*)(void* to, void* from);
 
 void register_settings_section(std::string name, std::type_index type, SharedPtr<void> value, SettingsBuilder build, SettingsAssigner assign);
 
+void assign_settings(std::type_index type, void* edited);
+[[nodiscard]] uint64_t subscribe_settings(std::type_index type, std::function<void(const void*)> callback);
+void unsubscribe_settings(uint64_t id);
+
+// Unsubscribes on destruction; keep it as a member of whatever the callback captures.
+class SettingsSubscription
+{
+public:
+    SettingsSubscription() = default;
+    explicit SettingsSubscription(uint64_t id);
+    SettingsSubscription(SettingsSubscription&& other) noexcept;
+    SettingsSubscription& operator=(SettingsSubscription&& other) noexcept;
+    SettingsSubscription(const SettingsSubscription&) = delete;
+    SettingsSubscription& operator=(const SettingsSubscription&) = delete;
+    ~SettingsSubscription();
+
+    void reset();
+
+private:
+    uint64_t m_id = 0;
+};
+
 // The values of a registered section: its defaults until a settings file has been loaded.
 template<typename T>
 [[nodiscard]] const T& settings_of()
 {
     return *static_cast<const T*>(settings_value(std::type_index(typeid(T))));
+}
+
+// Calls `callback` with the section's values after every load, reload, reset and update_settings, changed or not; an Error it throws is logged and does not stop the other callbacks.
+template<typename T>
+[[nodiscard]] SettingsSubscription on_settings_changed(std::function<void(const T&)> callback)
+{
+    return SettingsSubscription(subscribe_settings(std::type_index(typeid(T)), [callback = std::move(callback)](const void* value) { callback(*static_cast<const T*>(value)); }));
+}
+
+// Edits a copy of the section and assigns it, then notifies; the settings file is not touched, so the next reload_settings restores the file's values.
+template<typename T>
+void update_settings(const std::function<void(T&)>& edit)
+{
+    T edited = settings_of<T>();
+    edit(edited);
+    assign_settings(std::type_index(typeid(T)), &edited);
 }
 
 // A section is a default-constructible, assignable, data-only struct plus `void read_settings(T&, const SettingsNode&)` next to it.

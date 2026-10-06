@@ -34,6 +34,7 @@ void read_settings(ShaderSettings& settings, const SettingsNode& node)
 {
     settings.root = node.path("root", settings.root);
     settings.slangc = node.path("slangc", settings.slangc);
+    settings.error_fallback = node.boolean("error_fallback", settings.error_fallback);
     if (node.has("source_mode"))
     {
         settings.source_mode = parse_mode(node.string("source_mode"));

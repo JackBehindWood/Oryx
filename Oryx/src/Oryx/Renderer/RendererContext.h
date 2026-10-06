@@ -58,7 +58,7 @@ void reload_shaders(RendererContext& context);
 void trim(RendererContext& context);
 
 // Records the queued items into the back-buffer pass, submits and presents, then advances the frame ring and recycles the batchers; clears the queue.
-// Throws Error while a batcher scene is still open.
-void record_frame(RendererContext& context);
+// Throws Error while a batcher scene is still open. Returns whether a back buffer was presented (false when the viewport is missing, zero-sized or hidden).
+bool record_frame(RendererContext& context);
 
 } // namespace oryx

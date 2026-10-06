@@ -6,9 +6,10 @@
 namespace oryx
 {
 
-GraphicsPipeline::GraphicsPipeline(RHIGraphicsPipelinePtr pipeline, std::vector<std::string> names)
+GraphicsPipeline::GraphicsPipeline(RHIGraphicsPipelinePtr pipeline, std::vector<std::string> names, bool fallback)
     : m_pipeline(std::move(pipeline))
     , m_names(std::move(names))
+    , m_fallback(fallback)
 {
     if (!m_pipeline)
     {

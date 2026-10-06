@@ -17,6 +17,7 @@ public:
     MetalViewport(const MetalDevice& device, const RHIViewportDesc& desc);
 
     void resize(uint32_t width, uint32_t height, float scale);
+    void set_vsync(bool vsync);
     [[nodiscard]] uint32_t width() const override;
     [[nodiscard]] uint32_t height() const override;
     [[nodiscard]] RHIFormat format() const override { return m_format; }

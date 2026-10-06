@@ -2,6 +2,7 @@
 #include "Oryx/Shaders/ShaderLibrary.h"
 
 #include "Oryx/Core/Error.h"
+#include "Oryx/Shaders/Builtin/ErrorShader.h"
 #include "Oryx/Shaders/Compiler/ShaderInclude.h"
 #include "Oryx/Shaders/Cache/ShaderMap.h"
 
@@ -67,12 +68,33 @@ void ShaderLibrary::compile(IRHI& rhi, ShaderCache& cache, const ShaderType& typ
         }
         catch (const Error& error)
         {
-            throw Error(std::string(type.name) + " (permutation " + std::to_string(permutation) + "): " + error.what());
+            const bool first_load = m_shaders.count({ type.type, permutation }) == 0;
+            if (!m_error_fallback || type.stage != ShaderStage::Pixel || !first_load)
+            {
+                throw Error(std::string(type.name) + " (permutation " + std::to_string(permutation) + "): " + error.what());
+            }
+            built[{ type.type, permutation }] = build_fallback(rhi, cache, type, permutation, error);
         }
     }
     for (std::pair<const std::pair<std::type_index, uint32_t>, ShaderPtr>& entry : built)
     {
         m_shaders[entry.first] = std::move(entry.second);
+    }
+}
+
+ShaderPtr ShaderLibrary::build_fallback(IRHI& rhi, ShaderCache& cache, const ShaderType& type, uint32_t permutation, const Error& cause) const
+{
+    OX_CORE_ERROR("{} (permutation {}) failed to compile, drawing magenta instead: {}", type.name, permutation, cause.what());
+    try
+    {
+        const ShaderCompilerOutput& output = cache.get_or_compile(error_pixel_shader_input());
+        ShaderPtr shader = type.create(rhi, output, permutation);
+        shader->m_fallback = true;
+        return shader;
+    }
+    catch (const Error& error)
+    {
+        throw Error(std::string(type.name) + " (permutation " + std::to_string(permutation) + "): " + cause.what(), std::string("the error shader failed as well: ") + error.what());
     }
 }
 

@@ -25,6 +25,7 @@ public:
     RHIRenderTargetPtr create_render_target(const RHIRenderTargetDesc& desc) override;
     RHIViewportPtr create_viewport(const RHIViewportDesc& desc) override;
     void resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t height, float scale) override;
+    void set_viewport_vsync(RHIViewport* viewport, bool vsync) override;
 
     void submit(RHICommandList& commands) override;
     void present(RHIViewport* viewport, RHITexture* source = nullptr) override;

@@ -37,6 +37,8 @@ public:
     virtual void upload_buffer(RHIBuffer* buffer, uint32_t offset, const uint8_t* data, uint32_t data_size) = 0;
     // Size is in pixels; zero is allowed (the viewport then has no back buffer). The next acquire_back_buffer returns a buffer of the new size; frames in flight keep theirs.
     virtual void resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t height, float scale) = 0;
+    // Takes effect from the next present; a headless viewport only records it.
+    virtual void set_viewport_vsync(RHIViewport* viewport, bool vsync) = 0;
 
     // Consumes the list: its retained resources move to the current frame and stay alive until that frame completes.
     virtual void submit(RHICommandList& commands) = 0;

@@ -102,7 +102,7 @@ TEST_CASE("Renderer: a presented frame is bracketed by balanced Frame and BackBu
     NullRHI& rhi = static_cast<NullRHI&>(Renderer::rhi());
     RHIViewportPtr viewport = rhi.create_viewport({ .width = 8, .height = 8 });
     Renderer::set_viewport(viewport);
-    Renderer::end_frame();
+    CHECK(Renderer::end_frame());
     CHECK(rhi.last_submission() == std::vector<std::string_view>{ "PushDebugGroup", "BeginPass", "PushDebugGroup", "PopDebugGroup", "EndPass", "PopDebugGroup" });
     viewport.reset();
     Renderer::set_viewport({});
@@ -115,7 +115,7 @@ TEST_CASE("Renderer: zero-size viewport drops the frame")
     NullRHI& rhi = static_cast<NullRHI&>(Renderer::rhi());
     RHIViewportPtr viewport = rhi.create_viewport({ .width = 0, .height = 0 });
     Renderer::set_viewport(viewport);
-    Renderer::end_frame();
+    CHECK_FALSE(Renderer::end_frame());
     CHECK(rhi.submit_count() == 0);
     Renderer::set_viewport({});
 }
@@ -538,4 +538,36 @@ TEST_CASE("Renderer: begin_scene, draw and end_scene record one pass of batched 
     CHECK_THROWS_AS(Renderer::end_frame(), Error);
     Renderer::end_scene();
     Renderer::end_frame();
+}
+
+TEST_CASE("record_draw_item draws textured items through a fallback pixel shader")
+{
+    RendererGuard guard;
+    Renderer::init({ RHIBackend::Null });
+    RecordFixture fixture;
+    GraphicsPipelineDesc quad = pipeline_desc(pipeline_def(Primitive2D::Quad), Renderer::shaders(), Renderer::back_buffer_format());
+    CHECK_FALSE(quad.shaders.pixel->is_fallback());
+
+    ShaderType broken;
+    for (const ShaderType& type : registered_shader_types())
+    {
+        if (type.type == std::type_index(typeid(QuadPS)))
+        {
+            broken = type;
+        }
+    }
+    broken.source = "/Missing/Quad.slang";
+    ShaderLibrary library;
+    library.set_error_fallback(true);
+    ShaderCache cache;
+    library.compile(fixture.rhi, cache, broken);
+    quad.shaders.pixel = library.get<QuadPS>();
+    REQUIRE(quad.shaders.pixel->is_fallback());
+
+    DrawItem item = fixture.item(quad);
+    draw_item_add_texture(item, fixture.defaults.white_texture);
+    CHECK(fixture.cache.resolve(item.pipeline).is_fallback());
+    CHECK_NOTHROW(record_draw_item(fixture.commands, item, fixture.cache, fixture.defaults));
+    CHECK(fixture.count("BindTexture") == 0);
+    CHECK(fixture.count("Draw") == 1);
 }

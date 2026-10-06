@@ -95,6 +95,8 @@ public:
     explicit NullViewport(const RHIViewportDesc& desc);
 
     void resize(uint32_t width, uint32_t height);
+    void set_vsync(bool vsync) { m_vsync = vsync; }
+    [[nodiscard]] bool vsync() const { return m_vsync; }
     [[nodiscard]] uint32_t width() const override { return m_width; }
     [[nodiscard]] uint32_t height() const override { return m_height; }
     [[nodiscard]] RHIFormat format() const override { return m_format; }
@@ -105,6 +107,7 @@ private:
     RHIFormat m_format;
     uint32_t m_width;
     uint32_t m_height;
+    bool m_vsync;
     Ref<NullRenderTarget> m_back_buffer;
 };
 
@@ -121,11 +124,17 @@ struct NullStats
     std::vector<std::string> debug_events;
 };
 
+struct NullRHIOptions
+{
+    // A frame's resources stay alive until its ring slot is re-entered, as with a GPU `frames_in_flight` deep; off retires them at end_frame.
+    bool simulate_latency = true;
+};
+
 // Headless device: real CPU-side storage and clears, no GPU. Test-visible counters expose what was submitted.
 class NullRHI final : public IRHI
 {
 public:
-    NullRHI();
+    explicit NullRHI(NullRHIOptions options = {});
     ~NullRHI() override;
 
     [[nodiscard]] RHIBackend backend() const override { return RHIBackend::Null; }
@@ -140,6 +149,7 @@ public:
     RHIRenderTargetPtr create_render_target(const RHIRenderTargetDesc& desc) override;
     RHIViewportPtr create_viewport(const RHIViewportDesc& desc) override;
     void resize_viewport(RHIViewport* viewport, uint32_t width, uint32_t height, float scale) override;
+    void set_viewport_vsync(RHIViewport* viewport, bool vsync) override;
 
     void submit(RHICommandList& commands) override;
     void present(RHIViewport* viewport, RHITexture* source = nullptr) override;
@@ -154,6 +164,8 @@ public:
     [[nodiscard]] const std::vector<std::string_view>& last_submission() const { return m_last_submission; }
     [[nodiscard]] size_t frame_count() const { return m_frame_count; }
     [[nodiscard]] const NullStats& stats() const { return m_stats; }
+    // The next end_frame throws as a lost device or failed command buffer would, without advancing the frame ring.
+    void fail_next_end_frame() { m_fail_next_end_frame = true; }
 
 private:
     // Declared first so it is destroyed last: it drains retired resources once the device is gone.
@@ -161,6 +173,9 @@ private:
     RHICapabilities m_capabilities;
     // One reusable slot per frame in flight; the slot's capacity survives present.
     std::vector<std::vector<Ref<RHIResource>>> m_frame_slots;
+    std::vector<uint64_t> m_slot_serials;
+    NullRHIOptions m_options;
+    bool m_fail_next_end_frame = false;
     size_t m_slot = 0;
     std::vector<std::string_view> m_last_submission;
     size_t m_submit_count = 0;
