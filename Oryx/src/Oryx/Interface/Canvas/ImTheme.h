@@ -17,7 +17,12 @@ struct ImStyle
     Colour hover = { 0.22f, 0.24f, 0.29f, 1.0f };
     Colour pressed = { 0.12f, 0.13f, 0.16f, 1.0f };
     Colour border = { 0.32f, 0.34f, 0.40f, 1.0f };
+    // Marks, fills of the chosen part of a control, and the focus ring; never a resting surface.
     Colour accent = { 0.30f, 0.56f, 0.95f, 1.0f };
+    // A glyph or text drawn on an accent fill.
+    Colour on_accent = { 0.05f, 0.06f, 0.08f, 1.0f };
+    // The fill of a chosen row or tab; quieter than the accent so the text stays readable on it.
+    Colour selected = { 0.18f, 0.30f, 0.52f, 1.0f };
     float radius = 4.0f;
     float border_width = 1.0f;
     float text_height = 16.0f;

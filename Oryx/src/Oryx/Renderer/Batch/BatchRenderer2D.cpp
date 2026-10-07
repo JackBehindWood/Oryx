@@ -54,6 +54,11 @@ RHIScissorRect intersect(const RHIScissorRect& a, const RHIScissorRect& b)
     return { static_cast<int32_t>(left), static_cast<int32_t>(top), static_cast<uint32_t>(right - left), static_cast<uint32_t>(bottom - top) };
 }
 
+uint8_t to_byte(float value)
+{
+    return static_cast<uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
+}
+
 template<typename T, size_t N>
 void write(uint8_t* destination, const T (&vertices)[N])
 {
@@ -237,6 +242,125 @@ void BatchRenderer2D::write_quad_uvs(const Vec2f (&corners)[4], const Vec2f (&uv
         vertices[i] = { base_vertex(corners[i], colour), uvs[i], slot };
     }
     write(append(), vertices);
+}
+
+void BatchRenderer2D::write_ui(const Vec2f (&corners)[4], const Vec2f (&uvs)[4], const Colour& colour, const UiPrimitive& primitive)
+{
+    if (culled())
+    {
+        return;
+    }
+    const RHITexturePtr& texture = primitive.texture != nullptr ? *primitive.texture : defaults().white_texture;
+    static const RHISamplerPtr none;
+    select(m_streams[static_cast<uint32_t>(Primitive2D::Ui)], primitive.sampler != nullptr ? *primitive.sampler : none);
+    const float slot = static_cast<float>(acquire_texture(texture));
+    Vertex2DUi vertices[4];
+    for (uint32_t i = 0; i < 4; ++i)
+    {
+        Vertex2DUi& vertex = vertices[i];
+        vertex.position = corners[i];
+        vertex.uv = uvs[i];
+        vertex.colour[0] = to_byte(colour.r);
+        vertex.colour[1] = to_byte(colour.g);
+        vertex.colour[2] = to_byte(colour.b);
+        vertex.colour[3] = to_byte(colour.a);
+        vertex.control[0] = static_cast<uint8_t>(slot);
+        vertex.control[1] = static_cast<uint8_t>(primitive.mode);
+        vertex.control[2] = to_byte(primitive.thickness);
+        vertex.control[3] = static_cast<uint8_t>(std::clamp(primitive.px_range + 0.5f, 0.0f, 255.0f));
+        for (uint32_t corner = 0; corner < 4; ++corner)
+        {
+            vertex.radii[corner] = to_byte(primitive.radii[corner]);
+        }
+    }
+    write(append(), vertices);
+}
+
+void BatchRenderer2D::draw_ui_quad(const Vec2f (&corners)[4], const Colour& colour)
+{
+    const Vec2f uvs[4] = { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f } };
+    write_ui(corners, uvs, colour, {});
+}
+
+void BatchRenderer2D::draw_ui_image(const Vec2f& position, const Vec2f& size, const Texture2D& texture, const Colour& tint, const Vec2f& uv_min, const Vec2f& uv_max)
+{
+    Vec2f corners[4];
+    rect_corners(position, size, 0.0f, corners);
+    Vec2f uvs[4];
+    quad_uvs(uv_min, uv_max, uvs);
+    UiPrimitive primitive;
+    primitive.texture = &texture.texture();
+    primitive.sampler = &texture.sampler();
+    write_ui(corners, uvs, tint, primitive);
+}
+
+void BatchRenderer2D::draw_ui_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style)
+{
+    require_open();
+    if (!font.ready() || culled())
+    {
+        return;
+    }
+    GlyphAtlas& atlas = font.atlas(style.pixel_height);
+    const Texture2D& atlas_texture = atlas.texture(rhi());
+    const float px_range = atlas.data().px_range();
+    float align_offset = 0.0f;
+    if (style.align != TextAlign::Left)
+    {
+        TextExtent extent = layout_text(atlas.data(), text, style.scale, [](const Glyph&, const Vec2f&) {});
+        align_offset = style.align == TextAlign::Centre ? -0.5f * extent.width : -extent.width;
+    }
+    UiPrimitive primitive;
+    primitive.texture = &atlas_texture.texture();
+    primitive.sampler = &atlas_texture.sampler();
+    primitive.mode = px_range > 0.0f ? UiMode::Distance : UiMode::Coverage;
+    primitive.px_range = px_range;
+    layout_text(atlas.data(), text, style.scale, [&](const Glyph& glyph, const Vec2f& pen) {
+        if (glyph.size[0] <= 0.0f || glyph.size[1] <= 0.0f)
+        {
+            return;
+        }
+        const float x0 = position[0] + align_offset + pen[0] + glyph.bearing[0] * style.scale;
+        const float y0 = position[1] + pen[1] + glyph.bearing[1] * style.scale;
+        const float x1 = x0 + glyph.size[0] * style.scale;
+        const float y1 = y0 + glyph.size[1] * style.scale;
+        const Vec2f corners[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } };
+        Vec2f uvs[4];
+        quad_uvs(glyph.uv_min, glyph.uv_max, uvs);
+        write_ui(corners, uvs, style.colour, primitive);
+    });
+}
+
+void BatchRenderer2D::write_ui_shape(const Vec2f& position, const Vec2f& size, const float (&radii)[4], float thickness, UiMode mode, const Colour& colour)
+{
+    const float min_half = math::min(size[0], size[1]) * 0.5f;
+    if (!(min_half > 0.0f))
+    {
+        return;
+    }
+    const float hx = size[0] * 0.5f + UI_SHAPE_MARGIN;
+    const float hy = size[1] * 0.5f + UI_SHAPE_MARGIN;
+    Vec2f corners[4];
+    rect_corners(position, { hx * 2.0f, hy * 2.0f }, 0.0f, corners);
+    const Vec2f local[4] = { { -hx, -hy }, { hx, -hy }, { hx, hy }, { -hx, hy } };
+    UiPrimitive primitive;
+    primitive.mode = mode;
+    primitive.thickness = thickness / min_half;
+    for (uint32_t corner = 0; corner < 4; ++corner)
+    {
+        primitive.radii[corner] = radii[corner] / min_half;
+    }
+    write_ui(corners, local, colour, primitive);
+}
+
+void BatchRenderer2D::draw_ui_rounded(const Vec2f& position, const Vec2f& size, const float (&radii)[4], const Colour& colour)
+{
+    write_ui_shape(position, size, radii, 0.0f, UiMode::RoundedFill, colour);
+}
+
+void BatchRenderer2D::draw_ui_border(const Vec2f& position, const Vec2f& size, const float (&radii)[4], float thickness, const Colour& colour)
+{
+    write_ui_shape(position, size, radii, thickness, UiMode::RoundedBorder, colour);
 }
 
 RHIScissorRect BatchRenderer2D::to_pixels(const Vec2f& position, const Vec2f& size) const

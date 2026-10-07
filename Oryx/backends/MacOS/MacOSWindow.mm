@@ -68,13 +68,20 @@ MacOSWindow::MacOSWindow(WindowDesc desc)
 
     glfwSetKeyCallback(m_window, [](GLFWwindow* window, int key, int, int action, int)
     {
+        KeyCode code = static_cast<KeyCode>(key);
         if (action == GLFW_REPEAT)
         {
+            owner(window).m_input.set_key_repeat(code);
             return;
         }
-        KeyCode code = static_cast<KeyCode>(key);
         bool down = action == GLFW_PRESS;
         owner(window).m_input.set_key(code, down);
+        const bool paste = down && code == KeyCode::V && (glfwGetKey(window, GLFW_KEY_LEFT_SUPER) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SUPER) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
+        if (paste)
+        {
+            const char* clip = glfwGetClipboardString(window);
+            owner(window).m_input.set_paste_text(clip != nullptr ? std::string_view(clip) : std::string_view());
+        }
         if (down)
         {
             post(KeyPressedEvent(code));
@@ -84,6 +91,8 @@ MacOSWindow::MacOSWindow(WindowDesc desc)
             post(KeyReleasedEvent(code));
         }
     });
+
+    glfwSetCharCallback(m_window, [](GLFWwindow* window, unsigned int codepoint) { owner(window).m_input.add_text(codepoint); });
 
     glfwSetMouseButtonCallback(m_window, [](GLFWwindow* window, int button, int action, int)
     {
@@ -115,11 +124,46 @@ MacOSWindow::MacOSWindow(WindowDesc desc)
 
 MacOSWindow::~MacOSWindow()
 {
+    for (GLFWcursor* cursor : m_cursors)
+    {
+        if (cursor != nullptr)
+        {
+            glfwDestroyCursor(cursor);
+        }
+    }
     glfwDestroyWindow(m_window);
     if (--g_glfw_users == 0)
     {
         glfwTerminate();
     }
+}
+
+void MacOSWindow::set_cursor_kind(CursorKind kind)
+{
+    static constexpr int k_shapes[5] = { GLFW_ARROW_CURSOR, GLFW_POINTING_HAND_CURSOR, GLFW_RESIZE_EW_CURSOR, GLFW_RESIZE_NS_CURSOR, GLFW_IBEAM_CURSOR };
+    if (kind == m_cursor_kind)
+    {
+        return;
+    }
+    GLFWcursor*& cursor = m_cursors[static_cast<size_t>(kind)];
+    if (cursor == nullptr && kind != CursorKind::Arrow)
+    {
+        cursor = glfwCreateStandardCursor(k_shapes[static_cast<size_t>(kind)]);
+    }
+    glfwSetCursor(m_window, cursor);
+    m_cursor_kind = kind;
+}
+
+std::string MacOSWindow::clipboard_text() const
+{
+    const char* clip = glfwGetClipboardString(m_window);
+    return clip != nullptr ? std::string(clip) : std::string();
+}
+
+void MacOSWindow::set_clipboard_text(std::string_view text)
+{
+    const std::string copy(text);
+    glfwSetClipboardString(m_window, copy.c_str());
 }
 
 bool MacOSWindow::should_close() const

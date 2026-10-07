@@ -44,6 +44,9 @@ private:
     void replay_view();
     void replay_streams();
     void widgets();
+    void inputs();
+    void style();
+    void apply_theme();
     void data();
     void update_series(float delta_time);
     void ensure_image();
@@ -65,7 +68,7 @@ private:
     float m_wave[96] = {};
     float m_policy[9] = {};
     uint32_t m_tab = 0;
-    bool m_show_tab[3] = { true, true, true };
+    bool m_show_tab[5] = { true, true, true, true, true };
     bool m_show_frame = true;
     bool m_show_renderer = true;
     bool m_show_flushes = false;
@@ -83,6 +86,24 @@ private:
     uint32_t m_cell = oryx::gui::k_no_index;
     std::vector<TableRow> m_rows;
     int32_t m_row = -1;
+    int32_t m_edit_row = -1;
+    bool m_cell_edit = false;
+    bool m_minimised = false;
+    int32_t m_theme = 0;
+    int32_t m_applied_theme = -1;
+    float m_scale = 1.0f;
+    float m_applied_scale = 0.0f;
+    bool m_disable = false;
+    char m_text[64] = "Hello, Oryx";
+    char m_filter[32] = {};
+    float m_number = 1.5f;
+    int32_t m_integer = 7;
+    float m_entry_slider = 0.25f;
+    float m_entry_drag = 12.0f;
+    oryx::Selection m_list_selection;
+    uint64_t m_list_words[8] = {};
+    oryx::Selection m_row_selection;
+    uint64_t m_row_words[16] = {};
 };
 
 } // namespace oasis

@@ -125,6 +125,7 @@ public:
 protected:
     BatchStreamId register_stream(const BatchStreamDesc& stream);
 
+    // A null sampler means the primitive does not care (it samples a flat texel) and joins whatever sampler the pending batch has.
     // Primitives are added as select -> acquire_texture (textured streams) -> append; only the first two may flush, so a slot index stays valid until append.
     void select(BatchStreamId stream, const RHISamplerPtr& sampler);
     [[nodiscard]] uint32_t acquire_texture(const RHITexturePtr& texture);

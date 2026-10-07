@@ -27,6 +27,11 @@ constexpr KeyMapping k_key_mappings[] = {
     { KeyCode::End, ImKey::End },
     { KeyCode::PageUp, ImKey::PageUp },
     { KeyCode::PageDown, ImKey::PageDown },
+    { KeyCode::Space, ImKey::Space },
+    { KeyCode::A, ImKey::A },
+    { KeyCode::C, ImKey::C },
+    { KeyCode::V, ImKey::V },
+    { KeyCode::X, ImKey::X },
 };
 
 bool either_down(const IInput& input, KeyCode left, KeyCode right)
@@ -60,11 +65,19 @@ ImInput make_im_input(const IInput& input, uint32_t surface, const Vec2f& surfac
     {
         result.keys.down |= input.key_down(mapping.code) ? im_key_bit(mapping.key) : 0u;
         result.keys.pressed |= input.key_pressed(mapping.code) ? im_key_bit(mapping.key) : 0u;
+        result.keys.repeated |= input.key_repeated(mapping.code) ? im_key_bit(mapping.key) : 0u;
     }
     result.keys.ctrl = either_down(input, KeyCode::LeftControl, KeyCode::RightControl);
     result.keys.shift = either_down(input, KeyCode::LeftShift, KeyCode::RightShift);
     result.keys.alt = either_down(input, KeyCode::LeftAlt, KeyCode::RightAlt);
     result.keys.super = either_down(input, KeyCode::LeftSuper, KeyCode::RightSuper);
+#if defined(OX_PLATFORM_MACOS)
+    result.keys.shortcut = result.keys.super;
+#else
+    result.keys.shortcut = result.keys.ctrl;
+#endif
+    result.text = input.typed_text();
+    result.paste = input.paste_text();
     return result;
 }
 

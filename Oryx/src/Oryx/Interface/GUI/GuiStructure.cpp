@@ -92,7 +92,7 @@ bool header_impl(std::string_view label, bool* visible, bool default_open, const
         return false;
     }
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::header);
     const ImId id = ctx.id(label);
     ctx.push_id(id);
     const ImId close_id = ctx.id("close");
@@ -147,7 +147,7 @@ bool collapsing_header(std::string_view label, bool* visible, bool default_open,
 TreeNodeResult begin_tree_node(std::string_view label, const TreeNodeOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
     const ImId id = ctx.id(label);
     const ItemState state = ctx.item(id);
     const bool open = !options.leaf && toggled_open(ctx, id, options.default_open, state.clicked);
@@ -164,7 +164,7 @@ TreeNodeResult begin_tree_node(std::string_view label, const TreeNodeOptions& op
     const uint32_t index = ctx.begin_box(label, row);
     LayoutNode& node = ctx.layout().node(index);
     node.paint.has_fill = options.selected || state.hovered;
-    node.paint.fill = state.held ? style.pressed : options.selected ? style.accent : style.hover;
+    node.paint.fill = options.selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : style.hover;
     node.paint.radius = uniform_radius(style.radius);
     std::ignore = begin_icon_box(ctx, ImId{}, options.leaf ? Icon::None : open ? Icon::ChevronDown : Icon::ChevronRight, muted(style.text), 12.0f);
     ctx.end_box();
@@ -245,16 +245,17 @@ void end_scroll()
         {
             state.offset = math::clamp(state.offset + drag.delta[1] * max_offset / travel, 0.0f, max_offset);
         }
+        const ImStyle& style = theme.scroll;
+        const float width = thumb.hovered || thumb.held ? theme.scrollbar_width : theme.scrollbar_width * 0.6f;
         LayoutStyle bar;
-        bar.width = fixed(theme.scrollbar_width);
+        bar.width = fixed(width);
         bar.height = fixed(thumb_height);
         bar.floating = { true, AttachPoint::TopRight, AttachPoint::TopRight, FloatTarget::Parent, {}, { 0.0f, thumb_y } };
-        const ImStyle& style = ctx.theme().base;
         const uint32_t index = ctx.begin_box(thumb_id, bar);
         BoxPaint& paint = ctx.layout().node(index).paint;
         paint.has_fill = true;
         paint.fill = im::interaction_fill(style, thumb, style.border);
-        paint.radius = uniform_radius(theme.scrollbar_width * 0.5f);
+        paint.radius = uniform_radius(width * 0.5f);
         ctx.end_box();
     }
     ScrollState& state = ctx.state<ScrollState>(id);
@@ -274,7 +275,7 @@ void end_scroll()
 
 TabBarScope::TabBarScope(std::string_view name, uint32_t& selected, const TabBarOptions& options)
     : m_selected(selected)
-    , m_style(&im::resolved_style(context(), options))
+    , m_style(&context().role_style(options, &GuiTheme::tab))
     , m_closable(options.closable)
 {
     GuiContext& ctx = context();
@@ -319,7 +320,13 @@ bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
     LayoutStyle box = im::default_box(style);
     box.gap = style.padding.left * 0.5f;
     const uint32_t node_index = ctx.begin_box(tab_id, box);
-    im::paint_surface(ctx.layout().node(node_index).paint, style, im::interaction_fill(style, tab, index == m_selected ? style.accent : style.background));
+    const bool chosen = index == m_selected;
+    im::paint_surface(ctx.layout().node(node_index).paint, style, im::interaction_fill(style, tab, chosen ? style.selected : style.background));
+    ctx.layout().node(node_index).paint.border_width = 0.0f;
+    if (tab.hovered)
+    {
+        ctx.request_cursor(CursorShape::Hand);
+    }
     ItemState close;
     if (closable)
     {
@@ -338,6 +345,17 @@ bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
         ctx.layout().node(node_index).paint.text = ctx.arena().store(label);
         ctx.layout().node(node_index).paint.text_height = style.text_height;
         ctx.layout().node(node_index).paint.text_colour = style.text;
+    }
+    if (chosen)
+    {
+        LayoutStyle underline;
+        underline.width = grow();
+        underline.height = fixed(2.0f);
+        underline.floating = { true, AttachPoint::BottomLeft, AttachPoint::BottomLeft, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
+        const uint32_t line_index = ctx.begin_box(ImId{}, underline);
+        ctx.layout().node(line_index).paint.has_fill = true;
+        ctx.layout().node(line_index).paint.fill = style.accent;
+        ctx.end_box();
     }
     ctx.end_box();
     if (tab.pressed && !close.hovered)
@@ -365,7 +383,7 @@ bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
 bool splitter(std::string_view name, float& first_size, const SplitterOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = ctx.theme().base;
+    const ImStyle& style = ctx.gui_theme().panel;
     const ImId id = ctx.id(name);
     const ItemState state = ctx.item(id);
     const ItemDrag drag = ctx.item_drag(id);
@@ -444,7 +462,7 @@ ListBoxScope::ListBoxScope(std::string_view name, const ListBoxOptions& options,
 {
     if (options.item_count > 0)
     {
-        m_row = im::default_box(im::resolved_style(context(), options));
+        m_row = im::default_box(context().role_style(options, &GuiTheme::panel));
         m_row.width = grow();
         m_row.height = fixed(options.item_height);
         m_row.align_y = Align::Centre;

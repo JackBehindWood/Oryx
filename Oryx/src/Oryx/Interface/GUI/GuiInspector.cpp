@@ -30,7 +30,7 @@ void outline(GuiContext& ctx, const Rect& rect, const Colour& colour)
 void inspector(std::string_view name, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::overlay);
     const ImStats stats = ctx.stats();
     const ImId hovered = ctx.input().pointer.valid ? ctx.item_at(ctx.input().pointer.position) : ImId{};
     Rect rect;

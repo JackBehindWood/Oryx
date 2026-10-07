@@ -14,8 +14,10 @@ constexpr float k_panel_width = 340.0f;
 constexpr float k_panel_margin = 8.0f;
 constexpr uint32_t k_image_size = 32;
 constexpr float k_frame_budget_ms = 1000.0f / 60.0f;
-const char* const k_tabs[] = { "Perf", "Widgets", "Data" };
-constexpr uint32_t k_tab_count = 3;
+const char* const k_tabs[] = { "Perf", "Widgets", "Inputs", "Data", "Style" };
+constexpr uint32_t k_tab_count = 5;
+const char* const k_theme_names[] = { "dark", "light", "high contrast" };
+const std::string_view k_names[] = { "Tic-Tac-Toe", "Hexapawn", "Connect Four", "Nim", "Checkers", "Go", "Chess", "Othello", "Gomoku", "Backgammon" };
 constexpr uint32_t k_list_items = 500;
 const char* const k_flush_reasons[FLUSH_REASON_COUNT] = { "explicit", "end", "stream change", "sampler change", "texture slots full", "index limit", "scissor change" };
 const char* const k_command_kinds[6] = { "rect", "rounded", "border", "line", "text", "image" };
@@ -109,8 +111,24 @@ void GuiShowcase::set_font(Font* font)
 {
     GuiTheme theme = m_context.gui_theme();
     theme.font = font;
-    theme.min_hit_size = 18.0f;
     m_context.set_theme(theme);
+    m_applied_theme = m_theme;
+    m_applied_scale = m_scale;
+}
+
+void GuiShowcase::apply_theme()
+{
+    const bool theme_changed = m_theme != m_applied_theme;
+    const bool scale_changed = m_scale != m_applied_scale && !button_of(m_context.input(), MouseCode::Left).down;
+    if (!theme_changed && !scale_changed)
+    {
+        return;
+    }
+    GuiTheme theme = m_theme == 1 ? light_gui_theme() : m_theme == 2 ? high_contrast_gui_theme() : dark_gui_theme();
+    theme.font = m_context.gui_theme().font;
+    m_context.set_theme(scale_gui_theme(theme, m_scale));
+    m_applied_theme = m_theme;
+    m_applied_scale = m_scale;
 }
 
 void GuiShowcase::ensure_image()
@@ -150,6 +168,14 @@ void GuiShowcase::frame(const FrameInfo& info)
     m_window = info.logical;
     const Numbers numbers{ Renderer::last_frame_stats(), Renderer::pipeline_cache_stats() };
     run(make_im_input(info.input, 0, info.logical, info.scale, static_cast<float>(info.delta_time)), numbers);
+    if (Window* window = Application::Get().window())
+    {
+        window->set_cursor_kind(static_cast<CursorKind>(m_context.output().cursor));
+        if (!m_context.output().copy_text.empty())
+        {
+            window->set_clipboard_text(m_context.output().copy_text);
+        }
+    }
     Renderer::scene().submit(*this);
 }
 
@@ -202,6 +228,7 @@ void GuiShowcase::run(const ImInput& input, const Numbers& numbers)
         Timer timer;
         timer.start();
         m_context.begin_frame(input);
+        apply_theme();
         build(numbers);
         m_build_ms = lap_ms(timer);
         m_context.end_frame();
@@ -218,7 +245,27 @@ void GuiShowcase::run(const ImInput& input, const Numbers& numbers)
 void GuiShowcase::build(const Numbers& numbers)
 {
     const Vec2f surface = m_context.input().surface_size;
-    LayoutStyle layout = gui::anchored(AttachPoint::TopRight, fixed(k_panel_width), fixed(math::max(surface[1] - 2.0f * k_panel_margin, 0.0f)), { -k_panel_margin, k_panel_margin });
+    if (m_minimised)
+    {
+        LayoutStyle mini = gui::anchored(AttachPoint::TopRight, fit(), fit(), { -k_panel_margin, k_panel_margin });
+        mini.direction = Direction::Row;
+        mini.padding = uniform_insets(6.0f);
+        mini.gap = gui::spacing();
+        mini.align_y = Align::Centre;
+        gui::WidgetOptions mini_options;
+        mini_options.layout = &mini;
+        {
+            gui::PanelScope panel("showcase minimised", mini_options);
+            gui::label("GUI showcase");
+            if (gui::small_button("+").clicked)
+            {
+                m_minimised = false;
+            }
+        }
+        gui::show_toasts();
+        return;
+    }
+    LayoutStyle layout = gui::anchored(AttachPoint::TopRight, fixed(k_panel_width * m_applied_scale), fixed(math::max(surface[1] - 2.0f * k_panel_margin, 0.0f)), { -k_panel_margin, k_panel_margin });
     layout.direction = Direction::Column;
     layout.padding = uniform_insets(8.0f);
     layout.gap = gui::spacing();
@@ -226,12 +273,20 @@ void GuiShowcase::build(const Numbers& numbers)
     options.layout = &layout;
     {
         gui::PanelScope panel("showcase", options);
-        gui::label("GUI showcase (temporary)");
+        {
+            gui::RowScope title("title", { .width = grow(), .align = Align::Centre });
+            gui::label("GUI showcase (temporary)");
+            gui::spacer();
+            if (gui::small_button("-").clicked)
+            {
+                m_minimised = true;
+            }
+        }
         {
             gui::TabBarScope tabs("tabs", m_tab);
             for (uint32_t index = 0; index < k_tab_count; ++index)
             {
-                std::ignore = tabs.tab(k_tabs[index], &m_show_tab[index]);
+                tabs.tab(k_tabs[index], &m_show_tab[index]);
             }
         }
         for (uint32_t index = 0; index < k_tab_count; ++index)
@@ -272,9 +327,17 @@ void GuiShowcase::build(const Numbers& numbers)
         {
             widgets();
         }
-        else
+        else if (m_tab == 2)
+        {
+            inputs();
+        }
+        else if (m_tab == 3)
         {
             data();
+        }
+        else
+        {
+            style();
         }
     }
     gui::show_toasts();
@@ -386,12 +449,12 @@ void GuiShowcase::perf(const Numbers& numbers)
 {
     {
         gui::RowScope row("panels", { .gap = 6.0f });
-        std::ignore = gui::checkbox("frame", m_show_frame);
-        std::ignore = gui::checkbox("renderer", m_show_renderer);
-        std::ignore = gui::checkbox("flushes", m_show_flushes);
-        std::ignore = gui::checkbox("gui", m_show_gui);
-        std::ignore = gui::checkbox("replay", m_show_replay);
-        std::ignore = gui::checkbox("inspector", m_show_inspector);
+        gui::checkbox("frame", m_show_frame);
+        gui::checkbox("renderer", m_show_renderer);
+        gui::checkbox("flushes", m_show_flushes);
+        gui::checkbox("gui", m_show_gui);
+        gui::checkbox("replay", m_show_replay);
+        gui::checkbox("inspector", m_show_inspector);
     }
     const FrameStats& frame = numbers.frame;
     const BatchStats& batch = frame.batch;
@@ -482,17 +545,25 @@ void GuiShowcase::widgets()
             gui::toast("Hello from the GUI", 2.0f);
         }
         gui::tooltip(button, "Shows a message for two seconds");
-        std::ignore = gui::checkbox("checkbox", m_flag);
-        std::ignore = gui::radio("first", m_radio, 0);
-        std::ignore = gui::radio("second", m_radio, 1);
+        gui::checkbox("checkbox", m_flag);
+        gui::radio("first", m_radio, 0);
+        gui::radio("second", m_radio, 1);
         gui::badge("badge", { 0.0f, 0.62f, 0.45f, 1.0f });
         gui::progress("progress", m_slider, {});
     }
+    if (gui::collapsing_header("disabled", false))
+    {
+        gui::checkbox("disable the controls below", m_disable);
+        gui::DisabledScope off(m_disable);
+        gui::button("Button");
+        gui::checkbox("checkbox (off)", m_flag);
+        gui::slider_float("slider (off)", m_slider, 0.0f, 1.0f);
+    }
     if (gui::collapsing_header("input", true))
     {
-        std::ignore = gui::slider_float("slider", m_slider, 0.0f, 1.0f);
-        std::ignore = gui::slider_int("count", m_count, 0, 10);
-        std::ignore = gui::drag_float("drag", m_drag, 0.0f, 100.0f);
+        gui::slider_float("slider", m_slider, 0.0f, 1.0f);
+        gui::slider_int("count", m_count, 0, 10);
+        gui::drag_float("drag", m_drag, 0.0f, 100.0f);
         {
             gui::ComboScope combo("game", k_games[m_combo]);
             for (int32_t index = 0; index < 3; ++index)
@@ -501,14 +572,6 @@ void GuiShowcase::widgets()
                 {
                     m_combo = index;
                 }
-            }
-        }
-        gui::ListBoxScope list("list, 500 items", { .item_count = k_list_items });
-        for (uint32_t index = list.first_item(); index < list.last_item(); ++index)
-        {
-            if (list.item(index, m_context.arena().format("item %u", index), static_cast<int32_t>(index) == m_list).clicked)
-            {
-                m_list = static_cast<int32_t>(index);
             }
         }
     }
@@ -527,10 +590,10 @@ void GuiShowcase::widgets()
     }
     if (gui::collapsing_header("images", true))
     {
-        gui::RowScope row("images", { .gap = 6.0f });
-        std::ignore = gui::image("plain", k_single_image, { .width = fixed(40.0f), .height = fixed(40.0f) });
-        std::ignore = gui::image("rounded", k_single_image, { .width = fixed(40.0f), .height = fixed(40.0f), .radius = uniform_radius(10.0f) });
-        std::ignore = gui::image("circle", k_single_image, { .width = fixed(40.0f), .height = fixed(40.0f), .radius = im::circle_radius() });
+        gui::RowScope row("image row", { .gap = 6.0f });
+        gui::image("plain", k_single_image, { .width = fixed(40.0f), .height = fixed(40.0f) });
+        gui::image("rounded", k_single_image, { .width = fixed(40.0f), .height = fixed(40.0f), .radius = uniform_radius(10.0f) });
+        gui::image("circle", k_single_image, { .width = fixed(40.0f), .height = fixed(40.0f), .radius = im::circle_radius() });
         gui::ImageButtonOptions button_options;
         button_options.width = fixed(32.0f);
         button_options.height = fixed(32.0f);
@@ -538,6 +601,96 @@ void GuiShowcase::widgets()
         {
             gui::toast("Image button clicked", 2.0f);
         }
+    }
+}
+
+void GuiShowcase::inputs()
+{
+    if (gui::collapsing_header("text field", true))
+    {
+        const gui::TextInputResult result = gui::text_input("text", m_text, sizeof(m_text));
+        gui::key_value("length", m_context.arena().format("%u bytes%s", static_cast<uint32_t>(std::strlen(m_text)), result.submitted ? ", submitted" : ""));
+        gui::label("Click to focus; type, arrows, shift selects, cmd+A/C/X/V, double-click selects all");
+    }
+    if (gui::collapsing_header("filtering", true))
+    {
+        gui::text_input("filter", m_filter, sizeof(m_filter));
+        gui::ScrollScope names("names", { .height = fixed(110.0f) });
+        for (const std::string_view name : k_names)
+        {
+            if (gui::filter_matches(m_filter, name))
+            {
+                gui::selectable(name, false);
+            }
+        }
+    }
+    if (gui::collapsing_header("numbers", true))
+    {
+        gui::input_float("float", m_number, { .min = -10.0f, .max = 10.0f });
+        gui::input_int("int", m_integer, { .min = 0.0f, .max = 100.0f });
+        gui::slider_float("slider (double-click)", m_entry_slider, 0.0f, 1.0f);
+        gui::drag_float("drag (double-click)", m_entry_drag, 0.0f, 100.0f);
+        gui::label("Enter or a click elsewhere takes the number, Escape puts the old one back");
+    }
+    if (gui::collapsing_header("multi-select list", true))
+    {
+        gui::key_value("selected", m_context.arena().format("%u of %u", selection_size(m_list_words, k_list_items), k_list_items));
+        {
+            gui::RowScope row("select buttons", { .gap = 4.0f });
+            if (gui::small_button("all").clicked)
+            {
+                select_all(m_list_selection, m_list_words, k_list_items);
+            }
+            if (gui::small_button("none").clicked)
+            {
+                selection_clear(m_list_words, k_list_items);
+            }
+        }
+        gui::ListBoxScope list("list, 500 items", { .item_count = k_list_items });
+        for (uint32_t index = list.first_item(); index < list.last_item(); ++index)
+        {
+            gui::select_on_press(list.item(index, m_context.arena().format("item %u", index), selection_contains(m_list_words, k_list_items, index)), index, m_list_selection, m_list_words, k_list_items);
+        }
+        gui::label("Click picks one, cmd-click toggles, shift-click picks a run");
+    }
+}
+
+void GuiShowcase::style()
+{
+    if (gui::collapsing_header("theme", true))
+    {
+        for (int32_t index = 0; index < 3; ++index)
+        {
+            gui::radio(k_theme_names[index], m_theme, index);
+        }
+        gui::slider_float("scale", m_scale, 0.75f, 2.0f);
+        gui::label("The scale applies when you let go of the slider");
+    }
+    if (gui::collapsing_header("roles", true))
+    {
+        const GuiTheme& theme = m_context.gui_theme();
+        const struct
+        {
+            const char* name;
+            const ImStyle* style;
+        } roles[] = { { "panel", &theme.panel }, { "header", &theme.header }, { "field", &theme.field }, { "button", &theme.button }, { "tab", &theme.tab }, { "overlay", &theme.overlay } };
+        for (const auto& role : roles)
+        {
+            gui::colour_swatch(role.name, role.style->background);
+        }
+        gui::colour_swatch("accent", theme.field.accent);
+        gui::colour_swatch("selected", theme.field.selected);
+        gui::key_value("text on panel", m_context.arena().format("%.1f : 1", static_cast<double>(contrast_ratio(theme.panel.text, theme.panel.background))));
+        gui::key_value("text on field", m_context.arena().format("%.1f : 1", static_cast<double>(contrast_ratio(theme.field.text, theme.field.background))));
+        gui::key_value("accent on field", m_context.arena().format("%.1f : 1", static_cast<double>(contrast_ratio(theme.field.accent, theme.field.background))));
+    }
+    if (gui::collapsing_header("states", true))
+    {
+        gui::RowScope row("buttons", { .gap = 4.0f });
+        gui::button("Rest / hover / press");
+        gui::toggle("Toggle", m_flag);
+        gui::DisabledScope off;
+        gui::button("Disabled");
     }
 }
 
@@ -567,12 +720,12 @@ void GuiShowcase::data()
                 plot.vline(static_cast<float>(plot.result().hover_index), { 1.0f, 1.0f, 1.0f, 0.6f });
             }
         }
-        std::ignore = gui::plot_histogram("distribution", values(m_policy), { .height = fixed(60.0f), .y_min = 0.0f, .y_max = 1.0f });
+        gui::plot_histogram("distribution", values(m_policy), { .height = fixed(60.0f), .y_min = 0.0f, .y_max = 1.0f });
         gui::RowScope row("sparklines", { .gap = 8.0f });
-        std::ignore = gui::sparkline("wave", values(m_wave));
-        std::ignore = gui::sparkline("area", values(m_policy), { .colour = { 0.9f, 0.62f, 0.0f, 1.0f } });
-        gui::legend_item("wave", m_context.gui_theme().palette[0]);
-        gui::legend_item("policy", { 0.9f, 0.62f, 0.0f, 1.0f });
+        gui::sparkline("wave", values(m_wave));
+        gui::sparkline("area", values(m_policy), { .colour = { 0.9f, 0.62f, 0.0f, 1.0f } });
+        gui::legend_item("wave series", m_context.gui_theme().palette[0]);
+        gui::legend_item("policy series", { 0.9f, 0.62f, 0.0f, 1.0f });
     }
     if (gui::collapsing_header("table, 1000 rows", true))
     {
@@ -591,13 +744,31 @@ void GuiShowcase::data()
         for (uint32_t index = table.first_row(); index < table.last_row(); ++index)
         {
             const TableRow& row = m_rows[index];
-            if (table.row(index, static_cast<int32_t>(index) == m_row).clicked)
+            const bool chosen = selection_contains(m_row_words, k_table_rows, index);
+            const ItemState row_state = table.row(index, chosen);
+            if (gui::select_on_press(row_state, index, m_row_selection, m_row_words, k_table_rows))
             {
                 m_row = static_cast<int32_t>(index);
+                m_edit_row = m_edit_row == m_row ? m_edit_row : -1;
+            }
+            if (row_state.double_clicked)
+            {
+                m_edit_row = static_cast<int32_t>(index);
+                m_cell_edit = true;
             }
             FrameArena& arena = m_context.arena();
             table.cell(arena.format("%u", row.ply));
-            table.cell(arena.format("%.3f", static_cast<double>(row.value)));
+            if (static_cast<int32_t>(index) == m_edit_row)
+            {
+                table.begin_cell();
+                gui::input_float("##value", m_rows[index].value, { .decimals = 3, .edit = &m_cell_edit });
+                table.end_cell();
+                m_edit_row = m_cell_edit ? m_edit_row : -1;
+            }
+            else
+            {
+                table.cell(arena.format("%.3f", static_cast<double>(row.value)));
+            }
             table.cell(arena.format("%u", row.visits));
         }
     }

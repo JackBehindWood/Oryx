@@ -4,6 +4,7 @@
 #include "Oryx/Core/Window.h"
 
 struct GLFWwindow;
+struct GLFWcursor;
 
 namespace oryx
 {
@@ -24,10 +25,15 @@ public:
 
     void poll_events() override;
     void request_close() override;
+    [[nodiscard]] std::string clipboard_text() const override;
+    void set_clipboard_text(std::string_view text) override;
+    void set_cursor_kind(CursorKind kind) override;
 
 private:
     GLFWwindow* m_window = nullptr;
     PolledInput m_input;
+    GLFWcursor* m_cursors[5] = {};
+    CursorKind m_cursor_kind = CursorKind::Arrow;
 };
 
 } // namespace oryx

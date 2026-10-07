@@ -56,10 +56,10 @@ void end_widget();
 [[nodiscard]] im::CanvasArea canvas(std::string_view name, Sizing width = grow(), Sizing height = grow(), const im::CanvasOptions& options = {});
 
 void label(std::string_view text, const WidgetOptions& options = {});
-[[nodiscard]] ItemState button(std::string_view text, const WidgetOptions& options = {});
+ItemState button(std::string_view text, const WidgetOptions& options = {});
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options = {});
 ItemState image(std::string_view name, ImageHandle image, const ImageOptions& options = {});
-[[nodiscard]] ItemState image_button(std::string_view name, ImageHandle image, const ImageButtonOptions& options = {});
+ItemState image_button(std::string_view name, ImageHandle image, const ImageButtonOptions& options = {});
 void begin_panel(std::string_view name, const WidgetOptions& options = {});
 void end_panel();
 void begin_row(std::string_view name, const RowOptions& options = {});
@@ -71,6 +71,37 @@ void spacer(float weight = 1.0f);
 void separator(const WidgetOptions& options = {});
 // Uses the theme's status style unless the options name another.
 void status_line(std::string_view text, const StatusOptions& options = {});
+
+// Everything between the calls paints dimmed and ignores the pointer, like ImGui's BeginDisabled; nestable.
+void begin_disabled();
+void end_disabled();
+
+// Disables what is built in its scope when `disabled` is true; a false one does nothing, so it wraps a conditional widget without a branch.
+class DisabledScope
+{
+public:
+    explicit DisabledScope(bool disabled = true)
+        : m_active(disabled)
+    {
+        if (m_active)
+        {
+            begin_disabled();
+        }
+    }
+    ~DisabledScope()
+    {
+        if (m_active)
+        {
+            end_disabled();
+        }
+    }
+
+    DisabledScope(const DisabledScope&) = delete;
+    DisabledScope& operator=(const DisabledScope&) = delete;
+
+private:
+    bool m_active;
+};
 
 uint32_t begin_box(std::string_view label, const LayoutStyle& style);
 void end_box();

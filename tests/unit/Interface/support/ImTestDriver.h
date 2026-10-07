@@ -48,6 +48,32 @@ public:
         m_input.keys.pressed |= im_key_bit(key);
     }
     void key_release(ImKey key) { m_input.keys.down &= ~im_key_bit(key); }
+    // An OS auto-repeat of a held key for one frame.
+    void key_repeat(ImKey key) { m_input.keys.repeated |= im_key_bit(key); }
+    // Typed characters (UTF-8) for one frame.
+    void type(std::string_view utf8)
+    {
+        m_text.append(utf8);
+        m_input.text = m_text;
+    }
+    // The shortcut modifier held down (persists until released).
+    void hold_shortcut(bool held)
+    {
+        m_shortcut_held = held;
+        m_input.keys.shortcut = held;
+    }
+    // A shortcut + `key` stroke in one frame.
+    void chord(ImKey key)
+    {
+        m_input.keys.shortcut = true;
+        key_press(key);
+    }
+    // The clipboard text a paste delivers this frame.
+    void paste(std::string_view text)
+    {
+        m_paste.assign(text);
+        m_input.paste = m_paste;
+    }
 
     // Runs one frame with the queued input, then drops the one-frame edges.
     template<typename Build>
@@ -130,10 +156,19 @@ private:
         }
         m_input.wheel = { 0.0f, 0.0f };
         m_input.keys.pressed = 0;
+        m_input.keys.repeated = 0;
+        m_input.keys.shortcut = m_shortcut_held;
+        m_text.clear();
+        m_input.text = {};
+        m_paste.clear();
+        m_input.paste = {};
     }
 
     Context& m_context;
     ImInput m_input;
+    std::string m_text;
+    std::string m_paste;
+    bool m_shortcut_held = false;
 };
 
 } // namespace oryx::test

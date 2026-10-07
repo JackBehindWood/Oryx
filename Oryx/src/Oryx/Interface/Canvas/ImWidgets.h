@@ -54,6 +54,10 @@ struct RowOptions
 void paint_text(BoxPaint& paint, const LayoutNode& node, const ImStyle& style, TextAlign align, bool ellipsis);
 void paint_surface(BoxPaint& paint, const ImStyle& style, const Colour& fill);
 [[nodiscard]] Colour interaction_fill(const ImStyle& style, const ItemState& state, const Colour& rest);
+// `colour` moved towards white by `amount` (negative: towards black), alpha kept.
+[[nodiscard]] Colour tint(const Colour& colour, float amount);
+// A fill that keeps its identity under the pointer: `colour` lightened while hovered and darkened while held, so a chosen control never swaps to the hover colour.
+[[nodiscard]] Colour keep_fill(const ItemState& state, const Colour& colour);
 // A leaf box that reacts to the pointer; `rest` (null for the style's background) shows while idle.
 ItemState interactive_box(ImContext& context, std::string_view text, const WidgetOptions& options, const Colour* rest);
 

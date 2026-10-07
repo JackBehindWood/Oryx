@@ -60,7 +60,7 @@ Vec2f last_size_of(const GuiContext& ctx, ImId id)
 void begin_menu_bar(std::string_view name, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::header);
     LayoutStyle bar = im::widget_box(style, options);
     if (options.layout == nullptr)
     {
@@ -86,7 +86,7 @@ void end_menu_bar()
 bool begin_menu(std::string_view label, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::header);
     const ImId id = ctx.id(label);
     const ItemState state = ctx.item(id);
     const ImId host = host_id(ctx);
@@ -137,7 +137,7 @@ bool begin_menu(std::string_view label, const WidgetOptions& options)
         floating.element = flip ? AttachPoint::TopRight : AttachPoint::TopLeft;
         floating.target_point = flip ? AttachPoint::TopLeft : AttachPoint::TopRight;
     }
-    if (!open_popup_box(ctx, popup, style, floating, top_level ? 0.0f : 80.0f, state.hovered))
+    if (!open_popup_box(ctx, popup, ctx.gui_theme().overlay, floating, top_level ? 0.0f : 80.0f, state.hovered))
     {
         ctx.pop_id();
         MenuHost& menus = ctx.state<MenuHost>(host);
@@ -198,7 +198,7 @@ void close_current_popup()
 bool begin_popup(std::string_view name, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::overlay);
     const ImId id = ctx.id(name);
     const PopupState state = ctx.state<PopupState>(id);
     if (!state.open)
@@ -263,7 +263,7 @@ void toast(std::string_view text, float seconds)
 void show_toasts()
 {
     GuiContext& ctx = context();
-    const ImStyle& style = ctx.theme().base;
+    const ImStyle& style = ctx.gui_theme().overlay;
     LayoutStyle stack;
     stack.direction = Direction::Column;
     stack.gap = ctx.gui_theme().spacing;

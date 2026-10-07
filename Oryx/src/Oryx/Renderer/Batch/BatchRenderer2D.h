@@ -6,6 +6,7 @@
 #include "Oryx/Renderer/Batch/BatchRenderer.h"
 #include "Oryx/Renderer/Font.h"
 #include "Oryx/Renderer/Batch/Primitive2D.h"
+#include "Oryx/Renderer/Batch/Vertex2D.h"
 
 namespace oryx
 {
@@ -33,6 +34,14 @@ public:
     // Draws UTF-8 text with `position` at the baseline start of the first line (y up, so '\n' moves down); a font that is not ready draws nothing. Throws Error outside a scene.
     void draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style = {});
 
+    // The GUI path: one stream and pipeline for everything, so these never break a batch against each other. Corners run counter-clockwise from the bottom left.
+    void draw_ui_quad(const Vec2f (&corners)[4], const Colour& colour);
+    void draw_ui_image(const Vec2f& position, const Vec2f& size, const Texture2D& texture, const Colour& tint, const Vec2f& uv_min, const Vec2f& uv_max);
+    void draw_ui_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style = {});
+    // Radii run top-left, top-right, bottom-right, bottom-left and are clamped to the shorter half-extent; the edge is anti-aliased and the outline sits inside the box.
+    void draw_ui_rounded(const Vec2f& position, const Vec2f& size, const float (&radii)[4], const Colour& colour);
+    void draw_ui_border(const Vec2f& position, const Vec2f& size, const float (&radii)[4], float thickness, const Colour& colour);
+
     // Clips later draws to a world-space rect (centre and size, as draw_rect), intersected with the enclosing clip and the framebuffer; the rect resolves to whole
     // framebuffer pixels, rounded outward. An empty result culls draws until the matching pop_clip. Throws Error outside a scene or before the framebuffer size is known.
     void push_clip(const Vec2f& position, const Vec2f& size);
@@ -58,6 +67,18 @@ private:
 
     void write_quad(const Vec2f (&corners)[4], const RHITexturePtr& texture, const RHISamplerPtr& sampler, const Colour& colour, const Vec2f& uv_min, const Vec2f& uv_max);
     void write_quad_uvs(const Vec2f (&corners)[4], const Vec2f (&uvs)[4], const RHITexturePtr& texture, const RHISamplerPtr& sampler, const Colour& colour);
+    struct UiPrimitive
+    {
+        const RHITexturePtr* texture = nullptr;
+        const RHISamplerPtr* sampler = nullptr;
+        UiMode mode = UiMode::Texture;
+        float thickness = 0.0f;
+        float px_range = 0.0f;
+        float radii[4] = {};
+    };
+
+    void write_ui(const Vec2f (&corners)[4], const Vec2f (&uvs)[4], const Colour& colour, const UiPrimitive& primitive);
+    void write_ui_shape(const Vec2f& position, const Vec2f& size, const float (&radii)[4], float thickness, UiMode mode, const Colour& colour);
     void write_glyph(const Vec2f (&corners)[4], const Texture2D& atlas_texture, float px_range, const Colour& colour, const Glyph& glyph);
 
     BatchStreamId m_streams[PRIMITIVE_2D_COUNT];

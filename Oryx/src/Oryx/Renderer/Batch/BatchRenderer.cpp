@@ -181,7 +181,7 @@ void BatchRenderer::select(BatchStreamId stream, const RHISamplerPtr& sampler)
             ++m_stats.stream_switches[m_stream][stream];
             flush_batch(FlushReason::StreamChange);
         }
-        else if (sampler != m_sampler)
+        else if (sampler && m_sampler && sampler != m_sampler)
         {
             flush_batch(FlushReason::SamplerChange);
         }
@@ -191,7 +191,10 @@ void BatchRenderer::select(BatchStreamId stream, const RHISamplerPtr& sampler)
         }
     }
     m_stream = stream;
-    m_sampler = sampler;
+    if (m_primitives == 0 || sampler)
+    {
+        m_sampler = sampler;
+    }
 }
 
 uint32_t BatchRenderer::acquire_texture(const RHITexturePtr& texture)
@@ -260,7 +263,7 @@ void BatchRenderer::flush_batch(FlushReason reason)
                 draw_item_add_texture(item, m_slots.texture(i));
             }
         }
-        item.sampler = m_sampler;
+        item.sampler = m_sampler ? m_sampler : (stream.textured ? m_defaults.sampler : m_sampler);
         item.scissor = m_scissor;
         item.has_scissor = m_has_scissor;
         m_sink->push_back(std::move(item));

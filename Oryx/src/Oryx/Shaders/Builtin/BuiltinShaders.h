@@ -88,4 +88,17 @@ public:
     using BuiltinShader::BuiltinShader;
 };
 
+// Vertex layout: Vertex2DUi (28 bytes). One pipeline for the GUI: textured quads, glyph coverage or distance, and signed-distance rounded fills and borders.
+class UiVS : public BuiltinShader<VertexShader>
+{
+public:
+    using BuiltinShader::BuiltinShader;
+};
+
+class UiPS : public BuiltinShader<PixelShader, TextureArrayPermutations>
+{
+public:
+    using BuiltinShader::BuiltinShader;
+};
+
 } // namespace oryx

@@ -15,9 +15,19 @@ enum class LabelSide : uint8_t
 
 inline constexpr uint32_t k_palette_size = 8;
 
-// The shared theme plus the roles only developer tooling needs.
+// The shared theme plus the roles only developer tooling needs. The role styles split what one `base` style used to cover, so a panel, a header, a field, a button, a tab, a scroll bar and a popup each get their own surface;
+// a widget takes its role unless the call names a variant or a style. `base` stays the fallback for text and for code that predates the roles.
 struct GuiTheme : ImTheme
 {
+    ImStyle panel;
+    ImStyle header;
+    ImStyle field;
+    ImStyle button;
+    ImStyle tab;
+    // Track fill in `background`, thumb in `border`, hovered thumb in `hover`.
+    ImStyle scroll;
+    // Tooltips, menus and popups.
+    ImStyle overlay;
     // Space between neighbouring widgets in a row or column.
     float spacing = 4.0f;
     // Label first, as in Unity and Godot forms; After gives ImGui's order.
@@ -44,5 +54,15 @@ struct GuiTheme : ImTheme
 };
 
 static_assert(std::is_trivially_copyable_v<GuiTheme>);
+
+// Graphite surfaces, one teal accent. The default.
+[[nodiscard]] GuiTheme dark_gui_theme();
+[[nodiscard]] GuiTheme light_gui_theme();
+// Black and white with 2 px borders and a yellow accent; text and marks reach 7:1.
+[[nodiscard]] GuiTheme high_contrast_gui_theme();
+// `theme` with every size (text, padding, radius, spacing, indent, scroll bar, hit area) multiplied by `factor`; the colours, font and palette stay.
+[[nodiscard]] GuiTheme scale_gui_theme(const GuiTheme& theme, float factor);
+// WCAG contrast ratio of two opaque colours, 1 to 21.
+[[nodiscard]] float contrast_ratio(const Colour& a, const Colour& b);
 
 } // namespace oryx

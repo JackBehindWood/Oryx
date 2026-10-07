@@ -87,7 +87,7 @@ TEST_CASE("GUI structure: a tree node opens its children, a leaf never does, and
     REQUIRE(leaf != nullptr);
     const LayoutNode& leaf_row = f.context.layout().node(static_cast<uint32_t>(leaf->parent));
     CHECK(leaf_row.paint.has_fill);
-    CHECK(approx_equal(leaf_row.paint.fill, f.theme.base.accent));
+    CHECK(approx_equal(leaf_row.paint.fill, f.theme.panel.selected));
     const LayoutNode* root = f.find_text("root");
     REQUIRE(root != nullptr);
     CHECK(leaf->rect.min[0] > root->rect.min[0] - 0.01f);
@@ -170,7 +170,7 @@ TEST_CASE("GUI structure: dragging the scroll bar thumb moves the offset")
     for (uint32_t index = 0; index < f.context.layout().node_count(); ++index)
     {
         const LayoutNode& node = f.context.layout().node(index);
-        if (node.style.floating.enabled && node.style.width.kind == SizingKind::Fixed && node.style.width.value == f.theme.scrollbar_width)
+        if (node.style.floating.enabled && node.style.width.kind == SizingKind::Fixed && node.style.width.value == f.theme.scrollbar_width * 0.6f)
         {
             thumb = &node;
         }
@@ -350,7 +350,7 @@ TEST_CASE("GUI structure: golden layout of a menu bar, header and scroll panel")
         "    r1 [0.00 76.00 36.00 24.00] row w=fit h=fit text=\"r1\"\n"
         "    r2 [0.00 100.00 36.00 24.00] row w=fit h=fit text=\"r2\"\n"
         "    r3 [0.00 124.00 36.00 24.00] row w=fit h=fit text=\"r3\"\n"
-        "    #8b76bb748418875a [152.00 52.00 8.00 16.67] row w=fixed(8.00) h=fixed(16.67) floating\n";
+        "    #8b76bb748418875a [155.20 52.00 4.80 16.67] row w=fixed(4.80) h=fixed(16.67) floating\n";
     CHECK(dump_layout(f.context) == expected);
 }
 

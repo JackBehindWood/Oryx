@@ -52,6 +52,8 @@ struct LayoutNode
     Rect clip;
     // Extent of the in-flow children inside the padding, before scrolling; only set for Scroll boxes.
     Vec2f content_size{ 0.0f, 0.0f };
+    // Multiplies every colour the box paints; set by LayoutTree::set_alpha when the box is opened.
+    float alpha = 1.0f;
 };
 
 // Width of one line of text; a null `width` measures everything as zero (no font yet).
@@ -69,6 +71,9 @@ class LayoutTree
 public:
     // Drops the boxes (not the remembered rects). Also recovers after an error.
     void clear();
+    // Boxes opened from now on paint with this alpha factor.
+    void set_alpha(float alpha) { m_alpha = alpha; }
+    [[nodiscard]] float alpha() const { return m_alpha; }
 
     // Returns the node index. end_box throws Error when no box is open.
     uint32_t begin_box(ImId id, const LayoutStyle& style, std::string_view name = {});
@@ -99,6 +104,7 @@ private:
     void place_floating(uint32_t index, const Rect& viewport);
 
     std::vector<LayoutNode> m_nodes;
+    float m_alpha = 1.0f;
     std::vector<uint32_t> m_open;
     struct Placement
     {

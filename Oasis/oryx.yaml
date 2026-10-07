@@ -10,3 +10,5 @@ assets:
   worker_threads: 0
 # shaders:
 #   slangc: tools/slangc   # relative to this file; OX_SLANGC overrides it
+graphics:
+  vsync: true

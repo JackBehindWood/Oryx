@@ -3,6 +3,7 @@
 
 #include "Oryx/Core/Application.h"
 #include "Oryx/Core/Error.h"
+#include "Oryx/Core/Utf8.h"
 #include "Oryx/Events/KeyEvent.h"
 #include "Oryx/Events/MouseEvent.h"
 #include "Oryx/Events/WindowEvent.h"
@@ -48,6 +49,25 @@ void NullWindow::inject_key(KeyCode key, bool down)
     {
         post(KeyReleasedEvent(key));
     }
+}
+
+void NullWindow::inject_text(std::string_view utf8)
+{
+    size_t index = 0;
+    while (index < utf8.size())
+    {
+        m_input.add_text(decode_utf8(utf8, index));
+    }
+}
+
+void NullWindow::inject_key_repeat(KeyCode key)
+{
+    m_input.set_key_repeat(key);
+}
+
+void NullWindow::inject_paste(std::string_view text)
+{
+    m_input.set_paste_text(text);
 }
 
 void NullWindow::inject_mouse_button(MouseCode button, bool down)

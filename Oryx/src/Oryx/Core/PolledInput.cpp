@@ -1,5 +1,6 @@
 #include "oxpch.h"
 #include "Oryx/Core/PolledInput.h"
+#include "Oryx/Core/Utf8.h"
 
 namespace oryx
 {
@@ -16,6 +17,12 @@ auto* slot(Array& array, Code code)
 }
 
 } // namespace
+
+PolledInput::PolledInput()
+{
+    m_text.reserve(256);
+    m_paste.reserve(4096);
+}
 
 void PolledInput::apply(Edge& edge, bool down)
 {
@@ -42,6 +49,9 @@ void PolledInput::begin_frame()
     }
     m_scroll_x = 0.0f;
     m_scroll_y = 0.0f;
+    m_repeats.fill(false);
+    m_text.clear();
+    m_paste.clear();
 }
 
 void PolledInput::set_key(KeyCode key, bool down)
@@ -70,6 +80,30 @@ void PolledInput::add_scroll(float dx, float dy)
 {
     m_scroll_x += dx;
     m_scroll_y += dy;
+}
+
+void PolledInput::add_text(uint32_t codepoint)
+{
+    encode_utf8(codepoint, m_text);
+}
+
+void PolledInput::set_key_repeat(KeyCode key)
+{
+    if (bool* repeated = slot(m_repeats, key))
+    {
+        *repeated = true;
+    }
+}
+
+void PolledInput::set_paste_text(std::string_view text)
+{
+    m_paste.assign(text);
+}
+
+bool PolledInput::key_repeated(KeyCode key) const
+{
+    const bool* repeated = slot(m_repeats, key);
+    return repeated != nullptr && *repeated;
 }
 
 bool PolledInput::key_down(KeyCode key) const

@@ -63,6 +63,8 @@ enum class CursorShape : uint8_t
 struct ImOutput
 {
     CursorShape cursor = CursorShape::Arrow;
+    // Text the owner should put on the clipboard; empty when no widget asked this frame. Valid until the next begin_frame.
+    std::string_view copy_text;
 };
 
 static_assert(std::is_trivially_copyable_v<ImOutput> && std::is_standard_layout_v<ImOutput>);
@@ -73,6 +75,9 @@ inline constexpr size_t k_max_widget_state_size = 64;
 inline constexpr uint32_t k_channel_popup = 2;
 inline constexpr uint32_t k_channel_tooltip = 3;
 inline constexpr uint32_t k_channel_drag = 4;
+
+// Alpha factor of the boxes inside a disabled scope.
+inline constexpr float k_disabled_alpha = 0.45f;
 
 inline constexpr uint32_t k_max_popup_depth = 8;
 inline constexpr uint32_t k_max_popups_per_frame = 16;
@@ -183,6 +188,8 @@ public:
 
     // The last request of the frame wins, so a widget drawn later (a popup) overrides one below it.
     void request_cursor(CursorShape cursor) { m_output.cursor = cursor; }
+    // Asks the owner to copy `text` to the clipboard; stored in the frame arena.
+    void request_copy(std::string_view text) { m_output.copy_text = m_arena.store(text); }
     [[nodiscard]] const ImOutput& output() const { return m_output; }
 
     // Per-id state that outlives frames, for widgets of your own: created value-initialised on first use, dropped after a frame in which it is not asked for.
@@ -221,6 +228,11 @@ public:
     // True while an item is under the pointer or held, so the owner can leave the click to the UI.
     [[nodiscard]] bool wants_mouse() const { return is_valid(m_hot) || is_valid(m_active); }
     [[nodiscard]] bool wants_keyboard() const { return is_valid(m_focus); }
+
+    // Between begin_disabled and end_disabled (nestable) items report no hover or press and boxes paint at k_disabled_alpha. Both throw Error outside a frame; end_frame throws if one is left open.
+    void begin_disabled();
+    void end_disabled();
+    [[nodiscard]] bool disabled() const { return m_disabled != 0; }
 
     [[nodiscard]] ImStats stats() const;
 
@@ -277,6 +289,7 @@ private:
     uint32_t m_popup_count = 0;
     uint32_t m_last_popup_count = 0;
     uint32_t m_popup_depth = 0;
+    uint32_t m_disabled = 0;
     std::vector<ItemHit> m_hits;
     std::vector<ItemHit> m_last_hits;
     ImId m_hot;

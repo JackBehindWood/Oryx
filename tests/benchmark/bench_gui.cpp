@@ -1,6 +1,8 @@
 #include "doctest.h"
 
 #include "Oryx.h"
+#include "NullRHI.h"
+#include "Oryx/Renderer/RendererContext.h"
 #include "unit/Renderer/FakeFontSource.h"
 
 #include <chrono>
@@ -142,6 +144,50 @@ TEST_CASE("Benchmark: GUI plot decimation of 100k samples")
         std::ignore = gui::plot_lines("plot", values(data.data(), static_cast<uint32_t>(data.size())), options);
     });
     MESSAGE("one 100k-sample plot: " << ms << " ms/frame");
+}
+
+TEST_CASE("Benchmark: replaying a 500-widget GUI frame into the batcher")
+{
+    UniquePtr<RendererContext> renderer = create_renderer_context({ RHIBackend::Null });
+    std::vector<DrawItem> sink;
+    BatchRenderer2D batcher{ batch_renderer_desc(*renderer, sink) };
+    Camera2D camera = Camera2D::screen_space(1280.0f, 720.0f);
+    Scene scene;
+    float slider = 0.5f;
+    bool flag = false;
+    scene.milliseconds_per_frame(1, [&]
+    {
+        for (uint32_t row = 0; row < 100; ++row)
+        {
+            IdScope id(scene.context, scene.context.index_id(row));
+            gui::RowScope line("row");
+            gui::label("label");
+            std::ignore = gui::button("button");
+            std::ignore = gui::checkbox("check", flag);
+            std::ignore = gui::slider_float("slider", slider, 0.0f, 1.0f);
+            gui::bar("bar", 0.5f, 1.0f);
+        }
+    });
+    const uint32_t frames = 200;
+    const auto replay_once = [&]
+    {
+        sink.clear();
+        batcher.recycle(0);
+        batcher.begin(camera, { sink, { RHIFormat::BGRA8Unorm, RHIFormat::Undefined }, { 1280.0f, 720.0f } });
+        replay(scene.context.draw_list(), batcher, scene.font, { { 0.0f, 0.0f }, { 1280.0f, 720.0f } });
+        batcher.end();
+    };
+    replay_once();
+    replay_once();
+    const Clock::time_point start = Clock::now();
+    for (uint32_t frame = 0; frame < frames; ++frame)
+    {
+        replay_once();
+    }
+    const double ms = std::chrono::duration<double, std::milli>(Clock::now() - start).count() / static_cast<double>(frames);
+    const BatchStats& stats = batcher.stats();
+    MESSAGE("500 widgets replay: " << ms << " ms/frame, " << stats.primitives << " prims, " << stats.vertices << " verts, " << stats.bytes << " B, " << stats.draws << " draws");
+    renderer->rhi->wait_idle();
 }
 
 }

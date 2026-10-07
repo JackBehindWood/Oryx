@@ -23,6 +23,16 @@ struct WindowDesc
     int32_t height = 720;
 };
 
+// The pointer image a window can show; the order matches the GUI's CursorShape.
+enum class CursorKind : uint8_t
+{
+    Arrow,
+    Hand,
+    ResizeHorizontal,
+    ResizeVertical,
+    Text
+};
+
 class Window
 {
 public:
@@ -41,6 +51,12 @@ public:
     // Polls the OS, updates input() and posts events through Application::Get().post_event.
     virtual void poll_events() = 0;
     virtual void request_close() = 0;
+
+    // Defaulted: a window without a clipboard reads empty and drops writes.
+    [[nodiscard]] virtual std::string clipboard_text() const { return {}; }
+    virtual void set_clipboard_text(std::string_view) {}
+    // Defaulted: a window without a visible pointer ignores it.
+    virtual void set_cursor_kind(CursorKind) {}
 
 private:
     WindowDesc m_desc;

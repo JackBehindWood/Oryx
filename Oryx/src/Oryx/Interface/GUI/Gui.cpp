@@ -60,6 +60,16 @@ ItemDrag item_drag(GuiId id)
     return active().item_drag(id.im());
 }
 
+void begin_disabled()
+{
+    active().begin_disabled();
+}
+
+void end_disabled()
+{
+    active().end_disabled();
+}
+
 ItemState begin_widget(std::string_view name, const LayoutStyle& style)
 {
     return im::begin_widget(active(), name, style);
@@ -85,14 +95,43 @@ void label(std::string_view text, const WidgetOptions& options)
     im::label(active(), text, options);
 }
 
+namespace
+{
+
+// The options with the role's style filled in unless the call already chose one.
+WidgetOptions with_role(const WidgetOptions& options, const ImStyle GuiTheme::* role)
+{
+    WidgetOptions resolved = options;
+    resolved.style = &active().role_style(options, role);
+    return resolved;
+}
+
+} // namespace
+
 ItemState button(std::string_view text, const WidgetOptions& options)
 {
-    return im::button(active(), text, options);
+    const ItemState state = im::button(active(), text, with_role(options, &GuiTheme::button));
+    if (state.hovered)
+    {
+        active().request_cursor(CursorShape::Hand);
+    }
+    return state;
 }
 
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options)
 {
-    return im::toggle(active(), text, value, options);
+    const WidgetOptions resolved = with_role(options, &GuiTheme::button);
+    const ImStyle& style = *resolved.style;
+    const ItemState state = im::interactive_box(active(), text, resolved, value ? &style.selected : nullptr);
+    if (state.hovered)
+    {
+        active().request_cursor(CursorShape::Hand);
+    }
+    if (state.clicked)
+    {
+        value = !value;
+    }
+    return state.clicked;
 }
 
 ItemState image(std::string_view name, ImageHandle image, const ImageOptions& options)
@@ -102,12 +141,14 @@ ItemState image(std::string_view name, ImageHandle image, const ImageOptions& op
 
 ItemState image_button(std::string_view name, ImageHandle image, const ImageButtonOptions& options)
 {
-    return im::image_button(active(), name, image, options);
+    ImageButtonOptions resolved = options;
+    resolved.style = &active().role_style(options, &GuiTheme::button);
+    return im::image_button(active(), name, image, resolved);
 }
 
 void begin_panel(std::string_view name, const WidgetOptions& options)
 {
-    im::begin_panel(active(), name, options);
+    im::begin_panel(active(), name, with_role(options, &GuiTheme::panel));
 }
 
 void end_panel()

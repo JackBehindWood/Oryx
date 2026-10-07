@@ -12,10 +12,11 @@ enum class Primitive2D : uint8_t
     Circle,
     Line,
     Triangle,
-    Text
+    Text,
+    Ui
 };
 
-inline constexpr uint32_t PRIMITIVE_2D_COUNT = 5;
+inline constexpr uint32_t PRIMITIVE_2D_COUNT = 6;
 
 // How a primitive is expanded into vertices; `instanced` is the seam for one-vertex-per-instance quads and is false for every primitive today.
 struct PrimitiveTraits

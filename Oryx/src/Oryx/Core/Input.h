@@ -22,6 +22,12 @@ public:
     [[nodiscard]] virtual bool mouse_released(MouseCode button) const = 0;
     virtual void cursor_position(Vec2f& out) const = 0;
     virtual void scroll_delta(Vec2f& out) const = 0;
+    // Defaulted so an implementer without text input still compiles: the UTF-8 the user typed this frame (committed characters, no key codes).
+    [[nodiscard]] virtual std::string_view typed_text() const { return {}; }
+    // True on a frame the OS auto-repeated `key` while it was held (a press also counts as the first stroke through key_pressed).
+    [[nodiscard]] virtual bool key_repeated(KeyCode) const { return false; }
+    // The clipboard's text on the frame the paste shortcut went down, empty on every other frame.
+    [[nodiscard]] virtual std::string_view paste_text() const { return {}; }
 };
 
 // Static shortcut onto the primary window's input; everything reads as "nothing pressed" while there is no window.

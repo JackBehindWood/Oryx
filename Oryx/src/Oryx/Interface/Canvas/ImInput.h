@@ -38,6 +38,11 @@ enum class ImKey : uint8_t
     End,
     PageUp,
     PageDown,
+    Space,
+    A,
+    C,
+    V,
+    X,
     Count
 };
 
@@ -48,6 +53,10 @@ struct ImKeys
 {
     uint32_t down = 0;
     uint32_t pressed = 0;
+    // Keys the OS auto-repeated this frame (held past the delay); a text field treats pressed or repeated as one stroke.
+    uint32_t repeated = 0;
+    // The platform's command modifier: Cmd on macOS, Ctrl elsewhere.
+    bool shortcut = false;
     bool ctrl = false;
     bool shift = false;
     bool alt = false;
@@ -56,6 +65,7 @@ struct ImKeys
 
 [[nodiscard]] constexpr bool key_down(const ImKeys& keys, ImKey key) { return (keys.down & im_key_bit(key)) != 0; }
 [[nodiscard]] constexpr bool key_pressed(const ImKeys& keys, ImKey key) { return (keys.pressed & im_key_bit(key)) != 0; }
+[[nodiscard]] constexpr bool key_stroke(const ImKeys& keys, ImKey key) { return ((keys.pressed | keys.repeated) & im_key_bit(key)) != 0; }
 
 // One frame of input for one surface. Built by the owning layer from the window's input; `text` is valid for the frame only.
 struct ImInput
@@ -71,6 +81,8 @@ struct ImInput
     ImKeys keys;
     float delta_time = 0.0f;
     std::string_view text;
+    // The clipboard text on the frame the paste shortcut went down, empty otherwise; valid for the frame only.
+    std::string_view paste;
 };
 
 [[nodiscard]] inline const ImButton& button_of(const ImInput& input, MouseCode code)

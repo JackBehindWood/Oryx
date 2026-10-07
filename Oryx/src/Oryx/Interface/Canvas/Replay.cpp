@@ -49,7 +49,16 @@ private:
     void draw(const RectCmd& command)
     {
         set_clip(command.clip);
-        m_batcher.draw_rect(world(rect_centre(command.rect)), command.rect.size, command.colour);
+        draw_box(command.rect, command.colour);
+    }
+
+    void draw_box(const Rect& rect, const Colour& colour)
+    {
+        const Vec2f centre = world(rect_centre(rect));
+        const float hx = rect.size[0] * 0.5f;
+        const float hy = rect.size[1] * 0.5f;
+        const Vec2f corners[4] = { { centre[0] - hx, centre[1] - hy }, { centre[0] + hx, centre[1] - hy }, { centre[0] + hx, centre[1] + hy }, { centre[0] - hx, centre[1] + hy } };
+        m_batcher.draw_ui_quad(corners, colour);
     }
 
     void draw(const LineCmd& command)
@@ -65,7 +74,7 @@ private:
         }
         const Vec2f normal(-direction[1] / length * command.thickness * 0.5f, direction[0] / length * command.thickness * 0.5f);
         const Vec2f corners[4] = { a - normal, b - normal, b + normal, a + normal };
-        m_batcher.draw_quad(corners, command.colour);
+        m_batcher.draw_ui_quad(corners, command.colour);
     }
 
     void draw(const TextCmd& command)
@@ -75,7 +84,7 @@ private:
         style.pixel_height = command.pixel_height;
         style.colour = command.colour;
         style.align = command.align;
-        m_batcher.draw_text(world(command.origin), m_list.text(command), m_font, style);
+        m_batcher.draw_ui_text(world(command.origin), m_list.text(command), m_font, style);
     }
 
     // Points around the rounded rect, clockwise from the top-left corner's end of the top edge; `count` per corner.
@@ -110,6 +119,14 @@ private:
         return written;
     }
 
+    static void fill_radii(const CornerRadius& radius, float (&values)[4])
+    {
+        values[0] = radius.top_left;
+        values[1] = radius.top_right;
+        values[2] = radius.bottom_right;
+        values[3] = radius.bottom_left;
+    }
+
     static uint32_t points_per_corner(const CornerRadius& radius)
     {
         if (is_square(radius))
@@ -125,16 +142,12 @@ private:
         set_clip(command.clip);
         if (is_square(command.radius))
         {
-            m_batcher.draw_rect(world(rect_centre(command.rect)), command.rect.size, command.colour);
+            draw_box(command.rect, command.colour);
             return;
         }
-        Vec2f points[4 * k_max_corner_points];
-        const uint32_t count = outline(command.rect, command.radius, 0.0f, points_per_corner(command.radius), points);
-        const Vec2f centre = world(rect_centre(command.rect));
-        for (uint32_t i = 0; i < count; ++i)
-        {
-            m_batcher.draw_triangle(centre, world(points[i]), world(points[(i + 1) % count]), command.colour);
-        }
+        float radii[4];
+        fill_radii(command.radius, radii);
+        m_batcher.draw_ui_rounded(world(rect_centre(command.rect)), command.rect.size, radii, command.colour);
     }
 
     void draw(const ImageCmd& command)
@@ -148,7 +161,7 @@ private:
         const Vec2f centre = world(rect_centre(command.rect));
         if (is_square(command.radius))
         {
-            m_batcher.draw_sprite(centre, command.rect.size, texture, command.tint, 0.0f, command.uv_min, command.uv_max);
+            m_batcher.draw_ui_image(centre, command.rect.size, texture, command.tint, command.uv_min, command.uv_max);
             return;
         }
         Vec2f points[4 * k_max_corner_points];
@@ -164,17 +177,9 @@ private:
     {
         set_clip(command.clip);
         const float thickness = math::min(command.thickness, math::min(command.rect.size[0], command.rect.size[1]) * 0.5f);
-        const uint32_t per_corner = points_per_corner(command.radius);
-        Vec2f outer[4 * k_max_corner_points];
-        Vec2f inner[4 * k_max_corner_points];
-        const uint32_t count = outline(command.rect, command.radius, 0.0f, per_corner, outer);
-        outline(command.rect, command.radius, thickness, per_corner, inner);
-        for (uint32_t i = 0; i < count; ++i)
-        {
-            const uint32_t next = (i + 1) % count;
-            m_batcher.draw_triangle(world(outer[i]), world(outer[next]), world(inner[i]), command.colour);
-            m_batcher.draw_triangle(world(outer[next]), world(inner[next]), world(inner[i]), command.colour);
-        }
+        float radii[4];
+        fill_radii(command.radius, radii);
+        m_batcher.draw_ui_border(world(rect_centre(command.rect)), command.rect.size, radii, thickness, command.colour);
     }
 
     static constexpr uint32_t k_max_corner_points = 12;

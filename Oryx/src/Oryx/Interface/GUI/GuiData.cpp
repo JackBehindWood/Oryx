@@ -108,7 +108,7 @@ void resolve_y(float seen_min, float seen_max, bool bars, float fixed_min, float
 void bar(std::string_view label, float value, float max, const BarOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& base = im::resolved_style(ctx, options);
+    const ImStyle& base = ctx.role_style(options, &GuiTheme::field);
     const float fraction = max > math::EPSILON<float> ? math::saturate(value / max) : 0.0f;
     ImStyle coloured = base;
     if (options.scale != nullptr)
@@ -127,7 +127,7 @@ void bar(std::string_view label, float value, float max, const BarOptions& optio
 
 PlotScope::PlotScope(std::string_view name, const PlotOptions& options)
     : m_context(context())
-    , m_style(&im::resolved_style(m_context, options))
+    , m_style(&m_context.role_style(options, &GuiTheme::panel))
     , m_options(options)
     , m_id(m_context.id(name))
     , m_previous(m_context.state<Memory>(m_id))
@@ -466,7 +466,7 @@ PlotResult sparkline(std::string_view name, const Values& values, const Sparklin
 ItemState heat_cell(std::string_view label, float value, const ColourScale& scale, const HeatCellOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     const ItemState state = ctx.item(ctx.id(label));
     LayoutStyle box;
     if (options.layout != nullptr)
@@ -505,7 +505,7 @@ ItemState heat_cell(std::string_view label, float value, const ColourScale& scal
 HeatGridResult heat_grid(std::string_view name, const Values& values, uint32_t columns, const ColourScale& scale, const HeatGridOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     const uint32_t per_row = math::max(columns, 1u);
     const uint32_t rows = (values.count + per_row - 1) / per_row;
     const float stride_x = options.cell[0] + options.gap;

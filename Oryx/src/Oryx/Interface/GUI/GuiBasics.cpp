@@ -66,19 +66,20 @@ void overlay_text(std::string_view text, const ImStyle& style)
 
 FieldScope::FieldScope(std::string_view name, const FieldOptions& options)
     : m_name(name)
-    , m_style(&im::resolved_style(context(), options))
+    , m_style(&context().role_style(options, &GuiTheme::panel))
 {
     GuiContext& ctx = context();
     const GuiTheme& theme = ctx.gui_theme();
     m_label_width = options.label_width >= 0.0f ? options.label_width : theme.label_width;
     m_label_after = side_of(theme, options) == LabelSide::After;
+    m_hidden = m_name.starts_with("##");
     LayoutStyle row;
     row.width = options.width;
     row.align_y = Align::Centre;
     row.gap = theme.spacing;
     ctx.begin_box(name, row);
     ctx.push_id(name);
-    if (!m_label_after)
+    if (!m_label_after && !m_hidden)
     {
         text_box(m_name, *m_style, m_label_width > 0.0f ? fixed(m_label_width) : fit());
     }
@@ -87,7 +88,7 @@ FieldScope::FieldScope(std::string_view name, const FieldOptions& options)
 FieldScope::~FieldScope()
 {
     GuiContext& ctx = context();
-    if (m_label_after)
+    if (m_label_after && !m_hidden)
     {
         text_box(m_name, *m_style, m_label_width > 0.0f ? fixed(m_label_width) : fit());
     }
@@ -97,7 +98,7 @@ FieldScope::~FieldScope()
 
 void text_coloured(std::string_view text, const Colour& colour, const WidgetOptions& options)
 {
-    ImStyle style = im::resolved_style(context(), options);
+    ImStyle style = context().role_style(options, &GuiTheme::panel);
     style.text = colour;
     WidgetOptions coloured = options;
     coloured.style = &style;
@@ -107,7 +108,7 @@ void text_coloured(std::string_view text, const Colour& colour, const WidgetOpti
 void bullet(std::string_view text, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
     LayoutStyle row;
     row.align_y = Align::Centre;
     row.gap = ctx.gui_theme().spacing;
@@ -128,7 +129,7 @@ void bullet(std::string_view text, const WidgetOptions& options)
 void key_value(std::string_view key, std::string_view value, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
     LayoutStyle row;
     row.width = grow();
     row.align_y = Align::Centre;
@@ -144,21 +145,88 @@ void key_value(std::string_view key, std::string_view value, const WidgetOptions
 
 ItemState small_button(std::string_view text, const WidgetOptions& options)
 {
-    LayoutStyle box = im::default_box(im::resolved_style(context(), options));
+    LayoutStyle box = im::default_box(context().role_style(options, &GuiTheme::button));
     box.padding = { 4.0f, 1.0f, 4.0f, 1.0f };
     WidgetOptions small = options;
     small.layout = options.layout != nullptr ? options.layout : &box;
     return button(text, small);
 }
 
+namespace
+{
+
+Colour toward(const Colour& from, const Colour& to, float t)
+{
+    return lerp(from, to, t);
+}
+
+// The box of a checkbox or radio: a ring-less field that takes the accent when set, with a check mark or a dot.
+void choice_mark(GuiContext& ctx, const ImStyle& style, const ItemState& state, bool set, bool round)
+{
+    const float side = style.text_height;
+    LayoutStyle box = square_box(side);
+    box.align_x = Align::Centre;
+    box.align_y = Align::Centre;
+    const uint32_t index = ctx.begin_box(ImId{}, box);
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    const bool lit = state.hovered || state.held;
+    const Colour rest_border = lit ? toward(style.border, style.text, 0.45f) : style.border;
+    paint.has_fill = true;
+    paint.radius = uniform_radius(round ? side * 0.5f : style.radius);
+    paint.border_width = math::max(1.0f, style.border_width);
+    if (round)
+    {
+        paint.fill = im::interaction_fill(style, state, style.background);
+        paint.border = set ? im::keep_fill(state, style.accent) : rest_border;
+        if (set)
+        {
+            LayoutStyle dot = square_box(side * 0.48f);
+            const uint32_t dot_index = ctx.begin_box(ImId{}, dot);
+            BoxPaint& dot_paint = ctx.layout().node(dot_index).paint;
+            dot_paint.has_fill = true;
+            dot_paint.fill = im::keep_fill(state, style.accent);
+            dot_paint.radius = uniform_radius(side);
+            ctx.end_box();
+        }
+    }
+    else if (set)
+    {
+        paint.fill = im::keep_fill(state, style.accent);
+        paint.border = paint.fill;
+        paint.icon = Icon::Check;
+        paint.icon_colour = style.on_accent;
+        paint.icon_size = side * 0.72f;
+        paint.icon_thickness = 2.0f;
+    }
+    else
+    {
+        paint.fill = im::interaction_fill(style, state, style.background);
+        paint.border = rest_border;
+    }
+    ctx.end_box();
+}
+
+FieldOptions label_hit(const FieldOptions& options)
+{
+    FieldOptions fit_row = options;
+    fit_row.width = fit();
+    return fit_row;
+}
+
+} // namespace
+
 bool checkbox(std::string_view label, bool& value, const FieldOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     const ItemState state = ctx.item(ctx.id(label));
     {
-        FieldScope field(label, options);
-        leaf_surface(ctx, square_box(style.text_height), style, im::interaction_fill(style, state, value ? style.accent : style.background), style.radius);
+        FieldScope field(label, label_hit(options));
+        choice_mark(ctx, style, state, value, false);
+    }
+    if (state.hovered)
+    {
+        ctx.request_cursor(CursorShape::Hand);
     }
     if (state.clicked)
     {
@@ -170,11 +238,15 @@ bool checkbox(std::string_view label, bool& value, const FieldOptions& options)
 bool radio(std::string_view label, int32_t& value, int32_t option, const FieldOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     const ItemState state = ctx.item(ctx.id(label));
     {
-        FieldScope field(label, options);
-        leaf_surface(ctx, square_box(style.text_height), style, im::interaction_fill(style, state, value == option ? style.accent : style.background), style.text_height);
+        FieldScope field(label, label_hit(options));
+        choice_mark(ctx, style, state, value == option, true);
+    }
+    if (state.hovered)
+    {
+        ctx.request_cursor(CursorShape::Hand);
     }
     const bool changed = state.clicked && value != option;
     if (state.clicked)
@@ -187,7 +259,7 @@ bool radio(std::string_view label, int32_t& value, int32_t option, const FieldOp
 ItemState selectable(std::string_view label, bool selected, const SelectableOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
     const ItemState state = ctx.item(ctx.id(label));
     LayoutStyle box = im::widget_box(style, options);
     if (options.layout == nullptr)
@@ -197,19 +269,23 @@ ItemState selectable(std::string_view label, bool selected, const SelectableOpti
     }
     const uint32_t index = ctx.begin_box(label, box);
     LayoutNode& node = ctx.layout().node(index);
-    const bool lit = selected || state.hovered;
-    node.paint.has_fill = lit;
-    node.paint.fill = state.held ? style.pressed : selected ? style.accent : style.hover;
+    node.paint.has_fill = selected || state.hovered || state.held;
+    node.paint.fill = selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : style.hover;
     node.paint.radius = uniform_radius(style.radius);
     im::paint_text(node.paint, node, style, TextAlign::Left, true);
     ctx.end_box();
     return state;
 }
 
+bool select_on_press(const ItemState& item, uint32_t index, Selection& selection, uint64_t* words, uint32_t count)
+{
+    return item.pressed && select_click(selection, words, count, index, context().input().keys);
+}
+
 void badge(std::string_view text, const Colour& colour, const WidgetOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
     LayoutStyle box = im::widget_box(style, options);
     if (options.layout == nullptr)
     {
@@ -226,7 +302,7 @@ void badge(std::string_view text, const Colour& colour, const WidgetOptions& opt
 
 void colour_swatch(std::string_view label, const Colour& colour, const FieldOptions& options)
 {
-    const ImStyle& style = im::resolved_style(context(), options);
+    const ImStyle& style = context().role_style(options, &GuiTheme::field);
     FieldScope field(label, options);
     leaf_surface(context(), square_box(style.text_height), style, colour, style.radius);
 }
@@ -234,7 +310,7 @@ void colour_swatch(std::string_view label, const Colour& colour, const FieldOpti
 void progress(std::string_view label, float fraction, std::string_view text, const FieldOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     FieldScope field(label, options);
     LayoutStyle track;
     track.width = grow(1.0f, 80.0f);

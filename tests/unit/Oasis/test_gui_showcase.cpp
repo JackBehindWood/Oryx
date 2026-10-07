@@ -141,6 +141,9 @@ TEST_CASE("GUI showcase: the perf tab's replay is attributed per stream")
     CHECK(switches == stats.flushes[static_cast<uint32_t>(FlushReason::StreamChange)]);
     CHECK(stats.draws == rig.sink.size());
     CHECK(stats.primitives > 0);
+    CHECK(stats.streams[static_cast<uint32_t>(Primitive2D::Ui)].primitives == stats.primitives);
+    CHECK(switches == 0);
+    CHECK(stats.draws <= stats.flushes[static_cast<uint32_t>(FlushReason::ScissorChange)] + 1);
 }
 
 TEST_CASE("GUI showcase: replaying the same frame twice gives identical stats")
@@ -163,7 +166,7 @@ TEST_CASE("GUI showcase: every tab builds and the perf tab shows the renderer nu
     f.click("Widgets");
     CHECK(f.find("checkbox") != nullptr);
     f.click("Data");
-    CHECK(f.find("policy") != nullptr);
+    CHECK(f.find("policy series") != nullptr);
     CHECK(f.find("Visits") != nullptr);
     f.click("Visits");
     CHECK(f.find("Visits ^") != nullptr);

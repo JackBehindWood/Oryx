@@ -29,6 +29,15 @@ TEST_CASE("vertex_declaration: built-in 2D vertex formats match their structs")
     CHECK(text.attributes()[4].offset == offsetof(Vertex2DText, px_range));
     CHECK(text.hash() != quad.hash());
 
+    const RHIVertexDeclaration& ui = vertex_declaration<Vertex2DUi>();
+    CHECK(ui.stride() == sizeof(Vertex2DUi));
+    REQUIRE(ui.attributes().size() == 5);
+    CHECK(ui.attributes()[2].offset == offsetof(Vertex2DUi, colour));
+    CHECK(ui.attributes()[3].offset == offsetof(Vertex2DUi, control));
+    CHECK(ui.attributes()[4].offset == offsetof(Vertex2DUi, radii));
+    CHECK(ui.hash() != text.hash());
+    CHECK(primitive_traits(Primitive2D::Ui).vertex_size == ui.stride());
+
     CHECK(line.hash() != quad.hash());
     CHECK(quad.hash() != circle.hash());
     CHECK(&vertex_declaration<Vertex2DQuad>() == &quad);

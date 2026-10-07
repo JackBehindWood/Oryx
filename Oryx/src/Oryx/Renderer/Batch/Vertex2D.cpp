@@ -56,4 +56,18 @@ const RHIVertexDeclaration& vertex_declaration<Vertex2DText>()
     return declaration;
 }
 
+template<>
+const RHIVertexDeclaration& vertex_declaration<Vertex2DUi>()
+{
+    static const RHIVertexDeclaration declaration = RHIVertexDeclarationBuilder()
+                                                        .stream(0, sizeof(Vertex2DUi))
+                                                        .attribute(0, RHIVertexFormat::Float2, offsetof(Vertex2DUi, position))
+                                                        .attribute(1, RHIVertexFormat::Float2, offsetof(Vertex2DUi, uv))
+                                                        .attribute(2, RHIVertexFormat::UByte4Norm, offsetof(Vertex2DUi, colour))
+                                                        .attribute(3, RHIVertexFormat::UByte4Norm, offsetof(Vertex2DUi, control))
+                                                        .attribute(4, RHIVertexFormat::UByte4Norm, offsetof(Vertex2DUi, radii))
+                                                        .build();
+    return declaration;
+}
+
 } // namespace oryx

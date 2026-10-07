@@ -32,7 +32,7 @@ LayoutStyle cell_box(const Sizing& width, TextAlign align)
 
 TableScope::TableScope(std::string_view name, const TableOptions& options)
     : m_context(context())
-    , m_style(&im::resolved_style(m_context, options))
+    , m_style(&m_context.role_style(options, &GuiTheme::panel))
     , m_options(options)
     , m_id(m_context.id(name))
 {
@@ -189,7 +189,7 @@ ItemState TableScope::row(uint32_t index, bool selected)
     const uint32_t node = ctx.begin_box(id, box);
     BoxPaint& paint = ctx.layout().node(node).paint;
     paint.has_fill = selected || state.hovered;
-    paint.fill = state.held ? style.pressed : selected ? style.accent : style.hover;
+    paint.fill = selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : style.hover;
     ctx.push_id(id);
     m_row_open = true;
     m_cell = 0;

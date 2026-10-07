@@ -46,6 +46,18 @@ Colour interaction_fill(const ImStyle& style, const ItemState& state, const Colo
     return state.held ? style.pressed : state.hovered ? style.hover : rest;
 }
 
+Colour tint(const Colour& colour, float amount)
+{
+    const float target = amount >= 0.0f ? 1.0f : 0.0f;
+    const float t = math::abs(amount);
+    return { math::lerp(colour.r, target, t), math::lerp(colour.g, target, t), math::lerp(colour.b, target, t), colour.a };
+}
+
+Colour keep_fill(const ItemState& state, const Colour& colour)
+{
+    return state.held ? tint(colour, -0.18f) : state.hovered ? tint(colour, 0.14f) : colour;
+}
+
 // A leaf box that reacts to the pointer; the colour of `rest` shows while idle.
 ItemState interactive_box(ImContext& context, std::string_view text, const WidgetOptions& options, const Colour* rest)
 {

@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Interface/GUI/GuiWidgets.h"
+#include "Oryx/Interface/GUI/GuiTextField.h"
 
 namespace oryx::gui
 {
@@ -38,7 +38,16 @@ Track make_track(GuiContext& ctx, const ImStyle& style, float fraction, std::str
     box.width = grow(1.0f, 80.0f);
     box.height = fixed(style.text_height + 4.0f);
     const uint32_t index = ctx.begin_box(track.id, box);
-    im::paint_surface(ctx.layout().node(index).paint, style, im::interaction_fill(style, track.item, style.background));
+    BoxPaint& surface = ctx.layout().node(index).paint;
+    im::paint_surface(surface, style, im::interaction_fill(style, track.item, style.background));
+    if (ctx.focus() == track.id)
+    {
+        surface.border = style.accent;
+    }
+    if (track.item.hovered || track.item.held)
+    {
+        ctx.request_cursor(CursorShape::ResizeHorizontal);
+    }
     if (fraction >= 0.0f)
     {
         LayoutStyle fill;
@@ -70,11 +79,41 @@ std::string_view value_text(GuiContext& ctx, float value, bool integer)
     return integer ? ctx.arena().format("%d", static_cast<int>(std::lround(value))) : ctx.arena().format("%.2f", value);
 }
 
+bool wants_entry(const Track& track, const GuiContext& ctx)
+{
+    return track.item.double_clicked || (track.item.clicked && ctx.input().keys.shortcut);
+}
+
+// Runs the typed-number field in place of the bar; true when it ended and the value changed. `min >= max` leaves the range open.
+bool entry_step(GuiContext& ctx, const ImStyle& style, detail::NumberEntry& entry, ImId id, float& value, float min, float max, bool integer)
+{
+    double edited = static_cast<double>(value);
+    bool committed = false;
+    if (!detail::run_number_entry(ctx, id, style, entry, edited, committed) || !committed)
+    {
+        return false;
+    }
+    float next = static_cast<float>(edited);
+    next = min < max ? math::clamp(next, min, max) : next;
+    next = integer ? std::round(next) : next;
+    const bool changed = next != value;
+    value = next;
+    return changed;
+}
+
 bool slider_impl(std::string_view label, float& value, float min, float max, float step, bool integer, const FieldOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     FieldScope field(label, options);
+    const ImId entry_id = ctx.id("entry");
+    detail::NumberEntry entry = ctx.state<detail::NumberEntry>(entry_id);
+    if (entry.editing)
+    {
+        const bool changed = entry_step(ctx, style, entry, entry_id, value, min, math::max(min, max), integer);
+        ctx.state<detail::NumberEntry>(entry_id) = entry;
+        return changed;
+    }
     const float range = max - min;
     const Track track = make_track(ctx, style, range > 0.0f ? (value - min) / range : 0.0f, value_text(ctx, value, integer));
     const float before = value;
@@ -88,14 +127,27 @@ bool slider_impl(std::string_view label, float& value, float min, float max, flo
     }
     value += arrow_direction(ctx, track.id) * step;
     value = math::clamp(integer ? std::round(value) : value, min, math::max(min, max));
+    if (wants_entry(track, ctx))
+    {
+        detail::begin_number_entry(ctx, entry_id, entry, static_cast<double>(value), integer, 3);
+    }
+    ctx.state<detail::NumberEntry>(entry_id) = entry;
     return value != before;
 }
 
 bool drag_impl(std::string_view label, float& value, float min, float max, float speed, bool integer, const FieldOptions& options)
 {
     GuiContext& ctx = context();
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     FieldScope field(label, options);
+    const ImId entry_id = ctx.id("entry");
+    detail::NumberEntry entry = ctx.state<detail::NumberEntry>(entry_id);
+    if (entry.editing)
+    {
+        const bool changed = entry_step(ctx, style, entry, entry_id, value, min, max, integer);
+        ctx.state<detail::NumberEntry>(entry_id) = entry;
+        return changed;
+    }
     const Track track = make_track(ctx, style, -1.0f, value_text(ctx, value, integer));
     const float before = value;
     float& accumulated = ctx.state<DragAccumulator>(track.id).value;
@@ -103,10 +155,6 @@ bool drag_impl(std::string_view label, float& value, float min, float max, float
     {
         ctx.set_focus(track.id);
         accumulated = value;
-    }
-    if (track.item.hovered || track.item.held)
-    {
-        ctx.request_cursor(CursorShape::ResizeHorizontal);
     }
     if (track.drag.started || track.drag.dragging)
     {
@@ -122,6 +170,11 @@ bool drag_impl(std::string_view label, float& value, float min, float max, float
         value = math::clamp(value, min, max);
         accumulated = math::clamp(accumulated, min, max);
     }
+    if (wants_entry(track, ctx))
+    {
+        detail::begin_number_entry(ctx, entry_id, entry, static_cast<double>(value), integer, 3);
+    }
+    ctx.state<detail::NumberEntry>(entry_id) = entry;
     return value != before;
 }
 
@@ -161,7 +214,7 @@ ComboScope::ComboScope(std::string_view label, std::string_view preview, const F
     , m_open(m_context.state<OpenFlag>(m_control).open)
 {
     GuiContext& ctx = m_context;
-    const ImStyle& style = im::resolved_style(ctx, options);
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
     if (m_state.clicked)
     {
         m_open = !m_open;
@@ -194,7 +247,7 @@ ComboScope::ComboScope(std::string_view label, std::string_view preview, const F
         list.channel = k_channel_popup;
         list.floating = im::popup_below(m_control, anchor, last.size, ctx.input().surface_size);
         const uint32_t list_index = ctx.begin_box(popup, list);
-        im::paint_surface(ctx.layout().node(list_index).paint, style, style.background);
+        im::paint_surface(ctx.layout().node(list_index).paint, ctx.gui_theme().overlay, ctx.gui_theme().overlay.background);
         ctx.push_id("popup");
     }
 }

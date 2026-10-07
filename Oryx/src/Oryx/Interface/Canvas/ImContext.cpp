@@ -38,6 +38,8 @@ void ImContext::begin_frame(const ImInput& input)
     m_press_claimed = false;
     m_popup_count = 0;
     m_popup_depth = 0;
+    m_disabled = 0;
+    m_layout.set_alpha(1.0f);
 }
 
 Vec2f ImContext::consume_wheel()
@@ -66,6 +68,10 @@ void ImContext::end_frame()
     if (m_layout.open_depth() != 0)
     {
         throw Error("ImContext frame ended with a box open", "every begin_box needs an end_box");
+    }
+    if (m_disabled != 0)
+    {
+        throw Error("ImContext frame ended with a disabled scope open", "every begin_disabled needs an end_disabled");
     }
     if (m_popup_depth != 0)
     {
@@ -101,6 +107,8 @@ void ImContext::abort_frame()
     m_hits.clear();
     m_popup_depth = 0;
     m_popup_count = 0;
+    m_disabled = 0;
+    m_layout.set_alpha(1.0f);
     m_open = false;
 }
 
@@ -167,6 +175,26 @@ void ImContext::pop_id()
     m_id_stack.pop_back();
 }
 
+void ImContext::begin_disabled()
+{
+    require_frame("begin_disabled");
+    ++m_disabled;
+    m_layout.set_alpha(k_disabled_alpha);
+}
+
+void ImContext::end_disabled()
+{
+    require_frame("end_disabled");
+    if (m_disabled == 0)
+    {
+        throw Error("ImContext has no disabled scope to end", "every end_disabled needs a begin_disabled");
+    }
+    if (--m_disabled == 0)
+    {
+        m_layout.set_alpha(1.0f);
+    }
+}
+
 ItemState ImContext::item(ImId id, const Rect& rect)
 {
     return item_clipped(id, rect, unbounded_rect());
@@ -192,6 +220,10 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
     memory.rect = rect;
 
     ItemState state;
+    if (m_disabled != 0)
+    {
+        return state;
+    }
     const ImButton& left = button_of(m_input, MouseCode::Left);
     const Rect hit = intersect(intersect(at_least(rect, Vec2f(m_theme.min_hit_size, m_theme.min_hit_size)), m_draw.current_clip()), layout_clip);
     m_hits.push_back({ id, hit });

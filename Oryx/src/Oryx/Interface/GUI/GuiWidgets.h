@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Interface/GUI/Gui.h"
+#include "Oryx/Interface/GUI/GuiSelection.h"
 
 // The developer-tooling widget set. Like everything in oryx::gui they answer from last frame's rects, take a std::string_view label that is also the identity under the current id scope,
 // and return plain result structs. Labelled controls put the label on the side the theme (or the call) says, see FieldOptions.
@@ -20,7 +21,7 @@ struct FieldOptions : WidgetOptions
 
 static_assert(std::is_trivially_copyable_v<FieldOptions>);
 
-// A row holding a label and one control, built in the order the options and the theme choose; the row is the box named `name` and scopes the ids of its control.
+// A row holding a label and one control (a name starting with "##" hides its label but still names the row), built in the order the options and the theme choose; the row is the box named `name` and scopes the ids of its control.
 // Open it, add the control's boxes, close it by leaving the scope.
 class FieldScope
 {
@@ -36,6 +37,7 @@ private:
     const ImStyle* m_style;
     float m_label_width;
     bool m_label_after;
+    bool m_hidden;
 };
 
 // A leaf box with one line of text; the text is copied into the frame arena. Returns the node index.
@@ -49,7 +51,7 @@ void text_coloured(std::string_view text, const Colour& colour, const WidgetOpti
 void bullet(std::string_view text, const WidgetOptions& options = {});
 // A row with the key on the left and the value on the right, for statistics.
 void key_value(std::string_view key, std::string_view value, const WidgetOptions& options = {});
-[[nodiscard]] ItemState small_button(std::string_view text, const WidgetOptions& options = {});
+ItemState small_button(std::string_view text, const WidgetOptions& options = {});
 // Flips `value` on a click; returns whether it did. The whole row, label included, is the click area.
 bool checkbox(std::string_view label, bool& value, const FieldOptions& options = {});
 // Sets `value` to `option` on a click; returns whether it changed.
@@ -63,7 +65,9 @@ struct SelectableOptions : WidgetOptions
 
 static_assert(std::is_trivially_copyable_v<SelectableOptions>);
 
-[[nodiscard]] ItemState selectable(std::string_view label, bool selected, const SelectableOptions& options = {});
+ItemState selectable(std::string_view label, bool selected, const SelectableOptions& options = {});
+// A press on the item applies select_click for `index` with the frame's modifier keys; true when the set changed. Use it with the ItemState of selectable, TableScope::row or a list box row.
+bool select_on_press(const ItemState& item, uint32_t index, Selection& selection, uint64_t* words, uint32_t count);
 void badge(std::string_view text, const Colour& colour, const WidgetOptions& options = {});
 void colour_swatch(std::string_view label, const Colour& colour, const FieldOptions& options = {});
 // `fraction` is clamped to 0..1; `text` is drawn over the bar when not empty.
@@ -264,6 +268,37 @@ private:
 
 // Input
 
+struct TextInputResult
+{
+    bool changed = false;
+    bool submitted = false;
+    bool cancelled = false;
+    bool focused = false;
+};
+
+static_assert(std::is_trivially_copyable_v<TextInputResult> && std::is_standard_layout_v<TextInputResult>);
+
+// A one-line field editing the NUL-terminated text in `buffer` (`capacity` bytes with the NUL) in place while it has focus: typing, selection with shift, home/end, shortcut+A/C/X/V and a click to place the caret.
+// Enter submits and Escape cancels (the text typed so far stays); both release focus. Caret and scroll state live under the label's id.
+TextInputResult text_input(std::string_view label, char* buffer, uint32_t capacity, const FieldOptions& options = {});
+
+struct NumberOptions : FieldOptions
+{
+    // A min not below max leaves the value unclamped.
+    float min = 0.0f;
+    float max = 0.0f;
+    // Decimal places shown for floats; trailing zeros are dropped.
+    uint32_t decimals = 3;
+    // In: true starts an edit at once, with the focus and everything selected. Out: whether an edit is under way, so a caller can show the field only while it lasts (a table cell). Null for a plain field.
+    bool* edit = nullptr;
+};
+
+static_assert(std::is_trivially_copyable_v<NumberOptions>);
+
+// A text field that shows the number and edits it as text while it has focus. Enter or a click elsewhere takes the typed number (clamped to the range); Escape or text that is not a number puts the old value back. Returns whether the value changed.
+bool input_float(std::string_view label, float& value, const NumberOptions& options = {});
+bool input_int(std::string_view label, int32_t& value, const NumberOptions& options = {});
+
 struct SliderOptions : FieldOptions
 {
     // Change per arrow key when focused; zero uses a hundredth of the range (one for integers).
@@ -283,7 +318,7 @@ struct DragOptions : FieldOptions
 
 static_assert(std::is_trivially_copyable_v<DragOptions>);
 
-// Dragging sideways changes the value; there is no text entry. A min not below max leaves the value unclamped.
+// Dragging sideways changes the value; a double click (or a shortcut-click) turns the bar into a text field until Enter, Escape or a click elsewhere. A min not below max leaves the value unclamped.
 bool drag_float(std::string_view label, float& value, float min = 0.0f, float max = 0.0f, const DragOptions& options = {});
 bool drag_int(std::string_view label, int32_t& value, int32_t min = 0, int32_t max = 0, const DragOptions& options = {});
 

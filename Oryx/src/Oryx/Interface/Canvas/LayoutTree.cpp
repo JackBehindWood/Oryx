@@ -261,9 +261,15 @@ struct PaintPass
     float scale;
 };
 
+Colour faded(const Colour& colour, float alpha)
+{
+    return { colour.r, colour.g, colour.b, colour.a * alpha };
+}
+
 void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channel)
 {
     const LayoutNode& node = pass.tree.node(index);
+    const float alpha = node.alpha;
     const uint32_t channel = node.style.channel != 0 ? node.style.channel : inherited_channel;
     pass.list.set_channel(channel);
     const BoxPaint& paint = node.paint;
@@ -272,28 +278,28 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
         const Rect snapped = snap_to_pixels(node.rect, pass.scale);
         if (is_square(paint.radius))
         {
-            pass.list.add_rect(snapped, paint.fill);
+            pass.list.add_rect(snapped, faded(paint.fill, alpha));
         }
         else
         {
-            pass.list.add_rounded_rect(snapped, paint.radius, paint.fill);
+            pass.list.add_rounded_rect(snapped, paint.radius, faded(paint.fill, alpha));
         }
     }
     if (paint.has_image)
     {
-        pass.list.add_image(snap_to_pixels(inset(node.rect, node.style.padding), pass.scale), paint.image, paint.image_uv_min, paint.image_uv_max, paint.radius, paint.image_tint);
+        pass.list.add_image(snap_to_pixels(inset(node.rect, node.style.padding), pass.scale), paint.image, paint.image_uv_min, paint.image_uv_max, paint.radius, faded(paint.image_tint, alpha));
     }
     if (paint.border_width > 0.0f)
     {
-        pass.list.add_border(snap_to_pixels(node.rect, pass.scale), paint.radius, paint.border_width, paint.border);
+        pass.list.add_border(snap_to_pixels(node.rect, pass.scale), paint.radius, paint.border_width, faded(paint.border, alpha));
     }
     if (pass.painter != nullptr && !paint.text.empty())
     {
-        pass.painter->text(inset(node.rect, node.style.padding), paint.text, { paint.text_height, paint.text_colour, paint.text_align, paint.ellipsis });
+        pass.painter->text(inset(node.rect, node.style.padding), paint.text, { paint.text_height, faded(paint.text_colour, alpha), paint.text_align, paint.ellipsis });
     }
     if (paint.icon != Icon::None)
     {
-        draw_icon(pass.list, inset(node.rect, node.style.padding), paint.icon, paint.icon_colour, paint.icon_size, paint.icon_thickness);
+        draw_icon(pass.list, inset(node.rect, node.style.padding), paint.icon, faded(paint.icon_colour, alpha), paint.icon_size, paint.icon_thickness);
     }
     const bool clips = node.style.overflow != Overflow::Visible;
     if (clips)
@@ -329,6 +335,7 @@ uint32_t LayoutTree::begin_box(ImId id, const LayoutStyle& style, std::string_vi
     node.id = id;
     node.name = name;
     node.style = style;
+    node.alpha = m_alpha;
     node.parent = m_open.empty() ? -1 : static_cast<int32_t>(m_open.back());
     m_nodes.push_back(node);
     if (node.parent >= 0)

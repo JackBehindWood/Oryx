@@ -2,6 +2,7 @@
 
 #include "Oryx/Interface/Canvas/ActiveContext.h"
 #include "Oryx/Interface/Canvas/ImContext.h"
+#include "Oryx/Interface/Canvas/ImWidgets.h"
 #include "Oryx/Interface/GUI/GuiTheme.h"
 
 namespace oryx
@@ -39,6 +40,17 @@ public:
     }
     [[nodiscard]] const GuiTheme& gui_theme() const { return m_gui_theme; }
 
+    // The style a widget of this role draws with: the call's own style, else its variant when the theme has one, else the theme's role.
+    [[nodiscard]] const ImStyle& role_style(const im::WidgetOptions& options, const ImStyle GuiTheme::* role) const
+    {
+        if (options.style != nullptr)
+        {
+            return *options.style;
+        }
+        const ImStyle& variant = style_for(theme(), options.variant);
+        return &variant == &theme().base ? m_gui_theme.*role : variant;
+    }
+
     // A picked menu item asks every open menu to close; they do so in the next frame.
     void request_menu_close() { m_menu_close_frame = frame(); }
     [[nodiscard]] bool menu_close_requested() const { return m_menu_close_frame != 0 && m_menu_close_frame + 1 == frame(); }
@@ -59,7 +71,7 @@ public:
     [[nodiscard]] GuiToast* toasts() { return m_toasts; }
 
 private:
-    GuiTheme m_gui_theme;
+    GuiTheme m_gui_theme = dark_gui_theme();
     GuiToast m_toasts[k_max_toasts];
     uint64_t m_menu_close_frame = 0;
 };
