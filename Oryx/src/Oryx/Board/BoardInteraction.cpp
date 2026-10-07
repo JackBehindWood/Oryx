@@ -8,6 +8,16 @@ BoardInteraction::BoardInteraction(UniquePtr<IBoardPresenter> presenter, std::st
 {
 }
 
+void BoardInteraction::reset(PlayerId seat)
+{
+    m_presentation.reset(seat);
+    m_scene = {};
+    m_queued = PENDING_ACTION;
+    m_hovered = k_no_space;
+    m_drag_space = k_no_space;
+    m_drag = false;
+}
+
 bool BoardInteraction::update(const IState& state)
 {
     if (!m_presentation.update(state))

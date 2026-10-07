@@ -42,8 +42,15 @@ public:
     void on_turn(const IState&) override { ++turns; }
     ActionId poll_action(const IState&) override { return next_action; }
     bool shows_moves() const override { return true; }
+    void reset(PlayerId seat) override
+    {
+        ++resets;
+        last_seat = seat;
+    }
 
     int32_t turns = 0;
+    int32_t resets = 0;
+    PlayerId last_seat = -2;
     ActionId next_action = PENDING_ACTION;
 };
 

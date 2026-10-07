@@ -49,8 +49,20 @@ private:
 class RestartSimulationEvent : public Event
 {
 public:
+    RestartSimulationEvent() = default;
+    // `seat_order[seat]` is the index, among the strategies the simulation started with, of the one that plays `seat` in the next match.
+    explicit RestartSimulationEvent(SmallVector<uint32_t, 2> seat_order)
+        : m_seat_order(std::move(seat_order))
+    {
+    }
+
+    [[nodiscard]] const SmallVector<uint32_t, 2>& seat_order() const { return m_seat_order; }
+
     OX_EVENT_CLASS_TYPE(RestartSimulation)
     OX_EVENT_CLASS_CATEGORY(EventCategoryApplication)
+
+private:
+    SmallVector<uint32_t, 2> m_seat_order;
 };
 
 class SimulationCompleteEvent : public Event

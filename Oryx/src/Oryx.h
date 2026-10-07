@@ -165,6 +165,7 @@
 #include "Oryx/Interface/UI/UiContext.h"
 #include "Oryx/Interface/UI/Ui.h"
 #include "Oryx/Board/Graphics/BoardProjection2D.h"
+#include "Oryx/Board/Graphics/BoardOverlay2D.h"
 #include "Oryx/Board/Graphics/BoardRenderer2D.h"
 #include "Oryx/Board/Graphics/PresentedGraphicsBoard2D.h"
 #include "Oryx/Board/Graphics/GraphicsBoards.h"

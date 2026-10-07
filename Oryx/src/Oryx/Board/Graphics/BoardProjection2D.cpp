@@ -3,15 +3,17 @@
 namespace oryx
 {
 
-namespace
+Rect board_region_2d(const Vec2f& viewport)
 {
-
-constexpr Vec2f k_option_button_size = { 120.0f, 36.0f };
-constexpr float k_option_button_gap = 12.0f;
-
-} // namespace
+    return { { k_board_gutter, k_board_status_band }, { viewport[0] - 2.0f * k_board_gutter, viewport[1] - k_board_status_band - k_board_menu_band - k_board_gutter } };
+}
 
 BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
+{
+    return fit_board_2d(scene, viewport, board_region_2d(viewport));
+}
+
+BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport, const Rect& region)
 {
     BoardProjection2D layout;
     layout.viewport = viewport;
@@ -25,10 +27,10 @@ BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
     const Vec2f& max = scene.layout->max();
     float board_width = max[0] - min[0];
     float board_height = max[1] - min[1];
-    float left = k_board_gutter;
-    float bottom = k_board_menu_band + k_board_gutter;
-    float width = viewport[0] - 2.0f * k_board_gutter;
-    float height = viewport[1] - k_board_status_band - bottom;
+    float left = region.min[0];
+    float bottom = viewport[1] - region.min[1] - region.size[1];
+    float width = region.size[0];
+    float height = region.size[1];
     if (board_width <= 0.0f || board_height <= 0.0f || width <= 0.0f || height <= 0.0f)
     {
         return layout;
@@ -60,37 +62,6 @@ Vec2f cursor_to_board(const BoardProjection2D& layout, const Vec2f& cursor)
     }
     Vec2f world = cursor_to_world(layout, cursor);
     return { (world[0] - layout.origin[0]) / layout.scale, (world[1] - layout.origin[1]) / layout.scale };
-}
-
-OptionButton2D option_button_2d(const BoardProjection2D& layout, size_t count, size_t index)
-{
-    float step = k_option_button_size[0] + k_option_button_gap;
-    float total = static_cast<float>(count) * k_option_button_size[0] + static_cast<float>(count > 0 ? count - 1 : 0) * k_option_button_gap;
-    float x = (layout.viewport[0] - total) * 0.5f + k_option_button_size[0] * 0.5f + static_cast<float>(index) * step;
-    return { { x, k_board_menu_band * 0.5f }, k_option_button_size };
-}
-
-void option_buttons_2d(const BoardProjection2D& layout, size_t count, std::vector<OptionButton2D>& out)
-{
-    out.clear();
-    for (size_t index = 0; index < count; ++index)
-    {
-        out.push_back(option_button_2d(layout, count, index));
-    }
-}
-
-size_t option_at(const std::vector<OptionButton2D>& buttons, const BoardProjection2D& layout, const Vec2f& cursor)
-{
-    Vec2f world = cursor_to_world(layout, cursor);
-    for (size_t index = 0; index < buttons.size(); ++index)
-    {
-        const OptionButton2D& button = buttons[index];
-        if (std::abs(world[0] - button.centre[0]) <= button.size[0] * 0.5f && std::abs(world[1] - button.centre[1]) <= button.size[1] * 0.5f)
-        {
-            return index;
-        }
-    }
-    return buttons.size();
 }
 
 } // namespace oryx

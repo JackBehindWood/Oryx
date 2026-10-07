@@ -55,10 +55,29 @@ void BoardLayer::update(double delta_time)
     bool restart_requested = m_session->board().take_restart_request();
     if (restart_requested && m_session->restart_ready())
     {
-        m_session->restart();
-        RestartSimulationEvent restart;
+        SmallVector<uint32_t, 2> order = draw_next_seats();
+        m_session->restart(m_human_seat);
+        RestartSimulationEvent restart(std::move(order));
         Application::Get().post_event(restart);
     }
+}
+
+SmallVector<uint32_t, 2> BoardLayer::draw_next_seats()
+{
+    if (m_human_seat == k_all_seats)
+    {
+        return {};
+    }
+    size_t current = 0;
+    while (current < m_seat_order.size() && m_seat_order[current] != m_human_slot)
+    {
+        ++current;
+    }
+    PlayerId next = static_cast<PlayerId>(m_random.get_int(0, static_cast<int64_t>(m_seat_order.size()) - 1));
+    std::swap(m_seat_order[current], m_seat_order[static_cast<size_t>(next)]);
+    m_human_seat = next;
+    OX_INFO("Next game: you are player {}.", next + 1);
+    return m_seat_order;
 }
 
 void BoardLayer::start()
@@ -79,8 +98,14 @@ void BoardLayer::start()
     PlayerId human_seat = k_all_seats;
     if (!hot_seat)
     {
-        Random random;
-        human_seat = static_cast<PlayerId>(random.get_int(0, static_cast<int64_t>(seat_count) - 1));
+        human_seat = static_cast<PlayerId>(m_random.get_int(0, static_cast<int64_t>(seat_count) - 1));
+    }
+    m_human_seat = human_seat;
+    m_human_slot = static_cast<uint32_t>(human_seat < 0 ? 0 : human_seat);
+    m_seat_order.clear();
+    for (uint32_t seat = 0; seat < seat_count; ++seat)
+    {
+        m_seat_order.push_back(seat);
     }
 
     SharedPtr<IBoard> board = m_create_board ? m_create_board(game_name, human_seat) : SharedPtr<IBoard>(create_console_board(game_name, human_seat));
@@ -88,7 +113,7 @@ void BoardLayer::start()
     {
         throw Error("No board is available for '" + game_name + "'");
     }
-    m_session = create_shared<BoardSession>(board, m_terminal);
+    m_session = create_shared<BoardSession>(board, m_terminal, human_seat);
 
     SmallVector<UniquePtr<IStrategy>, 2> strategies(seat_count);
     for (size_t seat = 0; seat < seat_count; ++seat)

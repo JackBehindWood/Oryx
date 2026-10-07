@@ -16,6 +16,9 @@ public:
     // `seat` is the local human's player, or k_all_seats; it decides whose view is shown and when moves are accepted.
     BoardPresentation(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat);
 
+    // Forgets the game shown so far (view, last move, move being built) for a new one, now played by `seat`; the next update describes the state afresh with nothing marked as changed.
+    void reset(PlayerId seat);
+
     // Describes the state again. True when anything shown or playable changed, which also drops a half-built move.
     // Throws Error if the presenter produces an invalid view or ambiguous picks.
     bool update(const IState& state);
@@ -23,6 +26,10 @@ public:
     // A local human may move now.
     [[nodiscard]] bool accepts_moves() const;
     [[nodiscard]] bool terminal() const { return m_terminal; }
+    [[nodiscard]] PlayerId seat() const { return m_seat; }
+    [[nodiscard]] PlayerId to_move() const { return m_to_move; }
+    // The winner of a finished game, or -1 for a draw and while it is running.
+    [[nodiscard]] PlayerId winner() const { return m_winner; }
     [[nodiscard]] const BoardView& view() const { return m_view; }
     [[nodiscard]] const std::vector<SpaceId>& changed() const { return m_changed; }
     [[nodiscard]] const IBoardPresenter& presenter() const { return *m_presenter; }
@@ -41,6 +48,7 @@ private:
     MoveBuilder m_builder;
     ActionList m_legal;
     PlayerId m_to_move = 0;
+    PlayerId m_winner = -1;
     bool m_terminal = false;
     bool m_described = false;
 };

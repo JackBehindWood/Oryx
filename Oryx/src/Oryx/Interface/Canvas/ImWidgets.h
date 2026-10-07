@@ -19,6 +19,8 @@ struct WidgetOptions
 struct StatusOptions : WidgetOptions
 {
     AttachPoint at = AttachPoint::BottomCentre;
+    // Gap between the line and the surface edge it is attached to; negative derives it from the style's padding.
+    float margin = -1.0f;
 };
 
 // The widgets paint when the frame ends and answer from last frame's rects, so a widget that moved reacts one frame late. All throw Error outside a frame.

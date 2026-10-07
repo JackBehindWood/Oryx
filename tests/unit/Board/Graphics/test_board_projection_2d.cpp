@@ -69,16 +69,32 @@ TEST_CASE("fit_board_2d gives a zero scale for a degenerate window or board, and
     CHECK(fit_board_2d(BoardScene{}, { 800.0f, 600.0f }).scale == 0.0f);
 }
 
-TEST_CASE("option buttons sit centred in the menu band and are hit by the cursor")
+TEST_CASE("fit_board_2d inside a region keeps the board within it, and the viewport form uses the band region")
 {
-    BoardProjection2D layout = fit_board_2d(grid_scene(3, 3), { 800.0f, 600.0f });
-    std::vector<OptionButton2D> buttons;
-    option_buttons_2d(layout, 3, buttons);
-    REQUIRE(buttons.size() == 3);
-    CHECK(buttons[1].centre[0] == doctest::Approx(400.0f));
-    CHECK(buttons[0].centre[1] < k_board_menu_band);
+    BoardScene scene = grid_scene(3, 3);
+    const Vec2f viewport = { 800.0f, 600.0f };
+    Rect region = { { 100.0f, 80.0f }, { 300.0f, 200.0f } };
+    BoardProjection2D layout = fit_board_2d(scene, viewport, region);
+    REQUIRE(layout.scale > 0.0f);
 
-    Vec2f over_last = { buttons[2].centre[0], layout.viewport[1] - buttons[2].centre[1] };
-    CHECK(option_at(buttons, layout, over_last) == 2);
-    CHECK(option_at(buttons, layout, { 400.0f, 10.0f }) == buttons.size());
+    Vec2f low = board_to_world(layout, scene.layout->min());
+    Vec2f high = board_to_world(layout, scene.layout->max());
+    CHECK(low[0] >= region.min[0] - 0.01f);
+    CHECK(high[0] <= region.min[0] + region.size[0] + 0.01f);
+    CHECK(low[1] >= viewport[1] - region.min[1] - region.size[1] - 0.01f);
+    CHECK(high[1] <= viewport[1] - region.min[1] + 0.01f);
+
+    BoardProjection2D bands = fit_board_2d(scene, viewport);
+    BoardProjection2D explicit_region = fit_board_2d(scene, viewport, board_region_2d(viewport));
+    CHECK(bands.scale == explicit_region.scale);
+    CHECK(bands.origin == explicit_region.origin);
+    CHECK(fit_board_2d(scene, viewport, { { 0.0f, 0.0f }, { 0.0f, 50.0f } }).scale == 0.0f);
+}
+
+TEST_CASE("board_region_2d leaves the status band on top and the menu band and gutters elsewhere")
+{
+    Rect region = board_region_2d({ 800.0f, 600.0f });
+    CHECK(region.min == Vec2f(k_board_gutter, k_board_status_band));
+    CHECK(rect_max(region)[0] == doctest::Approx(800.0f - k_board_gutter));
+    CHECK(rect_max(region)[1] == doctest::Approx(600.0f - k_board_menu_band - k_board_gutter));
 }

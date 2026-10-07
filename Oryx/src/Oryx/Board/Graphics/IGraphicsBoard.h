@@ -22,6 +22,10 @@ public:
     void frame(const FrameInfo& info) final;
     [[nodiscard]] bool take_restart_request() final;
 
+protected:
+    // For a board's own control (a button) to ask for what the restart input asks for.
+    void request_restart() { m_restart_requested = true; }
+
 private:
     bool m_restart_requested = false;
 };

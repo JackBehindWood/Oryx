@@ -26,6 +26,20 @@ BoardPresentation::BoardPresentation(UniquePtr<IBoardPresenter> presenter, std::
     }
 }
 
+void BoardPresentation::reset(PlayerId seat)
+{
+    m_seat = seat;
+    m_view = {};
+    m_next = {};
+    m_changed.clear();
+    m_legal.clear();
+    m_builder.reset({});
+    m_to_move = 0;
+    m_winner = -1;
+    m_terminal = false;
+    m_described = false;
+}
+
 bool BoardPresentation::update(const IState& state)
 {
     PlayerId to_move = state.current_player();
@@ -47,6 +61,7 @@ bool BoardPresentation::update(const IState& state)
     std::swap(m_view, m_next);
     m_to_move = to_move;
     m_terminal = terminal;
+    m_winner = terminal ? winner_of(state.outcome()) : -1;
     m_legal = std::move(legal);
     m_described = true;
 

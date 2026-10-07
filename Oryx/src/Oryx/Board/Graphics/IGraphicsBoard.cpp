@@ -7,7 +7,7 @@ namespace oryx
 
 void IGraphicsBoard::frame(const FrameInfo& info)
 {
-    BoardInput input = read_board_input(info.input, info.logical);
+    BoardInput input = read_board_input(info.input, info.logical, info.scale);
     if (input.quit)
     {
         Application::Get().close();

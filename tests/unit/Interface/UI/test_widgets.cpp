@@ -195,6 +195,35 @@ TEST_CASE("UI: the status line floats at the bottom centre with the status style
     CHECK(rect.min == Vec2f(82.0f, 8.0f));
 }
 
+TEST_CASE("UI: an explicit status margin replaces the one derived from the padding")
+{
+    UiFixture f;
+    f.frame(pointer(150.0f, 80.0f), [&] { ui::status_line("AB", { .at = AttachPoint::TopCentre, .margin = 20.0f }); });
+    Rect rect;
+    REQUIRE(f.context.layout_rect(f.context.id("AB"), rect));
+    CHECK(rect.min == Vec2f(82.0f, 20.0f));
+
+    f.frame(pointer(150.0f, 80.0f), [&] { ui::status_line("AB", { .at = AttachPoint::BottomCentre, .margin = 0.0f }); });
+    REQUIRE(f.context.layout_rect(f.context.id("AB"), rect));
+    CHECK(rect_max(rect)[1] == doctest::Approx(100.0f));
+}
+
+TEST_CASE("UI: a BoxScope closes its box and the frame can end")
+{
+    UiFixture f;
+    LayoutStyle style;
+    style.width = fixed(40.0f);
+    style.height = fixed(20.0f);
+    f.context.begin_frame(pointer(0.0f, 0.0f));
+    {
+        ui::BoxScope box("scoped", style);
+    }
+    CHECK_NOTHROW(f.context.end_frame());
+    Rect rect;
+    REQUIRE(f.context.layout_rect(f.context.id("scoped"), rect));
+    CHECK(rect.size == Vec2f(40.0f, 20.0f));
+}
+
 TEST_CASE("UI: functions need an active UiContext and each context type has its own slot")
 {
     struct OtherContext : ImContext

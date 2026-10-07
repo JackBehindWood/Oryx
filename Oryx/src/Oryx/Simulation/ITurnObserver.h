@@ -12,6 +12,8 @@ public:
     virtual ~ITurnObserver() = default;
 
     virtual void on_turn(IState& state) = 0;
+    // Called when a new match has just been created, before its first on_turn.
+    virtual void on_match_start() {}
 };
 
 } // namespace oryx

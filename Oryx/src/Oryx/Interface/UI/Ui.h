@@ -31,6 +31,17 @@ void end_box();
 // A box floated against the whole surface by one point of itself and the same point of the surface.
 [[nodiscard]] LayoutStyle anchored(AttachPoint at, Sizing width = fit(), Sizing height = fit(), const Vec2f& offset = { 0.0f, 0.0f });
 
+// Ends the box when it goes out of scope.
+class BoxScope
+{
+public:
+    BoxScope(std::string_view label, const LayoutStyle& style) { begin_box(label, style); }
+    ~BoxScope() { end_box(); }
+
+    BoxScope(const BoxScope&) = delete;
+    BoxScope& operator=(const BoxScope&) = delete;
+};
+
 class PanelScope
 {
 public:

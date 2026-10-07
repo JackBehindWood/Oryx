@@ -22,7 +22,7 @@ TEST_CASE("read_board_input maps devices to board intents in one place")
     input.set_mouse_button(MouseCode::Left, true);
     BoardInput click = read_board_input(input, {});
     CHECK(click.select);
-    CHECK(click.restart);
+    CHECK_FALSE(click.restart);
 
     input.begin_frame();
     BoardInput held = read_board_input(input, {});
@@ -87,15 +87,21 @@ TEST_CASE("Escape quits with no button held and takes back a pick while the left
     CHECK_FALSE(drag.quit);
 }
 
+TEST_CASE("read_board_input carries the window's scale and defaults to one")
+{
+    PolledInput input;
+    CHECK(read_board_input(input, { 800.0f, 600.0f }).scale == 1.0f);
+    CHECK(read_board_input(input, { 800.0f, 600.0f }, 2.0f).scale == 2.0f);
+}
+
 TEST_CASE("The restart hint names exactly the inputs that set restart")
 {
     std::string hint = k_restart_hint;
-    CHECK(hint.find("click") != std::string::npos);
     CHECK(hint.find("R") != std::string::npos);
 
     PolledInput click;
     click.set_mouse_button(MouseCode::Left, true);
-    CHECK(read_board_input(click, {}).restart);
+    CHECK_FALSE(read_board_input(click, {}).restart);
 
     PolledInput key;
     key.set_key(KeyCode::R, true);

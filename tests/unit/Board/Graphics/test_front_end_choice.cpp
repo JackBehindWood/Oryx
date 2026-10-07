@@ -104,14 +104,18 @@ TEST_CASE("An IGraphicsBoard reads one BoardInput per frame, asks to restart onc
     Recording board;
     input.set_cursor(30.0f, 40.0f);
     input.set_mouse_button(MouseCode::Left, true);
-
     board.frame({ input, { 800.0f, 600.0f }, { 1600.0f, 1200.0f }, 2.0f, 0.25 });
-    CHECK(board.updates == 1);
-    CHECK(board.renders == 1);
+    CHECK_FALSE(board.take_restart_request());
+
+    input.begin_frame();
+    input.set_key(KeyCode::R, true);
+    board.frame({ input, { 800.0f, 600.0f }, { 1600.0f, 1200.0f }, 2.0f, 0.25 });
+    CHECK(board.updates == 2);
+    CHECK(board.renders == 2);
     CHECK(board.dt == 0.25);
+    CHECK(board.last.scale == 2.0f);
     CHECK(board.last.viewport == Vec2f(800.0f, 600.0f));
     CHECK(board.last.cursor == Vec2f(30.0f, 40.0f));
-    CHECK(board.last.select);
     CHECK(board.take_restart_request());
     CHECK_FALSE(board.take_restart_request());
 
@@ -119,6 +123,6 @@ TEST_CASE("An IGraphicsBoard reads one BoardInput per frame, asks to restart onc
     input.set_mouse_button(MouseCode::Left, false);
     input.set_key(KeyCode::Escape, true);
     board.frame({ input, { 800.0f, 600.0f }, { 800.0f, 600.0f }, 1.0f, 0.016 });
-    CHECK(board.updates == 1);
+    CHECK(board.updates == 2);
     CHECK(app.closing());
 }

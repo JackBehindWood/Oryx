@@ -65,12 +65,19 @@ TEST_CASE("A windowed board frame over an unchanged state allocates nothing once
     board.presentation().build_scene(k_no_space, scene);
     REQUIRE(scene.layout->space_count() == 361);
 
-    BoardProjection2D layout = fit_board_2d(scene, k_viewport);
-    OptionButton2D button = option_button_2d(layout, scene.options.size(), 0);
-    BoardInput option_click;
-    option_click.viewport = k_viewport;
-    option_click.cursor = { button.centre[0], k_viewport[1] - button.centre[1] };
-    option_click.select = true;
+    BoardInput idle;
+    idle.viewport = k_viewport;
+    board.update(idle, 0.016);
+    REQUIRE_FALSE(board.overlay().buttons.empty());
+    BoardInput option_press;
+    option_press.viewport = k_viewport;
+    option_press.cursor = rect_centre(board.overlay().buttons[0].rect);
+    option_press.select = true;
+    option_press.select_down = true;
+    BoardInput option_release = option_press;
+    option_release.select = false;
+    option_release.select_down = false;
+    option_release.select_released = true;
 
     auto run_frame = [&](uint32_t frame)
     {
@@ -83,7 +90,8 @@ TEST_CASE("A windowed board frame over an unchanged state allocates nothing once
         BoardInput release = hover;
         release.select_released = true;
         board.update(release, 0.016);
-        board.update(option_click, 0.016);
+        board.update(option_press, 0.016);
+        board.update(option_release, 0.016);
         board.poll_action(*state);
     };
 

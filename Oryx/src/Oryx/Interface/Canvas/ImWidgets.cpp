@@ -122,7 +122,7 @@ void status_line(ImContext& context, std::string_view text, const StatusOptions&
     LayoutStyle box = box_for(style, options);
     if (options.layout == nullptr)
     {
-        const float margin = style.padding.bottom * 2.0f;
+        const float margin = options.margin >= 0.0f ? options.margin : style.padding.bottom * 2.0f;
         const float direction = options.at == AttachPoint::TopLeft || options.at == AttachPoint::TopCentre || options.at == AttachPoint::TopRight ? 1.0f : -1.0f;
         box.floating = { true, options.at, options.at, FloatTarget::Root, {}, { 0.0f, direction * margin } };
     }

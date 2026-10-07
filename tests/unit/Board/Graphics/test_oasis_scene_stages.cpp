@@ -42,6 +42,7 @@ void check_game_uses_both_stages(PresentedGraphicsBoard2D& board, IState& state)
     BoardInput input;
     input.viewport = { 800.0f, 600.0f };
     input.cursor = { 400.0f, 300.0f };
+    board.update(input, 0.016);
 
     const Camera2D camera = Camera2D::screen_space(800.0f, 600.0f);
     SceneRenderer& scene = Renderer::scene();

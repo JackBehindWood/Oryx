@@ -7,13 +7,15 @@ namespace oryx
 {
 
 // Shown on a finished windowed game; read_board_input maps exactly these inputs to `restart`.
-constexpr const char* k_restart_hint = "click or press R to play again";
+constexpr const char* k_restart_hint = "press R to play again";
 
 // One frame of what a windowed board may react to, captured once by BoardLayer so boards never read Input or the window themselves.
 // Positions are logical window points with the origin top left, the units of NativeWindowHandle's width and height.
 struct BoardInput
 {
     Vec2f viewport;
+    // Device pixels per logical point.
+    float scale = 1.0f;
     Vec2f cursor;
     // Left click.
     bool select = false;
@@ -26,13 +28,13 @@ struct BoardInput
     bool confirm = false;
     // U: take back the last move.
     bool undo = false;
-    // R or left click; BoardLayer honours it only on a finished game.
+    // R; BoardLayer honours it only on a finished game. A board's own Play again button asks for the same thing.
     bool restart = false;
     // Escape with no button held.
     bool quit = false;
 };
 
 // The single mapping from devices to board intents.
-[[nodiscard]] BoardInput read_board_input(const IInput& input, const Vec2f& viewport);
+[[nodiscard]] BoardInput read_board_input(const IInput& input, const Vec2f& viewport, float scale = 1.0f);
 
 } // namespace oryx

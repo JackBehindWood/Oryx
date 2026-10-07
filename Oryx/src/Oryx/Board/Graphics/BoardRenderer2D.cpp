@@ -7,8 +7,6 @@ namespace
 {
 
 constexpr float k_label_height = 16.0f;
-constexpr float k_status_height = 24.0f;
-constexpr float k_option_height = 18.0f;
 constexpr float k_target_dot = 0.16f;
 constexpr float k_ring_thickness = 0.22f;
 constexpr float k_cross_thickness = 0.16f;
@@ -107,6 +105,59 @@ void draw_axis_labels(BatchRenderer2D& batcher, const BoardLayout2D& board, cons
 
 } // namespace
 
+UiTheme board_ui_theme()
+{
+    UiTheme theme;
+    theme.base.background = { 0.25f, 0.28f, 0.36f, 1.0f };
+    theme.base.hover = { 0.32f, 0.36f, 0.46f, 1.0f };
+    theme.base.pressed = { 0.19f, 0.21f, 0.28f, 1.0f };
+    theme.base.text = { 1.0f, 1.0f, 1.0f, 1.0f };
+    theme.base.radius = 0.0f;
+    theme.base.border_width = 0.0f;
+    theme.base.text_height = 18.0f;
+    theme.status.text = { 1.0f, 1.0f, 1.0f, 1.0f };
+    theme.status.text_height = 24.0f;
+    theme.status.padding = {};
+
+    ImStyle turn = theme.status;
+    turn.text = { 0.55f, 0.92f, 0.60f, 1.0f };
+    add_style_variant(theme, "your_turn", turn);
+    turn.text = { 0.75f, 0.78f, 0.86f, 1.0f };
+    add_style_variant(theme, "their_turn", turn);
+
+    ImStyle banner;
+    banner.background = { 0.07f, 0.08f, 0.11f, 0.94f };
+    banner.border = { 0.35f, 0.38f, 0.46f, 1.0f };
+    banner.border_width = 1.0f;
+    banner.radius = 10.0f;
+    add_style_variant(theme, "banner", banner);
+
+    ImStyle headline;
+    headline.text_height = 40.0f;
+    headline.padding = {};
+    headline.text = { 0.45f, 0.90f, 0.55f, 1.0f };
+    add_style_variant(theme, "win", headline);
+    headline.text = { 0.95f, 0.45f, 0.45f, 1.0f };
+    add_style_variant(theme, "lose", headline);
+    headline.text = { 0.85f, 0.87f, 0.92f, 1.0f };
+    add_style_variant(theme, "draw", headline);
+
+    ImStyle hint;
+    hint.text_height = 16.0f;
+    hint.padding = {};
+    hint.text = { 0.60f, 0.62f, 0.70f, 1.0f };
+    add_style_variant(theme, "hint", hint);
+
+    ImStyle primary = theme.base;
+    primary.background = { 0.22f, 0.50f, 0.88f, 1.0f };
+    primary.hover = { 0.30f, 0.58f, 0.95f, 1.0f };
+    primary.pressed = { 0.16f, 0.40f, 0.74f, 1.0f };
+    primary.radius = 6.0f;
+    primary.text_height = 20.0f;
+    add_style_variant(theme, "primary", primary);
+    return theme;
+}
+
 void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font)
 {
     if (layout.scale <= 0.0f || scene.layout == nullptr)
@@ -141,23 +192,6 @@ void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const Boar
     }
 
     draw_axis_labels(batcher, board, layout, theme, font);
-}
-
-void draw_board_overlay_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const std::string& status)
-{
-    if (layout.scale <= 0.0f || scene.layout == nullptr)
-    {
-        return;
-    }
-
-    for (size_t index = 0; index < scene.options.size(); ++index)
-    {
-        OptionButton2D button = option_button_2d(layout, scene.options.size(), index);
-        batcher.draw_rect(button.centre, button.size, theme.button);
-        draw_text_centred(batcher, font, button.centre, scene.options[index].label, k_option_height, theme.status);
-    }
-
-    draw_text_centred(batcher, font, { layout.viewport[0] * 0.5f, layout.viewport[1] - k_board_status_band * 0.5f }, status.empty() ? scene.status : status, k_status_height, theme.status);
 }
 
 } // namespace oryx

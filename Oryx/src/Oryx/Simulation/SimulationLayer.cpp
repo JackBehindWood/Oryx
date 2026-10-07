@@ -21,10 +21,36 @@ void SimulationLayer::event(Event& event)
     dispatcher.dispatch<RestartSimulationEvent>(OX_BIND_EVENT_FN(on_restart_simulation));
 }
 
-bool SimulationLayer::on_restart_simulation(RestartSimulationEvent&)
+bool SimulationLayer::on_restart_simulation(RestartSimulationEvent& event)
 {
     m_restart_requested = true;
+    m_next_seat_order = event.seat_order();
     return true;
+}
+
+void SimulationLayer::apply_seat_order()
+{
+    if (m_next_seat_order.empty())
+    {
+        return;
+    }
+    bool valid = m_next_seat_order.size() == m_strategy_storage.size();
+    for (uint32_t index : m_next_seat_order)
+    {
+        valid = valid && index < m_strategy_storage.size();
+    }
+    if (valid)
+    {
+        for (size_t seat = 0; seat < m_next_seat_order.size(); ++seat)
+        {
+            m_strategies[seat] = m_strategy_storage[m_next_seat_order[seat]].get();
+        }
+    }
+    else
+    {
+        OX_CORE_WARN("SimulationLayer: ignoring a seat order that does not name each of the {} strategies.", m_strategy_storage.size());
+    }
+    m_next_seat_order.clear();
 }
 
 bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
@@ -98,8 +124,13 @@ void SimulationLayer::update(double)
             Application::Get().close();
             return;
         }
+        apply_seat_order();
         m_match = create_unique<Match>(*m_game, m_strategies);
         m_restart_requested = false;
+        if (m_observer)
+        {
+            m_observer->on_match_start();
+        }
     }
 
     if (m_observer)

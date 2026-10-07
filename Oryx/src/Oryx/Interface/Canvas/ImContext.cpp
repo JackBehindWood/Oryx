@@ -172,7 +172,7 @@ ItemState ImContext::item(Id id, const Rect& rect)
 ItemState ImContext::item(Id id)
 {
     Rect rect;
-    layout_rect(id, rect);
+    std::ignore = layout_rect(id, rect);
     return item(id, rect);
 }
 

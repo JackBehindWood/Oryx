@@ -63,6 +63,26 @@ TEST_CASE("BoardSession is ready to restart only after the finished game has bee
     CHECK_FALSE(session.restart_ready());
 }
 
+TEST_CASE("BoardSession resets the board with the next seat only when the next match starts, and ignores the old finished state meanwhile")
+{
+    SharedPtr<FakeBoard> board = create_shared<FakeBoard>();
+    BoardSession session(board, false, 0);
+    UniquePtr<IState> finished = finished_dummy_state();
+    session.on_turn(*finished);
+    REQUIRE(session.game_over());
+
+    session.restart(1);
+    CHECK(board->resets == 0);
+    session.on_turn(*finished);
+    CHECK_FALSE(session.game_over());
+
+    session.on_match_start();
+    CHECK(board->resets == 1);
+    CHECK(board->last_seat == 1);
+    session.on_turn(*finished);
+    CHECK(session.game_over());
+}
+
 TEST_CASE("BoardSession serves human seats from the board's poll_action")
 {
     SharedPtr<FakeBoard> board = create_shared<FakeBoard>();

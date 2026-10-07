@@ -19,6 +19,8 @@ public:
     virtual ActionId poll_action(const IState& state) = 0;
     // True when the board itself shows what every seat played, so opponents need not announce their moves.
     [[nodiscard]] virtual bool shows_moves() const = 0;
+    // A new game is about to be shown, with `seat` (a player or k_all_seats) now the human's: drop everything left over from the last one.
+    virtual void reset(PlayerId) {}
     // True once if the person asked to play again since the last call; BoardLayer restarts a finished game when it is. Terminal boards never ask.
     [[nodiscard]] virtual bool take_restart_request() { return false; }
 };

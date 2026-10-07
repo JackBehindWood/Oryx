@@ -484,7 +484,7 @@ Potential visualisations include:
 
 The dashboard should consume observability data and the Phase 10 graphics system, and remain separate from the strategy implementation.
 
-The design, module split (`Canvas`, `UI`, `GUI`, `Dashboard`), build order and the optional multi-viewport step are in [Dashboard](design/dashboard.md).
+The design, module split (`Canvas`, `UI`, `GUI`, `Dashboard`), build order and the optional multi-viewport step are in [Dashboard](design/dashboard.md). Step 1 (scissor) and Step 2 (`Interface/Canvas/`, `Interface/UI/` and the Oasis board overlay ported to them) are built; Step 3 (`GUI/`) is next.
 
 ---
 

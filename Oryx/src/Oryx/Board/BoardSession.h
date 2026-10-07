@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Board/BoardPresentation.h"
 #include "Oryx/Board/IBoard.h"
 #include "Oryx/Simulation/ITurnObserver.h"
 #include "Oryx/Strategy/IActionSource.h"
@@ -14,10 +15,12 @@ class BoardSession : public ITurnObserver, public IActionSource
 public:
     static constexpr double k_restart_delay_seconds = 0.4;
 
-    // `announce_outcome` prints the result on the terminal the first time the game is seen finished.
-    BoardSession(SharedPtr<IBoard> board, bool announce_outcome);
+    // `announce_outcome` prints the result on the terminal the first time the game is seen finished. `seat` is the human's player, or k_all_seats.
+    BoardSession(SharedPtr<IBoard> board, bool announce_outcome, PlayerId seat = k_all_seats);
 
     void on_turn(IState& state) override;
+    // The next match exists: the board forgets the finished game and takes the seat chosen by restart.
+    void on_match_start() override;
     ActionId next_action(const Context& context) override;
 
     [[nodiscard]] IBoard& board() { return *m_board; }
@@ -26,11 +29,15 @@ public:
     void advance(double delta_time);
     // The finished game has been on screen long enough that a restart input should be honoured.
     [[nodiscard]] bool restart_ready() const { return m_game_over && m_seconds_over >= k_restart_delay_seconds; }
-    void restart();
+    // Ends the finished game for good; `seat` is the human's player in the next one. The board is reset when that match starts.
+    void restart(PlayerId seat);
+    void restart() { restart(m_next_seat); }
 
 private:
     SharedPtr<IBoard> m_board;
     bool m_announce_outcome;
+    PlayerId m_next_seat;
+    bool m_restarting = false;
     bool m_game_over = false;
     double m_seconds_over = 0.0;
 };

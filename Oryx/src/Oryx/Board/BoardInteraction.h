@@ -12,6 +12,9 @@ class BoardInteraction
 public:
     BoardInteraction(UniquePtr<IBoardPresenter> presenter, std::string game, PlayerId seat);
 
+    // A new game with `seat` as the human's player: drops the view, the picks, the drag, the hover and any waiting move.
+    void reset(PlayerId seat);
+
     // Describes the state again; a change drops the waiting move and any drag. True when anything shown or playable changed.
     bool update(const IState& state);
 

@@ -167,3 +167,71 @@ TEST_CASE("A lingering SimulationLayer holds a finished match until a restart is
     CHECK(observer->finished_frames == 3);
     CHECK(layer.result().matches == 1);
 }
+
+namespace
+{
+
+class SeatSwappingObserver : public ITurnObserver
+{
+public:
+    void on_turn(IState& state) override
+    {
+        if (!state.is_terminal())
+        {
+            return;
+        }
+        ++finished_frames;
+        if (finished_frames == 1)
+        {
+            SmallVector<uint32_t, 2> order;
+            order.push_back(1);
+            order.push_back(0);
+            RestartSimulationEvent restart(std::move(order));
+            Application::Get().post_event(restart);
+        }
+        else if (finished_frames >= 2)
+        {
+            Application::Get().close();
+        }
+    }
+
+    void on_match_start() override { ++matches_started; }
+
+    int32_t finished_frames = 0;
+    int32_t matches_started = 0;
+};
+
+} // namespace
+
+TEST_CASE("A restart can seat the strategies in a new order and tells the observer each match has started")
+{
+    Application app({ 0, nullptr });
+
+    SharedPtr<SeatSwappingObserver> observer = create_shared<SeatSwappingObserver>();
+    std::vector<PlayerId> first_strategy_seats;
+    std::vector<PlayerId> second_strategy_seats;
+    SmallVector<UniquePtr<IStrategy>, 2> strategies;
+    strategies.push_back(make_external([&](const Context& context) -> ActionId
+    {
+        first_strategy_seats.push_back(context.state().current_player());
+        return context.state().legal_actions()[0];
+    }));
+    strategies.push_back(make_external([&](const Context& context) -> ActionId
+    {
+        second_strategy_seats.push_back(context.state().current_player());
+        return context.state().legal_actions()[0];
+    }));
+
+    app.push_layer<SimulationLayer>();
+    StartSimulationEvent start(create_unique<DummyGame>(10), std::move(strategies), /*match_count=*/1, observer, /*benchmark=*/false, /*linger=*/true);
+    app.post_event(start);
+    app.run();
+
+    REQUIRE_FALSE(first_strategy_seats.empty());
+    REQUIRE_FALSE(second_strategy_seats.empty());
+    CHECK(first_strategy_seats.front() == 0);
+    CHECK(second_strategy_seats.front() == 1);
+    CHECK(first_strategy_seats.back() == 1);
+    CHECK(second_strategy_seats.back() == 0);
+    CHECK(observer->matches_started == 2);
+}
