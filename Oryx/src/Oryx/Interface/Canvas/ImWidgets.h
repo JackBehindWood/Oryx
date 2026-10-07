@@ -16,6 +16,17 @@ struct WidgetOptions
     const LayoutStyle* layout = nullptr;
 };
 
+struct IconOptions : WidgetOptions
+{
+    // The side of the square box the icon sits in; the glyph is 60% of it.
+    float size = 14.0f;
+    // Zero alpha uses the style's text colour.
+    Colour colour = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float thickness = 1.5f;
+};
+
+static_assert(std::is_trivially_copyable_v<IconOptions>);
+
 struct StatusOptions : WidgetOptions
 {
     AttachPoint at = AttachPoint::BottomCentre;
@@ -72,10 +83,43 @@ void begin_column(ImContext& context, std::string_view name, const RowOptions& o
 void end_column(ImContext& context);
 
 // Takes the leftover space of the stack it sits in, shared by weight.
+// A small drawn symbol in its own square box, for a button label or a row marker; no hit area (wrap it in your own item to click it).
+void icon(ImContext& context, Icon icon, const IconOptions& options = {});
 void spacer(ImContext& context, float weight = 1.0f);
 
 // A one-pixel-or-border-wide line across the stack it sits in, in the style's border colour.
 void separator(ImContext& context, const WidgetOptions& options = {});
+
+// Rounds every corner of a picture or box into a circle (or a pill on a non-square rect); the DrawList limits the radius to what fits.
+[[nodiscard]] constexpr CornerRadius circle_radius() { return uniform_radius(1.0e6f); }
+
+struct ImageOptions : WidgetOptions
+{
+    Sizing width = fixed(32.0f);
+    Sizing height = fixed(32.0f);
+    // The part of the picture shown, from its top-left (0, 0) to its bottom-right (1, 1).
+    Vec2f uv_min{ 0.0f, 0.0f };
+    Vec2f uv_max{ 1.0f, 1.0f };
+    Colour tint = { 1.0f, 1.0f, 1.0f, 1.0f };
+    // Rounds the picture's corners; circle_radius() makes a circle.
+    CornerRadius radius;
+};
+
+static_assert(std::is_trivially_copyable_v<ImageOptions>);
+
+struct ImageButtonOptions : ImageOptions
+{
+    // False draws the picture alone, with no fill, border or padding.
+    bool frame = true;
+};
+
+static_assert(std::is_trivially_copyable_v<ImageButtonOptions>);
+
+// A picture of the replay's image table (see ReplayTarget); the handle is the owner's index into it. The result is the pointer's relation to its box.
+ItemState image(ImContext& context, std::string_view name, ImageHandle image, const ImageOptions& options = {});
+
+// A button showing a picture inside the style's padding; it dims while held.
+[[nodiscard]] ItemState image_button(ImContext& context, std::string_view name, ImageHandle image, const ImageButtonOptions& options = {});
 
 // One line of text floated against the whole surface.
 void status_line(ImContext& context, std::string_view text, const StatusOptions& options = {});

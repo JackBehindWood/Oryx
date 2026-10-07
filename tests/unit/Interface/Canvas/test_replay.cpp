@@ -212,3 +212,53 @@ TEST_CASE("replay: a warm replay allocates nothing")
     f.run(list);
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("replay: an image draws its table entry, a missing one nothing")
+{
+    ReplayFixture f;
+    const Texture2D picture = Texture2D::create(*f.context->rhi, { .width = 1, .height = 1 });
+    DrawList list;
+    list.add_image({ { 10.0f, 5.0f }, { 20.0f, 10.0f } }, ImageHandle{ 0 }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, {}, RED);
+    list.add_image({ { 10.0f, 5.0f }, { 20.0f, 10.0f } }, ImageHandle{ 7 }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, {}, RED);
+    const Texture2D* const images[1] = { &picture };
+    f.target.images = images;
+    f.target.image_count = 1;
+    f.run(list);
+    REQUIRE(f.sink.size() == 1);
+    CHECK(f.sink[0].vertex_count == 4);
+}
+
+TEST_CASE("replay: the single-texture overload serves handle zero")
+{
+    ReplayFixture f;
+    const Texture2D picture = Texture2D::create(*f.context->rhi, { .width = 1, .height = 1 });
+    DrawList list;
+    list.add_image({ { 0.0f, 0.0f }, { 10.0f, 10.0f } }, k_single_image, { 0.0f, 0.0f }, { 1.0f, 1.0f }, {}, RED);
+    f.batcher.begin(f.camera, { f.sink, { RHIFormat::BGRA8Unorm, RHIFormat::Undefined }, { 100.0f, 50.0f } });
+    replay(list, f.batcher, f.font, f.target, picture);
+    f.batcher.end();
+    REQUIRE(f.sink.size() == 1);
+    CHECK(f.sink[0].vertex_count == 4);
+}
+
+TEST_CASE("replay: a rounded image is a fan of textured quads whose uvs follow the picture")
+{
+    ReplayFixture f;
+    const Texture2D picture = Texture2D::create(*f.context->rhi, { .width = 1, .height = 1 });
+    DrawList list;
+    list.add_image({ { 0.0f, 0.0f }, { 20.0f, 20.0f } }, k_single_image, { 0.0f, 0.0f }, { 1.0f, 1.0f }, uniform_radius(10.0f), RED);
+    f.target.images = nullptr;
+    f.batcher.begin(f.camera, { f.sink, { RHIFormat::BGRA8Unorm, RHIFormat::Undefined }, { 100.0f, 50.0f } });
+    replay(list, f.batcher, f.font, f.target, picture);
+    f.batcher.end();
+    REQUIRE(f.sink.size() == 1);
+    CHECK(f.sink[0].vertex_count > 4);
+    const std::vector<Vertex2DQuad> vertices = f.quads(f.sink[0]);
+    for (const Vertex2DQuad& vertex : vertices)
+    {
+        CHECK(vertex.uv[0] >= -0.001f);
+        CHECK(vertex.uv[0] <= 1.001f);
+        CHECK(vertex.uv[1] >= -0.001f);
+        CHECK(vertex.uv[1] <= 1.001f);
+    }
+}

@@ -9,6 +9,9 @@ namespace oryx::gui
 {
 
 using im::CanvasOptions;
+using im::IconOptions;
+using im::ImageButtonOptions;
+using im::ImageOptions;
 using im::RowOptions;
 using im::StatusOptions;
 using im::WidgetOptions;
@@ -55,12 +58,15 @@ void end_widget();
 void label(std::string_view text, const WidgetOptions& options = {});
 [[nodiscard]] ItemState button(std::string_view text, const WidgetOptions& options = {});
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options = {});
+ItemState image(std::string_view name, ImageHandle image, const ImageOptions& options = {});
+[[nodiscard]] ItemState image_button(std::string_view name, ImageHandle image, const ImageButtonOptions& options = {});
 void begin_panel(std::string_view name, const WidgetOptions& options = {});
 void end_panel();
 void begin_row(std::string_view name, const RowOptions& options = {});
 void end_row();
 void begin_column(std::string_view name, const RowOptions& options = {});
 void end_column();
+void icon(Icon icon, const IconOptions& options = {});
 void spacer(float weight = 1.0f);
 void separator(const WidgetOptions& options = {});
 // Uses the theme's status style unless the options name another.

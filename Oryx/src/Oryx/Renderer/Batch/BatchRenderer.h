@@ -24,6 +24,16 @@ enum class FlushReason : uint8_t
 
 inline constexpr uint32_t FLUSH_REASON_COUNT = 7;
 
+inline constexpr uint32_t BATCH_MAX_STREAMS = 8;
+
+struct BatchStreamStats
+{
+    uint32_t draws = 0;
+    uint32_t primitives = 0;
+    uint32_t vertices = 0;
+    uint32_t bytes = 0;
+};
+
 struct BatchStats
 {
     uint32_t draws = 0;
@@ -35,7 +45,13 @@ struct BatchStats
     uint32_t bytes = 0;
     uint32_t pages = 0;
     uint32_t flushes[FLUSH_REASON_COUNT] = {};
+    BatchStreamStats streams[BATCH_MAX_STREAMS] = {};
+    // stream_switches[from][to]: how often a draw of `to` followed pending primitives of `from` and flushed them.
+    uint32_t stream_switches[BATCH_MAX_STREAMS][BATCH_MAX_STREAMS] = {};
 };
+
+// What `after` added on top of `before`; both from the same batcher within one frame. `texture_slots_used` and `pages` keep the `after` value.
+[[nodiscard]] BatchStats batch_stats_delta(const BatchStats& after, const BatchStats& before);
 
 // Frame constants every batched pipeline reads at SHADER_FRAME_BINDING.
 struct BatchConstants

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Interface/Canvas/DrawList.h"
+#include "Oryx/Interface/Canvas/Icon.h"
 #include "Oryx/Interface/Canvas/LayoutStyle.h"
 #include "Oryx/Interface/Canvas/StateTable.h"
 
@@ -22,6 +23,17 @@ struct BoxPaint
     Colour text_colour = { 1.0f, 1.0f, 1.0f, 1.0f };
     TextAlign text_align = TextAlign::Left;
     bool ellipsis = false;
+    // A picture inside the padding, drawn over the fill and under the border; `radius` rounds it as it does the fill.
+    bool has_image = false;
+    ImageHandle image;
+    Vec2f image_uv_min{ 0.0f, 0.0f };
+    Vec2f image_uv_max{ 1.0f, 1.0f };
+    Colour image_tint = { 1.0f, 1.0f, 1.0f, 1.0f };
+    // Drawn last, over the text, centred in the padding box; see draw_icon for `icon_size` (zero: half the smaller side).
+    Icon icon = Icon::None;
+    Colour icon_colour = { 1.0f, 1.0f, 1.0f, 1.0f };
+    float icon_size = 0.0f;
+    float icon_thickness = 1.5f;
 };
 
 struct LayoutNode

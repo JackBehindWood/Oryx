@@ -153,66 +153,79 @@ bool drag_int(std::string_view label, int32_t& value, int32_t min, int32_t max, 
     return changed;
 }
 
-bool combo(std::string_view label, std::span<const std::string_view> items, int32_t& selected, const FieldOptions& options)
+ComboScope::ComboScope(std::string_view label, std::string_view preview, const FieldOptions& options)
+    : m_context(context())
+    , m_field(label, options)
+    , m_control(m_context.id("control"))
+    , m_state(m_context.item(m_control))
+    , m_open(m_context.state<OpenFlag>(m_control).open)
 {
-    GuiContext& ctx = context();
+    GuiContext& ctx = m_context;
     const ImStyle& style = im::resolved_style(ctx, options);
-    FieldScope field(label, options);
-    const ImId control = ctx.id("control");
-    const ItemState state = ctx.item(control);
-    bool open = ctx.state<OpenFlag>(control).open;
-    if (state.clicked)
+    if (m_state.clicked)
     {
-        open = !open;
+        m_open = !m_open;
     }
 
     LayoutStyle button = im::default_box(style);
     button.width = grow(1.0f, 80.0f);
     button.align_x = Align::Start;
-    const uint32_t index = ctx.begin_box(control, button);
+    const uint32_t index = ctx.begin_box(m_control, button);
     BoxPaint& paint = ctx.layout().node(index).paint;
-    im::paint_surface(paint, style, im::interaction_fill(style, state, style.background));
-    paint.text = selected >= 0 && selected < static_cast<int32_t>(items.size()) ? ctx.arena().store(items[static_cast<size_t>(selected)]) : std::string_view{};
+    im::paint_surface(paint, style, im::interaction_fill(style, m_state, style.background));
+    paint.text = ctx.arena().store(preview);
     paint.text_height = style.text_height;
     paint.text_colour = style.text;
     paint.ellipsis = true;
 
-    bool changed = false;
-    if (open)
+    m_popup = m_open;
+    if (m_popup)
     {
         const ImId popup = ctx.id("popup");
-        const PopupResult result = ctx.begin_popup_layer(popup);
+        m_result = ctx.begin_popup_layer(popup);
         Rect anchor;
         Rect last;
-        std::ignore = ctx.layout_rect(control, anchor);
+        std::ignore = ctx.layout_rect(m_control, anchor);
         std::ignore = ctx.layout_rect(popup, last);
         LayoutStyle list;
         list.width = fit(anchor.size[0]);
         list.direction = Direction::Column;
         list.padding = uniform_insets(2.0f);
         list.channel = k_channel_popup;
-        list.floating = im::popup_below(control, anchor, last.size, ctx.input().surface_size);
+        list.floating = im::popup_below(m_control, anchor, last.size, ctx.input().surface_size);
         const uint32_t list_index = ctx.begin_box(popup, list);
         im::paint_surface(ctx.layout().node(list_index).paint, style, style.background);
         ctx.push_id("popup");
-        for (uint32_t item = 0; item < items.size(); ++item)
-        {
-            IdScope row(ctx, ctx.index_id(item));
-            if (selectable(items[item], static_cast<int32_t>(item) == selected).clicked)
-            {
-                changed = selected != static_cast<int32_t>(item);
-                selected = static_cast<int32_t>(item);
-                open = false;
-            }
-        }
+    }
+}
+
+ComboScope::~ComboScope()
+{
+    GuiContext& ctx = m_context;
+    if (m_popup)
+    {
         ctx.pop_id();
         ctx.end_box();
         ctx.end_popup_layer();
-        open = open && !result.closed_by_escape && !(result.closed_by_outside && !state.hovered);
+        m_open = m_open && !m_result.closed_by_escape && !(m_result.closed_by_outside && !m_state.hovered);
     }
     ctx.end_box();
-    ctx.state<OpenFlag>(control).open = open;
-    return changed;
+    ctx.state<OpenFlag>(m_control).open = m_open;
+}
+
+bool ComboScope::item(std::string_view text, bool selected)
+{
+    if (!m_popup)
+    {
+        return false;
+    }
+    IdScope row(m_context, m_context.index_id(m_count++));
+    if (selectable(text, selected).clicked)
+    {
+        m_open = false;
+        return true;
+    }
+    return false;
 }
 
 } // namespace oryx::gui

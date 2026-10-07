@@ -60,6 +60,13 @@ void OasisLayer::attach()
     }
 }
 
+void OasisLayer::detach()
+{
+#ifdef OX_ENABLE_GRAPHICS
+    m_showcase.reset();
+#endif
+}
+
 void OasisLayer::event(oryx::Event& event)
 {
     oryx::EventDispatcher dispatcher(event);
@@ -107,6 +114,8 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
         return board;
     };
     app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent, create_board, false });
+    m_showcase = oryx::create_unique<GuiShowcase>();
+    graphics.add_client(*m_showcase);
     return true;
 #else
     return false;
@@ -117,7 +126,7 @@ bool OasisLayer::on_simulation_complete(oryx::SimulationCompleteEvent& event)
 {
     if (event.benchmark())
     {
-        std::cout << oryx::format_benchmark_report(event.results());
+        OX_CORE_INFO("Benchmark complete: {}", oryx::format_benchmark_report(event.results()));
     }
     else
     {

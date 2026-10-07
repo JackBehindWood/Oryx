@@ -137,6 +137,29 @@ private:
         }
     }
 
+    void draw(const ImageCmd& command)
+    {
+        if (command.image.index >= m_target.image_count || m_target.images[command.image.index] == nullptr)
+        {
+            return;
+        }
+        set_clip(command.clip);
+        const Texture2D& texture = *m_target.images[command.image.index];
+        const Vec2f centre = world(rect_centre(command.rect));
+        if (is_square(command.radius))
+        {
+            m_batcher.draw_sprite(centre, command.rect.size, texture, command.tint, 0.0f, command.uv_min, command.uv_max);
+            return;
+        }
+        Vec2f points[4 * k_max_corner_points];
+        const uint32_t count = outline(command.rect, command.radius, 0.0f, points_per_corner(command.radius), points);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            points[i] = world(points[i]);
+        }
+        m_batcher.draw_sprite_polygon(centre, command.rect.size, points, count, texture, command.tint, command.uv_min, command.uv_max);
+    }
+
     void draw(const BorderCmd& command)
     {
         set_clip(command.clip);
@@ -167,6 +190,7 @@ private:
 
 void replay(const DrawList& list, BatchRenderer2D& batcher, Font& font, const ReplayTarget& target)
 {
+    OX_PROFILE_SCOPE("replay");
     Replayer replayer(list, batcher, font, target);
     for (uint32_t index = 0; index < list.channel_count(); ++index)
     {
@@ -177,6 +201,14 @@ void replay(const DrawList& list, BatchRenderer2D& batcher, Font& font, const Re
         }
     }
     replayer.finish();
+}
+
+void replay(const DrawList& list, BatchRenderer2D& batcher, Font& font, ReplayTarget target, const Texture2D& image)
+{
+    const Texture2D* const images[1] = { &image };
+    target.images = images;
+    target.image_count = 1;
+    replay(list, batcher, font, target);
 }
 
 } // namespace oryx

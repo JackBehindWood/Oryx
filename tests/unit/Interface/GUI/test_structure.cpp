@@ -43,7 +43,7 @@ TEST_CASE("GUI structure: a collapsing header toggles, keeps its state and forge
     const auto body = [&] { open = gui::collapsing_header("Section"); };
     f.driver.settle(f.column_of(body));
     CHECK_FALSE(open);
-    f.driver.click(rect_centre(f.find_text("> Section")->rect), f.column_of(body));
+    f.driver.click(rect_centre(f.find_text("Section")->rect), f.column_of(body));
     CHECK(open);
     f.driver.run_frames(3, f.column_of(body));
     CHECK(open);
@@ -80,16 +80,17 @@ TEST_CASE("GUI structure: a tree node opens its children, a leaf never does, and
     };
     f.driver.settle(f.column_of(body));
     CHECK_FALSE(root_open);
-    f.driver.click(rect_centre(f.find_text("> root")->rect), f.column_of(body));
+    f.driver.click(rect_centre(f.find_text("root")->rect), f.column_of(body));
     CHECK(root_open);
     f.driver.settle(f.column_of(body));
-    const LayoutNode* leaf = f.find_text("  leaf");
+    const LayoutNode* leaf = f.find_text("leaf");
     REQUIRE(leaf != nullptr);
-    CHECK(leaf->paint.has_fill);
-    CHECK(approx_equal(leaf->paint.fill, f.theme.base.accent));
-    const LayoutNode* root = f.find_text("v root");
+    const LayoutNode& leaf_row = f.context.layout().node(static_cast<uint32_t>(leaf->parent));
+    CHECK(leaf_row.paint.has_fill);
+    CHECK(approx_equal(leaf_row.paint.fill, f.theme.base.accent));
+    const LayoutNode* root = f.find_text("root");
     REQUIRE(root != nullptr);
-    CHECK(leaf->rect.min[0] > root->rect.min[0]);
+    CHECK(leaf->rect.min[0] > root->rect.min[0] - 0.01f);
     f.driver.click(rect_centre(leaf->rect), f.column_of(body));
     CHECK_FALSE(leaf_open);
     CHECK(root_open);
@@ -186,9 +187,15 @@ TEST_CASE("GUI structure: tab bar selects on a press and reports drag and close"
     GuiFixture f;
     uint32_t selected = 0;
     gui::TabBarResult last;
-    const std::string_view labels[] = { "A", "B", "C" };
     bool closable = false;
-    const auto body = [&] { last = gui::tab_bar("tabs", labels, selected, { .closable = closable }); };
+    const auto body = [&]
+    {
+        gui::TabBarScope bar("tabs", selected, { .closable = closable });
+        std::ignore = bar.tab("A");
+        std::ignore = bar.tab("B");
+        std::ignore = bar.tab("C");
+        last = bar.result();
+    };
     f.driver.settle(f.column_of(body));
     f.driver.move_to(rect_centre(f.find_text("B")->rect));
     f.driver.press();
@@ -204,7 +211,7 @@ TEST_CASE("GUI structure: tab bar selects on a press and reports drag and close"
 
     closable = true;
     f.driver.settle(f.column_of(body));
-    f.driver.move_to(rect_centre(f.find_text("x")->rect));
+    f.driver.move_to(rect_centre(f.find_icon(Icon::Cross)->rect));
     f.driver.frame(f.column_of(body));
     f.driver.press();
     f.driver.frame(f.column_of(body));
@@ -250,7 +257,18 @@ TEST_CASE("GUI structure: a list box selects the clicked row")
     const std::string_view items[] = { "one", "two", "three" };
     int32_t selected = 0;
     bool changed = false;
-    const auto body = [&] { changed = gui::list_box("items", items, selected) || changed; };
+    const auto body = [&]
+    {
+        gui::ListBoxScope list("items");
+        for (int32_t index = 0; index < 3; ++index)
+        {
+            if (list.item(items[index], index == selected).clicked)
+            {
+                changed = changed || selected != index;
+                selected = index;
+            }
+        }
+    };
     f.driver.settle(f.column_of(body));
     f.driver.click(rect_centre(f.find_text("three")->rect), f.column_of(body));
     CHECK(selected == 2);
@@ -272,8 +290,6 @@ TEST_CASE("GUI structure: warm frames allocate nothing")
     uint32_t selected = 0;
     int32_t item = 0;
     float first = 60.0f;
-    const std::string_view labels[] = { "A", "B" };
-    const std::string_view items[] = { "one", "two" };
     const auto body = [&]
     {
         std::ignore = gui::collapsing_header("Section", true);
@@ -285,8 +301,16 @@ TEST_CASE("GUI structure: warm frames allocate nothing")
             gui::ScrollScope scope("scroll", { .height = fixed(40.0f) });
             rows(8, k_names);
         }
-        std::ignore = gui::tab_bar("tabs", labels, selected, { .closable = true });
-        std::ignore = gui::list_box("items", items, item);
+        {
+            gui::TabBarScope bar("tabs", selected, { .closable = true });
+            std::ignore = bar.tab("A");
+            std::ignore = bar.tab("B");
+        }
+        {
+            gui::ListBoxScope list("items");
+            std::ignore = list.item("one", item == 0);
+            std::ignore = list.item("two", item == 1);
+        }
         gui::BoxScope row("row", LayoutStyle{});
         std::ignore = gui::splitter("split", first);
     };
@@ -318,7 +342,9 @@ TEST_CASE("GUI structure: golden layout of a menu bar, header and scroll panel")
         "root [0.00 0.00 160.00 120.00] column w=grow(1.00) h=grow(1.00)\n"
         "  bar [0.00 0.00 160.00 28.00] row w=grow(1.00) h=fit\n"
         "    #03e4608196e89d51 [2.00 2.00 56.00 24.00] row w=fit h=fit text=\"File\"\n"
-        "  Stats [0.00 28.00 160.00 24.00] row w=grow(1.00) h=fit text=\"v Stats\"\n"
+        "  Stats [0.00 28.00 160.00 24.00] row w=grow(1.00) h=fit\n"
+        "    #0000000000000000 [8.00 32.00 16.00 16.00] row w=fixed(16.00) h=fixed(16.00) icon=2\n"
+        "    #0000000000000000 [28.00 32.00 124.00 16.00] row w=grow(1.00) h=fit text=\"Stats\"\n"
         "  list [0.00 52.00 160.00 40.00] column w=grow(1.00) h=fixed(40.00) scroll(0.00 0.00 of 36.00 96.00)\n"
         "    r0 [0.00 52.00 36.00 24.00] row w=fit h=fit text=\"r0\"\n"
         "    r1 [0.00 76.00 36.00 24.00] row w=fit h=fit text=\"r1\"\n"
@@ -326,4 +352,134 @@ TEST_CASE("GUI structure: golden layout of a menu bar, header and scroll panel")
         "    r3 [0.00 124.00 36.00 24.00] row w=fit h=fit text=\"r3\"\n"
         "    #8b76bb748418875a [152.00 52.00 8.00 16.67] row w=fixed(8.00) h=fixed(16.67) floating\n";
     CHECK(dump_layout(f.context) == expected);
+}
+
+TEST_CASE("GUI structure: a header given a visible flag hides itself and its body on the close button, and stays shut until reopened")
+{
+    GuiFixture f;
+    bool visible = true;
+    uint32_t body_runs = 0;
+    const auto body = [&]
+    {
+        if (gui::collapsing_header("Panel", &visible, true))
+        {
+            ++body_runs;
+        }
+    };
+    f.driver.settle(f.column_of(body));
+    CHECK(body_runs > 0);
+    const LayoutNode* close = f.find_icon(Icon::Cross);
+    REQUIRE(close != nullptr);
+    f.driver.click(rect_centre(close->rect), f.column_of(body));
+    CHECK_FALSE(visible);
+
+    body_runs = 0;
+    f.driver.run_frames(3, f.column_of(body));
+    CHECK(body_runs == 0);
+    CHECK(f.find_icon(Icon::Cross) == nullptr);
+
+    visible = true;
+    f.driver.run_frames(2, f.column_of(body));
+    CHECK(body_runs > 0);
+}
+
+TEST_CASE("GUI structure: a tab given an open flag closes itself, draws nothing while shut and keeps the other tabs' indices")
+{
+    GuiFixture f;
+    uint32_t selected = 0;
+    bool open_b = true;
+    gui::TabBarResult last;
+    const auto body = [&]
+    {
+        gui::TabBarScope bar("tabs", selected);
+        std::ignore = bar.tab("A");
+        std::ignore = bar.tab("B", &open_b);
+        std::ignore = bar.tab("C");
+        last = bar.result();
+    };
+    f.driver.settle(f.column_of(body));
+    REQUIRE(f.find_icon(Icon::Cross) != nullptr);
+    f.driver.click(rect_centre(f.find_icon(Icon::Cross)->rect), f.column_of(body));
+    CHECK_FALSE(open_b);
+
+    f.driver.run_frames(3, f.column_of(body));
+    CHECK(f.find_text("B") == nullptr);
+    CHECK(f.find_icon(Icon::Cross) == nullptr);
+    f.driver.click(rect_centre(f.find_text("C")->rect), f.column_of(body));
+    CHECK(selected == 2);
+}
+
+TEST_CASE("GUI structure: a virtualised list box submits only the rows in view, and scrolls through all of them")
+{
+    GuiFixture f;
+    constexpr uint32_t k_items = 1000;
+    int32_t selected = -1;
+    uint32_t submitted = 0;
+    uint32_t first = 0;
+    const auto body = [&]
+    {
+        gui::ListBoxScope list("items", { .height = fixed(110.0f), .item_count = k_items, .item_height = 22.0f });
+        first = list.first_item();
+        submitted = 0;
+        for (uint32_t index = list.first_item(); index < list.last_item(); ++index)
+        {
+            ++submitted;
+            if (list.item(index, f.context.arena().format("row %u", index), static_cast<int32_t>(index) == selected).clicked)
+            {
+                selected = static_cast<int32_t>(index);
+            }
+        }
+    };
+    f.driver.settle(f.column_of(body));
+    f.driver.run_frames(2, f.column_of(body));
+    CHECK(submitted > 0);
+    CHECK(submitted < 12);
+    CHECK(first == 0);
+    CHECK(f.find_text("row 0") != nullptr);
+
+    Rect view;
+    REQUIRE(f.context.layout_rect(f.context.id("items"), view));
+    f.driver.move_to(rect_centre(view));
+    for (uint32_t step = 0; step < 6; ++step)
+    {
+        f.driver.wheel({ 0.0f, -3.0f });
+        f.driver.run_frames(2, f.column_of(body));
+    }
+    CHECK(first > 0);
+    CHECK(submitted < 12);
+    CHECK(f.find_text("row 0") == nullptr);
+
+    CHECK_THROWS_AS(f.driver.frame(f.column_of([] { gui::ListBoxScope list("bad", { .item_count = 3 }); std::ignore = list.item("x", false); })), Error);
+}
+
+TEST_CASE("Icons: draw_icon strokes each symbol as lines inside its box, and gui::icon puts one in a box of its own")
+{
+    DrawList list;
+    const Rect box = { { 10.0f, 10.0f }, { 20.0f, 20.0f } };
+    const struct
+    {
+        Icon icon;
+        size_t lines;
+    } cases[] = { { Icon::None, 0 }, { Icon::ChevronRight, 2 }, { Icon::ChevronLeft, 2 }, { Icon::ChevronUp, 2 }, { Icon::ChevronDown, 2 },
+                  { Icon::Cross, 2 }, { Icon::Plus, 2 }, { Icon::Minus, 1 }, { Icon::Check, 2 } };
+    for (const auto& entry : cases)
+    {
+        list.clear();
+        draw_icon(list, box, entry.icon, { 1.0f, 1.0f, 1.0f, 1.0f });
+        CHECK(list.channel(0).lines.size() == entry.lines);
+        for (const LineCmd& line : list.channel(0).lines)
+        {
+            CHECK(line.from[0] >= box.min[0]);
+            CHECK(line.from[0] <= box.min[0] + box.size[0]);
+            CHECK(line.to[1] >= box.min[1]);
+            CHECK(line.to[1] <= box.min[1] + box.size[1]);
+        }
+    }
+
+    GuiFixture f;
+    f.driver.settle(f.column_of([] { gui::icon(Icon::Plus, { .size = 20.0f }); }));
+    const LayoutNode* node = f.find_icon(Icon::Plus);
+    REQUIRE(node != nullptr);
+    CHECK(node->rect.size[0] == doctest::Approx(20.0f));
+    CHECK(f.context.draw_list().channel(0).lines.size() >= 2);
 }

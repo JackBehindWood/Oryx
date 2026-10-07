@@ -2,6 +2,8 @@
 
 #include "Options.h"
 
+#include "GuiShowcase.h"
+
 namespace oasis
 {
 
@@ -12,6 +14,7 @@ public:
     explicit OasisLayer(Options options);
 
     void attach() override;
+    void detach() override;
     void event(oryx::Event& event) override;
 
 private:
@@ -22,6 +25,9 @@ private:
     bool on_simulation_complete(oryx::SimulationCompleteEvent& event);
 
     Options m_options;
+#ifdef OX_ENABLE_GRAPHICS
+    oryx::UniquePtr<GuiShowcase> m_showcase;
+#endif
 };
 
 } // namespace oasis

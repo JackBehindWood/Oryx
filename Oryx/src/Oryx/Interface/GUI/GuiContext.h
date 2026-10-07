@@ -56,11 +56,11 @@ public:
         m_toasts[slot].text[length] = '\0';
         m_toasts[slot].remaining = seconds;
     }
-    [[nodiscard]] std::span<GuiToast> toasts() { return m_toasts; }
+    [[nodiscard]] GuiToast* toasts() { return m_toasts; }
 
 private:
     GuiTheme m_gui_theme;
-    std::array<GuiToast, k_max_toasts> m_toasts;
+    GuiToast m_toasts[k_max_toasts];
     uint64_t m_menu_close_frame = 0;
 };
 

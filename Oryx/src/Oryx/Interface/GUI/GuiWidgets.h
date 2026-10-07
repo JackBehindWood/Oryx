@@ -74,6 +74,10 @@ void progress(std::string_view label, float fraction, std::string_view text = {}
 // Returns whether the header is open; the content follows at the same level. The open flag lives in widget state under the header's id.
 [[nodiscard]] bool collapsing_header(std::string_view label, bool default_open = false, const WidgetOptions& options = {});
 
+// With a `visible` pointer the header gets a close button at its right edge, like ImGui's `p_open`: the click clears *visible, and while it is false nothing is drawn and the result is false,
+// so the body (and everything it would compute) is skipped for a closed panel. The caller owns the flag and reopens it from a menu or toggle. A null pointer is the plain header.
+[[nodiscard]] bool collapsing_header(std::string_view label, bool* visible, bool default_open = false, const WidgetOptions& options = {});
+
 struct TreeNodeOptions : WidgetOptions
 {
     bool default_open = false;
@@ -134,6 +138,8 @@ static_assert(std::is_trivially_copyable_v<ScrollOptions>);
 // The wheel goes to the innermost hovered region that can still move that way, so a region at its end passes it on to the one around it.
 void begin_scroll(std::string_view name, const ScrollOptions& options = {});
 void end_scroll();
+// The offset of the region `name` would have in the current id scope, in pixels from the top; for widgets that draw only what is visible.
+[[nodiscard]] float scroll_offset(std::string_view name);
 
 class ScrollScope
 {
@@ -164,8 +170,33 @@ struct TabBarResult
 
 static_assert(std::is_trivially_copyable_v<TabBarResult> && std::is_standard_layout_v<TabBarResult>);
 
-// A strip of tabs; a press selects. `selected` is the caller's, so tab content is a plain `if` on it.
-[[nodiscard]] TabBarResult tab_bar(std::string_view name, std::span<const std::string_view> labels, uint32_t& selected, const TabBarOptions& options = {});
+// A strip of tabs, one tab() call each in order; a press selects. `selected` is the caller's, so tab content is a plain `if` on it once the scope ends.
+class TabBarScope
+{
+public:
+    TabBarScope(std::string_view name, uint32_t& selected, const TabBarOptions& options = {});
+    ~TabBarScope();
+
+    TabBarScope(const TabBarScope&) = delete;
+    TabBarScope& operator=(const TabBarScope&) = delete;
+
+    // True while this tab is the selected one (after this frame's press).
+    bool tab(std::string_view label);
+    // A tab with its own close button, like ImGui's TabItem `p_open`: the click clears *open, and while it is false nothing is drawn and the result is false (skip the content too).
+    // The index still counts, so the other tabs keep theirs.
+    bool tab(std::string_view label, bool* open);
+    // What the tabs added so far reported.
+    [[nodiscard]] const TabBarResult& result() const { return m_result; }
+
+private:
+    bool draw_tab(std::string_view label, bool closable, bool* open);
+
+    uint32_t& m_selected;
+    const ImStyle* m_style;
+    bool m_closable;
+    uint32_t m_count = 0;
+    TabBarResult m_result;
+};
 
 struct SplitterOptions
 {
@@ -184,12 +215,49 @@ bool splitter(std::string_view name, float& first_size, const SplitterOptions& o
 struct ListBoxOptions : WidgetOptions
 {
     Sizing height = fixed(120.0f);
+    // Nonzero virtualises the list: the scroll range spans item_count rows of item_height, and the caller submits only first_item()..last_item() with item(index, ...).
+    uint32_t item_count = 0;
+    float item_height = 22.0f;
 };
 
 static_assert(std::is_trivially_copyable_v<ListBoxOptions>);
 
-// Selectable rows in a scroll region; returns whether `selected` changed.
-bool list_box(std::string_view name, std::span<const std::string_view> items, int32_t& selected, const ListBoxOptions& options = {});
+// Selectable rows in a scroll region; the caller owns the selection. Without item_count, one item(label, selected) call per row. With it, a long list costs only its visible rows:
+//   ListBoxScope list("games", { .item_count = n }); for (i = list.first_item(); i < list.last_item(); ++i) { if (list.item(i, names[i], i == selected).clicked) ... }
+// The range comes from last frame's scroll offset and view height with a row of margin each side, so it is one frame late like every hit area.
+class ListBoxScope
+{
+public:
+    explicit ListBoxScope(std::string_view name, const ListBoxOptions& options = {});
+    ~ListBoxScope();
+
+    ListBoxScope(const ListBoxScope&) = delete;
+    ListBoxScope& operator=(const ListBoxScope&) = delete;
+
+    // A row; the state's `clicked` says it was picked. Throws Error on a virtualised list, which needs the index.
+    [[nodiscard]] ItemState item(std::string_view label, bool selected);
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected);
+    [[nodiscard]] uint32_t first_item() const { return m_first; }
+    [[nodiscard]] uint32_t last_item() const { return m_last; }
+
+private:
+    struct Range
+    {
+        uint32_t first = 0;
+        uint32_t last = 0;
+    };
+
+    ListBoxScope(std::string_view name, const ListBoxOptions& options, const Range& range);
+    [[nodiscard]] static Range visible_range(std::string_view name, const ListBoxOptions& options);
+    void spacer(uint32_t rows);
+
+    uint32_t m_first = 0;
+    uint32_t m_last = 0;
+    ScrollScope m_scroll;
+    ListBoxOptions m_options;
+    LayoutStyle m_row;
+    uint32_t m_count = 0;
+};
 
 // True when every character of `needle` matches `text` as a case-insensitive (ASCII) substring; an empty needle matches everything. The needle is fed by the caller.
 [[nodiscard]] bool filter_matches(std::string_view needle, std::string_view text);
@@ -219,7 +287,29 @@ static_assert(std::is_trivially_copyable_v<DragOptions>);
 bool drag_float(std::string_view label, float& value, float min = 0.0f, float max = 0.0f, const DragOptions& options = {});
 bool drag_int(std::string_view label, int32_t& value, int32_t min = 0, int32_t max = 0, const DragOptions& options = {});
 
-// A button showing the chosen label that opens a list; returns whether `selected` changed. Closes on a pick, a press outside or Escape.
-bool combo(std::string_view label, std::span<const std::string_view> items, int32_t& selected, const FieldOptions& options = {});
+// A button showing `preview` that opens a list while the scope lives; one item() call per entry, the caller owns the selection and the preview text. Closes on a pick, a press outside or Escape.
+class ComboScope
+{
+public:
+    ComboScope(std::string_view label, std::string_view preview, const FieldOptions& options = {});
+    ~ComboScope();
+
+    ComboScope(const ComboScope&) = delete;
+    ComboScope& operator=(const ComboScope&) = delete;
+
+    [[nodiscard]] bool open() const { return m_popup; }
+    // An entry of the open list; true on the frame it is picked. Does nothing while the list is closed.
+    bool item(std::string_view text, bool selected);
+
+private:
+    GuiContext& m_context;
+    FieldScope m_field;
+    ImId m_control;
+    ItemState m_state;
+    bool m_open;
+    bool m_popup = false;
+    PopupResult m_result;
+    uint32_t m_count = 0;
+};
 
 } // namespace oryx::gui

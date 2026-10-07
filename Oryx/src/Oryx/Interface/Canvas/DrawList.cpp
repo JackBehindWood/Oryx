@@ -36,6 +36,7 @@ void DrawList::clear()
         channel.borders.clear();
         channel.lines.clear();
         channel.texts.clear();
+        channel.images.clear();
         channel.runs.clear();
     }
     m_clips.clear();
@@ -85,6 +86,7 @@ void DrawList::merge()
             static_cast<uint32_t>(target.borders.size()),
             static_cast<uint32_t>(target.lines.size()),
             static_cast<uint32_t>(target.texts.size()),
+            static_cast<uint32_t>(target.images.size()),
         };
         for (DrawRun run : source.runs)
         {
@@ -96,6 +98,7 @@ void DrawList::merge()
         append(target.borders, source.borders);
         append(target.lines, source.lines);
         append(target.texts, source.texts);
+        append(target.images, source.images);
         source.runs.clear();
     }
     m_channel_count = 1;
@@ -204,6 +207,17 @@ void DrawList::add_line(const Vec2f& from, const Vec2f& to, float thickness, con
     record(DrawKind::Line, array.size());
 }
 
+void DrawList::add_image(const Rect& rect, ImageHandle image, const Vec2f& uv_min, const Vec2f& uv_max, const CornerRadius& radius, const Colour& tint)
+{
+    if (!visible(rect))
+    {
+        return;
+    }
+    std::vector<ImageCmd>& array = m_channels[m_current].images;
+    array.push_back({ rect, image, uv_min, uv_max, clamp_radius(radius, rect.size), tint, clip_index() });
+    record(DrawKind::Image, array.size());
+}
+
 void DrawList::add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour)
 {
     if (text.empty() || (!m_clip_stack.empty() && is_empty(m_clips[m_clip_stack.back()])))
@@ -222,9 +236,28 @@ uint32_t DrawList::command_count() const
     for (uint32_t index = 0; index < m_channel_count; ++index)
     {
         const DrawChannel& channel = m_channels[index];
-        total += static_cast<uint32_t>(channel.rects.size() + channel.rounded_rects.size() + channel.borders.size() + channel.lines.size() + channel.texts.size());
+        total += static_cast<uint32_t>(channel.rects.size() + channel.rounded_rects.size() + channel.borders.size() + channel.lines.size() + channel.texts.size() + channel.images.size());
     }
     return total;
+}
+
+uint32_t DrawList::command_count(DrawKind kind) const
+{
+    size_t total = 0;
+    for (uint32_t index = 0; index < m_channel_count; ++index)
+    {
+        const DrawChannel& channel = m_channels[index];
+        switch (kind)
+        {
+            case DrawKind::Rect: total += channel.rects.size(); break;
+            case DrawKind::RoundedRect: total += channel.rounded_rects.size(); break;
+            case DrawKind::Border: total += channel.borders.size(); break;
+            case DrawKind::Line: total += channel.lines.size(); break;
+            case DrawKind::Text: total += channel.texts.size(); break;
+            case DrawKind::Image: total += channel.images.size(); break;
+        }
+    }
+    return static_cast<uint32_t>(total);
 }
 
 } // namespace oryx

@@ -30,6 +30,7 @@ struct PrimitiveTraits
 };
 
 [[nodiscard]] PrimitiveTraits primitive_traits(Primitive2D primitive);
+[[nodiscard]] const char* primitive_name(Primitive2D primitive);
 // The pipeline each primitive draws with; built on first use because shader types register during static initialisation.
 [[nodiscard]] const PipelineDef& pipeline_def(Primitive2D primitive);
 

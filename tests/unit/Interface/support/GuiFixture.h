@@ -25,7 +25,7 @@ struct GuiFixture
     template<typename Body>
     auto frame_of(Body&& body)
     {
-        return [this, &body]
+        return [&body]
         {
             LayoutStyle root;
             root.width = grow();
@@ -38,7 +38,7 @@ struct GuiFixture
     template<typename Body>
     auto column_of(Body&& body)
     {
-        return [this, &body]
+        return [&body]
         {
             LayoutStyle root;
             root.width = grow();
@@ -47,6 +47,19 @@ struct GuiFixture
             gui::BoxScope scope("root", root);
             body();
         };
+    }
+
+    // The nth box that draws `icon`, or null.
+    const LayoutNode* find_icon(Icon icon, uint32_t nth = 0) const
+    {
+        for (uint32_t index = 0; index < context.layout().node_count(); ++index)
+        {
+            if (context.layout().node(index).paint.icon == icon && nth-- == 0)
+            {
+                return &context.layout().node(index);
+            }
+        }
+        return nullptr;
     }
 
     // The first box whose painted text is `text`, or null.

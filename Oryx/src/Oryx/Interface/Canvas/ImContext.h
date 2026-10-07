@@ -103,6 +103,16 @@ struct ImStats
     size_t arena_capacity = 0;
     uint32_t boxes = 0;
     uint32_t popups = 0;
+    uint32_t state_entries = 0;
+    // The most the frame arena held at the end of any frame so far.
+    size_t arena_high_water = 0;
+    // `commands` split by kind.
+    uint32_t rects = 0;
+    uint32_t rounded_rects = 0;
+    uint32_t borders = 0;
+    uint32_t lines = 0;
+    uint32_t texts = 0;
+    uint32_t images = 0;
 };
 
 // The state both the player-facing and the tooling immediate-mode systems share: input, ids, hot/active/focus, a frame arena, the DrawList being recorded and the theme.
@@ -237,7 +247,7 @@ private:
     {
         const void* tag = nullptr;
         uint32_t size = 0;
-        std::byte data[k_max_widget_state_size];
+        alignas(16) std::byte data[k_max_widget_state_size];
     };
 
     ImInput m_input;
@@ -274,6 +284,7 @@ private:
     ImId m_focus;
     uint64_t m_id_seed;
     uint64_t m_frame = 0;
+    size_t m_arena_high_water = 0;
     float m_time = 0.0f;
     ImId m_last_click_id;
     float m_last_click_time = 0.0f;

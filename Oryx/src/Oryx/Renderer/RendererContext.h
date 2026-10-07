@@ -9,6 +9,7 @@
 #include "Oryx/Renderer/Batch/DebugRenderer.h"
 #include "Oryx/Renderer/DefaultResources.h"
 #include "Oryx/Renderer/DrawItem.h"
+#include "Oryx/Renderer/FrameStats.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Renderer/Renderer.h"
 #include "Oryx/Shaders/Cache/ShaderCache.h"
@@ -39,6 +40,9 @@ struct RendererContext
     DebugRenderer debug;
     // Owns the frame's batcher and passes; declared after what it points at so it is destroyed first.
     UniquePtr<SceneRenderer> scene;
+    FrameStats last_frame_stats;
+    GraphicsPipelineCacheStats previous_pipelines;
+    uint64_t previous_allocations = 0;
 };
 
 // Creates the device, compiles every registered shader and builds the default resources; throws Error on failure.

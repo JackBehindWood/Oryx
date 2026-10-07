@@ -13,6 +13,8 @@ enum class LabelSide : uint8_t
     After
 };
 
+inline constexpr uint32_t k_palette_size = 8;
+
 // The shared theme plus the roles only developer tooling needs.
 struct GuiTheme : ImTheme
 {
@@ -28,6 +30,17 @@ struct GuiTheme : ImTheme
     float tooltip_delay = 0.5f;
     // Left padding of the children of a tree node.
     float indent = 16.0f;
+    // Categorical colours for series, legends and tags: the Okabe-Ito set, distinguishable with the common colour-vision deficiencies.
+    Colour palette[k_palette_size] = {
+        { 0.337f, 0.706f, 0.914f, 1.0f },
+        { 0.902f, 0.624f, 0.000f, 1.0f },
+        { 0.000f, 0.620f, 0.451f, 1.0f },
+        { 0.800f, 0.475f, 0.655f, 1.0f },
+        { 0.941f, 0.894f, 0.259f, 1.0f },
+        { 0.835f, 0.369f, 0.000f, 1.0f },
+        { 0.000f, 0.447f, 0.698f, 1.0f },
+        { 0.700f, 0.700f, 0.700f, 1.0f },
+    };
 };
 
 static_assert(std::is_trivially_copyable_v<GuiTheme>);

@@ -54,6 +54,16 @@ bool toggle(std::string_view text, bool& value, const WidgetOptions& options)
     return im::toggle(active(), text, value, options);
 }
 
+ItemState image(std::string_view name, ImageHandle image, const ImageOptions& options)
+{
+    return im::image(active(), name, image, options);
+}
+
+ItemState image_button(std::string_view name, ImageHandle image, const ImageButtonOptions& options)
+{
+    return im::image_button(active(), name, image, options);
+}
+
 void begin_panel(std::string_view name, const WidgetOptions& options)
 {
     im::begin_panel(active(), name, options);
@@ -82,6 +92,11 @@ void begin_column(std::string_view name, const RowOptions& options)
 void end_column()
 {
     im::end_column(active());
+}
+
+void icon(Icon icon, const IconOptions& options)
+{
+    im::icon(active(), icon, options);
 }
 
 void spacer(float weight)

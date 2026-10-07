@@ -21,6 +21,19 @@ PrimitiveTraits primitive_traits(Primitive2D primitive)
     throw Error("Primitive2D is invalid");
 }
 
+const char* primitive_name(Primitive2D primitive)
+{
+    switch (primitive)
+    {
+    case Primitive2D::Quad: return "quad";
+    case Primitive2D::Circle: return "circle";
+    case Primitive2D::Line: return "line";
+    case Primitive2D::Triangle: return "triangle";
+    case Primitive2D::Text: return "text";
+    }
+    throw Error("Primitive2D is invalid");
+}
+
 const PipelineDef& pipeline_def(Primitive2D primitive)
 {
     static const PipelineDef defs[PRIMITIVE_2D_COUNT] = {

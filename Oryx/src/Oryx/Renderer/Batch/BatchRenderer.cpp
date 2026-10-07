@@ -24,6 +24,32 @@ uint32_t align_up(uint32_t value, uint32_t alignment)
 
 } // namespace
 
+BatchStats batch_stats_delta(const BatchStats& after, const BatchStats& before)
+{
+    BatchStats delta = after;
+    delta.draws -= before.draws;
+    delta.primitives -= before.primitives;
+    delta.vertices -= before.vertices;
+    delta.triangles -= before.triangles;
+    delta.bytes -= before.bytes;
+    for (uint32_t reason = 0; reason < FLUSH_REASON_COUNT; ++reason)
+    {
+        delta.flushes[reason] -= before.flushes[reason];
+    }
+    for (uint32_t stream = 0; stream < BATCH_MAX_STREAMS; ++stream)
+    {
+        delta.streams[stream].draws -= before.streams[stream].draws;
+        delta.streams[stream].primitives -= before.streams[stream].primitives;
+        delta.streams[stream].vertices -= before.streams[stream].vertices;
+        delta.streams[stream].bytes -= before.streams[stream].bytes;
+        for (uint32_t to = 0; to < BATCH_MAX_STREAMS; ++to)
+        {
+            delta.stream_switches[stream][to] -= before.stream_switches[stream][to];
+        }
+    }
+    return delta;
+}
+
 BatchRenderer::BatchRenderer(const BatchRendererDesc& desc)
     : m_rhi(desc.rhi)
     , m_pipelines(desc.pipelines)
@@ -52,7 +78,7 @@ BatchStreamId BatchRenderer::register_stream(const BatchStreamDesc& stream)
     {
         throw Error("BatchStreamDesc is invalid", "indexed streams must be quads (4 vertices, 6 indices)");
     }
-    if (m_streams.size() >= UINT8_MAX)
+    if (m_streams.size() >= BATCH_MAX_STREAMS)
     {
         throw Error("BatchRenderer has too many streams");
     }
@@ -152,6 +178,7 @@ void BatchRenderer::select(BatchStreamId stream, const RHISamplerPtr& sampler)
     {
         if (stream != m_stream)
         {
+            ++m_stats.stream_switches[m_stream][stream];
             flush_batch(FlushReason::StreamChange);
         }
         else if (sampler != m_sampler)
@@ -247,6 +274,11 @@ void BatchRenderer::flush_batch(FlushReason reason)
             m_stats.texture_slots_used = std::max(m_stats.texture_slots_used, m_slots.count());
         }
         m_stats.bytes += bytes;
+        BatchStreamStats& per_stream = m_stats.streams[m_stream];
+        ++per_stream.draws;
+        per_stream.primitives += primitives;
+        per_stream.vertices += primitives * stream.vertices_per_primitive;
+        per_stream.bytes += bytes;
         ++m_stats.flushes[static_cast<uint32_t>(reason)];
     }
     m_staging.clear();

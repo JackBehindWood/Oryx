@@ -128,6 +128,22 @@ TEST_CASE("GUI: state<T> persists, is collected when unused and checks its type"
     CHECK_THROWS_AS(std::ignore = f.context.state<Counter>(id), Error);
 }
 
+TEST_CASE("GUI: state<T> hands out storage aligned for its type")
+{
+    struct alignas(16) Wide
+    {
+        double a = 0.0;
+        uint64_t b = 0;
+    };
+    GuiFixture f;
+    f.context.begin_frame(f.driver.input());
+    Wide& wide = gui::state<Wide>(gui::id("wide"));
+    uint64_t& small = gui::state<uint64_t>(gui::id("small"));
+    CHECK(reinterpret_cast<uintptr_t>(&wide) % alignof(Wide) == 0);
+    CHECK(reinterpret_cast<uintptr_t>(&small) % alignof(uint64_t) == 0);
+    f.context.end_frame();
+}
+
 TEST_CASE("GUI: state<T> allocates only when a new id appears")
 {
     GuiFixture f;
@@ -251,6 +267,8 @@ TEST_CASE("GUI: wrappers mirror the UI signatures")
     static_assert(std::is_same_v<decltype(&gui::label), decltype(&ui::label)>);
     static_assert(std::is_same_v<decltype(&gui::button), decltype(&ui::button)>);
     static_assert(std::is_same_v<decltype(&gui::toggle), decltype(&ui::toggle)>);
+    static_assert(std::is_same_v<decltype(&gui::image), decltype(&ui::image)>);
+    static_assert(std::is_same_v<decltype(&gui::image_button), decltype(&ui::image_button)>);
     static_assert(std::is_same_v<decltype(&gui::begin_panel), decltype(&ui::begin_panel)>);
     static_assert(std::is_same_v<decltype(&gui::end_panel), decltype(&ui::end_panel)>);
     static_assert(std::is_same_v<decltype(&gui::begin_row), decltype(&ui::begin_row)>);

@@ -579,3 +579,37 @@ TEST_CASE("record_draw_item draws textured items through a fallback pixel shader
     CHECK(fixture.count("BindTexture") == 0);
     CHECK(fixture.count("Draw") == 1);
 }
+
+TEST_CASE("Renderer: last_frame_stats holds the finished frame after the batcher recycled")
+{
+    RendererGuard guard;
+    Camera2D camera(2.0f, 2.0f);
+    Renderer::init({ RHIBackend::Null });
+    DrawFixture fixture;
+    const Colour red = { 1.0f, 0.0f, 0.0f, 1.0f };
+
+    test::render_2d(camera, [&](BatchRenderer2D& batcher)
+    {
+        batcher.draw_rect({ 0.0f, 0.0f }, { 1.0f, 1.0f }, red);
+        batcher.draw_circle({ 0.0f, 0.0f }, 0.5f, red);
+    });
+    CHECK(Renderer::end_frame());
+
+    CHECK(Renderer::batch_stats().draws == 0);
+    const FrameStats& stats = Renderer::last_frame_stats();
+    CHECK(stats.presented);
+    CHECK(stats.batch.draws > 0);
+    CHECK(stats.batch.primitives == 2);
+    CHECK(stats.draw_items > 0);
+    CHECK(stats.passes > 0);
+    CHECK(stats.pass_items[0] + stats.pass_items[1] + stats.pass_items[2] == stats.draw_items);
+    CHECK(stats.pipeline_misses > 0);
+
+    test::render_2d(camera, [&](BatchRenderer2D& batcher) { batcher.draw_rect({ 0.0f, 0.0f }, { 1.0f, 1.0f }, red); });
+    Renderer::end_frame();
+    CHECK(Renderer::last_frame_stats().batch.primitives == 1);
+    CHECK(Renderer::last_frame_stats().pipeline_misses == 0);
+
+    Renderer::set_frame_cpu_times({ 1.0f, 2.0f, 3.0f });
+    CHECK(Renderer::last_frame_stats().cpu.record_ms == 3.0f);
+}

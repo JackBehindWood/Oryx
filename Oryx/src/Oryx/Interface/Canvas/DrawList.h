@@ -44,6 +44,30 @@ struct LineCmd
     uint32_t clip = k_no_clip;
 };
 
+// Which picture of the owner's image table an ImageCmd draws; ReplayTarget carries the table, so the list never names a texture.
+struct ImageHandle
+{
+    uint32_t index = 0;
+};
+
+// The one image of a replay that was given a single texture.
+inline constexpr ImageHandle k_single_image{ 0 };
+
+// `uv_min` is the image's top-left and `uv_max` its bottom-right; a radius rounds the picture's corners.
+struct ImageCmd
+{
+    Rect rect;
+    ImageHandle image;
+    Vec2f uv_min{ 0.0f, 0.0f };
+    Vec2f uv_max{ 1.0f, 1.0f };
+    CornerRadius radius;
+    Colour tint;
+    uint32_t clip = k_no_clip;
+};
+
+static_assert(std::is_trivially_copyable_v<ImageCmd> && std::is_standard_layout_v<ImageCmd>);
+static_assert(std::is_trivially_copyable_v<ImageHandle> && std::is_standard_layout_v<ImageHandle>);
+
 // `origin` is the baseline point: x per `align`, y the baseline. The characters live in the list's text pool.
 struct TextCmd
 {
@@ -63,10 +87,11 @@ enum class DrawKind : uint32_t
     RoundedRect,
     Border,
     Line,
-    Text
+    Text,
+    Image
 };
 
-inline constexpr uint32_t DRAW_KIND_COUNT = 5;
+inline constexpr uint32_t DRAW_KIND_COUNT = 6;
 
 // Consecutive commands of one kind, so the draw order across kinds survives the typed arrays.
 struct DrawRun
@@ -84,6 +109,7 @@ struct DrawChannel
     std::vector<BorderCmd> borders;
     std::vector<LineCmd> lines;
     std::vector<TextCmd> texts;
+    std::vector<ImageCmd> images;
     std::vector<DrawRun> runs;
 };
 
@@ -100,6 +126,7 @@ void for_each_command(const DrawChannel& channel, const DrawRun& run, Visitor&& 
             case DrawKind::Border: visitor(channel.borders[at]); break;
             case DrawKind::Line: visitor(channel.lines[at]); break;
             case DrawKind::Text: visitor(channel.texts[at]); break;
+            case DrawKind::Image: visitor(channel.images[at]); break;
         }
     }
 }
@@ -143,10 +170,12 @@ public:
     void add_rounded_rect(const Rect& rect, const CornerRadius& radius, const Colour& colour);
     void add_border(const Rect& rect, const CornerRadius& radius, float thickness, const Colour& colour);
     void add_line(const Vec2f& from, const Vec2f& to, float thickness, const Colour& colour);
+    void add_image(const Rect& rect, ImageHandle image, const Vec2f& uv_min, const Vec2f& uv_max, const CornerRadius& radius, const Colour& tint);
     void add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour);
 
     [[nodiscard]] std::string_view text(const TextCmd& command) const { return std::string_view(m_text).substr(command.first, command.length); }
     [[nodiscard]] uint32_t command_count() const;
+    [[nodiscard]] uint32_t command_count(DrawKind kind) const;
 
 private:
     [[nodiscard]] bool visible(const Rect& rect) const;

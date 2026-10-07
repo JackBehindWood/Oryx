@@ -112,7 +112,18 @@ TEST_CASE("GUI input: a combo opens, picks, and closes on a pick, an outside pre
     int32_t selected = 0;
     bool changed = false;
     f.driver.input().surface_size = { 200.0f, 200.0f };
-    const auto body = [&] { changed = gui::combo("mode", items, selected) || changed; };
+    const auto body = [&]
+    {
+        gui::ComboScope combo("mode", items[selected]);
+        for (int32_t index = 0; index < 3; ++index)
+        {
+            if (combo.item(items[index], index == selected))
+            {
+                changed = changed || selected != index;
+                selected = index;
+            }
+        }
+    };
     f.driver.settle(f.column_of(body));
     CHECK(f.find_text("beta") == nullptr);
     f.driver.click(rect_centre(f.find_text("alpha")->rect), f.column_of(body));
@@ -152,7 +163,9 @@ TEST_CASE("GUI input: warm frames allocate nothing")
     {
         std::ignore = gui::slider_float("slider", slider, 0.0f, 10.0f);
         std::ignore = gui::drag_float("drag", drag);
-        std::ignore = gui::combo("mode", items, selected);
+        gui::ComboScope combo("mode", items[selected]);
+        std::ignore = combo.item(items[0], selected == 0);
+        std::ignore = combo.item(items[1], selected == 1);
     };
     f.driver.run_frames(5, f.column_of(body));
     f.driver.click(rect_centre(f.find_text("alpha")->rect), f.column_of(body));

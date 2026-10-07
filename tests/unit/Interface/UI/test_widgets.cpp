@@ -336,3 +336,25 @@ TEST_CASE("ui: a separator runs across a column and down a row")
     CHECK(layout.find("w=grow(1.00) h=fixed(1.00)") != std::string::npos);
     CHECK(layout.find("w=fixed(1.00) h=grow(1.00)") != std::string::npos);
 }
+
+TEST_CASE("ui: an image and an image button use the shared widgets")
+{
+    UiFixture f;
+    uint32_t clicks = 0;
+    const auto body = [&]
+    {
+        std::ignore = ui::image("pic", k_single_image);
+        clicks += ui::image_button("button", ImageHandle{ 1 }).clicked ? 1 : 0;
+    };
+    for (uint32_t index = 0; index < 3; ++index)
+    {
+        f.frame(pointer(500.0f, 500.0f), body);
+    }
+    REQUIRE(f.context.draw_list().channel(0).images.size() == 2);
+    CHECK(f.context.draw_list().channel(0).images[1].image.index == 1);
+    const Vec2f at = rect_centre(f.context.draw_list().channel(0).images[1].rect);
+    f.frame(pointer(at[0], at[1]), body);
+    f.frame(pointer(at[0], at[1], true, true), body);
+    f.frame(pointer(at[0], at[1], false, false, true), body);
+    CHECK(clicks == 1);
+}

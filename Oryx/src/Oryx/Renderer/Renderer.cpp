@@ -180,6 +180,16 @@ const BatchStats& Renderer::batch_stats()
     return require_context().scene->batcher_2d().stats();
 }
 
+const FrameStats& Renderer::last_frame_stats()
+{
+    return require_context().last_frame_stats;
+}
+
+void Renderer::set_frame_cpu_times(const FrameCpuTimes& times)
+{
+    require_context().last_frame_stats.cpu = times;
+}
+
 bool Renderer::end_frame()
 {
     return record_frame(require_context());

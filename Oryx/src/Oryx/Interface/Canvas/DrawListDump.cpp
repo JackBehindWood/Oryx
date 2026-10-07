@@ -83,6 +83,16 @@ struct Dumper
         end(command.clip);
     }
 
+    void operator()(const ImageCmd& command)
+    {
+        out.append("  image ");
+        put_rect(out, command.rect);
+        put(out, " #%u uv(%.2f %.2f %.2f %.2f)", command.image.index, command.uv_min[0], command.uv_min[1], command.uv_max[0], command.uv_max[1]);
+        put_radius(out, command.radius);
+        put_colour(out, command.tint);
+        end(command.clip);
+    }
+
     void operator()(const TextCmd& command)
     {
         put(out, "  text (%.2f %.2f) h=%.2f align=%u \"", command.origin[0], command.origin[1], command.pixel_height, static_cast<uint32_t>(command.align));

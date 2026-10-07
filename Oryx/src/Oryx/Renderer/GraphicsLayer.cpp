@@ -3,6 +3,7 @@
 
 #include "Oryx/Core/Application.h"
 #include "Oryx/Core/Error.h"
+#include "Oryx/Core/Timer.h"
 #include "Oryx/Events/WindowEvent.h"
 #include "Oryx/Renderer/Renderer.h"
 
@@ -125,12 +126,17 @@ void GraphicsLayer::update(double delta_time)
                     { static_cast<float>(handle.framebuffer_width), static_cast<float>(handle.framebuffer_height) },
                     handle.content_scale,
                     delta_time };
+    Timer timer;
+    timer.start();
+    FrameCpuTimes cpu;
+    const auto lap_ms = [&timer] { return static_cast<float>(timer.tick() * 1000.0); };
     if (m_viewport)
     {
         const Camera2D camera = Camera2D::screen_space(std::max(info.logical[0], 1.0f), std::max(info.logical[1], 1.0f));
         SceneRenderer& scene = Renderer::scene();
         scene.begin_scene(make_render_view(camera, info));
         run_clients(info);
+        cpu.clients_ms = lap_ms();
         try
         {
             scene.end_scene();
@@ -141,6 +147,7 @@ void GraphicsLayer::update(double delta_time)
             OX_CORE_ERROR("GraphicsLayer: dropped every frame client after a scene error.");
             m_clients.clear();
         }
+        cpu.scene_ms = lap_ms();
     }
     else
     {
@@ -152,6 +159,8 @@ void GraphicsLayer::update(double delta_time)
     {
         Renderer::set_clear_colour(m_clear);
         idle = !Renderer::end_frame();
+        cpu.record_ms = lap_ms();
+        Renderer::set_frame_cpu_times(cpu);
     }
     m_window->poll_events();
     if (m_window->should_close())

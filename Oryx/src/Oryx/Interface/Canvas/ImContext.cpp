@@ -16,6 +16,7 @@ void ImContext::require_frame(const char* what) const
 
 void ImContext::begin_frame(const ImInput& input)
 {
+    OX_PROFILE_SCOPE("ImContext::begin_frame");
     if (m_open)
     {
         throw Error("ImContext frame is already open", "end_frame, or abort_frame after an error");
@@ -52,6 +53,7 @@ Vec2f ImContext::consume_wheel()
 
 void ImContext::end_frame()
 {
+    OX_PROFILE_SCOPE("ImContext::end_frame");
     require_frame("end_frame");
     if (!m_id_stack.empty())
     {
@@ -70,6 +72,7 @@ void ImContext::end_frame()
         throw Error("ImContext frame ended with a popup layer open", "every begin_popup_layer needs an end_popup_layer");
     }
     solve_layout();
+    m_arena_high_water = math::max(m_arena_high_water, m_arena.used());
     if (!button_of(m_input, MouseCode::Left).down)
     {
         m_active = {};
@@ -103,6 +106,7 @@ void ImContext::abort_frame()
 
 void ImContext::solve_layout()
 {
+    OX_PROFILE_SCOPE("ImContext::solve_layout");
     TextMeasure measure;
     if (m_theme.font != nullptr)
     {
@@ -408,7 +412,8 @@ bool ImContext::previous_rect(ImId id, Rect& out) const
 
 ImStats ImContext::stats() const
 {
-    return { m_frame, m_items, m_draw.command_count(), static_cast<uint32_t>(m_memory.size()), m_arena.used(), m_arena.capacity(), m_layout.node_count(), m_popup_count };
+    return { m_frame, m_items, m_draw.command_count(), static_cast<uint32_t>(m_memory.size()), m_arena.used(), m_arena.capacity(), m_layout.node_count(), m_popup_count, static_cast<uint32_t>(m_state.size()), m_arena_high_water,
+             m_draw.command_count(DrawKind::Rect), m_draw.command_count(DrawKind::RoundedRect), m_draw.command_count(DrawKind::Border), m_draw.command_count(DrawKind::Line), m_draw.command_count(DrawKind::Text), m_draw.command_count(DrawKind::Image) };
 }
 
 std::string dump_layout(const ImContext& context)

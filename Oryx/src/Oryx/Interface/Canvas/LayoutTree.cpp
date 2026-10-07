@@ -229,6 +229,11 @@ void dump_node(const LayoutTree& tree, uint32_t index, uint32_t depth, std::stri
         snprintf_c(buffer, sizeof(buffer), " scroll(%.2f %.2f of %.2f %.2f)", node.style.scroll_offset[0], node.style.scroll_offset[1], node.content_size[0], node.content_size[1]);
         out += buffer;
     }
+    if (node.paint.icon != Icon::None)
+    {
+        out += " icon=";
+        out += std::to_string(static_cast<uint32_t>(node.paint.icon));
+    }
     if (!node.paint.text.empty())
     {
         out += " text=\"";
@@ -274,6 +279,10 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
             pass.list.add_rounded_rect(snapped, paint.radius, paint.fill);
         }
     }
+    if (paint.has_image)
+    {
+        pass.list.add_image(snap_to_pixels(inset(node.rect, node.style.padding), pass.scale), paint.image, paint.image_uv_min, paint.image_uv_max, paint.radius, paint.image_tint);
+    }
     if (paint.border_width > 0.0f)
     {
         pass.list.add_border(snap_to_pixels(node.rect, pass.scale), paint.radius, paint.border_width, paint.border);
@@ -281,6 +290,10 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
     if (pass.painter != nullptr && !paint.text.empty())
     {
         pass.painter->text(inset(node.rect, node.style.padding), paint.text, { paint.text_height, paint.text_colour, paint.text_align, paint.ellipsis });
+    }
+    if (paint.icon != Icon::None)
+    {
+        draw_icon(pass.list, inset(node.rect, node.style.padding), paint.icon, paint.icon_colour, paint.icon_size, paint.icon_thickness);
     }
     const bool clips = node.style.overflow != Overflow::Visible;
     if (clips)

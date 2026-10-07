@@ -25,6 +25,8 @@ public:
         return delta;
     }
 
+    double tick_ms() { return tick() * 1000.0; }
+
     [[nodiscard]] double elapsed_seconds() const
     {
         return std::chrono::duration<double>(m_end - m_start).count();

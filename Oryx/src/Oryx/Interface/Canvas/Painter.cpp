@@ -10,6 +10,8 @@ namespace
 {
 
 constexpr std::string_view k_ellipsis = "...";
+// A stack buffer, because a Painter is rebuilt every frame and a string member would allocate again each time.
+constexpr size_t k_truncation_capacity = 256;
 
 }
 
@@ -28,9 +30,19 @@ void Painter::border(const Rect& rect, const CornerRadius& radius, float thickne
     m_list.add_border(snap_to_pixels(rect, m_scale), radius, thickness, colour);
 }
 
+void Painter::image(const Rect& rect, ImageHandle image, const ImageSpec& spec)
+{
+    m_list.add_image(snap_to_pixels(rect, m_scale), image, spec.uv_min, spec.uv_max, spec.radius, spec.tint);
+}
+
 void Painter::line(const Vec2f& from, const Vec2f& to, const Colour& colour, float thickness)
 {
     m_list.add_line(from, to, thickness, colour);
+}
+
+void Painter::icon(const Rect& box, Icon icon, const Colour& colour, float size, float thickness)
+{
+    draw_icon(m_list, box, icon, colour, size, thickness);
 }
 
 float Painter::text_width(std::string_view text, float pixel_height)
@@ -45,6 +57,7 @@ void Painter::text(const Rect& box, std::string_view text, const TextSpec& spec)
         return;
     }
     bool clip_to_box = false;
+    char truncated[k_truncation_capacity];
     if (text_width(text, spec.pixel_height) > box.size[0])
     {
         if (spec.ellipsis)
@@ -61,9 +74,10 @@ void Painter::text(const Rect& box, std::string_view text, const TextSpec& spec)
                 }
                 keep = index;
             }
-            m_scratch.assign(text.substr(0, keep));
-            m_scratch.append(k_ellipsis);
-            text = m_scratch;
+            keep = math::min(keep, k_truncation_capacity - k_ellipsis.size());
+            std::memcpy(truncated, text.data(), keep);
+            std::memcpy(truncated + keep, k_ellipsis.data(), k_ellipsis.size());
+            text = std::string_view(truncated, keep + k_ellipsis.size());
         }
         else
         {

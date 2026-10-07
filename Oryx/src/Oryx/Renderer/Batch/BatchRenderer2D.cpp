@@ -128,6 +128,29 @@ void BatchRenderer2D::draw_sprite(const Vec2f& position, const Vec2f& size, cons
     write_quad(corners, texture.texture(), texture.sampler(), tint, uv_min, uv_max);
 }
 
+void BatchRenderer2D::draw_sprite_polygon(const Vec2f& position, const Vec2f& size, const Vec2f* points, uint32_t count, const Texture2D& texture, const Colour& tint, const Vec2f& uv_min, const Vec2f& uv_max)
+{
+    if (count < 3 || !(size[0] > 0.0f) || !(size[1] > 0.0f))
+    {
+        return;
+    }
+    const float left = position[0] - size[0] * 0.5f;
+    const float top = position[1] + size[1] * 0.5f;
+    const auto uv_of = [&](const Vec2f& point)
+    {
+        return Vec2f(math::lerp(uv_min[0], uv_max[0], (point[0] - left) / size[0]), math::lerp(uv_min[1], uv_max[1], (top - point[1]) / size[1]));
+    };
+    const Vec2f centre_uv = uv_of(position);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const Vec2f& from = points[i];
+        const Vec2f& to = points[(i + 1) % count];
+        const Vec2f corners[4] = { position, from, to, to };
+        const Vec2f uvs[4] = { centre_uv, uv_of(from), uv_of(to), uv_of(to) };
+        write_quad_uvs(corners, uvs, texture.texture(), texture.sampler(), tint);
+    }
+}
+
 void BatchRenderer2D::draw_circle(const Vec2f& centre, float radius, const Colour& colour, float thickness, float fade)
 {
     if (culled())
@@ -195,14 +218,19 @@ void BatchRenderer2D::write_glyph(const Vec2f (&corners)[4], const Texture2D& at
 
 void BatchRenderer2D::write_quad(const Vec2f (&corners)[4], const RHITexturePtr& texture, const RHISamplerPtr& sampler, const Colour& colour, const Vec2f& uv_min, const Vec2f& uv_max)
 {
+    Vec2f uvs[4];
+    quad_uvs(uv_min, uv_max, uvs);
+    write_quad_uvs(corners, uvs, texture, sampler, colour);
+}
+
+void BatchRenderer2D::write_quad_uvs(const Vec2f (&corners)[4], const Vec2f (&uvs)[4], const RHITexturePtr& texture, const RHISamplerPtr& sampler, const Colour& colour)
+{
     if (culled())
     {
         return;
     }
     select(m_streams[static_cast<uint32_t>(Primitive2D::Quad)], sampler);
     const float slot = static_cast<float>(acquire_texture(texture));
-    Vec2f uvs[4];
-    quad_uvs(uv_min, uv_max, uvs);
     Vertex2DQuad vertices[4];
     for (uint32_t i = 0; i < 4; ++i)
     {

@@ -145,6 +145,59 @@ bool toggle(ImContext& context, std::string_view text, bool& value, const Widget
     return state.clicked;
 }
 
+namespace
+{
+
+// `frame` gives the box the style's fill, border, radius and padding and dims the picture while held.
+ItemState image_box(ImContext& context, std::string_view name, ImageHandle image, const ImageOptions& options, const ImStyle* frame)
+{
+    const ItemState state = context.item(context.id(name));
+    LayoutStyle box;
+    if (options.layout != nullptr)
+    {
+        box = *options.layout;
+    }
+    else
+    {
+        box.width = options.width;
+        box.height = options.height;
+        if (frame != nullptr)
+        {
+            box.padding = frame->padding;
+        }
+    }
+    const uint32_t index = context.begin_box(name, box);
+    BoxPaint& paint = context.layout().node(index).paint;
+    const float dim = frame != nullptr && state.held ? 0.7f : 1.0f;
+    if (frame != nullptr)
+    {
+        paint_surface(paint, *frame, interaction_fill(*frame, state, frame->background));
+    }
+    else
+    {
+        paint.radius = options.radius;
+    }
+    paint.has_image = true;
+    paint.image = image;
+    paint.image_uv_min = options.uv_min;
+    paint.image_uv_max = options.uv_max;
+    paint.image_tint = { options.tint.r * dim, options.tint.g * dim, options.tint.b * dim, options.tint.a };
+    context.end_box();
+    return state;
+}
+
+} // namespace
+
+ItemState image(ImContext& context, std::string_view name, ImageHandle image, const ImageOptions& options)
+{
+    return image_box(context, name, image, options, nullptr);
+}
+
+ItemState image_button(ImContext& context, std::string_view name, ImageHandle image, const ImageButtonOptions& options)
+{
+    return image_box(context, name, image, options, options.frame ? &resolved_style(context, options) : nullptr);
+}
+
 void begin_panel(ImContext& context, std::string_view name, const WidgetOptions& options)
 {
     const ImStyle& style = resolved_style(context, options);
@@ -185,6 +238,28 @@ void begin_column(ImContext& context, std::string_view name, const RowOptions& o
 void end_column(ImContext& context)
 {
     end_stack(context);
+}
+
+void icon(ImContext& context, Icon icon, const IconOptions& options)
+{
+    const ImStyle& style = resolved_style(context, options);
+    LayoutStyle box;
+    if (options.layout != nullptr)
+    {
+        box = *options.layout;
+    }
+    else
+    {
+        box.width = fixed(options.size);
+        box.height = fixed(options.size);
+    }
+    const uint32_t index = context.begin_box(ImId{}, box);
+    BoxPaint& paint = context.layout().node(index).paint;
+    paint.icon = icon;
+    paint.icon_colour = options.colour.a > 0.0f ? options.colour : style.text;
+    paint.icon_size = options.size * 0.6f;
+    paint.icon_thickness = options.thickness;
+    context.end_box();
 }
 
 void spacer(ImContext& context, float weight)

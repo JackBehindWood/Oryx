@@ -2,6 +2,7 @@
 #include "Oryx/Renderer/FrameRecorder.h"
 
 #include "Oryx/Core/Error.h"
+#include "Oryx/Debug/MemoryTracker.h"
 #include "Oryx/Renderer/RendererContext.h"
 #include "Oryx/Shaders/Builtin/BuiltinShaders.h"
 
@@ -217,6 +218,30 @@ void record_pass(RendererContext& context, const RenderPass& pass, RHIRenderTarg
     context.commands.end_pass();
 }
 
+void capture_frame_stats(RendererContext& context, bool presented)
+{
+    FrameStats stats;
+    stats.batch = context.scene->batcher_2d().stats();
+    stats.presented = presented;
+    for (const RenderPass* pass : context.scene->ordered_passes())
+    {
+        const uint32_t count = static_cast<uint32_t>(pass->items.size());
+        const uint32_t slot = math::min(stats.passes, FRAME_STATS_PASSES - 1);
+        stats.pass_items[slot] += count;
+        stats.draw_items += count;
+        ++stats.passes;
+    }
+    const GraphicsPipelineCacheStats pipelines = context.pipelines.stats();
+    stats.pipeline_hits = pipelines.hits - context.previous_pipelines.hits;
+    stats.pipeline_misses = pipelines.misses - context.previous_pipelines.misses;
+    context.previous_pipelines = pipelines;
+    const MemoryStats memory = MemoryTracker::snapshot();
+    stats.allocations = memory.allocation_count - context.previous_allocations;
+    stats.live_bytes = memory.live_bytes;
+    context.previous_allocations = memory.allocation_count;
+    context.last_frame_stats = stats;
+}
+
 } // namespace
 
 bool record_frame(RendererContext& context)
@@ -261,6 +286,7 @@ bool record_frame(RendererContext& context)
         context.rhi->present(context.viewport.get());
     }
     context.rhi->end_frame();
+    capture_frame_stats(context, presented);
     scene.finish_frame(context.rhi->frame_slot());
     context.debug.end_frame();
     return presented;

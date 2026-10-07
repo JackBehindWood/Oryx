@@ -16,6 +16,7 @@
 #include "Oryx/Renderer/Batch/DebugRenderer.h"
 #include "Oryx/Renderer/DrawItem.h"
 #include "Oryx/Renderer/Font.h"
+#include "Oryx/Renderer/FrameStats.h"
 #include "Oryx/Renderer/GraphicsPipelineCache.h"
 #include "Oryx/Shaders/ShaderLibrary.h"
 
@@ -82,8 +83,12 @@ public:
     [[nodiscard]] static DebugRenderer& debug();
     // The built-in 8x8 bitmap font (see BuiltinFontSource); the debug renderer draws text with it until set_font replaces it.
     [[nodiscard]] static Font& default_font();
-    // Counters of the frame being recorded; reset when the frame ring advances.
+    // Counters of the frame being recorded (zero between end_frame and the first draw of the next); reset when the frame ring advances.
     [[nodiscard]] static const BatchStats& batch_stats();
+    // The previous frame, final: what end_frame recorded, with the pipeline and allocation deltas of that frame.
+    [[nodiscard]] static const FrameStats& last_frame_stats();
+    // Called by GraphicsLayer after end_frame to attach its CPU timings to last_frame_stats().
+    static void set_frame_cpu_times(const FrameCpuTimes& times);
 
     // Called only by GraphicsLayer: records, submits and presents the frame, then advances the frame ring. Returns whether anything was presented.
     static bool end_frame();

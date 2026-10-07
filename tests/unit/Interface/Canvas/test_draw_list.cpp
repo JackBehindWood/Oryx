@@ -150,3 +150,31 @@ TEST_CASE("DrawList: a warm list records without allocating")
     frame();
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("DrawList: an image is a command with its handle, uv and radius in the dump")
+{
+    DrawList list;
+    list.add_image({ { 1.0f, 2.0f }, { 10.0f, 10.0f } }, ImageHandle{ 3 }, { 0.0f, 0.0f }, { 0.5f, 1.0f }, uniform_radius(2.0f), RED);
+    list.add_image({ { 1.0f, 2.0f }, { 0.0f, 10.0f } }, ImageHandle{ 3 }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, {}, RED);
+    REQUIRE(list.channel(0).images.size() == 1);
+    CHECK(list.command_count() == 1);
+    CHECK(dump(list).find("image [1.00 2.00 10.00 10.00] #3 uv(0.00 0.00 0.50 1.00) r(2.00 2.00 2.00 2.00)") != std::string::npos);
+}
+
+TEST_CASE("DrawList: merge keeps images in channel order")
+{
+    DrawList list;
+    list.split_channels(2);
+    list.set_channel(1);
+    list.add_image({ { 0.0f, 0.0f }, { 5.0f, 5.0f } }, ImageHandle{ 1 }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, {}, RED);
+    list.set_channel(0);
+    list.add_image({ { 0.0f, 0.0f }, { 5.0f, 5.0f } }, ImageHandle{ 0 }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, {}, RED);
+    list.merge();
+    const DrawChannel& channel = list.channel(0);
+    REQUIRE(channel.images.size() == 2);
+    CHECK(channel.images[0].image.index == 0);
+    CHECK(channel.images[1].image.index == 1);
+    REQUIRE(channel.runs.size() == 2);
+    CHECK(channel.runs[1].kind == DrawKind::Image);
+    CHECK(channel.runs[1].first == 1);
+}

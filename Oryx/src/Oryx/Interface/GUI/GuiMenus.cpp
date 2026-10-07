@@ -270,8 +270,10 @@ void show_toasts()
     stack.channel = k_channel_tooltip;
     stack.floating = { true, AttachPoint::BottomRight, AttachPoint::BottomRight, FloatTarget::Root, {}, { -12.0f, -12.0f } };
     bool any = false;
-    for (GuiToast& toast : ctx.toasts())
+    GuiToast* toasts = ctx.toasts();
+    for (uint32_t slot = 0; slot < k_max_toasts; ++slot)
     {
+        GuiToast& toast = toasts[slot];
         if (toast.remaining <= 0.0f)
         {
             continue;
