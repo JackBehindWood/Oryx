@@ -150,14 +150,14 @@ TEST_CASE("The board overlay shows a result banner with a Play again button once
     CHECK(layout.find("You win!") != std::string::npos);
     CHECK(layout.find("Play again") != std::string::npos);
     Rect banner;
-    REQUIRE(fixture.ui.layout_rect(make_im_id("result"), banner));
+    REQUIRE(fixture.ui.layout_rect(fixture.ui.id("result"), banner));
     CHECK(rect_centre(banner) == Vec2f(400.0f, 300.0f));
     const std::string drawn = dump(fixture.ui.draw_list());
     CHECK(drawn.find("You win!") != std::string::npos);
     CHECK(drawn.find("player 1") == std::string::npos);
 
     Rect again;
-    REQUIRE(fixture.ui.layout_rect(make_im_id("Play again", make_im_id("result")), again));
+    REQUIRE(fixture.ui.layout_rect(make_im_id("Play again", fixture.ui.id("result")), again));
     BoardInput press = idle;
     press.cursor = rect_centre(again);
     press.select = true;

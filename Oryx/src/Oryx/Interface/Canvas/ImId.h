@@ -3,18 +3,18 @@
 namespace oryx
 {
 
-// The value of the none id; make_im_id never returns it.
-inline constexpr uint64_t k_none_id = 0;
-
 // A widget identity: a 64-bit hash of a label or index scoped by the ids above it. The untyped form the shared layer works in; UiId and GuiId wrap it.
 struct ImId
 {
-    uint64_t value = k_none_id;
+    // make_im_id never returns it.
+    static constexpr uint64_t none = 0;
+
+    uint64_t value = none;
 };
 
 [[nodiscard]] constexpr bool operator==(ImId a, ImId b) { return a.value == b.value; }
 [[nodiscard]] constexpr bool operator!=(ImId a, ImId b) { return a.value != b.value; }
-[[nodiscard]] constexpr bool is_valid(ImId id) { return id.value != k_none_id; }
+[[nodiscard]] constexpr bool is_valid(ImId id) { return id.value != ImId::none; }
 
 // 64-bit FNV-1a; saved layouts may key on these ids, so the constants and byte order are fixed (golden test).
 inline constexpr uint64_t k_im_fnv_offset = 14695981039346656037ull;
@@ -30,7 +30,7 @@ template<typename Tag>
 class TypedId
 {
 public:
-    uint64_t value = k_none_id;
+    uint64_t value = ImId::none;
 
     constexpr TypedId() = default;
     constexpr explicit TypedId(ImId id)
@@ -46,6 +46,6 @@ template<typename Tag>
 template<typename Tag>
 [[nodiscard]] constexpr bool operator!=(TypedId<Tag> a, TypedId<Tag> b) { return a.value != b.value; }
 template<typename Tag>
-[[nodiscard]] constexpr bool is_valid(TypedId<Tag> id) { return id.value != k_none_id; }
+[[nodiscard]] constexpr bool is_valid(TypedId<Tag> id) { return id.value != ImId::none; }
 
 } // namespace oryx

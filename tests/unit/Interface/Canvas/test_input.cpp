@@ -14,13 +14,26 @@ struct TestContext : ImContext
 {
 };
 
+// NullWindow posts its events through Application::Get().
+struct WindowFixture
+{
+    WindowFixture()
+        : window(static_cast<NullWindow&>(app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", 200, 100 }))))
+    {
+    }
+
+    Application app{ {} };
+    NullWindow& window;
+};
+
 const Vec2f k_surface = { 200.0f, 100.0f };
 
 } // namespace
 
 TEST_CASE("make_im_input: the wheel arrives in lines and resets next frame")
 {
-    NullWindow window({ "Test", 200, 100 });
+    WindowFixture fixture;
+    NullWindow& window = fixture.window;
     window.inject_scroll(0.0f, 1.0f);
     window.inject_scroll(0.5f, 0.25f);
     ImInput input = make_im_input(window.input(), 3, k_surface, 2.0f, 0.016f);
@@ -38,7 +51,8 @@ TEST_CASE("make_im_input: the wheel arrives in lines and resets next frame")
 
 TEST_CASE("make_im_input: the pointer is valid only inside the surface")
 {
-    NullWindow window({ "Test", 200, 100 });
+    WindowFixture fixture;
+    NullWindow& window = fixture.window;
     window.inject_cursor(10.0f, 20.0f);
     window.inject_mouse_button(MouseCode::Left, true);
     ImInput input = make_im_input(window.input(), 0, k_surface, 1.0f, 0.0f);
@@ -69,7 +83,8 @@ TEST_CASE("make_im_input: navigation keys and modifiers map")
     };
     for (const Pair& pair : pairs)
     {
-        NullWindow window({ "Test", 200, 100 });
+        WindowFixture fixture;
+    NullWindow& window = fixture.window;
         window.inject_key(pair.code, true);
         ImInput input = make_im_input(window.input(), 0, k_surface, 1.0f, 0.0f);
         CHECK(input.keys.down == im_key_bit(pair.key));
@@ -81,7 +96,8 @@ TEST_CASE("make_im_input: navigation keys and modifiers map")
         CHECK_FALSE(key_pressed(input.keys, pair.key));
     }
 
-    NullWindow window({ "Test", 200, 100 });
+    WindowFixture fixture;
+    NullWindow& window = fixture.window;
     window.inject_key(KeyCode::RightShift, true);
     window.inject_key(KeyCode::LeftSuper, true);
     const ImInput input = make_im_input(window.input(), 0, k_surface, 1.0f, 0.0f);

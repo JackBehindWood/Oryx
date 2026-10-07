@@ -148,7 +148,7 @@ void run_board_overlay(UiContext& ui, const BoardInput& input, double delta_time
         throw;
     }
 
-    if (!ui.layout_rect(make_im_id("board"), out.board))
+    if (!ui.layout_rect(ui.id("board"), out.board))
     {
         out.board = {};
     }
