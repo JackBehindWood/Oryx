@@ -11,11 +11,11 @@ bool contains(const Rect& rect, const Vec2f& point)
 
 Rect intersect(const Rect& a, const Rect& b)
 {
-    const float left = std::max(a.min[0], b.min[0]);
-    const float top = std::max(a.min[1], b.min[1]);
-    const float right = std::min(a.min[0] + a.size[0], b.min[0] + b.size[0]);
-    const float bottom = std::min(a.min[1] + a.size[1], b.min[1] + b.size[1]);
-    return { Vec2f(left, top), Vec2f(std::max(right - left, 0.0f), std::max(bottom - top, 0.0f)) };
+    const float left = math::max(a.min[0], b.min[0]);
+    const float top = math::max(a.min[1], b.min[1]);
+    const float right = math::min(a.min[0] + a.size[0], b.min[0] + b.size[0]);
+    const float bottom = math::min(a.min[1] + a.size[1], b.min[1] + b.size[1]);
+    return { Vec2f(left, top), Vec2f(math::max(right - left, 0.0f), math::max(bottom - top, 0.0f)) };
 }
 
 Rect unbounded_rect()
@@ -31,7 +31,7 @@ bool overlaps(const Rect& a, const Rect& b)
 
 Rect inset(const Rect& rect, const Insets& insets)
 {
-    return { Vec2f(rect.min[0] + insets.left, rect.min[1] + insets.top), Vec2f(std::max(rect.size[0] - insets.left - insets.right, 0.0f), std::max(rect.size[1] - insets.top - insets.bottom, 0.0f)) };
+    return { Vec2f(rect.min[0] + insets.left, rect.min[1] + insets.top), Vec2f(math::max(rect.size[0] - insets.left - insets.right, 0.0f), math::max(rect.size[1] - insets.top - insets.bottom, 0.0f)) };
 }
 
 Rect expand(const Rect& rect, const Insets& insets)
@@ -41,14 +41,14 @@ Rect expand(const Rect& rect, const Insets& insets)
 
 Rect at_least(const Rect& rect, const Vec2f& minimum)
 {
-    const float width = std::max(rect.size[0], minimum[0]);
-    const float height = std::max(rect.size[1], minimum[1]);
+    const float width = math::max(rect.size[0], minimum[0]);
+    const float height = math::max(rect.size[1], minimum[1]);
     return { Vec2f(rect.min[0] - (width - rect.size[0]) * 0.5f, rect.min[1] - (height - rect.size[1]) * 0.5f), Vec2f(width, height) };
 }
 
 CornerRadius clamp_radius(const CornerRadius& radius, const Vec2f& size)
 {
-    CornerRadius out = { std::max(radius.top_left, 0.0f), std::max(radius.top_right, 0.0f), std::max(radius.bottom_right, 0.0f), std::max(radius.bottom_left, 0.0f) };
+    CornerRadius out = { math::max(radius.top_left, 0.0f), math::max(radius.top_right, 0.0f), math::max(radius.bottom_right, 0.0f), math::max(radius.bottom_left, 0.0f) };
     float scale = 1.0f;
     const float sums[4] = { out.top_left + out.top_right, out.bottom_left + out.bottom_right, out.top_left + out.bottom_left, out.top_right + out.bottom_right };
     const float limits[4] = { size[0], size[0], size[1], size[1] };
@@ -56,7 +56,7 @@ CornerRadius clamp_radius(const CornerRadius& radius, const Vec2f& size)
     {
         if (sums[i] > limits[i] && sums[i] > 0.0f)
         {
-            scale = std::min(scale, std::max(limits[i], 0.0f) / sums[i]);
+            scale = math::min(scale, math::max(limits[i], 0.0f) / sums[i]);
         }
     }
     return { out.top_left * scale, out.top_right * scale, out.bottom_right * scale, out.bottom_left * scale };

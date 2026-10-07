@@ -69,7 +69,7 @@ void* FrameArena::allocate(size_t size, size_t alignment)
             return m_current->data + offset;
         }
     }
-    const size_t chunk_bytes = std::max(m_chunk_size, size + alignment);
+    const size_t chunk_bytes = math::max(m_chunk_size, size + alignment);
     Chunk* chunk = new (::operator new(sizeof(Chunk) + chunk_bytes)) Chunk;
     chunk->data = reinterpret_cast<uint8_t*>(chunk + 1);
     chunk->size = chunk_bytes;

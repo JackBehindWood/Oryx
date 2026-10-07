@@ -11,11 +11,9 @@ namespace oryx
 namespace
 {
 
-constexpr float k_epsilon = 1.0e-3f;
-
 float clamp_to(const Sizing& sizing, float value)
 {
-    return std::min(std::max(value, sizing.min), sizing.max);
+    return math::min(math::max(value, sizing.min), sizing.max);
 }
 
 const Sizing& sizing_of(const LayoutNode& node, uint32_t axis)
@@ -51,7 +49,7 @@ bool is_definite(SizingKind kind)
 
 float aligned_offset(Align align, float free)
 {
-    free = std::max(free, 0.0f);
+    free = math::max(free, 0.0f);
     return align == Align::Centre ? free * 0.5f : align == Align::End ? free : 0.0f;
 }
 
@@ -81,7 +79,7 @@ void apply_aspect(LayoutNode& node)
     }
     else if (!is_definite(width) && !is_definite(height))
     {
-        const float fitted_width = std::min(node.size[0], node.size[1] * ratio);
+        const float fitted_width = math::min(node.size[0], node.size[1] * ratio);
         node.size[0] = clamp_to(node.style.width, fitted_width);
         node.size[1] = clamp_to(node.style.height, fitted_width / ratio);
     }
@@ -89,7 +87,7 @@ void apply_aspect(LayoutNode& node)
 
 void compress(LayoutTree& tree, const LayoutNode& parent, uint32_t axis, float overflow)
 {
-    for (uint32_t pass = 0; pass < 64 && overflow > k_epsilon; ++pass)
+    for (uint32_t pass = 0; pass < 64 && overflow > math::EPSILON<float>; ++pass)
     {
         float largest = 0.0f;
         float second = 0.0f;
@@ -97,18 +95,18 @@ void compress(LayoutTree& tree, const LayoutNode& parent, uint32_t axis, float o
         {
             const LayoutNode& node = tree.node(static_cast<uint32_t>(child));
             const float size = node.size[axis];
-            if (!in_flow(node) || is_definite(sizing_of(node, axis).kind) || size <= sizing_of(node, axis).min + k_epsilon)
+            if (!in_flow(node) || is_definite(sizing_of(node, axis).kind) || size <= sizing_of(node, axis).min + math::EPSILON<float>)
             {
                 continue;
             }
-            if (size > largest + k_epsilon)
+            if (size > largest + math::EPSILON<float>)
             {
                 second = largest;
                 largest = size;
             }
-            else if (size < largest - k_epsilon)
+            else if (size < largest - math::EPSILON<float>)
             {
-                second = std::max(second, size);
+                second = math::max(second, size);
             }
         }
         if (largest <= 0.0f)
@@ -119,16 +117,16 @@ void compress(LayoutTree& tree, const LayoutNode& parent, uint32_t axis, float o
         for (int32_t child = parent.first_child; child >= 0; child = tree.node(static_cast<uint32_t>(child)).next)
         {
             const LayoutNode& node = tree.node(static_cast<uint32_t>(child));
-            count += in_flow(node) && !is_definite(sizing_of(node, axis).kind) && std::abs(node.size[axis] - largest) <= k_epsilon ? 1u : 0u;
+            count += in_flow(node) && !is_definite(sizing_of(node, axis).kind) && math::abs(node.size[axis] - largest) <= math::EPSILON<float> ? 1u : 0u;
         }
-        const float step = std::min(overflow / static_cast<float>(count), largest - second);
+        const float step = math::min(overflow / static_cast<float>(count), largest - second);
         float removed = 0.0f;
         for (int32_t child = parent.first_child; child >= 0; child = tree.node(static_cast<uint32_t>(child)).next)
         {
             LayoutNode& node = tree.node(static_cast<uint32_t>(child));
-            if (in_flow(node) && !is_definite(sizing_of(node, axis).kind) && std::abs(node.size[axis] - largest) <= k_epsilon)
+            if (in_flow(node) && !is_definite(sizing_of(node, axis).kind) && math::abs(node.size[axis] - largest) <= math::EPSILON<float>)
             {
-                const float reduced = std::max(node.size[axis] - step, sizing_of(node, axis).min);
+                const float reduced = math::max(node.size[axis] - step, sizing_of(node, axis).min);
                 removed += node.size[axis] - reduced;
                 node.size[axis] = reduced;
             }
@@ -143,14 +141,14 @@ void compress(LayoutTree& tree, const LayoutNode& parent, uint32_t axis, float o
 
 void distribute(LayoutTree& tree, const LayoutNode& parent, uint32_t axis, float remaining)
 {
-    for (uint32_t pass = 0; pass < 64 && remaining > k_epsilon; ++pass)
+    for (uint32_t pass = 0; pass < 64 && remaining > math::EPSILON<float>; ++pass)
     {
         float weights = 0.0f;
         for (int32_t child = parent.first_child; child >= 0; child = tree.node(static_cast<uint32_t>(child)).next)
         {
             const LayoutNode& node = tree.node(static_cast<uint32_t>(child));
             const Sizing& sizing = sizing_of(node, axis);
-            if (in_flow(node) && sizing.kind == SizingKind::Grow && node.size[axis] < sizing.max - k_epsilon)
+            if (in_flow(node) && sizing.kind == SizingKind::Grow && node.size[axis] < sizing.max - math::EPSILON<float>)
             {
                 weights += sizing.value;
             }
@@ -164,9 +162,9 @@ void distribute(LayoutTree& tree, const LayoutNode& parent, uint32_t axis, float
         {
             LayoutNode& node = tree.node(static_cast<uint32_t>(child));
             const Sizing& sizing = sizing_of(node, axis);
-            if (in_flow(node) && sizing.kind == SizingKind::Grow && node.size[axis] < sizing.max - k_epsilon)
+            if (in_flow(node) && sizing.kind == SizingKind::Grow && node.size[axis] < sizing.max - math::EPSILON<float>)
             {
-                const float grown = std::min(node.size[axis] + remaining * sizing.value / weights, sizing.max);
+                const float grown = math::min(node.size[axis] + remaining * sizing.value / weights, sizing.max);
                 given += grown - node.size[axis];
                 node.size[axis] = grown;
             }
@@ -244,6 +242,12 @@ void dump_node(const LayoutTree& tree, uint32_t index, uint32_t depth, std::stri
     }
 }
 
+// A floating box attached to the surface or to another element leaves its ancestors' clips (popups, tooltips) and paints after the tree.
+bool escapes_clip(const LayoutNode& node)
+{
+    return node.parent >= 0 && node.style.floating.enabled && node.style.floating.target != FloatTarget::Parent;
+}
+
 struct PaintPass
 {
     const LayoutTree& tree;
@@ -285,7 +289,10 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
     }
     for (int32_t child = node.first_child; child >= 0; child = pass.tree.node(static_cast<uint32_t>(child)).next)
     {
-        paint_node(pass, static_cast<uint32_t>(child), channel);
+        if (!escapes_clip(pass.tree.node(static_cast<uint32_t>(child))))
+        {
+            paint_node(pass, static_cast<uint32_t>(child), channel);
+        }
     }
     if (clips)
     {
@@ -412,7 +419,7 @@ void LayoutTree::solve(const Rect& viewport, const TextMeasure& measure, uint64_
             if (in_flow(other))
             {
                 main_total += other.size[axis_main];
-                cross_max = std::max(cross_max, other.size[axis_cross]);
+                cross_max = math::max(cross_max, other.size[axis_cross]);
                 ++children;
             }
         }
@@ -466,7 +473,7 @@ void LayoutTree::solve(const Rect& viewport, const TextMeasure& measure, uint64_
     for (LayoutNode& node : m_nodes)
     {
         node.clip = unbounded_rect();
-        if (node.parent >= 0)
+        if (node.parent >= 0 && !escapes_clip(node))
         {
             const LayoutNode& parent = m_nodes[static_cast<uint32_t>(node.parent)];
             node.clip = parent.style.overflow == Overflow::Visible ? parent.clip : intersect(parent.clip, parent.rect);
@@ -484,7 +491,7 @@ void LayoutTree::arrange(uint32_t index)
     LayoutNode& parent = m_nodes[index];
     const Insets& padding = parent.style.padding;
     const Vec2f inner_min(parent.rect.min[0] + padding.left, parent.rect.min[1] + padding.top);
-    const Vec2f inner_size(std::max(0.0f, parent.rect.size[0] - padding_on(parent, 0)), std::max(0.0f, parent.rect.size[1] - padding_on(parent, 1)));
+    const Vec2f inner_size(math::max(0.0f, parent.rect.size[0] - padding_on(parent, 0)), math::max(0.0f, parent.rect.size[1] - padding_on(parent, 1)));
     const uint32_t axis_main = main_axis(parent);
     const uint32_t axis_cross = 1 - axis_main;
 
@@ -524,14 +531,14 @@ void LayoutTree::arrange(uint32_t index)
         used += in_flow(m_nodes[static_cast<uint32_t>(child)]) ? m_nodes[static_cast<uint32_t>(child)].size[axis_main] : 0.0f;
     }
     const bool scrolls = parent.style.overflow == Overflow::Scroll;
-    if (used > inner_size[axis_main] + k_epsilon)
+    if (used > inner_size[axis_main] + math::EPSILON<float>)
     {
         if (!scrolls)
         {
             compress(*this, parent, axis_main, used - inner_size[axis_main]);
         }
     }
-    else if (used < inner_size[axis_main] - k_epsilon)
+    else if (used < inner_size[axis_main] - math::EPSILON<float>)
     {
         distribute(*this, parent, axis_main, inner_size[axis_main] - used);
     }
@@ -562,7 +569,7 @@ void LayoutTree::arrange(uint32_t index)
         {
             for (uint32_t axis = 0; axis < 2; ++axis)
             {
-                parent.content_size[axis] = std::max(parent.content_size[axis], position[axis] - inner_min[axis] + node.size[axis]);
+                parent.content_size[axis] = math::max(parent.content_size[axis], position[axis] - inner_min[axis] + node.size[axis]);
             }
             position = position - parent.style.scroll_offset;
         }
@@ -621,7 +628,7 @@ void LayoutTree::paint(DrawList& list, Font* font, float scale) const
     uint32_t channels = 1;
     for (const LayoutNode& node : m_nodes)
     {
-        channels = std::max(channels, node.style.channel + 1);
+        channels = math::max(channels, node.style.channel + 1);
     }
     const uint32_t previous_channels = list.channel_count();
     if (channels > previous_channels)
@@ -636,6 +643,18 @@ void LayoutTree::paint(DrawList& list, Font* font, float scale) const
             if (m_nodes[index].parent < 0)
             {
                 paint_node(pass, index, 0);
+            }
+        }
+        for (uint32_t index = 0; index < node_count(); ++index)
+        {
+            if (escapes_clip(m_nodes[index]))
+            {
+                uint32_t channel = 0;
+                for (int32_t up = m_nodes[index].parent; up >= 0 && channel == 0; up = m_nodes[static_cast<uint32_t>(up)].parent)
+                {
+                    channel = m_nodes[static_cast<uint32_t>(up)].style.channel;
+                }
+                paint_node(pass, index, channel);
             }
         }
     };

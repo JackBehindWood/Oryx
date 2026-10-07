@@ -1,51 +1,15 @@
 #include "doctest.h"
 
 #include "Oryx.h"
-#include "unit/Interface/support/ImTestDriver.h"
+#include "unit/Interface/support/GuiFixture.h"
 #include "unit/MemoryTestSupport.h"
-#include "unit/Renderer/FakeFontSource.h"
 
 using namespace oryx;
+using test::fixed_box;
+using test::GuiFixture;
 
 namespace
 {
-
-struct GuiFixture
-{
-    test::FakeFontSource* source = nullptr;
-    Font font = test::make_fake_font(source);
-    GuiContext context;
-    GuiTheme theme;
-    ContextScope<GuiContext> scope{ context };
-    test::ImTestDriver<GuiContext> driver{ context, { 200.0f, 100.0f } };
-
-    GuiFixture()
-    {
-        theme.font = &font;
-        context.set_theme(theme);
-    }
-
-    template<typename Body>
-    auto frame_of(Body&& body)
-    {
-        return [this, &body]
-        {
-            LayoutStyle root;
-            root.width = grow();
-            root.height = grow();
-            gui::BoxScope scope("root", root);
-            body();
-        };
-    }
-};
-
-LayoutStyle fixed_box(float width, float height)
-{
-    LayoutStyle box;
-    box.width = fixed(width);
-    box.height = fixed(height);
-    return box;
-}
 
 struct Counter
 {

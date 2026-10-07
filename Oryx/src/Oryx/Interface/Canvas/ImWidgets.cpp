@@ -4,10 +4,7 @@
 namespace oryx::im
 {
 
-namespace
-{
-
-const ImStyle& resolve_style(const ImContext& context, const WidgetOptions& options)
+const ImStyle& resolved_style(const ImContext& context, const WidgetOptions& options)
 {
     return options.style != nullptr ? *options.style : style_for(context.theme(), options.variant);
 }
@@ -21,12 +18,12 @@ LayoutStyle default_box(const ImStyle& style)
     return box;
 }
 
-LayoutStyle box_for(const ImStyle& style, const WidgetOptions& options)
+LayoutStyle widget_box(const ImStyle& style, const WidgetOptions& options)
 {
     return options.layout != nullptr ? *options.layout : default_box(style);
 }
 
-void set_text(BoxPaint& paint, const LayoutNode& node, const ImStyle& style, TextAlign align, bool ellipsis)
+void paint_text(BoxPaint& paint, const LayoutNode& node, const ImStyle& style, TextAlign align, bool ellipsis)
 {
     paint.text = node.name;
     paint.text_height = style.text_height;
@@ -35,7 +32,7 @@ void set_text(BoxPaint& paint, const LayoutNode& node, const ImStyle& style, Tex
     paint.ellipsis = ellipsis;
 }
 
-void set_surface(BoxPaint& paint, const ImStyle& style, const Colour& fill)
+void paint_surface(BoxPaint& paint, const ImStyle& style, const Colour& fill)
 {
     paint.has_fill = true;
     paint.fill = fill;
@@ -52,15 +49,45 @@ Colour interaction_fill(const ImStyle& style, const ItemState& state, const Colo
 // A leaf box that reacts to the pointer; the colour of `rest` shows while idle.
 ItemState interactive_box(ImContext& context, std::string_view text, const WidgetOptions& options, const Colour* rest)
 {
-    const ImStyle& style = resolve_style(context, options);
+    const ImStyle& style = resolved_style(context, options);
     const ItemState state = context.item(context.id(text));
-    const uint32_t index = context.begin_box(text, box_for(style, options));
+    const uint32_t index = context.begin_box(text, widget_box(style, options));
     LayoutNode& node = context.layout().node(index);
-    set_surface(node.paint, style, interaction_fill(style, state, rest != nullptr ? *rest : style.background));
-    set_text(node.paint, node, style, TextAlign::Centre, true);
+    paint_surface(node.paint, style, interaction_fill(style, state, rest != nullptr ? *rest : style.background));
+    paint_text(node.paint, node, style, TextAlign::Centre, true);
     context.end_box();
     return state;
 }
+
+Floating popup_below(ImId anchor, const Rect& anchor_rect, const Vec2f& last_size, const Vec2f& surface_size)
+{
+    const Vec2f anchor_max = rect_max(anchor_rect);
+    const bool up = anchor_max[1] + last_size[1] > surface_size[1] && anchor_rect.min[1] >= last_size[1];
+    const bool right = anchor_rect.min[0] + last_size[0] > surface_size[0] && anchor_max[0] >= last_size[0];
+    Floating floating;
+    floating.enabled = true;
+    floating.target = FloatTarget::Element;
+    floating.target_id = anchor;
+    floating.element = up ? (right ? AttachPoint::BottomRight : AttachPoint::BottomLeft) : (right ? AttachPoint::TopRight : AttachPoint::TopLeft);
+    floating.target_point = up ? (right ? AttachPoint::TopRight : AttachPoint::TopLeft) : (right ? AttachPoint::BottomRight : AttachPoint::BottomLeft);
+    return floating;
+}
+
+Floating popup_at(const Vec2f& point, const Vec2f& last_size, const Vec2f& surface_size, float gap)
+{
+    Floating floating;
+    floating.enabled = true;
+    floating.target = FloatTarget::Root;
+    floating.element = AttachPoint::TopLeft;
+    floating.target_point = AttachPoint::TopLeft;
+    const bool left = point[0] + gap + last_size[0] > surface_size[0];
+    const bool up = point[1] + gap + last_size[1] > surface_size[1];
+    floating.offset = { math::max(0.0f, left ? point[0] - gap - last_size[0] : point[0] + gap), math::max(0.0f, up ? point[1] - gap - last_size[1] : point[1] + gap) };
+    return floating;
+}
+
+namespace
+{
 
 LayoutStyle stack_style(Direction direction, const RowOptions& options)
 {
@@ -90,15 +117,15 @@ void end_stack(ImContext& context)
 
 void label(ImContext& context, std::string_view text, const WidgetOptions& options)
 {
-    const ImStyle& style = resolve_style(context, options);
-    LayoutStyle box = box_for(style, options);
+    const ImStyle& style = resolved_style(context, options);
+    LayoutStyle box = widget_box(style, options);
     if (options.layout == nullptr)
     {
         box.align_x = Align::Start;
     }
     const uint32_t index = context.begin_box(text, box);
     LayoutNode& node = context.layout().node(index);
-    set_text(node.paint, node, style, TextAlign::Left, false);
+    paint_text(node.paint, node, style, TextAlign::Left, false);
     context.end_box();
 }
 
@@ -109,7 +136,7 @@ ItemState button(ImContext& context, std::string_view text, const WidgetOptions&
 
 bool toggle(ImContext& context, std::string_view text, bool& value, const WidgetOptions& options)
 {
-    const ImStyle& style = resolve_style(context, options);
+    const ImStyle& style = resolved_style(context, options);
     const ItemState state = interactive_box(context, text, options, value ? &style.accent : nullptr);
     if (state.clicked)
     {
@@ -120,8 +147,8 @@ bool toggle(ImContext& context, std::string_view text, bool& value, const Widget
 
 void begin_panel(ImContext& context, std::string_view name, const WidgetOptions& options)
 {
-    const ImStyle& style = resolve_style(context, options);
-    LayoutStyle box = box_for(style, options);
+    const ImStyle& style = resolved_style(context, options);
+    LayoutStyle box = widget_box(style, options);
     if (options.layout == nullptr)
     {
         box.direction = Direction::Column;
@@ -130,7 +157,7 @@ void begin_panel(ImContext& context, std::string_view name, const WidgetOptions&
     }
     box.overflow = Overflow::Clip;
     const uint32_t index = context.begin_box(name, box);
-    set_surface(context.layout().node(index).paint, style, style.background);
+    paint_surface(context.layout().node(index).paint, style, style.background);
     context.push_id(name);
 }
 
@@ -171,7 +198,7 @@ void spacer(ImContext& context, float weight)
 
 void separator(ImContext& context, const WidgetOptions& options)
 {
-    const ImStyle& style = resolve_style(context, options);
+    const ImStyle& style = resolved_style(context, options);
     LayoutStyle box;
     if (options.layout != nullptr)
     {
@@ -180,7 +207,7 @@ void separator(ImContext& context, const WidgetOptions& options)
     else
     {
         const bool across_column = context.layout().open_depth() == 0 || context.layout().current().style.direction == Direction::Column;
-        const float thickness = std::max(style.border_width, 1.0f);
+        const float thickness = math::max(style.border_width, 1.0f);
         box.width = across_column ? grow() : fixed(thickness);
         box.height = across_column ? fixed(thickness) : grow();
     }
@@ -224,7 +251,7 @@ CanvasArea canvas(ImContext& context, std::string_view name, Sizing width, Sizin
     DrawList& draw = context.draw_list();
     Painter painter = context.painter(context.input().scale);
     const uint32_t previous_channel = draw.current_channel();
-    draw.split_channels(std::max(draw.channel_count(), options.channel + 1));
+    draw.split_channels(math::max(draw.channel_count(), options.channel + 1));
     draw.set_channel(options.channel);
     Rect rect;
     std::ignore = context.layout_rect(id, rect);
@@ -239,8 +266,8 @@ CanvasArea canvas(ImContext& context, std::string_view name, Sizing width, Sizin
 
 void status_line(ImContext& context, std::string_view text, const StatusOptions& options)
 {
-    const ImStyle& style = resolve_style(context, options);
-    LayoutStyle box = box_for(style, options);
+    const ImStyle& style = resolved_style(context, options);
+    LayoutStyle box = widget_box(style, options);
     if (options.layout == nullptr)
     {
         const float margin = options.margin >= 0.0f ? options.margin : style.padding.bottom * 2.0f;
@@ -248,7 +275,7 @@ void status_line(ImContext& context, std::string_view text, const StatusOptions&
         box.floating = { true, options.at, options.at, FloatTarget::Root, {}, { 0.0f, direction * margin } };
     }
     const uint32_t index = context.begin_box(text, box);
-    set_text(context.layout().node(index).paint, context.layout().node(index), style, TextAlign::Centre, false);
+    paint_text(context.layout().node(index).paint, context.layout().node(index), style, TextAlign::Centre, false);
     context.end_box();
 }
 

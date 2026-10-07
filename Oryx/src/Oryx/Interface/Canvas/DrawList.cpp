@@ -192,8 +192,8 @@ void DrawList::add_border(const Rect& rect, const CornerRadius& radius, float th
 
 void DrawList::add_line(const Vec2f& from, const Vec2f& to, float thickness, const Colour& colour)
 {
-    const Vec2f low(std::min(from[0], to[0]), std::min(from[1], to[1]));
-    const Vec2f high(std::max(from[0], to[0]), std::max(from[1], to[1]));
+    const Vec2f low(math::min(from[0], to[0]), math::min(from[1], to[1]));
+    const Vec2f high(math::max(from[0], to[0]), math::max(from[1], to[1]));
     const float reach = thickness * 0.5f;
     if (!(thickness > 0.0f) || !visible({ Vec2f(low[0] - reach, low[1] - reach), Vec2f(high[0] - low[0] + thickness, high[1] - low[1] + thickness) }))
     {

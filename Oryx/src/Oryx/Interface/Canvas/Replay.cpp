@@ -95,7 +95,7 @@ private:
         for (uint32_t corner = 0; corner < 4; ++corner)
         {
             const float start = -math::PI<float> + math::PI<float> * 0.5f * static_cast<float>(corner);
-            const float r = std::max(radii[corner] - inset, 0.0f);
+            const float r = math::max(radii[corner] - inset, 0.0f);
             for (uint32_t step = 0; step < per_corner; ++step)
             {
                 if (radii[corner] <= 0.0f || per_corner == 1)
@@ -116,8 +116,8 @@ private:
         {
             return 1;
         }
-        const float largest = std::max(std::max(radius.top_left, radius.top_right), std::max(radius.bottom_right, radius.bottom_left));
-        return 2 + std::min(static_cast<uint32_t>(largest * 0.5f), 10u);
+        const float largest = math::max(math::max(radius.top_left, radius.top_right), math::max(radius.bottom_right, radius.bottom_left));
+        return 2 + math::min(static_cast<uint32_t>(largest * 0.5f), 10u);
     }
 
     void draw(const RoundedRectCmd& command)
@@ -140,7 +140,7 @@ private:
     void draw(const BorderCmd& command)
     {
         set_clip(command.clip);
-        const float thickness = std::min(command.thickness, std::min(command.rect.size[0], command.rect.size[1]) * 0.5f);
+        const float thickness = math::min(command.thickness, math::min(command.rect.size[0], command.rect.size[1]) * 0.5f);
         const uint32_t per_corner = points_per_corner(command.radius);
         Vec2f outer[4 * k_max_corner_points];
         Vec2f inner[4 * k_max_corner_points];

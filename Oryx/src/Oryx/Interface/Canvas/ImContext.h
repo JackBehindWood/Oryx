@@ -21,6 +21,8 @@ struct ItemState
     bool clicked = false;
     bool double_clicked = false;
     bool right_clicked = false;
+    // Consecutive seconds the item has been hovered, zero on the first hovered frame; drives tooltip delays.
+    float hovered_seconds = 0.0f;
 };
 
 // The left-button drag that began on an item. `started` and `ended` are single-frame edges; `delta` is the pointer travel since the previous call, `total` since the press.
@@ -43,6 +45,8 @@ struct ItemMemory
     Rect rect;
     Rect previous_rect;
     uint64_t seen_frame = 0;
+    uint64_t hovered_frame = 0;
+    float hovered_seconds = 0.0f;
     bool has_previous = false;
 };
 
@@ -65,6 +69,23 @@ static_assert(std::is_trivially_copyable_v<ImOutput> && std::is_standard_layout_
 
 inline constexpr size_t k_max_widget_state_size = 64;
 
+// Reserved draw channels, above the default canvas channel (1): popups, then tooltips, then a dragged ghost.
+inline constexpr uint32_t k_channel_popup = 2;
+inline constexpr uint32_t k_channel_tooltip = 3;
+inline constexpr uint32_t k_channel_drag = 4;
+
+inline constexpr uint32_t k_max_popup_depth = 8;
+inline constexpr uint32_t k_max_popups_per_frame = 16;
+
+// Why a popup should close this frame, from last frame's rects (no callbacks): a left press outside it and its nested popups, or Escape while it is the innermost.
+struct PopupResult
+{
+    bool closed_by_outside = false;
+    bool closed_by_escape = false;
+};
+
+static_assert(std::is_trivially_copyable_v<PopupResult> && std::is_standard_layout_v<PopupResult>);
+
 template<typename T>
 struct WidgetStateTag
 {
@@ -81,6 +102,7 @@ struct ImStats
     size_t arena_used = 0;
     size_t arena_capacity = 0;
     uint32_t boxes = 0;
+    uint32_t popups = 0;
 };
 
 // The state both the player-facing and the tooling immediate-mode systems share: input, ids, hot/active/focus, a frame arena, the DrawList being recorded and the theme.
@@ -169,6 +191,15 @@ public:
         return *static_cast<T*>(slot);
     }
 
+    // Popups: items inside begin_popup_layer/end_popup_layer win over everything beneath, and while the pointer is over last frame's popup rect the items outside any popup are not hovered.
+    // `box_id` is the id of the floating box the caller opens for the popup (on k_channel_popup); the result comes from that box's rect in the previous frame. Nested layers form the stack, at most k_max_popup_depth.
+    // Throws Error outside a frame, on overflow of the stack or of k_max_popups_per_frame, and end_popup_layer throws with no layer open.
+    [[nodiscard]] PopupResult begin_popup_layer(ImId box_id);
+    void end_popup_layer();
+    [[nodiscard]] uint32_t popup_depth() const { return m_popup_depth; }
+    // The box id the innermost open layer was begun with; the none id outside any layer.
+    [[nodiscard]] ImId popup_id() const;
+
     // The topmost item (the last one submitted) whose hit area held the point in the latest finished frame; the none id when there is none. Valid inside a frame too, where it still answers from the frame before.
     [[nodiscard]] ImId item_at(const Vec2f& point) const;
 
@@ -198,6 +229,7 @@ private:
     void require_frame(const char* what) const;
     ItemState item_clipped(ImId id, const Rect& rect, const Rect& layout_clip);
     [[nodiscard]] ImId hash_parent() const { return m_id_stack.empty() ? ImId{ m_id_seed } : m_id_stack.back(); }
+    [[nodiscard]] bool under_popup(const Vec2f& point) const;
     void solve_layout();
     void* state_slot(ImId id, uint32_t size, const void* tag, bool& created);
 
@@ -223,6 +255,18 @@ private:
         Rect area;
     };
 
+    struct PopupEntry
+    {
+        ImId id;
+        Rect rect;
+        uint32_t depth = 0;
+    };
+
+    std::array<PopupEntry, k_max_popups_per_frame> m_popups;
+    std::array<PopupEntry, k_max_popups_per_frame> m_last_popups;
+    uint32_t m_popup_count = 0;
+    uint32_t m_last_popup_count = 0;
+    uint32_t m_popup_depth = 0;
     std::vector<ItemHit> m_hits;
     std::vector<ItemHit> m_last_hits;
     ImId m_hot;

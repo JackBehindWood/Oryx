@@ -35,6 +35,8 @@ void ImContext::begin_frame(const ImInput& input)
     m_time += input.delta_time;
     m_output = {};
     m_press_claimed = false;
+    m_popup_count = 0;
+    m_popup_depth = 0;
 }
 
 Vec2f ImContext::consume_wheel()
@@ -63,6 +65,10 @@ void ImContext::end_frame()
     {
         throw Error("ImContext frame ended with a box open", "every begin_box needs an end_box");
     }
+    if (m_popup_depth != 0)
+    {
+        throw Error("ImContext frame ended with a popup layer open", "every begin_popup_layer needs an end_popup_layer");
+    }
     solve_layout();
     if (!button_of(m_input, MouseCode::Left).down)
     {
@@ -90,6 +96,8 @@ void ImContext::abort_frame()
     m_id_stack.clear();
     m_active = {};
     m_hits.clear();
+    m_popup_depth = 0;
+    m_popup_count = 0;
     m_open = false;
 }
 
@@ -116,6 +124,12 @@ void ImContext::solve_layout()
             memory->rect = node.rect;
         }
     }
+    for (uint32_t index = 0; index < m_popup_count; ++index)
+    {
+        std::ignore = m_layout.rect_of(m_popups[index].id, m_popups[index].rect);
+    }
+    m_last_popups = m_popups;
+    m_last_popup_count = m_popup_count;
 }
 
 Painter ImContext::painter(float scale)
@@ -178,9 +192,13 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
     const Rect hit = intersect(intersect(at_least(rect, Vec2f(m_theme.min_hit_size, m_theme.min_hit_size)), m_draw.current_clip()), layout_clip);
     m_hits.push_back({ id, hit });
     const bool inside = m_input.pointer.valid && contains(hit, m_input.pointer.position);
-    state.hovered = inside && (!is_valid(m_active) || m_active == id || (m_press_claimed && left.pressed));
+    const bool covered = inside && m_popup_depth == 0 && under_popup(m_input.pointer.position);
+    state.hovered = inside && !covered && (!is_valid(m_active) || m_active == id || (m_press_claimed && left.pressed));
     if (state.hovered)
     {
+        memory.hovered_seconds = memory.hovered_frame != 0 && memory.hovered_frame + 1 == m_frame ? memory.hovered_seconds + m_input.delta_time : 0.0f;
+        memory.hovered_frame = m_frame;
+        state.hovered_seconds = memory.hovered_seconds;
         m_hot = id;
         if (left.pressed)
         {
@@ -213,6 +231,71 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
         }
     }
     return state;
+}
+
+bool ImContext::under_popup(const Vec2f& point) const
+{
+    for (uint32_t index = 0; index < m_last_popup_count; ++index)
+    {
+        if (contains(m_last_popups[index].rect, point))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+PopupResult ImContext::begin_popup_layer(ImId box_id)
+{
+    require_frame("begin_popup_layer");
+    if (m_popup_depth >= k_max_popup_depth || m_popup_count >= k_max_popups_per_frame)
+    {
+        throw Error("ImContext popup layers nest too deep or there are too many in one frame", "close popups that are not needed");
+    }
+    PopupResult result;
+    uint32_t at = k_max_popups_per_frame;
+    uint32_t deepest = 0;
+    for (uint32_t index = 0; index < m_last_popup_count; ++index)
+    {
+        at = m_last_popups[index].id == box_id ? index : at;
+        deepest = m_last_popups[index].depth > m_last_popups[deepest].depth ? index : deepest;
+    }
+    if (at < m_last_popup_count)
+    {
+        const PopupEntry& entry = m_last_popups[at];
+        bool inside = false;
+        for (uint32_t index = at; index < m_last_popup_count && (index == at || m_last_popups[index].depth > entry.depth); ++index)
+        {
+            inside = inside || (m_input.pointer.valid && contains(m_last_popups[index].rect, m_input.pointer.position));
+        }
+        result.closed_by_outside = button_of(m_input, MouseCode::Left).pressed && m_input.pointer.valid && !inside;
+        result.closed_by_escape = key_pressed(m_input.keys, ImKey::Escape) && at == deepest;
+    }
+    m_popups[m_popup_count++] = { box_id, {}, m_popup_depth };
+    ++m_popup_depth;
+    return result;
+}
+
+ImId ImContext::popup_id() const
+{
+    for (uint32_t index = m_popup_count; index-- > 0 && m_popup_depth != 0;)
+    {
+        if (m_popups[index].depth + 1 == m_popup_depth)
+        {
+            return m_popups[index].id;
+        }
+    }
+    return {};
+}
+
+void ImContext::end_popup_layer()
+{
+    require_frame("end_popup_layer");
+    if (m_popup_depth == 0)
+    {
+        throw Error("ImContext has no popup layer to end", "every end_popup_layer needs a begin_popup_layer");
+    }
+    --m_popup_depth;
 }
 
 ItemDrag ImContext::item_drag(ImId id)
@@ -325,7 +408,7 @@ bool ImContext::previous_rect(ImId id, Rect& out) const
 
 ImStats ImContext::stats() const
 {
-    return { m_frame, m_items, m_draw.command_count(), static_cast<uint32_t>(m_memory.size()), m_arena.used(), m_arena.capacity(), m_layout.node_count() };
+    return { m_frame, m_items, m_draw.command_count(), static_cast<uint32_t>(m_memory.size()), m_arena.used(), m_arena.capacity(), m_layout.node_count(), m_popup_count };
 }
 
 std::string dump_layout(const ImContext& context)

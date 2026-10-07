@@ -34,6 +34,23 @@ struct RowOptions
     Align align = Align::Start;
 };
 
+// Pieces the built-in widgets are made of, public so widgets of your own look and behave the same.
+// The style an options struct resolves to: its own, else the named variant, else the theme's base.
+[[nodiscard]] const ImStyle& resolved_style(const ImContext& context, const WidgetOptions& options);
+// The options' layout, else the default box of the style (padding, centred content).
+[[nodiscard]] LayoutStyle default_box(const ImStyle& style);
+[[nodiscard]] LayoutStyle widget_box(const ImStyle& style, const WidgetOptions& options);
+void paint_text(BoxPaint& paint, const LayoutNode& node, const ImStyle& style, TextAlign align, bool ellipsis);
+void paint_surface(BoxPaint& paint, const ImStyle& style, const Colour& fill);
+[[nodiscard]] Colour interaction_fill(const ImStyle& style, const ItemState& state, const Colour& rest);
+// A leaf box that reacts to the pointer; `rest` (null for the style's background) shows while idle.
+ItemState interactive_box(ImContext& context, std::string_view text, const WidgetOptions& options, const Colour* rest);
+
+// Where a popup opens, from its size last frame (zero on the first, so it opens unflipped): below the anchor box with the left edges aligned, above and/or right-aligned when it would leave the surface.
+[[nodiscard]] Floating popup_below(ImId anchor, const Rect& anchor_rect, const Vec2f& last_size, const Vec2f& surface_size);
+// At a point such as the pointer, `gap` away from it, pushed to the other side when it would leave the surface.
+[[nodiscard]] Floating popup_at(const Vec2f& point, const Vec2f& last_size, const Vec2f& surface_size, float gap = 0.0f);
+
 // The widgets paint when the frame ends and answer from last frame's rects, so a widget that moved reacts one frame late. All throw Error outside a frame.
 // The label is the text shown and, under the current id scope, the identity; give repeated labels a scope.
 

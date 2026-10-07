@@ -14,6 +14,11 @@ GuiContext& active()
 
 } // namespace
 
+GuiContext& context()
+{
+    return active();
+}
+
 GuiId id(std::string_view label)
 {
     return GuiId(active().id(label));

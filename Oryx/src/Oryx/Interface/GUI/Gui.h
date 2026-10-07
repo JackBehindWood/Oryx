@@ -13,6 +13,8 @@ using im::RowOptions;
 using im::StatusOptions;
 using im::WidgetOptions;
 
+// The active context, for widgets of your own that need more than the free functions; throws Error when none is active.
+[[nodiscard]] GuiContext& context();
 [[nodiscard]] GuiId id(std::string_view label);
 void push_id(std::string_view label);
 void pop_id();
