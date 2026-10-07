@@ -115,6 +115,7 @@ project "Oryx"
             "src/Oryx/Graphics/**",
             "src/Oryx/Shaders/**",
             "src/Oryx/Renderer/**",
+            "src/Oryx/Interface/**",
             "src/Oryx/Board/Graphics/**",
             "src/Oryx/Assets/Gpu*"
         }

@@ -43,6 +43,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <cctype>
+#include <cstdarg>
 
 #include "Oryx/Core/Base.h"
 
