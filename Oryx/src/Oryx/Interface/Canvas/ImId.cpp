@@ -14,7 +14,7 @@ uint64_t mix(uint64_t hash, uint8_t byte)
 
 ImId finish(uint64_t hash)
 {
-    return { hash == ImId::none ? 1 : hash };
+    return ImId{ hash == ImId::none ? 1 : hash };
 }
 
 } // namespace

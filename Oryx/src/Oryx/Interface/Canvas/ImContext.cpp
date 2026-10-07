@@ -32,6 +32,9 @@ void ImContext::begin_frame(const ImInput& input)
     m_hot = {};
     m_items = 0;
     m_wheel_consumed = false;
+    m_time += input.delta_time;
+    m_output = {};
+    m_press_claimed = false;
 }
 
 Vec2f ImContext::consume_wheel()
@@ -65,11 +68,17 @@ void ImContext::end_frame()
     {
         m_active = {};
     }
+    if (!button_of(m_input, MouseCode::Left).down)
+    {
+        m_drag_id = {};
+        m_dragging = false;
+    }
     if (button_of(m_input, MouseCode::Left).pressed && !is_valid(m_hot))
     {
         m_focus = {};
     }
     m_memory.collect(m_frame);
+    m_state.collect(m_frame);
     m_last_hits.swap(m_hits);
     m_open = false;
 }
@@ -94,6 +103,10 @@ void ImContext::solve_layout()
     }
     m_layout.solve({ { 0.0f, 0.0f }, m_input.surface_size }, measure, m_frame);
     m_layout.paint(m_draw, m_theme.font, m_input.scale);
+    if (m_draw.channel_count() > 1)
+    {
+        m_draw.merge();
+    }
     for (uint32_t index = 0; index < m_layout.node_count(); ++index)
     {
         const LayoutNode& node = m_layout.node(index);
@@ -165,14 +178,23 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
     const Rect hit = intersect(intersect(at_least(rect, Vec2f(m_theme.min_hit_size, m_theme.min_hit_size)), m_draw.current_clip()), layout_clip);
     m_hits.push_back({ id, hit });
     const bool inside = m_input.pointer.valid && contains(hit, m_input.pointer.position);
-    state.hovered = inside && (!is_valid(m_active) || m_active == id);
+    state.hovered = inside && (!is_valid(m_active) || m_active == id || (m_press_claimed && left.pressed));
     if (state.hovered)
     {
         m_hot = id;
         if (left.pressed)
         {
             m_active = id;
+            m_press_claimed = true;
             state.pressed = true;
+            m_drag_id = id;
+            m_drag_press = m_input.pointer.position;
+            m_drag_last = m_drag_press;
+            m_dragging = false;
+        }
+        if (button_of(m_input, MouseCode::Right).released)
+        {
+            state.right_clicked = true;
         }
     }
     if (m_active == id)
@@ -182,9 +204,68 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
         {
             state.clicked = state.hovered;
             m_active = {};
+            if (state.clicked)
+            {
+                state.double_clicked = m_last_click_id == id && m_time - m_last_click_time <= m_theme.double_click_seconds;
+                m_last_click_id = state.double_clicked ? ImId{} : id;
+                m_last_click_time = m_time;
+            }
         }
     }
     return state;
+}
+
+ItemDrag ImContext::item_drag(ImId id)
+{
+    require_frame("item_drag");
+    ItemDrag drag;
+    if (m_drag_id != id || !is_valid(id))
+    {
+        return drag;
+    }
+    const ImButton& left = button_of(m_input, MouseCode::Left);
+    const Vec2f position = m_input.pointer.position;
+    drag.start = m_drag_press;
+    drag.total = position - m_drag_press;
+    if (!m_dragging && left.down && length(drag.total) >= m_theme.drag_threshold)
+    {
+        m_dragging = true;
+        drag.started = true;
+    }
+    if (m_dragging)
+    {
+        drag.delta = position - m_drag_last;
+        m_drag_last = position;
+        drag.dragging = left.down;
+        if (!left.down)
+        {
+            drag.ended = true;
+            m_dragging = false;
+            m_drag_id = {};
+        }
+    }
+    return drag;
+}
+
+void* ImContext::state_slot(ImId id, uint32_t size, const void* tag, bool& created)
+{
+    require_frame("state");
+    if (!is_valid(id))
+    {
+        throw Error("ImContext state needs a valid id");
+    }
+    WidgetState& entry = m_state.get(id, m_frame);
+    created = entry.tag == nullptr;
+    if (created)
+    {
+        entry.tag = tag;
+        entry.size = size;
+    }
+    else if (entry.tag != tag || entry.size != size)
+    {
+        throw Error("ImContext state id already holds another type", "give each state type its own id");
+    }
+    return entry.data;
 }
 
 ImId ImContext::item_at(const Vec2f& point) const

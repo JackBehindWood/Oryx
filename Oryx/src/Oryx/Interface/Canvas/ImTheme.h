@@ -37,6 +37,10 @@ struct ImTheme
     uint32_t variant_count = 0;
     // Items smaller than this on either side still get this much hit area (accessibility); zero disables.
     float min_hit_size = 0.0f;
+    // Pointer travel in points before a held item counts as dragged.
+    float drag_threshold = 4.0f;
+    // Longest gap between two clicks on one item that makes the second a double click.
+    float double_click_seconds = 0.35f;
     uint32_t version = 1;
 };
 

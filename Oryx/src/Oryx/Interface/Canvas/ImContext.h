@@ -12,13 +12,30 @@ namespace oryx
 {
 
 // What one widget interaction reports. `pressed` is the frame the button went down on the item, `clicked` the frame it was released over the item that it went down on.
+// `double_clicked` is a click that follows another on the same item within the theme's double_click_seconds; `right_clicked` is the right button released over the item.
 struct ItemState
 {
     bool hovered = false;
     bool pressed = false;
     bool held = false;
     bool clicked = false;
+    bool double_clicked = false;
+    bool right_clicked = false;
 };
+
+// The left-button drag that began on an item. `started` and `ended` are single-frame edges; `delta` is the pointer travel since the previous call, `total` since the press.
+struct ItemDrag
+{
+    bool started = false;
+    bool dragging = false;
+    bool ended = false;
+    Vec2f start{ 0.0f, 0.0f };
+    Vec2f delta{ 0.0f, 0.0f };
+    Vec2f total{ 0.0f, 0.0f };
+};
+
+static_assert(std::is_trivially_copyable_v<ItemState> && std::is_standard_layout_v<ItemState>);
+static_assert(std::is_trivially_copyable_v<ItemDrag> && std::is_standard_layout_v<ItemDrag>);
 
 // What the context remembers about an item between frames.
 struct ItemMemory
@@ -27,6 +44,31 @@ struct ItemMemory
     Rect previous_rect;
     uint64_t seen_frame = 0;
     bool has_previous = false;
+};
+
+enum class CursorShape : uint8_t
+{
+    Arrow,
+    Hand,
+    ResizeHorizontal,
+    ResizeVertical,
+    Text
+};
+
+// What a frame asks of its owner, read after end_frame. Reset by begin_frame.
+struct ImOutput
+{
+    CursorShape cursor = CursorShape::Arrow;
+};
+
+static_assert(std::is_trivially_copyable_v<ImOutput> && std::is_standard_layout_v<ImOutput>);
+
+inline constexpr size_t k_max_widget_state_size = 64;
+
+template<typename T>
+struct WidgetStateTag
+{
+    static inline const char value = 0;
 };
 
 // Counters of the last frame, for tests and benchmarks.
@@ -103,6 +145,30 @@ public:
     // The rect the item had last frame; false when it was not there.
     [[nodiscard]] bool previous_rect(ImId id, Rect& out) const;
 
+    // The drag of the left button that began on `id`, once the pointer has moved past the theme's drag_threshold. Call it once per frame, after item(id); all zeros for any other item.
+    // `ended` arrives on the release frame even when the pointer is no longer over the item.
+    [[nodiscard]] ItemDrag item_drag(ImId id);
+
+    // The last request of the frame wins, so a widget drawn later (a popup) overrides one below it.
+    void request_cursor(CursorShape cursor) { m_output.cursor = cursor; }
+    [[nodiscard]] const ImOutput& output() const { return m_output; }
+
+    // Per-id state that outlives frames, for widgets of your own: created value-initialised on first use, dropped after a frame in which it is not asked for.
+    // Throws Error when the id holds a different type or size. The reference is valid until the next state call (a new id may move the table); T must be trivially copyable and at most k_max_widget_state_size.
+    template<typename T>
+    [[nodiscard]] T& state(ImId id)
+    {
+        static_assert(std::is_trivially_copyable_v<T> && std::is_default_constructible_v<T>, "widget state must be trivially copyable");
+        static_assert(sizeof(T) <= k_max_widget_state_size && alignof(T) <= alignof(WidgetState), "widget state too large");
+        bool created = false;
+        void* slot = state_slot(id, sizeof(T), &WidgetStateTag<T>::value, created);
+        if (created)
+        {
+            new (slot) T{};
+        }
+        return *static_cast<T*>(slot);
+    }
+
     // The topmost item (the last one submitted) whose hit area held the point in the latest finished frame; the none id when there is none. Valid inside a frame too, where it still answers from the frame before.
     [[nodiscard]] ImId item_at(const Vec2f& point) const;
 
@@ -133,13 +199,23 @@ private:
     ItemState item_clipped(ImId id, const Rect& rect, const Rect& layout_clip);
     [[nodiscard]] ImId hash_parent() const { return m_id_stack.empty() ? ImId{ m_id_seed } : m_id_stack.back(); }
     void solve_layout();
+    void* state_slot(ImId id, uint32_t size, const void* tag, bool& created);
+
+    struct alignas(16) WidgetState
+    {
+        const void* tag = nullptr;
+        uint32_t size = 0;
+        std::byte data[k_max_widget_state_size];
+    };
 
     ImInput m_input;
+    ImOutput m_output;
     ImTheme m_theme;
     DrawList m_draw;
     LayoutTree m_layout;
     FrameArena m_arena;
     StateTable<ItemMemory> m_memory;
+    StateTable<WidgetState> m_state;
     std::vector<ImId> m_id_stack;
     struct ItemHit
     {
@@ -154,6 +230,15 @@ private:
     ImId m_focus;
     uint64_t m_id_seed;
     uint64_t m_frame = 0;
+    float m_time = 0.0f;
+    ImId m_last_click_id;
+    float m_last_click_time = 0.0f;
+    ImId m_drag_id;
+    Vec2f m_drag_press{ 0.0f, 0.0f };
+    Vec2f m_drag_last{ 0.0f, 0.0f };
+    bool m_dragging = false;
+    // An item took this frame's press; a later item under the pointer (drawn above it) may still take it over.
+    bool m_press_claimed = false;
     uint32_t m_items = 0;
     bool m_open = false;
     bool m_wheel_consumed = false;

@@ -47,7 +47,7 @@ public:
     {
     }
 
-    [[nodiscard]] constexpr ImId im() const { return { value }; }
+    [[nodiscard]] constexpr ImId im() const { return ImId{ value }; }
 };
 
 template<typename Tag>

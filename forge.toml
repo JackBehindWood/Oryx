@@ -75,7 +75,7 @@ rules = [
   { rule = "graphics Text !-> Assets", why = "{module} must not include Assets; fonts reach the renderer through Text/IFontSource" },
   { rule = "Interface/Canvas !-> Interface/UI Interface/GUI Board Assets", why = "{module} is the shared immediate-mode layer; it must not include {target}" },
   { rule = "Interface/UI !-> Interface/GUI Board Assets Game Strategy", why = "{module} is the player-facing UI layer; it must not include {target}" },
-  { rule = "Interface/GUI !-> Interface/UI Board Assets Game Strategy", why = "{module} is the developer-tooling UI layer, a peer of Interface/UI; it must not include {target}" },
+  { rule = "Interface/GUI !-> Interface/UI Board Assets Game Strategy Dashboard", why = "{module} is the developer-tooling UI layer, a peer of Interface/UI; it must not include {target}" },
   "Graphics < Shaders < Renderer < Interface/Canvas < Interface/UI < Board/Graphics",
   "Renderer < Interface/Canvas < Interface/GUI",
 ]
@@ -88,7 +88,7 @@ backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']
 
 [[boundaries.artifacts]]
 path = "build/bin/**/libOryx.a"
-deny = '\boryx::(?:Graphics|Shaders|Renderer|DrawList|Painter|ImContext|ImTheme|LayoutTree|UiContext|UiTheme|GuiContext|GuiTheme|im|ui|gui|PresentedGraphicsBoard2D)::'
+deny = '\boryx::(?:Graphics|Shaders|Renderer|DrawList|Painter|ImContext|ImTheme|LayoutTree|UiContext|UiTheme|GuiContext|GuiTheme|ImId|UiId|GuiId|im|ui|gui|PresentedGraphicsBoard2D)::'
 requires = ["!graphics"]
 why = "graphics-off library must not export graphics symbols"
 

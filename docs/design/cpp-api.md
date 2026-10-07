@@ -25,6 +25,7 @@ Likewise, advanced metaprogramming should not become a prerequisite for understa
 * Classes: `PascalCase` (e.g. `class Rewards`)
 * File-scope and namespace-scope `constexpr` constants: `k_snake_case` (e.g. `k_restart_hint`, `k_board_gutter`, `k_action_list_inline_capacity`). Real macro and system constants keep `UPPER_SNAKE` (`PENDING_ACTION`, `INVALID_ACTION`, `UNDO_ACTION`, `RHI_MAX_*`, `MAX_TEXTURES`).
 * Widget identities are strong types: `ImId` is the untyped id of the shared immediate-mode layer (`ImId::none` is the null sentinel, scoped to the type, not a free `k_` constant), and each context family gets its own type from `TypedId<Tag>` (`UiId`, `GuiId`), with no implicit conversion between any two of them. Free functions are `make_im_id` / `make_im_index_id`.
+* Immediate-mode widgets of your own use the same tools as the built-ins: `item` + `item_drag` for interaction, `state<T>(id)` for per-id state that outlives frames (small, trivially copyable), `begin_widget/end_widget` for a boxed widget and `canvas` for custom painting (a `CanvasArea` whose destructor ends the painting). Results and options are plain data.
 * Interfaces (no data members; every method pure virtual, apart from optional
   capability hooks that default to "not provided" — `IGame::action_features()`
   returns `nullptr`, `IStrategy::required_capabilities()` returns `{}`)

@@ -63,6 +63,53 @@ void separator(ImContext& context, const WidgetOptions& options = {});
 // One line of text floated against the whole surface.
 void status_line(ImContext& context, std::string_view text, const StatusOptions& options = {});
 
+// The frame of a widget of your own: reports the item under `name` (from last frame's box), opens the box and scopes the ids inside it. Close it with end_widget.
+[[nodiscard]] ItemState begin_widget(ImContext& context, std::string_view name, const LayoutStyle& style);
+void end_widget(ImContext& context);
+
+struct CanvasOptions
+{
+    // Z-order channel the painting goes to; above the boxes' own paint at the default.
+    uint32_t channel = 1;
+};
+
+// A reserved box that hit-tests, clips and hands out a Painter. Painting is recorded at once, over the box's last-frame rect (so a moved canvas paints one frame late); it ends when the area is destroyed.
+// `drag` is item_drag for the canvas and `pointer_local` the pointer relative to the rect's top-left, both from the same frame's input.
+class CanvasArea
+{
+public:
+    CanvasArea(const CanvasArea&) = delete;
+    CanvasArea& operator=(const CanvasArea&) = delete;
+    ~CanvasArea();
+
+    Rect rect;
+    ItemState item;
+    ItemDrag drag;
+    Vec2f pointer_local{ 0.0f, 0.0f };
+    Vec2f wheel{ 0.0f, 0.0f };
+    Painter painter;
+
+private:
+    friend CanvasArea canvas(ImContext&, std::string_view, Sizing, Sizing, const CanvasOptions&);
+    CanvasArea(ImContext& context, Painter&& painter, uint32_t previous_channel, const Rect& rect, const ItemState& item, const ItemDrag& drag, const Vec2f& pointer_local, const Vec2f& wheel)
+        : rect(rect)
+        , item(item)
+        , drag(drag)
+        , pointer_local(pointer_local)
+        , wheel(wheel)
+        , painter(std::move(painter))
+        , m_draw(context.draw_list())
+        , m_previous_channel(previous_channel)
+    {
+    }
+
+    DrawList& m_draw;
+    uint32_t m_previous_channel;
+};
+
+// Throws Error outside a frame or while the theme has no font. The wheel is only taken when the pointer is over the canvas.
+[[nodiscard]] CanvasArea canvas(ImContext& context, std::string_view name, Sizing width = grow(), Sizing height = grow(), const CanvasOptions& options = {});
+
 // Ends the panel when it goes out of scope.
 class PanelScope
 {

@@ -1,6 +1,6 @@
 # Dashboard (Phase 11)
 
-> **Status: Step 1 (scissor) and Step 2 (`Interface/Canvas/` drawing, core, layout and shared widgets, `Interface/UI/`, and the Oasis board overlay ported to it) built, pending the user's check of the real window; Step 3 (`GUI/`) is next.** The step-by-step tracker lives with the implementation plan; this page records the design and the reasons behind it.
+> **Status: Step 1 (scissor) and Step 2 (`Interface/Canvas/` drawing, core, layout and shared widgets, `Interface/UI/`, and the Oasis board overlay ported to it) built, pending the user's check of the real window; Step 3 (`GUI/`) is in progress: Sessions 1 (Canvas foundation) and 2 (interaction, `state<T>`, `canvas`, `GuiContext`, `gui::` wrappers) built.** The step-by-step tracker lives with the implementation plan; this page records the design and the reasons behind it.
 
 Phase 11 adds a live in-window Strategy Dashboard. This page covers the module layout, the UI and GUI systems it needs, the scissor/clipping work in the renderer, and the industry survey the choices come from. See also [Observability](observability.md) for the data it consumes and [Graphics](graphics.md) for the renderer it draws through.
 

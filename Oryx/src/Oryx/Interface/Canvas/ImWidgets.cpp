@@ -191,6 +191,52 @@ void separator(ImContext& context, const WidgetOptions& options)
     context.end_box();
 }
 
+ItemState begin_widget(ImContext& context, std::string_view name, const LayoutStyle& style)
+{
+    const ItemState state = context.item(context.id(name));
+    context.begin_box(name, style);
+    context.push_id(name);
+    return state;
+}
+
+void end_widget(ImContext& context)
+{
+    context.pop_id();
+    context.end_box();
+}
+
+CanvasArea::~CanvasArea()
+{
+    m_draw.pop_clip();
+    m_draw.set_channel(m_previous_channel);
+}
+
+CanvasArea canvas(ImContext& context, std::string_view name, Sizing width, Sizing height, const CanvasOptions& options)
+{
+    LayoutStyle box;
+    box.width = width;
+    box.height = height;
+    const ImId id = context.id(name);
+    const ItemState item = context.item(id);
+    context.begin_box(name, box);
+    context.end_box();
+
+    DrawList& draw = context.draw_list();
+    Painter painter = context.painter(context.input().scale);
+    const uint32_t previous_channel = draw.current_channel();
+    draw.split_channels(std::max(draw.channel_count(), options.channel + 1));
+    draw.set_channel(options.channel);
+    Rect rect;
+    std::ignore = context.layout_rect(id, rect);
+    Rect clip = unbounded_rect();
+    std::ignore = context.layout().clip_of(id, clip);
+    draw.push_clip(intersect(rect, clip));
+
+    const ItemDrag drag = context.item_drag(id);
+    const Vec2f wheel = item.hovered ? context.consume_wheel() : Vec2f(0.0f, 0.0f);
+    return CanvasArea(context, std::move(painter), previous_channel, rect, item, drag, context.input().pointer.position - rect.min, wheel);
+}
+
 void status_line(ImContext& context, std::string_view text, const StatusOptions& options)
 {
     const ImStyle& style = resolve_style(context, options);
