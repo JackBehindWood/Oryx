@@ -44,6 +44,7 @@
 #include <unordered_set>
 #include <cctype>
 #include <cstdarg>
+#include <clocale>
 
 #include "Oryx/Core/Base.h"
 

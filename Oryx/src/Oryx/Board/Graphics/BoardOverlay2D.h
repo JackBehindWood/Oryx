@@ -10,7 +10,7 @@ namespace oryx
 
 struct OverlayButton
 {
-    Id id;
+    ImId id;
     Rect rect;
 };
 

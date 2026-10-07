@@ -375,7 +375,7 @@ TEST_CASE("PresentedGraphicsBoard2D asks for a restart only from its Play again 
     board.update(idle(), 0.016);
 
     Rect again;
-    REQUIRE(board.ui().layout_rect(make_id("Play again", make_id("result")), again));
+    REQUIRE(board.ui().layout_rect(make_im_id("Play again", make_im_id("result")), again));
     BoardInput press = idle();
     press.cursor = rect_centre(again);
     press.select = true;

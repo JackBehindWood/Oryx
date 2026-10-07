@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Interface/Canvas/Id.h"
+#include "Oryx/Interface/Canvas/ImId.h"
 #include "Oryx/Interface/Canvas/Rect.h"
 #include "Oryx/Math/Colour.h"
 
@@ -33,7 +33,7 @@ struct ImTheme
     Font* font = nullptr;
     ImStyle base;
     ImStyle variants[k_max_style_variants];
-    Id variant_ids[k_max_style_variants];
+    ImId variant_ids[k_max_style_variants];
     uint32_t variant_count = 0;
     // Items smaller than this on either side still get this much hit area (accessibility); zero disables.
     float min_hit_size = 0.0f;
@@ -43,7 +43,7 @@ struct ImTheme
 // Adds the variant or replaces one of the same name. Throws Error when all slots are taken.
 void add_style_variant(ImTheme& theme, std::string_view name, const ImStyle& style);
 // The base style when no variant has this name or id.
-[[nodiscard]] const ImStyle& style_for(const ImTheme& theme, Id variant);
+[[nodiscard]] const ImStyle& style_for(const ImTheme& theme, ImId variant);
 [[nodiscard]] const ImStyle& style_for(const ImTheme& theme, std::string_view variant);
 
 } // namespace oryx

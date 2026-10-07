@@ -8,7 +8,7 @@ namespace oryx
 
 void add_style_variant(ImTheme& theme, std::string_view name, const ImStyle& style)
 {
-    const Id id = make_id(name);
+    const ImId id = make_im_id(name);
     for (uint32_t index = 0; index < theme.variant_count; ++index)
     {
         if (theme.variant_ids[index] == id)
@@ -26,7 +26,7 @@ void add_style_variant(ImTheme& theme, std::string_view name, const ImStyle& sty
     ++theme.variant_count;
 }
 
-const ImStyle& style_for(const ImTheme& theme, Id variant)
+const ImStyle& style_for(const ImTheme& theme, ImId variant)
 {
     for (uint32_t index = 0; index < theme.variant_count; ++index)
     {
@@ -40,7 +40,7 @@ const ImStyle& style_for(const ImTheme& theme, Id variant)
 
 const ImStyle& style_for(const ImTheme& theme, std::string_view variant)
 {
-    return style_for(theme, make_id(variant));
+    return style_for(theme, make_im_id(variant));
 }
 
 } // namespace oryx

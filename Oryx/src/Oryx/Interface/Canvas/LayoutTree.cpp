@@ -2,6 +2,7 @@
 #include "Oryx/Interface/Canvas/LayoutTree.h"
 
 #include "Oryx/Core/Error.h"
+#include "Oryx/Interface/Canvas/FrameArena.h"
 #include "Oryx/Interface/Canvas/Painter.h"
 
 namespace oryx
@@ -184,16 +185,16 @@ void write_sizing(std::string& out, const char* axis, const Sizing& sizing)
     switch (sizing.kind)
     {
     case SizingKind::Fit:
-        std::snprintf(buffer, sizeof(buffer), " %s=fit", axis);
+        snprintf_c(buffer, sizeof(buffer), " %s=fit", axis);
         break;
     case SizingKind::Grow:
-        std::snprintf(buffer, sizeof(buffer), " %s=grow(%.2f)", axis, sizing.value);
+        snprintf_c(buffer, sizeof(buffer), " %s=grow(%.2f)", axis, sizing.value);
         break;
     case SizingKind::Fixed:
-        std::snprintf(buffer, sizeof(buffer), " %s=fixed(%.2f)", axis, sizing.value);
+        snprintf_c(buffer, sizeof(buffer), " %s=fixed(%.2f)", axis, sizing.value);
         break;
     case SizingKind::Percent:
-        std::snprintf(buffer, sizeof(buffer), " %s=percent(%.2f)", axis, sizing.value);
+        snprintf_c(buffer, sizeof(buffer), " %s=percent(%.2f)", axis, sizing.value);
         break;
     }
     out += buffer;
@@ -210,10 +211,10 @@ void dump_node(const LayoutTree& tree, uint32_t index, uint32_t depth, std::stri
     }
     else
     {
-        std::snprintf(buffer, sizeof(buffer), "#%016llx", static_cast<unsigned long long>(node.id.value));
+        snprintf_c(buffer, sizeof(buffer), "#%016llx", static_cast<unsigned long long>(node.id.value));
         out += buffer;
     }
-    std::snprintf(buffer, sizeof(buffer), " [%.2f %.2f %.2f %.2f] %s", node.rect.min[0], node.rect.min[1], node.rect.size[0], node.rect.size[1], node.style.direction == Direction::Row ? "row" : "column");
+    snprintf_c(buffer, sizeof(buffer), " [%.2f %.2f %.2f %.2f] %s", node.rect.min[0], node.rect.min[1], node.rect.size[0], node.rect.size[1], node.style.direction == Direction::Row ? "row" : "column");
     out += buffer;
     write_sizing(out, "w", node.style.width);
     write_sizing(out, "h", node.style.height);
@@ -296,7 +297,7 @@ void LayoutTree::clear()
     m_open.clear();
 }
 
-uint32_t LayoutTree::begin_box(Id id, const LayoutStyle& style, std::string_view name)
+uint32_t LayoutTree::begin_box(ImId id, const LayoutStyle& style, std::string_view name)
 {
     const uint32_t index = static_cast<uint32_t>(m_nodes.size());
     LayoutNode node;
@@ -331,7 +332,7 @@ void LayoutTree::end_box()
     m_open.pop_back();
 }
 
-uint32_t LayoutTree::leaf(Id id, const LayoutStyle& style, std::string_view name)
+uint32_t LayoutTree::leaf(ImId id, const LayoutStyle& style, std::string_view name)
 {
     const uint32_t index = begin_box(id, style, name);
     end_box();
@@ -347,7 +348,7 @@ LayoutNode& LayoutTree::current()
     return m_open.empty() ? m_nodes.back() : m_nodes[m_open.back()];
 }
 
-bool LayoutTree::rect_of(Id id, Rect& out) const
+bool LayoutTree::rect_of(ImId id, Rect& out) const
 {
     const Rect* found = m_rects.find(id);
     if (found == nullptr)

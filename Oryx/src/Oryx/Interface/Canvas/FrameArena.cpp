@@ -6,6 +6,24 @@
 namespace oryx
 {
 
+int32_t vsnprintf_c(char* buffer, size_t size, const char* format, va_list args)
+{
+    static const locale_t c_locale = newlocale(LC_ALL_MASK, "C", nullptr);
+    const locale_t previous = uselocale(c_locale);
+    const int32_t length = std::vsnprintf(buffer, size, format, args);
+    uselocale(previous);
+    return length;
+}
+
+int32_t snprintf_c(char* buffer, size_t size, const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    const int32_t length = vsnprintf_c(buffer, size, format, args);
+    va_end(args);
+    return length;
+}
+
 FrameArena::~FrameArena()
 {
     clear();
@@ -82,7 +100,7 @@ std::string_view FrameArena::format(const char* format, ...)
     va_start(args, format);
     va_list measure;
     va_copy(measure, args);
-    const int32_t length = std::vsnprintf(nullptr, 0, format, measure);
+    const int32_t length = vsnprintf_c(nullptr, 0, format, measure);
     va_end(measure);
     if (length < 0)
     {
@@ -90,7 +108,7 @@ std::string_view FrameArena::format(const char* format, ...)
         throw Error("FrameArena format failed");
     }
     char* destination = static_cast<char*>(allocate(static_cast<size_t>(length) + 1, 1));
-    std::vsnprintf(destination, static_cast<size_t>(length) + 1, format, args);
+    vsnprintf_c(destination, static_cast<size_t>(length) + 1, format, args);
     va_end(args);
     return std::string_view(destination, static_cast<size_t>(length));
 }

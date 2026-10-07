@@ -7,10 +7,17 @@
 namespace oryx
 {
 
+inline constexpr uint64_t k_ui_id_seed = 0x5549'4944'5345'4544ull;
+
 // The immediate-mode context of the player-facing UI: ImContext plus the UiTheme. Make it the active one with a ContextScope<UiContext> to use the oryx::ui functions.
 class UiContext : public ImContext
 {
 public:
+    UiContext()
+        : ImContext(k_ui_id_seed)
+    {
+    }
+
     using ImContext::set_theme;
     // The shared part also goes to the base context; the UI roles stay here.
     void set_theme(const UiTheme& theme)

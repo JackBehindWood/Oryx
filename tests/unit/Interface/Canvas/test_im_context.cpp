@@ -30,7 +30,7 @@ ImInput with_left(ImInput input, bool down, bool pressed, bool released)
     return input;
 }
 
-ItemState frame_with_item(TestContext& context, const ImInput& input, Id id, const Rect& rect)
+ItemState frame_with_item(TestContext& context, const ImInput& input, ImId id, const Rect& rect)
 {
     context.begin_frame(input);
     ItemState state = context.item(id, rect);
@@ -45,11 +45,11 @@ TEST_CASE("ImContext: frame misuse throws")
     TestContext context;
     CHECK_THROWS_AS(context.end_frame(), Error);
     CHECK_THROWS_AS(context.push_id("x"), Error);
-    CHECK_THROWS_AS(context.item(make_id("x"), k_button), Error);
+    CHECK_THROWS_AS(context.item(make_im_id("x"), k_button), Error);
     context.begin_frame({});
     CHECK_THROWS_AS(context.begin_frame({}), Error);
     CHECK_THROWS_AS(context.pop_id(), Error);
-    CHECK_THROWS_AS(context.item(Id{}, k_button), Error);
+    CHECK_THROWS_AS(context.item(ImId{}, k_button), Error);
     context.end_frame();
     CHECK(context.frame() == 1);
 }
@@ -74,15 +74,15 @@ TEST_CASE("ImContext: ids nest through scopes and the same label differs per sco
 {
     TestContext context;
     context.begin_frame({});
-    const Id plain = context.id("OK");
-    Id scoped;
+    const ImId plain = context.id("OK");
+    ImId scoped;
     {
         IdScope scope(context, "dialog");
         scoped = context.id("OK");
-        CHECK(context.current_id() != Id{});
+        CHECK(context.current_id() != ImId{});
     }
     CHECK(scoped != plain);
-    CHECK(context.current_id() == Id{});
+    CHECK(context.current_id() == ImId{});
     CHECK(context.id("OK") == plain);
     CHECK(context.index_id(2) != context.index_id(3));
     context.end_frame();
@@ -107,7 +107,7 @@ TEST_CASE("ImContext: an id used twice in a frame throws, but a scope makes it d
 TEST_CASE("ImContext: hover follows the pointer and a missing pointer hovers nothing")
 {
     TestContext context;
-    const Id id = make_id("b");
+    const ImId id = make_im_id("b");
     CHECK(frame_with_item(context, pointer_at(20.0f, 20.0f), id, k_button).hovered);
     CHECK_FALSE(frame_with_item(context, pointer_at(60.0f, 20.0f), id, k_button).hovered);
     ImInput away = pointer_at(20.0f, 20.0f);
@@ -118,7 +118,7 @@ TEST_CASE("ImContext: hover follows the pointer and a missing pointer hovers not
 TEST_CASE("ImContext: a click is press then release over the same item")
 {
     TestContext context;
-    const Id id = make_id("b");
+    const ImId id = make_im_id("b");
     ItemState down = frame_with_item(context, with_left(pointer_at(20.0f, 20.0f), true, true, false), id, k_button);
     CHECK(down.pressed);
     CHECK(down.held);
@@ -136,7 +136,7 @@ TEST_CASE("ImContext: a click is press then release over the same item")
 TEST_CASE("ImContext: a press and release in one frame still clicks")
 {
     TestContext context;
-    ItemState state = frame_with_item(context, with_left(pointer_at(20.0f, 20.0f), false, true, true), make_id("b"), k_button);
+    ItemState state = frame_with_item(context, with_left(pointer_at(20.0f, 20.0f), false, true, true), make_im_id("b"), k_button);
     CHECK(state.pressed);
     CHECK(state.clicked);
 }
@@ -144,8 +144,8 @@ TEST_CASE("ImContext: a press and release in one frame still clicks")
 TEST_CASE("ImContext: pressing A and releasing over B is no click on either")
 {
     TestContext context;
-    const Id a = make_id("a");
-    const Id b = make_id("b");
+    const ImId a = make_im_id("a");
+    const ImId b = make_im_id("b");
     auto frame = [&](const ImInput& input)
     {
         context.begin_frame(input);
@@ -164,7 +164,7 @@ TEST_CASE("ImContext: pressing A and releasing over B is no click on either")
 TEST_CASE("ImContext: dragging onto an item after pressing empty space is no click")
 {
     TestContext context;
-    const Id id = make_id("b");
+    const ImId id = make_im_id("b");
     frame_with_item(context, with_left(pointer_at(300.0f, 300.0f), true, true, false), id, k_button);
     ItemState state = frame_with_item(context, with_left(pointer_at(20.0f, 20.0f), true, false, false), id, k_button);
     CHECK(state.hovered);
@@ -176,7 +176,7 @@ TEST_CASE("ImContext: dragging onto an item after pressing empty space is no cli
 TEST_CASE("ImContext: wants_mouse while hovering or holding, and a lost release clears active")
 {
     TestContext context;
-    const Id id = make_id("b");
+    const ImId id = make_im_id("b");
     context.begin_frame(pointer_at(300.0f, 300.0f));
     context.item(id, k_button);
     CHECK_FALSE(context.wants_mouse());
@@ -201,9 +201,9 @@ TEST_CASE("ImContext: an item outside the clip is not hovered")
     TestContext context;
     context.begin_frame(pointer_at(20.0f, 20.0f));
     context.draw_list().push_clip({ { 0.0f, 0.0f }, { 15.0f, 15.0f } });
-    CHECK_FALSE(context.item(make_id("clipped"), k_button).hovered);
+    CHECK_FALSE(context.item(make_im_id("clipped"), k_button).hovered);
     context.draw_list().pop_clip();
-    CHECK(context.item(make_id("free"), { { 12.0f, 12.0f }, { 20.0f, 20.0f } }).hovered);
+    CHECK(context.item(make_im_id("free"), { { 12.0f, 12.0f }, { 20.0f, 20.0f } }).hovered);
     context.end_frame();
 }
 
@@ -214,14 +214,14 @@ TEST_CASE("ImContext: min_hit_size grows the hit area of a small item")
     theme.min_hit_size = 40.0f;
     context.set_theme(theme);
     const Rect tiny = { { 100.0f, 100.0f }, { 10.0f, 10.0f } };
-    CHECK(frame_with_item(context, pointer_at(90.0f, 90.0f), make_id("tiny"), tiny).hovered);
-    CHECK_FALSE(frame_with_item(context, pointer_at(60.0f, 60.0f), make_id("tiny"), tiny).hovered);
+    CHECK(frame_with_item(context, pointer_at(90.0f, 90.0f), make_im_id("tiny"), tiny).hovered);
+    CHECK_FALSE(frame_with_item(context, pointer_at(60.0f, 60.0f), make_im_id("tiny"), tiny).hovered);
 }
 
 TEST_CASE("ImContext: focus is reserved, drives wants_keyboard and a press on nothing clears it")
 {
     TestContext context;
-    const Id id = make_id("field");
+    const ImId id = make_im_id("field");
     context.set_focus(id);
     CHECK(context.wants_keyboard());
     frame_with_item(context, with_left(pointer_at(20.0f, 20.0f), true, true, false), id, k_button);
@@ -234,7 +234,7 @@ TEST_CASE("ImContext: focus is reserved, drives wants_keyboard and a press on no
 TEST_CASE("ImContext: the previous frame's rect is remembered by id")
 {
     TestContext context;
-    const Id id = make_id("b");
+    const ImId id = make_im_id("b");
     Rect rect;
     context.begin_frame({});
     CHECK_FALSE(context.previous_rect(id, rect));
@@ -299,7 +299,7 @@ TEST_CASE("ImContext: two contexts keep separate state")
 {
     TestContext a;
     TestContext b;
-    const Id id = make_id("b");
+    const ImId id = make_im_id("b");
     frame_with_item(a, with_left(pointer_at(20.0f, 20.0f), true, true, false), id, k_button);
     CHECK(a.active() == id);
     CHECK_FALSE(is_valid(b.active()));

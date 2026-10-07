@@ -5,6 +5,10 @@ namespace oryx
 
 inline constexpr size_t k_default_arena_chunk_size = 16 * 1024; // 16 KiB, enough for a few hundred layout nodes and a few dozen formatted strings.
 
+// printf into a fixed buffer with numbers always in the C locale, so a host's setlocale cannot turn "1.50" into "1,50" in goldens or plots.
+int32_t vsnprintf_c(char* buffer, size_t size, const char* format, va_list args);
+int32_t snprintf_c(char* buffer, size_t size, const char* format, ...) __attribute__((format(printf, 3, 4)));
+
 // Bump allocator for one frame's scratch (formatted text, layout nodes). `reset` rewinds and keeps the chunks, so a warm arena allocates nothing; memory handed out is valid until the next reset.
 // Only trivially destructible types fit, since nothing is destroyed.
 class FrameArena

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Interface/Canvas/Id.h"
+#include "Oryx/Interface/Canvas/ImId.h"
 #include "Oryx/Interface/Canvas/Rect.h"
 
 namespace oryx
@@ -77,7 +77,7 @@ struct Floating
     AttachPoint target_point = AttachPoint::TopLeft;
     FloatTarget target = FloatTarget::Parent;
     // Used when target is Element; the element must be laid out before this box in the tree order.
-    Id target_id;
+    ImId target_id;
     Vec2f offset{ 0.0f, 0.0f };
 };
 

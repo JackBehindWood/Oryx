@@ -1,5 +1,6 @@
 #include "oxpch.h"
 #include "Oryx/Interface/Canvas/DrawList.h"
+#include "Oryx/Interface/Canvas/FrameArena.h"
 
 namespace oryx
 {
@@ -12,7 +13,7 @@ void put(std::string& out, const char* format, ...)
     char buffer[256];
     va_list args;
     va_start(args, format);
-    std::vsnprintf(buffer, sizeof(buffer), format, args);
+    vsnprintf_c(buffer, sizeof(buffer), format, args);
     va_end(args);
     out.append(buffer);
 }

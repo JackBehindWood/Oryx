@@ -2,6 +2,7 @@
 
 #include "Oryx/Interface/Canvas/ImWidgets.h"
 #include "Oryx/Interface/UI/UiContext.h"
+#include "Oryx/Interface/UI/UiId.h"
 
 // The player-facing UI as free functions over the active UiContext (see ContextScope<UiContext>). Each throws Error when none is active; the widgets themselves are the shared ones in oryx::im.
 namespace oryx::ui
@@ -10,11 +11,11 @@ namespace oryx::ui
 using im::StatusOptions;
 using im::WidgetOptions;
 
-[[nodiscard]] Id id(std::string_view label);
+[[nodiscard]] UiId id(std::string_view label);
 void push_id(std::string_view label);
 void pop_id();
 // Reports the pointer's relation to a rect and remembers it for the next frame; for widgets of your own.
-ItemState item(Id id, const Rect& rect);
+ItemState item(UiId id, const Rect& rect);
 
 [[nodiscard]] float spacing();
 

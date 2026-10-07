@@ -26,7 +26,7 @@ struct BoxPaint
 
 struct LayoutNode
 {
-    Id id;
+    ImId id;
     std::string_view name;
     LayoutStyle style;
     BoxPaint paint;
@@ -55,9 +55,9 @@ public:
     void clear();
 
     // Returns the node index. end_box throws Error when no box is open.
-    uint32_t begin_box(Id id, const LayoutStyle& style, std::string_view name = {});
+    uint32_t begin_box(ImId id, const LayoutStyle& style, std::string_view name = {});
     void end_box();
-    uint32_t leaf(Id id, const LayoutStyle& style, std::string_view name = {});
+    uint32_t leaf(ImId id, const LayoutStyle& style, std::string_view name = {});
 
     [[nodiscard]] LayoutNode& node(uint32_t index) { return m_nodes[index]; }
     [[nodiscard]] const LayoutNode& node(uint32_t index) const { return m_nodes[index]; }
@@ -70,7 +70,7 @@ public:
     void solve(const Rect& viewport, const TextMeasure& measure, uint64_t frame);
 
     // The rect the box with this id had after the latest solve (so the previous frame's while the current frame is still being built); false when it was not there.
-    [[nodiscard]] bool rect_of(Id id, Rect& out) const;
+    [[nodiscard]] bool rect_of(ImId id, Rect& out) const;
 
     // Records fills, outlines, text and clips into the list, boxes with a channel on that channel. Text is skipped without a font.
     void paint(DrawList& list, Font* font, float scale) const;

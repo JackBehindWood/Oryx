@@ -31,6 +31,18 @@ void ImContext::begin_frame(const ImInput& input)
     m_frame_items.clear();
     m_hot = {};
     m_items = 0;
+    m_wheel_consumed = false;
+}
+
+Vec2f ImContext::consume_wheel()
+{
+    require_frame("consume_wheel");
+    if (m_wheel_consumed)
+    {
+        return { 0.0f, 0.0f };
+    }
+    m_wheel_consumed = true;
+    return m_input.wheel;
 }
 
 void ImContext::end_frame()
@@ -103,13 +115,13 @@ Painter ImContext::painter(float scale)
 void ImContext::push_id(std::string_view label)
 {
     require_frame("push_id");
-    m_id_stack.push_back(make_id(label, current_id()));
+    m_id_stack.push_back(make_im_id(label, hash_parent()));
 }
 
-void ImContext::push_id(Id id)
+void ImContext::push_id(ImId id)
 {
     require_frame("push_id");
-    m_id_stack.push_back(make_index_id(id.value, current_id()));
+    m_id_stack.push_back(make_im_index_id(id.value, hash_parent()));
 }
 
 void ImContext::pop_id()
@@ -122,7 +134,7 @@ void ImContext::pop_id()
     m_id_stack.pop_back();
 }
 
-ItemState ImContext::item(Id id, const Rect& rect)
+ItemState ImContext::item(ImId id, const Rect& rect)
 {
     require_frame("item");
     if (!is_valid(id))
@@ -169,7 +181,7 @@ ItemState ImContext::item(Id id, const Rect& rect)
     return state;
 }
 
-ItemState ImContext::item(Id id)
+ItemState ImContext::item(ImId id)
 {
     Rect rect;
     std::ignore = layout_rect(id, rect);
@@ -182,7 +194,7 @@ uint32_t ImContext::begin_box(std::string_view label, const LayoutStyle& style)
     return m_layout.begin_box(id(label), style, m_arena.store(label));
 }
 
-uint32_t ImContext::begin_box(Id id, const LayoutStyle& style)
+uint32_t ImContext::begin_box(ImId id, const LayoutStyle& style)
 {
     require_frame("begin_box");
     return m_layout.begin_box(id, style);
@@ -194,7 +206,7 @@ void ImContext::end_box()
     m_layout.end_box();
 }
 
-bool ImContext::previous_rect(Id id, Rect& out) const
+bool ImContext::previous_rect(ImId id, Rect& out) const
 {
     const ItemMemory* memory = m_memory.find(id);
     if (memory == nullptr)

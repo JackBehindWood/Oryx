@@ -14,9 +14,9 @@ UiContext& active()
 
 } // namespace
 
-Id id(std::string_view label)
+UiId id(std::string_view label)
 {
-    return active().id(label);
+    return UiId(active().id(label));
 }
 
 void push_id(std::string_view label)
@@ -29,9 +29,9 @@ void pop_id()
     active().pop_id();
 }
 
-ItemState item(Id id, const Rect& rect)
+ItemState item(UiId id, const Rect& rect)
 {
-    return active().item(id, rect);
+    return active().item(id.im(), rect);
 }
 
 float spacing()

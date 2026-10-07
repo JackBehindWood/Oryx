@@ -1,5 +1,5 @@
 #include "oxpch.h"
-#include "Oryx/Interface/Canvas/Id.h"
+#include "Oryx/Interface/Canvas/ImId.h"
 
 namespace oryx
 {
@@ -7,24 +7,21 @@ namespace oryx
 namespace
 {
 
-constexpr uint64_t k_fnv_offset = 14695981039346656037ull;
-constexpr uint64_t k_fnv_prime = 1099511628211ull;
-
 uint64_t mix(uint64_t hash, uint8_t byte)
 {
-    return (hash ^ byte) * k_fnv_prime;
+    return (hash ^ byte) * k_im_fnv_prime;
 }
 
-Id finish(uint64_t hash)
+ImId finish(uint64_t hash)
 {
-    return { hash == 0 ? 1 : hash };
+    return { hash == k_none_id ? 1 : hash };
 }
 
 } // namespace
 
-Id make_id(std::string_view label, Id parent)
+ImId make_im_id(std::string_view label, ImId parent)
 {
-    uint64_t hash = k_fnv_offset;
+    uint64_t hash = k_im_fnv_offset;
     for (uint32_t shift = 0; shift < 64; shift += 8)
     {
         hash = mix(hash, static_cast<uint8_t>(parent.value >> shift));
@@ -36,9 +33,9 @@ Id make_id(std::string_view label, Id parent)
     return finish(hash);
 }
 
-Id make_index_id(uint64_t index, Id parent)
+ImId make_im_index_id(uint64_t index, ImId parent)
 {
-    uint64_t hash = k_fnv_offset ^ 0x9E3779B97F4A7C15ull;
+    uint64_t hash = k_im_fnv_offset ^ 0x9E3779B97F4A7C15ull;
     for (uint32_t shift = 0; shift < 64; shift += 8)
     {
         hash = mix(hash, static_cast<uint8_t>(parent.value >> shift));

@@ -26,9 +26,9 @@ LayoutStyle box_style(Sizing width, Sizing height, Direction direction = Directi
     return style;
 }
 
-Id named(const char* label)
+ImId named(const char* label)
 {
-    return make_id(label);
+    return make_im_id(label);
 }
 
 void solve(LayoutTree& tree, float width, float height, uint64_t frame = 1)
@@ -264,7 +264,7 @@ TEST_CASE("Layout: rects of boxes with an id are remembered and forgotten when t
     CHECK(tree.rect_of(named("root"), rect));
     CHECK_FALSE(tree.rect_of(named("other"), rect));
     tree.clear();
-    tree.begin_box(Id{}, box_style(fixed(10.0f), fixed(10.0f)));
+    tree.begin_box(ImId{}, box_style(fixed(10.0f), fixed(10.0f)));
     tree.end_box();
     solve(tree, 100.0f, 100.0f, 2);
     CHECK_FALSE(tree.rect_of(named("root"), rect));
@@ -352,7 +352,7 @@ TEST_CASE("Layout: a warm tree solves and paints without allocating")
         tree.begin_box(named("root"), box_style(grow(), grow()));
         for (uint32_t i = 0; i < 20; ++i)
         {
-            const uint32_t index = tree.leaf(make_index_id(i, named("root")), box_style(grow(), fixed(10.0f)));
+            const uint32_t index = tree.leaf(make_im_index_id(i, named("root")), box_style(grow(), fixed(10.0f)));
             tree.node(index).paint.has_fill = true;
         }
         tree.end_box();
@@ -384,7 +384,7 @@ ImInput press_at(float x, float y, bool pressed)
     return input;
 }
 
-ItemState button_frame(TestContext& context, const ImInput& input, Id& id)
+ItemState button_frame(TestContext& context, const ImInput& input, ImId& id)
 {
     context.begin_frame(input);
     context.begin_box("root", box_style(grow(), grow()));
@@ -402,7 +402,7 @@ ItemState button_frame(TestContext& context, const ImInput& input, Id& id)
 TEST_CASE("ImContext layout: hit-testing uses last frame's solved rect, so the first frame has no hit")
 {
     TestContext context;
-    Id id;
+    ImId id;
     CHECK_FALSE(button_frame(context, press_at(10.0f, 10.0f, true), id).hovered);
     ItemState second = button_frame(context, press_at(10.0f, 10.0f, true), id);
     CHECK(second.hovered);

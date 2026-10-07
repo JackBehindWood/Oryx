@@ -18,25 +18,25 @@ struct SecondContext : ImContext
 
 } // namespace
 
-TEST_CASE("Id: stable, scoped by parent and never none")
+TEST_CASE("ImId: stable, scoped by parent and never none")
 {
-    CHECK(make_id("ok") == make_id("ok"));
-    CHECK(make_id("ok") != make_id("no"));
-    const Id panel = make_id("panel");
-    CHECK(make_id("ok", panel) != make_id("ok"));
-    CHECK(make_id("ok", panel) == make_id("ok", panel));
-    CHECK(make_index_id(3, panel) == make_index_id(3, panel));
-    CHECK(make_index_id(3, panel) != make_index_id(4, panel));
-    CHECK(make_index_id(3, panel) != make_index_id(3));
-    CHECK(is_valid(make_id("")));
-    CHECK_FALSE(is_valid(Id{}));
+    CHECK(make_im_id("ok") == make_im_id("ok"));
+    CHECK(make_im_id("ok") != make_im_id("no"));
+    const ImId panel = make_im_id("panel");
+    CHECK(make_im_id("ok", panel) != make_im_id("ok"));
+    CHECK(make_im_id("ok", panel) == make_im_id("ok", panel));
+    CHECK(make_im_index_id(3, panel) == make_im_index_id(3, panel));
+    CHECK(make_im_index_id(3, panel) != make_im_index_id(4, panel));
+    CHECK(make_im_index_id(3, panel) != make_im_index_id(3));
+    CHECK(is_valid(make_im_id("")));
+    CHECK_FALSE(is_valid(ImId{}));
 }
 
 TEST_CASE("StateTable: entries persist while used and are collected when not")
 {
     StateTable<int32_t> table;
-    const Id a = make_id("a");
-    const Id b = make_id("b");
+    const ImId a = make_im_id("a");
+    const ImId b = make_im_id("b");
     table.get(a, 1) = 10;
     table.get(b, 1) = 20;
     table.collect(1);
@@ -55,18 +55,18 @@ TEST_CASE("StateTable: a warm table allocates nothing")
     StateTable<int32_t> table;
     for (uint32_t i = 0; i < 50; ++i)
     {
-        table.get(make_index_id(i), 1);
+        table.get(make_im_index_id(i), 1);
     }
     table.collect(2);
     for (uint32_t i = 0; i < 50; ++i)
     {
-        table.get(make_index_id(i), 2);
+        table.get(make_im_index_id(i), 2);
     }
     MemoryStats before = test::all_allocations();
     table.collect(3);
     for (uint32_t i = 0; i < 50; ++i)
     {
-        table.get(make_index_id(i), 3);
+        table.get(make_im_index_id(i), 3);
     }
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
@@ -114,7 +114,7 @@ TEST_CASE("ImTheme: variants resolve by name, fall back to the base and replace"
     primary.accent = { 1.0f, 0.0f, 0.0f, 1.0f };
     add_style_variant(theme, "primary", primary);
     CHECK(style_for(theme, "primary").accent == primary.accent);
-    CHECK(style_for(theme, make_id("primary")).accent == primary.accent);
+    CHECK(style_for(theme, make_im_id("primary")).accent == primary.accent);
     CHECK(style_for(theme, "missing").accent == theme.base.accent);
     primary.accent = { 0.0f, 1.0f, 0.0f, 1.0f };
     add_style_variant(theme, "primary", primary);

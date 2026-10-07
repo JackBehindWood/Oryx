@@ -96,7 +96,7 @@ void build_overlay(UiContext& ui, const BoardScene& scene, const BoardOverlayTex
     {
         const std::string& label = scene.options[index].label;
         ui.push_id(ui.index_id(index));
-        const Id id = ui.id(label);
+        const ImId id = ui.id(label);
         const bool clicked = ui::button(label, button_options).clicked;
         ui.pop_id();
         out.buttons.push_back({ id, {} });
@@ -148,7 +148,7 @@ void run_board_overlay(UiContext& ui, const BoardInput& input, double delta_time
         throw;
     }
 
-    if (!ui.layout_rect(make_id("board"), out.board))
+    if (!ui.layout_rect(make_im_id("board"), out.board))
     {
         out.board = {};
     }

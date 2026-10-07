@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Interface/Canvas/Id.h"
+#include "Oryx/Interface/Canvas/ImId.h"
 
 namespace oryx
 {
@@ -12,7 +12,7 @@ class StateTable
 {
 public:
     // The entry for `id`, created default-initialised if absent, marked as used in `frame`.
-    T& get(Id id, uint64_t frame)
+    T& get(ImId id, uint64_t frame)
     {
         auto at = std::lower_bound(m_entries.begin(), m_entries.end(), id.value, [](const Entry& entry, uint64_t value) { return entry.id < value; });
         if (at == m_entries.end() || at->id != id.value)
@@ -24,14 +24,14 @@ public:
     }
 
     // Null when absent. Does not mark the entry used.
-    [[nodiscard]] const T* find(Id id) const
+    [[nodiscard]] const T* find(ImId id) const
     {
         auto at = std::lower_bound(m_entries.begin(), m_entries.end(), id.value, [](const Entry& entry, uint64_t value) { return entry.id < value; });
         return at != m_entries.end() && at->id == id.value ? &at->value : nullptr;
     }
 
     // Null when absent. Does not mark the entry used.
-    [[nodiscard]] T* find_mut(Id id)
+    [[nodiscard]] T* find_mut(ImId id)
     {
         return const_cast<T*>(std::as_const(*this).find(id));
     }
