@@ -62,6 +62,30 @@ ItemState interactive_box(ImContext& context, std::string_view text, const Widge
     return state;
 }
 
+LayoutStyle stack_style(Direction direction, const RowOptions& options)
+{
+    LayoutStyle box;
+    box.width = options.width;
+    box.height = options.height;
+    box.direction = direction;
+    box.padding = options.padding;
+    box.gap = options.gap;
+    (direction == Direction::Row ? box.align_y : box.align_x) = options.align;
+    return box;
+}
+
+void begin_stack(ImContext& context, std::string_view name, Direction direction, const RowOptions& options)
+{
+    context.begin_box(name, stack_style(direction, options));
+    context.push_id(name);
+}
+
+void end_stack(ImContext& context)
+{
+    context.pop_id();
+    context.end_box();
+}
+
 } // namespace
 
 void label(ImContext& context, std::string_view text, const WidgetOptions& options)
@@ -113,6 +137,57 @@ void begin_panel(ImContext& context, std::string_view name, const WidgetOptions&
 void end_panel(ImContext& context)
 {
     context.pop_id();
+    context.end_box();
+}
+
+void begin_row(ImContext& context, std::string_view name, const RowOptions& options)
+{
+    begin_stack(context, name, Direction::Row, options);
+}
+
+void end_row(ImContext& context)
+{
+    end_stack(context);
+}
+
+void begin_column(ImContext& context, std::string_view name, const RowOptions& options)
+{
+    begin_stack(context, name, Direction::Column, options);
+}
+
+void end_column(ImContext& context)
+{
+    end_stack(context);
+}
+
+void spacer(ImContext& context, float weight)
+{
+    LayoutStyle box;
+    box.width = grow(weight);
+    box.height = grow(weight);
+    context.begin_box(ImId{}, box);
+    context.end_box();
+}
+
+void separator(ImContext& context, const WidgetOptions& options)
+{
+    const ImStyle& style = resolve_style(context, options);
+    LayoutStyle box;
+    if (options.layout != nullptr)
+    {
+        box = *options.layout;
+    }
+    else
+    {
+        const bool across_column = context.layout().open_depth() == 0 || context.layout().current().style.direction == Direction::Column;
+        const float thickness = std::max(style.border_width, 1.0f);
+        box.width = across_column ? grow() : fixed(thickness);
+        box.height = across_column ? fixed(thickness) : grow();
+    }
+    const uint32_t index = context.begin_box(ImId{}, box);
+    BoxPaint& paint = context.layout().node(index).paint;
+    paint.has_fill = true;
+    paint.fill = style.border;
     context.end_box();
 }
 

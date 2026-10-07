@@ -87,7 +87,7 @@ public:
     // Throws Error outside a frame, for the none id, or when the id was already used this frame.
     ItemState item(ImId id, const Rect& rect);
 
-    // Same, with the hit area the item's box had in the latest solve (so last frame's while this one is being built); no hit on the first frame.
+    // Same, with the hit area the item's box had in the latest solve (so last frame's while this one is being built), cut by the Clip/Scroll boxes around it; no hit on the first frame.
     ItemState item(ImId id);
 
     // Boxes nest like ids: end_frame solves them inside `ImInput::surface_size` and paints them into the draw list. The label makes the id under the current scope.
@@ -102,6 +102,9 @@ public:
 
     // The rect the item had last frame; false when it was not there.
     [[nodiscard]] bool previous_rect(ImId id, Rect& out) const;
+
+    // The topmost item (the last one submitted) whose hit area held the point in the latest finished frame; the none id when there is none. Valid inside a frame too, where it still answers from the frame before.
+    [[nodiscard]] ImId item_at(const Vec2f& point) const;
 
     [[nodiscard]] ImId hot() const { return m_hot; }
     [[nodiscard]] ImId active() const { return m_active; }
@@ -127,6 +130,7 @@ protected:
 
 private:
     void require_frame(const char* what) const;
+    ItemState item_clipped(ImId id, const Rect& rect, const Rect& layout_clip);
     [[nodiscard]] ImId hash_parent() const { return m_id_stack.empty() ? ImId{ m_id_seed } : m_id_stack.back(); }
     void solve_layout();
 
@@ -137,7 +141,14 @@ private:
     FrameArena m_arena;
     StateTable<ItemMemory> m_memory;
     std::vector<ImId> m_id_stack;
-    std::vector<uint64_t> m_frame_items;
+    struct ItemHit
+    {
+        ImId id;
+        Rect area;
+    };
+
+    std::vector<ItemHit> m_hits;
+    std::vector<ItemHit> m_last_hits;
     ImId m_hot;
     ImId m_active;
     ImId m_focus;

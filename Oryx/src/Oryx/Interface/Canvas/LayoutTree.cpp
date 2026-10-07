@@ -226,6 +226,11 @@ void dump_node(const LayoutTree& tree, uint32_t index, uint32_t depth, std::stri
     {
         out += " clip";
     }
+    else if (node.style.overflow == Overflow::Scroll)
+    {
+        snprintf_c(buffer, sizeof(buffer), " scroll(%.2f %.2f of %.2f %.2f)", node.style.scroll_offset[0], node.style.scroll_offset[1], node.content_size[0], node.content_size[1]);
+        out += buffer;
+    }
     if (!node.paint.text.empty())
     {
         out += " text=\"";
@@ -273,7 +278,7 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
     {
         pass.painter->text(inset(node.rect, node.style.padding), paint.text, { paint.text_height, paint.text_colour, paint.text_align, paint.ellipsis });
     }
-    const bool clips = node.style.overflow == Overflow::Clip;
+    const bool clips = node.style.overflow != Overflow::Visible;
     if (clips)
     {
         pass.list.push_clip(node.rect);
@@ -350,12 +355,34 @@ LayoutNode& LayoutTree::current()
 
 bool LayoutTree::rect_of(ImId id, Rect& out) const
 {
-    const Rect* found = m_rects.find(id);
+    const Placement* found = m_placements.find(id);
     if (found == nullptr)
     {
         return false;
     }
-    out = *found;
+    out = found->rect;
+    return true;
+}
+
+bool LayoutTree::clip_of(ImId id, Rect& out) const
+{
+    const Placement* found = m_placements.find(id);
+    if (found == nullptr)
+    {
+        return false;
+    }
+    out = found->clip;
+    return true;
+}
+
+bool LayoutTree::content_size_of(ImId id, Vec2f& out) const
+{
+    const Placement* found = m_placements.find(id);
+    if (found == nullptr)
+    {
+        return false;
+    }
+    out = found->content_size;
     return true;
 }
 
@@ -435,14 +462,21 @@ void LayoutTree::solve(const Rect& viewport, const TextMeasure& measure, uint64_
         }
     }
 
-    for (const LayoutNode& node : m_nodes)
+    // Parents precede their children in the vector, so one forward pass hands every box its ancestors' clip.
+    for (LayoutNode& node : m_nodes)
     {
+        node.clip = unbounded_rect();
+        if (node.parent >= 0)
+        {
+            const LayoutNode& parent = m_nodes[static_cast<uint32_t>(node.parent)];
+            node.clip = parent.style.overflow == Overflow::Visible ? parent.clip : intersect(parent.clip, parent.rect);
+        }
         if (is_valid(node.id))
         {
-            m_rects.get(node.id, frame) = node.rect;
+            m_placements.get(node.id, frame) = { node.rect, node.clip, node.content_size };
         }
     }
-    m_rects.collect(frame);
+    m_placements.collect(frame);
 }
 
 void LayoutTree::arrange(uint32_t index)
@@ -477,6 +511,7 @@ void LayoutTree::arrange(uint32_t index)
             node.size[axis_cross] = clamp_to(cross, inner_size[axis_cross]);
         }
     }
+    parent.content_size = { 0.0f, 0.0f };
     if (children == 0)
     {
         return;
@@ -488,9 +523,13 @@ void LayoutTree::arrange(uint32_t index)
     {
         used += in_flow(m_nodes[static_cast<uint32_t>(child)]) ? m_nodes[static_cast<uint32_t>(child)].size[axis_main] : 0.0f;
     }
+    const bool scrolls = parent.style.overflow == Overflow::Scroll;
     if (used > inner_size[axis_main] + k_epsilon)
     {
-        compress(*this, parent, axis_main, used - inner_size[axis_main]);
+        if (!scrolls)
+        {
+            compress(*this, parent, axis_main, used - inner_size[axis_main]);
+        }
     }
     else if (used < inner_size[axis_main] - k_epsilon)
     {
@@ -519,6 +558,14 @@ void LayoutTree::arrange(uint32_t index)
         Vec2f position = inner_min;
         position[axis_main] += cursor;
         position[axis_cross] += aligned_offset(align_on(parent, axis_cross), inner_size[axis_cross] - node.size[axis_cross]);
+        if (scrolls)
+        {
+            for (uint32_t axis = 0; axis < 2; ++axis)
+            {
+                parent.content_size[axis] = std::max(parent.content_size[axis], position[axis] - inner_min[axis] + node.size[axis]);
+            }
+            position = position - parent.style.scroll_offset;
+        }
         node.rect = { position, node.size };
         cursor += node.size[axis_main] + parent.style.gap;
         arrange(static_cast<uint32_t>(child));

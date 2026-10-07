@@ -64,6 +64,36 @@ void end_panel()
     im::end_panel(active());
 }
 
+void begin_row(std::string_view name, const RowOptions& options)
+{
+    im::begin_row(active(), name, options);
+}
+
+void end_row()
+{
+    im::end_row(active());
+}
+
+void begin_column(std::string_view name, const RowOptions& options)
+{
+    im::begin_column(active(), name, options);
+}
+
+void end_column()
+{
+    im::end_column(active());
+}
+
+void spacer(float weight)
+{
+    im::spacer(active(), weight);
+}
+
+void separator(const WidgetOptions& options)
+{
+    im::separator(active(), options);
+}
+
 void status_line(std::string_view text, const StatusOptions& options)
 {
     UiContext& context = active();

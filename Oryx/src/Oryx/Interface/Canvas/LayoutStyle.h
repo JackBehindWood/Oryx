@@ -46,7 +46,9 @@ enum class Align : uint8_t
 enum class Overflow : uint8_t
 {
     Visible,
-    Clip
+    Clip,
+    // Clips like Clip and shifts in-flow children by -scroll_offset; children keep their natural size on the main axis instead of compressing.
+    Scroll
 };
 
 enum class AttachPoint : uint8_t
@@ -95,6 +97,8 @@ struct LayoutStyle
     // Width over height; derives the missing axis, or fits inside two flexible axes.
     float aspect_ratio = 0.0f;
     Overflow overflow = Overflow::Visible;
+    // Pixels the content is scrolled by; only read when overflow is Scroll, clamped by the widget from last frame's content_size_of.
+    Vec2f scroll_offset{ 0.0f, 0.0f };
     // Z-order channel of the box's own paint; zero inherits the parent's.
     uint32_t channel = 0;
     Floating floating;

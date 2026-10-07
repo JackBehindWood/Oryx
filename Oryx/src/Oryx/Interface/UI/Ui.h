@@ -8,6 +8,7 @@
 namespace oryx::ui
 {
 
+using im::RowOptions;
 using im::StatusOptions;
 using im::WidgetOptions;
 
@@ -24,6 +25,12 @@ void label(std::string_view text, const WidgetOptions& options = {});
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options = {});
 void begin_panel(std::string_view name, const WidgetOptions& options = {});
 void end_panel();
+void begin_row(std::string_view name, const RowOptions& options = {});
+void end_row();
+void begin_column(std::string_view name, const RowOptions& options = {});
+void end_column();
+void spacer(float weight = 1.0f);
+void separator(const WidgetOptions& options = {});
 // Uses the theme's status style unless the options name another.
 void status_line(std::string_view text, const StatusOptions& options = {});
 
@@ -41,6 +48,26 @@ public:
 
     BoxScope(const BoxScope&) = delete;
     BoxScope& operator=(const BoxScope&) = delete;
+};
+
+class RowScope
+{
+public:
+    explicit RowScope(std::string_view name, const RowOptions& options = {}) { begin_row(name, options); }
+    ~RowScope() { end_row(); }
+
+    RowScope(const RowScope&) = delete;
+    RowScope& operator=(const RowScope&) = delete;
+};
+
+class ColumnScope
+{
+public:
+    explicit ColumnScope(std::string_view name, const RowOptions& options = {}) { begin_column(name, options); }
+    ~ColumnScope() { end_column(); }
+
+    ColumnScope(const ColumnScope&) = delete;
+    ColumnScope& operator=(const ColumnScope&) = delete;
 };
 
 class PanelScope

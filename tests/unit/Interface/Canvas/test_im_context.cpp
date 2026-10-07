@@ -326,3 +326,100 @@ TEST_CASE("ImContext: a warm frame with items allocates nothing")
     frame();
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("ImContext: an item scrolled out of its Scroll box is never hovered")
+{
+    TestContext context;
+    const ImId inside = make_im_id("inside");
+    const ImId outside = make_im_id("outside");
+    ImInput input = pointer_at(10.0f, 70.0f);
+    input.surface_size = { 200.0f, 200.0f };
+    ItemState state_inside;
+    ItemState state_outside;
+    for (uint32_t frame = 0; frame < 3; ++frame)
+    {
+        context.begin_frame(input);
+        LayoutStyle scroll;
+        scroll.width = fixed(100.0f);
+        scroll.height = fixed(50.0f);
+        scroll.direction = Direction::Column;
+        scroll.overflow = Overflow::Scroll;
+        context.begin_box("scroll", scroll);
+        LayoutStyle row;
+        row.width = grow();
+        row.height = fixed(40.0f);
+        context.begin_box(inside, row);
+        context.end_box();
+        context.begin_box(outside, row);
+        context.end_box();
+        context.end_box();
+        state_inside = context.item(inside);
+        state_outside = context.item(outside);
+        context.end_frame();
+    }
+    CHECK_FALSE(state_outside.hovered);
+    CHECK_FALSE(state_inside.hovered);
+    input = pointer_at(10.0f, 20.0f);
+    input.surface_size = { 200.0f, 200.0f };
+    context.begin_frame(input);
+    CHECK(context.item(inside).hovered);
+    context.end_frame();
+}
+
+TEST_CASE("ImContext: a repeated item id in one frame is still rejected")
+{
+    TestContext context;
+    context.begin_frame(ImInput{});
+    std::ignore = context.item(make_im_id("dup"), k_button);
+    CHECK_THROWS_AS(std::ignore = context.item(make_im_id("dup"), k_other), Error);
+    context.abort_frame();
+    context.begin_frame(ImInput{});
+    CHECK_NOTHROW(std::ignore = context.item(make_im_id("dup"), k_button));
+    context.end_frame();
+}
+
+TEST_CASE("ImContext: item_at answers with the topmost item of the last frame, respecting clip and min hit size")
+{
+    TestContext context;
+    ImTheme theme;
+    theme.min_hit_size = 0.0f;
+    context.set_theme(theme);
+    const ImId under = make_im_id("under");
+    const ImId over = make_im_id("over");
+    const ImId clipped = make_im_id("clipped");
+    const auto build = [&] {
+        std::ignore = context.item(under, { { 0.0f, 0.0f }, { 100.0f, 100.0f } });
+        std::ignore = context.item(over, { { 20.0f, 20.0f }, { 20.0f, 20.0f } });
+        context.draw_list().push_clip({ { 60.0f, 60.0f }, { 10.0f, 10.0f } });
+        std::ignore = context.item(clipped, { { 50.0f, 50.0f }, { 50.0f, 50.0f } });
+        context.draw_list().pop_clip();
+    };
+    context.begin_frame(ImInput{});
+    CHECK_FALSE(is_valid(context.item_at({ 30.0f, 30.0f })));
+    build();
+    CHECK_FALSE(is_valid(context.item_at({ 30.0f, 30.0f })));
+    context.end_frame();
+    CHECK(context.item_at({ 30.0f, 30.0f }) == over);
+    CHECK(context.item_at({ 10.0f, 10.0f }) == under);
+    CHECK(context.item_at({ 65.0f, 65.0f }) == clipped);
+    CHECK(context.item_at({ 90.0f, 90.0f }) == under);
+    CHECK_FALSE(is_valid(context.item_at({ 200.0f, 200.0f })));
+
+    context.begin_frame(ImInput{});
+    CHECK(context.item_at({ 30.0f, 30.0f }) == over);
+    context.end_frame();
+}
+
+TEST_CASE("ImContext: item_at grows tiny items to the minimum hit size")
+{
+    TestContext context;
+    ImTheme theme;
+    theme.min_hit_size = 28.0f;
+    context.set_theme(theme);
+    const ImId tiny = make_im_id("tiny");
+    context.begin_frame(ImInput{});
+    std::ignore = context.item(tiny, { { 90.0f, 90.0f }, { 4.0f, 4.0f } });
+    context.end_frame();
+    CHECK(context.item_at({ 100.0f, 100.0f }) == tiny);
+    CHECK_FALSE(is_valid(context.item_at({ 60.0f, 60.0f })));
+}

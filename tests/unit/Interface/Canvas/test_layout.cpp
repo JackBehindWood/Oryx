@@ -440,3 +440,96 @@ TEST_CASE("ImContext layout: end_frame paints the boxes and dump_layout names th
     CHECK(dump_layout(context).starts_with("panel [0.00 0.00 50.00 20.00]"));
     CHECK(context.stats().boxes == 1);
 }
+
+namespace
+{
+
+LayoutStyle scroll_region(Sizing width, Sizing height, Vec2f offset = { 0.0f, 0.0f })
+{
+    LayoutStyle style = box_style(width, height, Direction::Column);
+    style.overflow = Overflow::Scroll;
+    style.scroll_offset = offset;
+    return style;
+}
+
+void rows_in_scroll(LayoutTree& tree, Vec2f offset, uint32_t rows = 5)
+{
+    tree.begin_box(named("root"), box_style(grow(), grow()));
+    tree.begin_box(named("scroll"), scroll_region(fixed(100.0f), fixed(50.0f), offset));
+    for (uint32_t index = 0; index < rows; ++index)
+    {
+        tree.leaf(make_im_index_id(index, named("scroll")), box_style(grow(), fit(20.0f)));
+    }
+    tree.end_box();
+    tree.end_box();
+}
+
+Rect row_rect(const LayoutTree& tree, uint32_t index)
+{
+    Rect rect;
+    REQUIRE(tree.rect_of(make_im_index_id(index, named("scroll")), rect));
+    return rect;
+}
+
+} // namespace
+
+TEST_CASE("Layout: a scroll box keeps its content size, shifts children by the offset and clips them")
+{
+    LayoutTree tree;
+    rows_in_scroll(tree, { 0.0f, 30.0f });
+    solve(tree, 300.0f, 200.0f);
+    Vec2f content;
+    REQUIRE(tree.content_size_of(named("scroll"), content));
+    CHECK(content == Vec2f(100.0f, 100.0f));
+    CHECK(row_rect(tree, 0) == Rect{ { 0.0f, -30.0f }, { 100.0f, 20.0f } });
+    CHECK(row_rect(tree, 2) == Rect{ { 0.0f, 10.0f }, { 100.0f, 20.0f } });
+    Rect clip;
+    REQUIRE(tree.clip_of(make_im_index_id(0, named("scroll")), clip));
+    CHECK(clip == rect_named(tree, "scroll"));
+    REQUIRE(tree.clip_of(named("scroll"), clip));
+    CHECK(clip == unbounded_rect());
+}
+
+TEST_CASE("Layout: a scroll box does not compress its children on the main axis")
+{
+    LayoutTree tree;
+    rows_in_scroll(tree, { 0.0f, 0.0f }, 10);
+    solve(tree, 300.0f, 200.0f);
+    CHECK(row_rect(tree, 9).size[1] == 20.0f);
+    Vec2f content;
+    REQUIRE(tree.content_size_of(named("scroll"), content));
+    CHECK(content[1] == 200.0f);
+}
+
+TEST_CASE("Layout: scroll shift and the golden dump are deterministic")
+{
+    LayoutTree tree;
+    rows_in_scroll(tree, { 0.0f, 30.0f }, 3);
+    solve(tree, 300.0f, 200.0f);
+    const std::string first = dump_layout(tree);
+    CHECK(first.find("scroll(0.00 30.00 of 100.00 60.00)") != std::string::npos);
+    tree.clear();
+    rows_in_scroll(tree, { 0.0f, 30.0f }, 3);
+    solve(tree, 300.0f, 200.0f, 2);
+    CHECK(dump_layout(tree) == first);
+}
+
+TEST_CASE("Layout: a floating box attached to a scrolled element follows it, one attached to the scroll box stays")
+{
+    LayoutTree tree;
+    tree.begin_box(named("root"), box_style(grow(), grow()));
+    tree.begin_box(named("scroll"), scroll_region(fixed(100.0f), fixed(50.0f), { 0.0f, 20.0f }));
+    tree.leaf(named("row0"), box_style(grow(), fixed(20.0f)));
+    tree.leaf(named("row1"), box_style(grow(), fixed(20.0f)));
+    tree.end_box();
+    LayoutStyle follows = box_style(fixed(10.0f), fixed(10.0f));
+    follows.floating = { true, AttachPoint::TopLeft, AttachPoint::TopLeft, FloatTarget::Element, named("row1"), {} };
+    tree.leaf(named("follows"), follows);
+    LayoutStyle stays = box_style(fixed(10.0f), fixed(10.0f));
+    stays.floating = { true, AttachPoint::TopRight, AttachPoint::TopRight, FloatTarget::Element, named("scroll"), {} };
+    tree.leaf(named("stays"), stays);
+    tree.end_box();
+    solve(tree, 300.0f, 200.0f);
+    CHECK(rect_named(tree, "follows").min == Vec2f(0.0f, 0.0f));
+    CHECK(rect_named(tree, "stays").min == Vec2f(90.0f, 0.0f));
+}

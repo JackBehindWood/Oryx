@@ -136,8 +136,7 @@ Rect DrawList::current_clip() const
 {
     if (m_clip_stack.empty())
     {
-        const float limit = std::numeric_limits<float>::max() * 0.25f;
-        return { Vec2f(-limit * 0.5f, -limit * 0.5f), Vec2f(limit, limit) };
+        return unbounded_rect();
     }
     return m_clips[m_clip_stack.back()];
 }

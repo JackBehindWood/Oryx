@@ -36,7 +36,7 @@ Four modules, in dependency order (the first three are folders of one group, `In
 2. Style is global and enum-indexed -> `Theme` struct plus per-widget `Style` overrides.
 3. Custom widgets need internals -> a public item/behaviour API our own widgets use.
 4. Layout cannot know sizes before emitting -> `UI/` layout has measure/arrange; retained size cache gives scroll extents without a one-frame lag where content size is known.
-5. Id collisions via label strings -> typed `Id`, explicit scopes, an always-on duplicate-id check (a sorted per-frame list, cheap at this size).
+5. Id collisions via label strings -> typed ids (`ImId` in the shared layer, distinct `UiId`/`GuiId` built from `TypedId<Tag>`, a pinned FNV-1a hash, a per-context salt), explicit scopes, an always-on duplicate-id check (one comparison against the item's last-seen frame, no per-frame list).
 6. Layout persistence is string-keyed ini -> versioned typed layout record.
 7. Platform/draw coupling -> draws only through `Painter`/`BatchRenderer2D`, tested on `NullRHI`.
 

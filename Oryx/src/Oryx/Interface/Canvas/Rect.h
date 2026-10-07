@@ -44,6 +44,8 @@ struct CornerRadius
 [[nodiscard]] bool contains(const Rect& rect, const Vec2f& point);
 // An empty result keeps the overlap's min and a zero size.
 [[nodiscard]] Rect intersect(const Rect& a, const Rect& b);
+// A rect that contains every point a UI can reach; what "no clip" intersects with.
+[[nodiscard]] Rect unbounded_rect();
 [[nodiscard]] bool overlaps(const Rect& a, const Rect& b);
 // Shrinks by the insets; the size never goes negative.
 [[nodiscard]] Rect inset(const Rect& rect, const Insets& insets);

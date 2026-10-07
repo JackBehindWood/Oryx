@@ -36,6 +36,10 @@ struct LayoutNode
     int32_t next = -1;
     Vec2f size{ 0.0f, 0.0f };
     Rect rect;
+    // Where the ancestors' Clip/Scroll boxes cut this box; unbounded when none do.
+    Rect clip;
+    // Extent of the in-flow children inside the padding, before scrolling; only set for Scroll boxes.
+    Vec2f content_size{ 0.0f, 0.0f };
 };
 
 // Width of one line of text; a null `width` measures everything as zero (no font yet).
@@ -71,6 +75,9 @@ public:
 
     // The rect the box with this id had after the latest solve (so the previous frame's while the current frame is still being built); false when it was not there.
     [[nodiscard]] bool rect_of(ImId id, Rect& out) const;
+    // Same lookup for the clip the box sits in and, for a Scroll box, the extent of its content; false when the box was not there.
+    [[nodiscard]] bool clip_of(ImId id, Rect& out) const;
+    [[nodiscard]] bool content_size_of(ImId id, Vec2f& out) const;
 
     // Records fills, outlines, text and clips into the list, boxes with a channel on that channel. Text is skipped without a font.
     void paint(DrawList& list, Font* font, float scale) const;
@@ -81,7 +88,14 @@ private:
 
     std::vector<LayoutNode> m_nodes;
     std::vector<uint32_t> m_open;
-    StateTable<Rect> m_rects;
+    struct Placement
+    {
+        Rect rect;
+        Rect clip;
+        Vec2f content_size{ 0.0f, 0.0f };
+    };
+
+    StateTable<Placement> m_placements;
 };
 
 // One line per box in tree order, indented by depth, with fixed two-decimal numbers, for golden tests and debugging.

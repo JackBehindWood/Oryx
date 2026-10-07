@@ -28,7 +28,7 @@ void ImContext::begin_frame(const ImInput& input)
     m_draw.set_surface(input.surface);
     m_arena.reset();
     m_id_stack.clear();
-    m_frame_items.clear();
+    m_hits.clear();
     m_hot = {};
     m_items = 0;
     m_wheel_consumed = false;
@@ -70,6 +70,7 @@ void ImContext::end_frame()
         m_focus = {};
     }
     m_memory.collect(m_frame);
+    m_last_hits.swap(m_hits);
     m_open = false;
 }
 
@@ -79,6 +80,7 @@ void ImContext::abort_frame()
     m_layout.clear();
     m_id_stack.clear();
     m_active = {};
+    m_hits.clear();
     m_open = false;
 }
 
@@ -136,20 +138,23 @@ void ImContext::pop_id()
 
 ItemState ImContext::item(ImId id, const Rect& rect)
 {
+    return item_clipped(id, rect, unbounded_rect());
+}
+
+ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_clip)
+{
     require_frame("item");
     if (!is_valid(id))
     {
         throw Error("ImContext item needs a valid id");
     }
-    auto seen = std::lower_bound(m_frame_items.begin(), m_frame_items.end(), id.value);
-    if (seen != m_frame_items.end() && *seen == id.value)
+    ItemMemory& memory = m_memory.get(id, m_frame);
+    if (memory.seen_frame == m_frame)
     {
         throw Error("ImContext item id used twice in one frame", "push_id a scope or give the widget a distinct label");
     }
-    m_frame_items.insert(seen, id.value);
     ++m_items;
 
-    ItemMemory& memory = m_memory.get(id, m_frame);
     memory.has_previous = memory.seen_frame != 0 && memory.seen_frame + 1 == m_frame;
     memory.previous_rect = memory.rect;
     memory.seen_frame = m_frame;
@@ -157,7 +162,8 @@ ItemState ImContext::item(ImId id, const Rect& rect)
 
     ItemState state;
     const ImButton& left = button_of(m_input, MouseCode::Left);
-    const Rect hit = intersect(at_least(rect, Vec2f(m_theme.min_hit_size, m_theme.min_hit_size)), m_draw.current_clip());
+    const Rect hit = intersect(intersect(at_least(rect, Vec2f(m_theme.min_hit_size, m_theme.min_hit_size)), m_draw.current_clip()), layout_clip);
+    m_hits.push_back({ id, hit });
     const bool inside = m_input.pointer.valid && contains(hit, m_input.pointer.position);
     state.hovered = inside && (!is_valid(m_active) || m_active == id);
     if (state.hovered)
@@ -181,11 +187,25 @@ ItemState ImContext::item(ImId id, const Rect& rect)
     return state;
 }
 
+ImId ImContext::item_at(const Vec2f& point) const
+{
+    for (size_t index = m_last_hits.size(); index-- > 0;)
+    {
+        if (contains(m_last_hits[index].area, point))
+        {
+            return m_last_hits[index].id;
+        }
+    }
+    return {};
+}
+
 ItemState ImContext::item(ImId id)
 {
     Rect rect;
+    Rect clip = unbounded_rect();
     std::ignore = layout_rect(id, rect);
-    return item(id, rect);
+    std::ignore = m_layout.clip_of(id, clip);
+    return item_clipped(id, rect, clip);
 }
 
 uint32_t ImContext::begin_box(std::string_view label, const LayoutStyle& style)

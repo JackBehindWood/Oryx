@@ -9,6 +9,11 @@ struct ImId
     // make_im_id never returns it.
     static constexpr uint64_t none = 0;
 
+    constexpr ImId() = default;
+    constexpr explicit ImId(uint64_t value)
+        : value(value)
+    {
+    }
     uint64_t value = none;
 };
 
@@ -33,6 +38,10 @@ public:
     uint64_t value = ImId::none;
 
     constexpr TypedId() = default;
+    constexpr explicit TypedId(uint64_t value)
+        : value(value)
+    {
+    }
     constexpr explicit TypedId(ImId id)
         : value(id.value)
     {

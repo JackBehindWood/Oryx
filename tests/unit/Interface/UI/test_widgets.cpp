@@ -272,3 +272,67 @@ TEST_CASE("UI: a warm frame of widgets allocates nothing")
     frame();
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("ui: row and column equal the hand-written boxes")
+{
+    UiFixture sugar;
+    sugar.frame(pointer(0.0f, 0.0f), [&] {
+        ui::RowOptions row;
+        row.gap = 6.0f;
+        row.padding = uniform_insets(4.0f);
+        row.align = Align::Centre;
+        row.height = fixed(40.0f);
+        ui::RowScope scope("row", row);
+        ui::label("a");
+        ui::spacer(2.0f);
+        ui::ColumnScope inner("col", { fixed(50.0f), fit(), {}, 2.0f, Align::End });
+        ui::label("b");
+    });
+
+    UiFixture manual;
+    manual.frame(pointer(0.0f, 0.0f), [&] {
+        LayoutStyle row;
+        row.direction = Direction::Row;
+        row.width = fit();
+        row.height = fixed(40.0f);
+        row.padding = uniform_insets(4.0f);
+        row.gap = 6.0f;
+        row.align_y = Align::Centre;
+        ui::BoxScope row_scope("row", row);
+        manual.context.push_id("row");
+        ui::label("a");
+        LayoutStyle spacer;
+        spacer.width = grow(2.0f);
+        spacer.height = grow(2.0f);
+        manual.context.begin_box(ImId{}, spacer);
+        manual.context.end_box();
+        LayoutStyle column;
+        column.direction = Direction::Column;
+        column.width = fixed(50.0f);
+        column.gap = 2.0f;
+        column.align_x = Align::End;
+        {
+            ui::BoxScope column_scope("col", column);
+            manual.context.push_id("col");
+            ui::label("b");
+            manual.context.pop_id();
+        }
+        manual.context.pop_id();
+    });
+    CHECK(dump_layout(sugar.context) == dump_layout(manual.context));
+    CHECK(dump(sugar.context.draw_list()) == dump(manual.context.draw_list()));
+}
+
+TEST_CASE("ui: a separator runs across a column and down a row")
+{
+    UiFixture fixture;
+    fixture.frame(pointer(0.0f, 0.0f), [&] {
+        ui::ColumnScope column("column", { fixed(80.0f), fit() });
+        ui::separator();
+        ui::RowScope row("row", { fit(), fixed(30.0f) });
+        ui::separator();
+    });
+    const std::string layout = dump_layout(fixture.context);
+    CHECK(layout.find("w=grow(1.00) h=fixed(1.00)") != std::string::npos);
+    CHECK(layout.find("w=fixed(1.00) h=grow(1.00)") != std::string::npos);
+}

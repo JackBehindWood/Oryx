@@ -23,6 +23,17 @@ struct StatusOptions : WidgetOptions
     float margin = -1.0f;
 };
 
+// Sugar over LayoutStyle for the common stacks; every form is expressible as a hand-written begin_box.
+struct RowOptions
+{
+    Sizing width = fit();
+    Sizing height = fit();
+    Insets padding;
+    float gap = 0.0f;
+    // Placement of the children across the stack's axis.
+    Align align = Align::Start;
+};
+
 // The widgets paint when the frame ends and answer from last frame's rects, so a widget that moved reacts one frame late. All throw Error outside a frame.
 // The label is the text shown and, under the current id scope, the identity; give repeated labels a scope.
 
@@ -36,6 +47,18 @@ bool toggle(ImContext& context, std::string_view text, bool& value, const Widget
 // A bordered, filled column that clips its children; close it with end_panel.
 void begin_panel(ImContext& context, std::string_view name, const WidgetOptions& options = {});
 void end_panel(ImContext& context);
+
+// A box with no paint whose children flow left to right (row) or top to bottom (column); close it with the matching end. The name scopes the children's ids.
+void begin_row(ImContext& context, std::string_view name, const RowOptions& options = {});
+void end_row(ImContext& context);
+void begin_column(ImContext& context, std::string_view name, const RowOptions& options = {});
+void end_column(ImContext& context);
+
+// Takes the leftover space of the stack it sits in, shared by weight.
+void spacer(ImContext& context, float weight = 1.0f);
+
+// A one-pixel-or-border-wide line across the stack it sits in, in the style's border colour.
+void separator(ImContext& context, const WidgetOptions& options = {});
 
 // One line of text floated against the whole surface.
 void status_line(ImContext& context, std::string_view text, const StatusOptions& options = {});
@@ -53,6 +76,40 @@ public:
 
     PanelScope(const PanelScope&) = delete;
     PanelScope& operator=(const PanelScope&) = delete;
+
+private:
+    ImContext& m_context;
+};
+
+class RowScope
+{
+public:
+    RowScope(ImContext& context, std::string_view name, const RowOptions& options = {})
+        : m_context(context)
+    {
+        begin_row(m_context, name, options);
+    }
+    ~RowScope() { end_row(m_context); }
+
+    RowScope(const RowScope&) = delete;
+    RowScope& operator=(const RowScope&) = delete;
+
+private:
+    ImContext& m_context;
+};
+
+class ColumnScope
+{
+public:
+    ColumnScope(ImContext& context, std::string_view name, const RowOptions& options = {})
+        : m_context(context)
+    {
+        begin_column(m_context, name, options);
+    }
+    ~ColumnScope() { end_column(m_context); }
+
+    ColumnScope(const ColumnScope&) = delete;
+    ColumnScope& operator=(const ColumnScope&) = delete;
 
 private:
     ImContext& m_context;

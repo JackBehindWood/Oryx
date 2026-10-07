@@ -18,6 +18,12 @@ Rect intersect(const Rect& a, const Rect& b)
     return { Vec2f(left, top), Vec2f(std::max(right - left, 0.0f), std::max(bottom - top, 0.0f)) };
 }
 
+Rect unbounded_rect()
+{
+    const float limit = std::numeric_limits<float>::max() * 0.25f;
+    return { Vec2f(-limit * 0.5f, -limit * 0.5f), Vec2f(limit, limit) };
+}
+
 bool overlaps(const Rect& a, const Rect& b)
 {
     return !is_empty(intersect(a, b));
