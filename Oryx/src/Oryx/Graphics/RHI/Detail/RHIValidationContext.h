@@ -41,6 +41,8 @@ public:
 
     [[nodiscard]] bool in_pass() const { return m_in_pass; }
     [[nodiscard]] uint32_t debug_depth() const { return m_debug_depth; }
+    // The open pass's attachment size; zero outside a pass.
+    [[nodiscard]] RHIScissorRect pass_extent() const { return { 0, 0, m_pass_width, m_pass_height }; }
     // The open debug groups, outermost first, joined with " > "; empty when none are open.
     [[nodiscard]] std::string breadcrumb_path() const;
 

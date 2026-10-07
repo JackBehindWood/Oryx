@@ -49,6 +49,7 @@ nav:
       - Observability: design/observability.md
       - Platform: design/platform.md
       - Graphics: design/graphics.md
+      - Dashboard: design/dashboard.md
       - Memory Allocator: design/memory-allocator.md
       - Decision Log: design/decision-log.md
   - Python:

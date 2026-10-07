@@ -452,6 +452,30 @@ TEST_CASE("RHICommandList validates viewport and scissor")
     CHECK_NOTHROW(f.list.set_scissor({ 0, 0, 4, 4 }));
     CHECK_THROWS_AS(f.list.set_scissor({ -1, 0, 2, 2 }), Error);
     CHECK_THROWS_AS(f.list.set_scissor({ 3, 0, 2, 2 }), Error);
+    CHECK_THROWS_AS(f.list.set_scissor({ 1, 1, 0, 2 }), Error);
+    CHECK_THROWS_AS(f.list.set_scissor({ 1, 1, 2, 0 }), Error);
+}
+
+TEST_CASE("RHICommandList clear_scissor records the full pass extent")
+{
+    CommandListFixture f;
+    CHECK_THROWS_AS(f.list.clear_scissor(), Error);
+    f.list.begin_pass(f.target.get());
+    f.list.set_scissor({ 1, 1, 2, 2 });
+    f.list.clear_scissor();
+    f.list.end_pass();
+    std::vector<const RHICommand*> commands;
+    for (const RHICommand& command : f.list)
+    {
+        commands.push_back(&command);
+    }
+    REQUIRE(commands.size() == 4);
+    const RHISetScissorCommand* last = command_cast<RHISetScissorCommand>(*commands[2]);
+    REQUIRE(last != nullptr);
+    CHECK(last->scissor().x == 0);
+    CHECK(last->scissor().y == 0);
+    CHECK(last->scissor().width == 4);
+    CHECK(last->scissor().height == 4);
 }
 
 TEST_CASE("RHICommandList validates pass descriptions")

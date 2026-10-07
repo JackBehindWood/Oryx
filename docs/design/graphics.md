@@ -175,7 +175,7 @@ Out of scope: ECS, scene graph, PBR, physics, audio, render graph, GUI toolkit, 
 - **No inheritance.** `SceneRenderer` does not derive from `BatchRenderer`: it is not a kind of accumulator, and inheriting would drag primitive state into view/stage logic. **Composition instead:** it owns a `BatchRenderer2D` today and gains a `BatchRenderer3D` and sibling emitters (e.g. a `MeshRenderer`) as stages are added; all write `DrawItem`s that `record_frame` records.
 - **One 2D path.** The static `Renderer::begin_scene/draw_*` forwarders were removed once `SceneRenderer` existed (Oasis never called them; only the board front end did). `scene().batcher_2d()` stays for direct use; `Renderer::submit(DrawItem)` and `StageContext::emit` are the direct-`DrawItem` paths.
 - **Batcher lifetime.** The scene owns its batchers and recycles them in `finish_frame`; there is no `RendererContext::batchers` list. A list returns only when a second owner outside the scene needs recycling. A batcher takes its sink and pass formats per scene through `BatchTarget`, so one batcher serves any pass.
-- **Seams Step 6 provides:** the sink is injected and the camera is a parameter; sorting and culling live outside the batcher; the camera base class carries 2D and 3D alike. Deferred until a consumer exists: a `DrawItem` sort key, a scissor rectangle on the batch key and `DrawItem` (needed by the Phase 11 dashboard), instanced quads, a custom-pipeline hook on a stream (SDF text, materials), and a `draw_sprite(AssetHandle<ImageAsset>)` overload (the `Application` owns no `AssetManager` yet).
+- **Seams Step 6 provides:** the sink is injected and the camera is a parameter; sorting and culling live outside the batcher; the camera base class carries 2D and 3D alike. Deferred until a consumer exists: a `DrawItem` sort key, instanced quads, a custom-pipeline hook on a stream (SDF text, materials), and a `draw_sprite(AssetHandle<ImageAsset>)` overload (the `Application` owns no `AssetManager` yet).
 
 ### Rendering architecture (Step 10, Session 7)
 
@@ -219,7 +219,7 @@ Game ─IBoardPresenter─► BoardView (per seat: pieces + shared layout, no ca
 | Later need | Where it plugs in |
 |---|---|
 | Step 7 bitmap text, `DebugRenderer` | glyphs are `draw_quad`/`draw_sprite` with the atlas texture; `DebugRenderer` records shapes the scene replays at the end of Scene2D |
-| Phase 11 clipped panels | scissor field on the batch key and `DrawItem` |
+| Phase 11 clipped panels | built in Phase 11 Step 1: scissor on `DrawItem`, `FlushReason::ScissorChange`, `BatchRenderer2D::push_clip`/`ClipScope` |
 | 3D lines, billboards | `BatchRenderer3D` registering streams, owned by the scene; a depth attachment on the routed pass |
 | SDF text, custom materials | one stream row plus a pipeline hook |
 | Step 9 Slang | none: streams name `PipelineDef`s, not shaders |

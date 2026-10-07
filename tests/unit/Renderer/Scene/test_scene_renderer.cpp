@@ -235,3 +235,44 @@ TEST_CASE("SceneRenderer submits and ends allocation-free once warm")
     MemoryStats delta = memory_delta(before, all_allocations());
     CHECK(delta.allocation_count == 0);
 }
+
+TEST_CASE("SceneRenderer resolves a clip against the framebuffer scale and records scissor only on change")
+{
+    RendererGuard guard;
+    NullRHI& rhi = static_cast<NullRHI&>(Renderer::rhi());
+    RHIViewportPtr viewport = rhi.create_viewport({ .width = 200, .height = 100 });
+    Renderer::set_viewport(viewport);
+    const Camera2D camera = Camera2D::screen_space(100.0f, 50.0f);
+    const RenderView view{ camera, { 100.0f, 50.0f }, { 200.0f, 100.0f }, 2.0f };
+    FnSource source([](RenderStage stage, StageContext& context)
+    {
+        if (stage != RenderStage::Scene2D)
+        {
+            return;
+        }
+        BatchRenderer2D& batcher = context.batcher_2d;
+        batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, WHITE);
+        {
+            ClipScope clip(batcher, { 25.0f, 10.0f }, { 50.0f, 20.0f });
+            batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, WHITE);
+        }
+        batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, WHITE);
+    });
+    Renderer::scene().render(view, source);
+
+    const std::vector<DrawItem>& items = Renderer::scene().pass(RENDER_PASS_MAIN).items;
+    REQUIRE(items.size() == 3);
+    REQUIRE(items[1].has_scissor);
+    CHECK(items[1].scissor.y == 60);
+    CHECK(items[1].scissor.width == 100);
+    CHECK(items[1].scissor.height == 40);
+
+    CHECK(Renderer::end_frame());
+    const std::vector<std::string_view> commands = rhi.last_submission();
+    CHECK(std::count(commands.begin(), commands.end(), std::string_view("SetScissor")) == 2);
+    CHECK(std::count(commands.begin(), commands.end(), std::string_view("Draw")) + std::count(commands.begin(), commands.end(), std::string_view("DrawIndexed")) == 3);
+
+    Renderer::scene().render(view, source);
+    CHECK(Renderer::end_frame());
+    Renderer::set_viewport({});
+}

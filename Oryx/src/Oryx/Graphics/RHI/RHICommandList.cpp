@@ -69,6 +69,11 @@ void RHICommandList::set_scissor(const RHIScissorRect& scissor)
     m_stream.emplace<RHISetScissorCommand>(scissor);
 }
 
+void RHICommandList::clear_scissor()
+{
+    set_scissor(m_validation.pass_extent());
+}
+
 void RHICommandList::set_vertex_buffer(uint32_t slot, RHIBuffer* buffer, uint32_t offset)
 {
     rhi_require_non_null(buffer, "set_vertex_buffer");

@@ -1,0 +1,129 @@
+# Dashboard (Phase 11)
+
+> **Status: Planned. Design agreed, nothing built yet.** The step-by-step tracker lives with the implementation plan; this page records the design and the reasons behind it.
+
+Phase 11 adds a live in-window Strategy Dashboard. This page covers the module layout, the UI and GUI systems it needs, the scissor/clipping work in the renderer, and the industry survey the choices come from. See also [Observability](observability.md) for the data it consumes and [Graphics](graphics.md) for the renderer it draws through.
+
+Phase 9 gave observability (`IDecisionObserver`, `Decision`, sinks); Phase 10 gave graphics (`SceneRenderer`, `RenderSource`, `DebugRenderer`, bitmap text, Oasis windowed boards). Phase 11 makes algorithm behaviour visible in a live in-window dashboard. It consumes only `Decision` data, is headless-testable through `NullRHI`, and costs nothing when detached.
+
+Four modules, in dependency order, each usable without the ones above it. `UI` and `GUI` are **two peer systems**, both immediate-mode in the Dear ImGui spirit, with different audiences (the Unity split of player UI vs IMGUI/editor tooling):
+1. **`Draw2D/`**: thin shared painter (rect, rounded rect, border, text with clip/ellipsis, line, polyline, `ClipScope`) over `BatchRenderer2D`, plus plain input/rect/hit-test data. No ids, no state, no layout policy.
+2. **`UI/`**: *player-facing* immediate-mode system: themed, anchored, game-like (board buttons, status, menus, HUD). Few widgets, generous spacing, anchor-based layout, designed to be styled per game.
+3. **`GUI/`**: *developer-tooling* immediate-mode system: dense, dockable, tool-like (dashboard, inspectors). Rich widget set, panel/dock host, tooltips, tables.
+4. **`Dashboard/`**: a consumer and extension point (feed, built-in views, a view API users extend). It uses `GUI/` and is unknown to `Draw2D/`, `UI/` and `GUI/`.
+
+## Industry survey: what we use, what we won't
+| Item | Unreal (Slate/UMG) | Unity (IMGUI, uGUI, UI Toolkit) | Dear ImGui | Godot (Control nodes) | **Oryx: use** | **Oryx: won't use** |
+|---|---|---|---|---|---|---|
+| Paradigm | Slate: declarative C++ widget tree, retained, rebuilt by construction; UMG wraps it | IMGUI immediate (editor/debug); uGUI/UI Toolkit retained, DOM-like | Immediate: code runs every frame, no widget objects | Retained scene tree of `Control` nodes | Immediate calls (cheap, no object lifetime, fits per-frame `Decision` data); retained *state* only where needed (scroll, open flag) | Retained widget tree and scene-graph ownership; UXML/CSS-like markup |
+| Widget identity/state | Widget pointers; invalidation boxes | Control ids by call order; UI Toolkit element refs | Hashed id stack from labels; state in a global map | Node paths and objects | Typed `GuiId` hashed from `string_view` + explicit push/pop, label and id separable (no `##` tricks); per-id state in a flat table with frame-generation GC | String-keyed ini state; ids that silently collide; call-order ids |
+| Layout | Box/overlay/grid panels with desired-size pass then arrange pass | IMGUI: GUILayout; uGUI: anchors + layout groups; Toolkit: flexbox | Cursor-based, no constraint pass; one-frame lag if you need sizes | Containers (HBox/VBox/Grid) + anchors/size flags | Rect-stack layout in `UI/` (row/column/stack, fixed/flex/min-max, padding) with a measure-then-arrange option for known-size content, explicit cursor escape hatch | Full flexbox/CSS engine, anchoring graphs |
+| Draw output | Element lists per window, batched by material, clip rects, culling | Canvas mesh rebuild on dirty; IMGUI draws immediately | `ImDrawList` of cmds, each with ClipRect/texture, vertex/index buffers, merged by state | CanvasItem command lists, batching by state | Primitives written through `BatchRenderer2D` with a scissor on `BatchKey` (flush on change); virtualise long lists (emit only visible rows) | Per-widget draw calls; rebuilding meshes on dirty tracking |
+| Clipping/scroll | Clip rects/scissor stack, `SScrollBox` | Mask / RectMask2D, ScrollRect | Clip rect per cmd; scroll = child window with offset | Scroll container, clip contents | `ClipScope` stack -> scissor (Step 1); scroll = clip + stored offset | Stencil/mask-based clipping |
+| Input & focus | Event routing through widget path, bubbling, focus/navigation, capture | EventSystem, raycasters, selectable nav | Hot/active/focus ids, `WantCaptureMouse/Keyboard` flags | Event propagation up tree, focus neighbours | Hot/active/focus + explicit `wants_mouse`/`wants_keyboard` outputs so boards ignore clicks on panels; hit-test via `UI/` rects; keyboard nav a seam only | Event bubbling and tunnelling machinery, tab-order graphs |
+| Styling | Style sets, brushes, slate widget styles | USS (CSS-like), skins | Global style struct + push/pop stacks (restrictive: enum-indexed, global) | Theme resources per control type | `Theme` data struct passed in the context **and** per-widget `Style` override argument (not a global stack); dark default | Style sheets, runtime style cascade |
+| Custom widgets/extension | Subclass `SWidget`, many virtuals | Custom VisualElement / IMGUI draw | Possible but needs `imgui_internal.h` (the main "too restrictive" point) | Subclass `Control`, override `_draw` | **Public low-level API**: `item_add(id, rect)` -> `ItemState{hovered, pressed, held, clicked}` and `Painter` access, documented and used by our own built-ins (no private shortcuts) | Hidden internals only built-ins may use |
+| Panels/docking | Tab manager, docking in editor, multi-window | Editor windows, docking | Docking branch + multi-viewport (separate OS windows, platform backend heavy) | Dock containers/ SplitContainer, embedded subwindows | `PanelHost`: fixed dock regions, tabs, drag between regions, versioned layout save; host does not assume one surface (seam for multi-viewport) | Free-form dock tree; OS-window tear-off before the optional, gated Step 11 |
+| Text | Slate text layout, rich text, localisation | TextMeshPro, rich text | One font atlas, simple wrap, no shaping | Full `TextServer`, shaping, BiDi | Existing `Text/` layout + `Font`; `string_view` APIs, clip/ellipsis, wrap helper, tabular numbers for metrics | Shaping/BiDi/rich text, localisation, text input fields |
+| Context/lifetime | Global app + widget ownership | Global event system | Global `ImGuiContext` pointer, `SetCurrentContext`, free-function API (ergonomic) | Scene tree singleton | ImGui's ergonomics with a safer shape: a **private** active context owned by the framework (`Gui`/`Ui` layer creates it); widgets are free functions with no context argument; users may hold the handle and swap it temporarily through a scoped guard (`GuiContextScope`); tests use the same guard | Users creating/owning/threading contexts by hand; public mutable global |
+| Observability tooling | Visual Logger (timeline, scrub), Gameplay Debugger, Insights (trace file/socket) | Profiler/Memory Profiler, Debug.DrawLine | Used *as* the in-engine debug UI; Tracy: separate viewer over socket | Debugger/Monitors in editor | Feed of self-contained records with a bounded ring (Visual Logger idea), click a past ply to inspect it, TensorBoard-style `namespace/name` series, UCI-style eval/depth/nodes; transport seam kept | Socket viewer, trace file format in this phase |
+| Audience split | Slate serves game UI (UMG) and the editor with one toolkit | Two systems: uGUI/UI Toolkit (players) vs IMGUI/editor UI (tools) | Tool/debug UI only (not meant for shipping game UI) | One Control system for both | Two peers: `UI/` for players, `GUI/` for tools; same immediate-mode style and shared `Draw2D`, separate defaults, themes and widget sets | One toolkit forced to serve both audiences (styling tension) |
+| Testing | Automation/spec tests, mostly editor-bound | Play-mode tests | Test engine (separate project) driving the UI | GUT/unit frameworks | Headless: synthetic `UiInput`, assertions on recorded `DrawItem`s/command list via `NullRHI`; no screenshots | Pixel/screenshot comparison |
+| Perf & memory | Invalidation to avoid rebuilds, culling | Dirty-mesh rebuild; GC pitfalls from IMGUI strings | CPU-built vertices each frame, tight, allocation-light, `const char*` + printf-style | Redraw only when dirty | Zero heap allocation once warm: frame arena for scratch, flat id-state table, **`std::string_view` parameters** (no allocation, slices allowed, no `strlen`; not `std::string`, not raw `char*`), formatted text written into the frame arena or a fixed buffer, `std::string` only for long-lived owned data off the hot path (feed labels), culling and list virtualisation, redraw every frame (cheap at this size) | Retained invalidation tracking (complexity not paid back at 2D dashboard scale) |
+
+### Where ImGui is too restrictive, and what we do about it
+1. Global context pointer is unguarded -> private active context, scoped swap (`GuiContextScope`), debug check that a frame is open.
+2. Style is global and enum-indexed -> `Theme` struct plus per-widget `Style` overrides.
+3. Custom widgets need internals -> a public item/behaviour API our own widgets use.
+4. Layout cannot know sizes before emitting -> `UI/` layout has measure/arrange; retained size cache gives scroll extents without a one-frame lag where content size is known.
+5. Id collisions via label strings -> typed `GuiId`, explicit scopes, a debug-build duplicate-id check.
+6. Layout persistence is string-keyed ini -> versioned typed layout record.
+7. Platform/draw coupling -> draws only through `Painter`/`BatchRenderer2D`, tested on `NullRHI`.
+
+## Decisions
+| # | Decision | Why |
+|---|----------|-----|
+| D1 | Plan tracker in `.claude/plans/`, design in `docs/design/dashboard.md` | Mirrors Phase 10 |
+| D2 | Transport: in-process only; single-threaded so no locks. External viewer and replay deferred | Smallest core; decision-log entry |
+| D3 | `UI/` (player-facing) and `GUI/` (developer tooling) are **peer** immediate-mode systems over a thin shared `Draw2D/`; neither includes the other. `Dashboard/` is a separate consumer of `GUI/`. None of them names Strategy, Game, Board or Assets | User decision; Unity-style split |
+| D4 | GUI widget set: label, button, toggle, collapsing header, scroll region, bar, line plot, tooltip, `PanelHost`. No text input, slider, rich text | Covers all views |
+| D5 | Live first; JSON-lines replay is a late optional step | Cheap path first |
+| D6 | Search tree: seam only; render any `Decision::tree` (synthetic tests); capped opt-in tree from strategies comes with Phase 12 | No strategy edits, no memory bloat now |
+| D7 | On-board annotations are user-selectable (panel toggle + `dashboard:` setting): off / probability heat / chosen marker / value on hover. Dashboard emits neutral `BoardAnnotation` data; Oasis glue maps it to spaces through `IGraphicsBoard::describe_action`; `Dashboard/` never includes `Board/` | Lc0/Lichess practice; layering kept |
+| D8 | Click a trace row to inspect that ply; board stays live (no rewind) | No new core hooks |
+| D9 | Feed stores self-contained `DashboardRecord` copies (labels, scores, metrics, tree); no wire format | Tracy-style split stays possible |
+| D10 | Look: board left, dockable panels right/bottom, dark `Theme` | Lichess/Arena layout |
+| D11 | Panel system: fixed dock regions, tabs, drag between regions, saved layout. Multi-viewport (panel torn off into its own OS window) is **Step 11, optional and gated**: a go/no-go review after Step 9; the host never assumes one surface so the seam is open either way | User decision |
+| D12 | **Dashboard is extensible**: views implement `IDashboardView` (`name()`, `draw(GuiContext&, const DashboardModel&)`) and self-register through a factory (same pattern as boards/games; no central list, no `Registry<T>` decision pre-empted). Strategies publish custom series just by adding `namespace/name` diagnostics; a view subscribes by key prefix. Built-in views are ordinary registered views | User: "use and extend the dashboard" |
+| D13 | **Dogfood in Step 2**: the existing Oasis board overlays (buttons, status line in `draw_board_overlay_2d`) are ported to `UI/` for Tic-Tac-Toe and Hexapawn before Step 2 is done | User request: judge the API on real code early |
+| D14 | API shape: free functions (`gui::button("Run")`, `ui::button(...)`) on a private active context; `GuiContextScope`/`UiContextScope` for temporary replacement. Strings: `std::string_view` in, arena/fixed-buffer formatting out, no `std::string` on hot paths | User + industry (ImGui ergonomics) |
+| D15 | **Independent styles:** `UiTheme` and `GuiTheme` are separate types owned by their own module; `Draw2D/` has no style and takes colours/metrics as plain arguments. Each is replaceable at runtime (data struct, scoped override) and loadable from its own settings section (`ui:` / `gui:`, reactive like `graphics:`), with per-widget style overrides in both. A game can ship a custom player UI theme while the dashboard keeps its dense dark `GuiTheme` (or the reverse); `Dashboard/` may set its own `GuiTheme` | User request |
+
+## Architecture
+Layering: `Graphics -> Shaders -> Renderer -> Draw2D -> {UI, GUI}`; `GUI -> Dashboard`; `Board/Graphics -> UI`. `UI` and `GUI` never include each other. Add `[boundaries]` rules in `forge.toml` for each edge (`forge boundaries check`).
+
+- **`Draw2D/` (stateless):** `Rect`/`Color`/`DrawInput` data; `Painter` (rect, rounded rect, border, text with clip/ellipsis, line, bar, polyline) over `BatchRenderer2D`; `ClipScope` stack (Step 1 scissor); hit-test helpers. Logical points, scale applied at the painter. No ids, no widget state.
+- **`UI/` (player-facing, immediate-mode):** `UiContext` (private, active-context global, created by the owning layer) with ids, hot/active/focus, anchor-based layout (anchor + margin + stack/row/column), `UiTheme` (per-game styling, independent of `GuiTheme`), widgets: label, button, toggle, panel/frame, icon-free status line, simple modal. API `ui::button("Undo")` returns clicked. Owns its own state table.
+- **`GUI/` (developer tooling, immediate-mode):** `GuiContext` (same active-context pattern), hashed id stack + hot/active/focus, `wants_mouse`/`wants_keyboard`, per-id state table with generation GC, frame arena, measure/arrange layout with cursor escape hatch, public item API (`item_add` -> `ItemState{hovered, pressed, held, clicked}`) used by our own widgets, widgets (label, button, toggle, collapsing header, scroll region, bar, line plot, table, tooltip), `PanelHost` (dock regions, tabs, drag, versioned layout save). `GuiTheme` (dense dark default, independent of `UiTheme`).
+- **`Dashboard/`:** `DashboardFeed : IDecisionObserver` (bounded ring of `DashboardRecord`, labels captured at `on_decision` via `IState::action_to_string`, aggregates through `DiagnosticsAggregator`); `DashboardModel` (read-only view of feed + selection); `IDashboardView` + factory registration; built-in views; `DashboardPanel : RenderSource, IFrameClient` submitting in the Overlay stage like `PresentedGraphicsBoard2D`. Not an extra layer, not in `BoardLayer`; Oasis wires `Match::set_observer`, the window split and `--dashboard` / `dashboard:`.
+- **Never inline strategy/game knowledge:** the feed copies; the dashboard sees only `Decision` + labels.
+
+## Default dashboard layout (the target of Step 6)
+Source: roadmap §13 visualisation list (current game state, selected action, action probabilities, value estimates, search trees, simulation statistics, decision traces, algorithm-specific diagnostics) and architecture §7. The docs name the views but contain no wireframe, so this is the agreed starting layout:
+
+```text
++--------------------------------+----------------------------------+
+|                                | Decision (ply 7, player X)       |
+|        Board (live game)       |  chosen: B2                      |
+|     + optional annotations     |  A1 ####........ 0.31            |
+|     (heat / marker / value)    |  B2 #########... 0.62  <- chosen |
+|                                |  C3 #........... 0.07            |
+|   [Undo] [Restart]  status     | Values   [bars] + [value/ply plot]|
+|          (player UI)           | Stats    minimax/nodes 1,204 ... |
++--------------------------------+ Search   (tree; empty until MCTS)|
+| Trace: ply | player | action | value | nodes   <- scroll, click    |
++---------------------------------------------------------------------+
+```
+Board and its buttons come from `UI/` (player-facing); every dashboard panel comes from `GUI/`. Panels are collapsible; overlay mode (off/heat/marker/hover) is a toggle in the Decision panel. Coverage check against the roadmap list: game state = board, selected action/probabilities/values/stats/trace = panels, algorithm-specific diagnostics = stats table grouped by `namespace/` plus custom `IDashboardView`s, search trees = seam view until Phase 12.
+
+**Risk addressed by ordering:** infrastructure is front-loaded, so the visible dashboard would otherwise appear only late. The fixed side-panel/trace-strip layout above is built first (Step 6, before the dock host); docking (Step 6b) then replaces the fixed regions without changing views.
+
+## Future-proofing, extensibility, ergonomics
+- **Seams, not features:** multi-viewport (host holds no surface assumption), keyboard navigation (focus id exists), replay/external viewer (`DashboardRecord` is self-contained plain data), 3D/world-space panels (`Painter` takes a camera via the batcher, no screen assumption), Python views later (view API is plain C++ virtual; decision left open per §14), a second backend (everything goes through `DrawItem`).
+- **Extensibility:** public low-level GUI API, registered views, `Theme` override, strategies add series with no dashboard code.
+- **User-friendliness:** a view is about 20 lines: `if (collapsing_header(gui, "Search")) { bar(gui, "nodes", value, max); }`; sensible defaults (layout, theme, default panels); `--dashboard` just works; settings reactive like `graphics:`.
+- **Performance and memory (targets to be measured by a micro-benchmark in `Benchmark/`, not promises):** zero heap allocation per frame once warm (extend the `test_scene_renderer` allocation pattern); feed ring fixed capacity (default 256 records, `SmallVector` scores, one `Diagnostics` map each); trace list virtualised (only visible rows emitted); widgets fully outside the clip are skipped; id-state table flat and generation-collected; one vertex format, one pipeline, flush only on clip/texture change; record cost per decision when attached bounded and detached cost is the existing null check.
+
+## Scissor / clipping API (Step 1, built)
+- `RHIScissorRect {int32_t x, y; uint32_t width, height}` (framebuffer pixels, top-left) already existed in `Graphics/RHI`; `DrawItem` gained `scissor` + `has_scissor` (no `std::optional`).
+- `RHICommandList::set_scissor` / `clear_scissor` (a full-extent `set_scissor`, so no new `IRHICommandContext` virtual). Validation: inside the pass attachments, non-negative, **non-empty** (callers cull empty clips). Every pass starts with the full extent: Metal's encoder default, NullRHI resets `last_scissor` at `begin_pass`, `FrameRecorder` re-derives state per pass. Metal clamps to the target as a safety net.
+- There is no `BatchKey`: `BatchRenderer` flushes in `select`, and scissor changes flush through `set_scissor`/`clear_scissor` with `FlushReason::ScissorChange`. `FrameRecorder` emits set/clear only when state differs from the previous item.
+- `BatchRenderer2D::push_clip(position, size)` (world-space centre and size, as `draw_rect`) resolves through the camera and `BatchTarget::framebuffer` (physical pixels, so DPI scale is covered) into pixels rounded outward, intersected with the parent clip and the framebuffer. An empty result culls draws until the matching `pop_clip`. `ClipScope` is the RAII form; `clip_scissor()` and `is_clipped(position, size)` let widgets and virtualised lists skip hidden content. `SceneRenderer` passes the routed pass's attachment size as the framebuffer.
+- Industry basis (see the decision-log row "Renderer: clipping basis"): Slate/Unity/ImGui/Godot all keep clip as per-draw rect state with an intersecting stack and use scissor for axis-aligned clips; stencil and shader-side clipping (rotated, rounded, soft) are the fallbacks we do not build.
+- Tests: flush on clip change, same clip no flush, nested intersection, scale-2 framebuffer, clamp/rounding, culling, `ClipScope` unwinding, recorded `SetScissor` count via NullRHI, validation errors, NullRHI per-pass reset.
+
+## Views (as registered `IDashboardView`s, in order)
+1. Selected action and probabilities (bars, chosen highlighted).
+2. Value estimates (diverging bars; line plot of chosen value over plies).
+3. Decision trace list (virtualised scroll; click to inspect a ply).
+4. Simulation statistics: key/value table of `Diagnostics` grouped by `namespace/`.
+5. Search tree (`Decision::tree`; synthetic tests; empty state until Phase 12).
+
+## Build order
+
+The work is split into steps 0 to 11 (step 11, multi-viewport, is optional and gated on a go/no-go review after step 9). Each step ends with `forge all` and `forge docs build` green.
+
+- [ ] **Step 0. Design + decisions** (docs only): tracker, `docs/design/dashboard.md` (incl. the industry table), decision-log entries (transport, Draw2D/UI/GUI/Dashboard split, active-context and string policy, panel system, multi-viewport roadmap, tree seam, scissor, view registration), roadmap, nav, `forge docs build`.
+- [x] **Step 1. Scissor in RHI + batch**: as above; NullRHI + Metal + validation + tests.
+- [ ] **Step 2. `Draw2D/` + `UI/` + Oasis dogfooding**: module scaffolds and boundaries rules, `Painter` with `ClipScope`, `UiContext` (private active context, scoped swap), ids, anchor layout, `Theme`, button/label/toggle/panel/status line; **port `draw_board_overlay_2d` (buttons, status) of Tic-Tac-Toe and Hexapawn to `UI/`** so API pain shows now; headless tests with synthetic input; user checks the real window and we adjust the API before building on it.
+- [ ] **Step 3. `GUI/` core + widgets**: `GuiContext` (private active context), ids, state table, frame arena, public item API, widgets, wheel input (check `Core/Input.h`/`PolledInput`/window events for scroll delta); tests per widget; compare ergonomics against `UI/` and fold shared lessons back into `Draw2D/`.
+- [ ] **Step 4. `DashboardFeed` + record/model**: ring, labels, aggregates, `Match::set_observer` attach, zero-alloc detached test, hand-built `Decision` tests.
+- [ ] **Step 5. View API + first views**: `IDashboardView` + registration, probabilities and values views, tests via `NullRHI` with a fake Tic-Tac-Toe `Decision`.
+- [ ] **Step 6. Oasis wiring (first end-to-end)**: Tic-Tac-Toe vs Minimax shows the layout above with fixed regions; `DashboardPanel`, window split, `--dashboard` + `dashboard:` settings, console/headless unaffected; user checks Metal.
+- [ ] **Step 6b. `PanelHost`**: dock regions, tabs, drag between regions, versioned layout save/load, tests with synthetic drag; replaces the fixed layout of Step 6 with no change to views.
+- [ ] **Step 7. Trace + stats views** (scroll, ply selection, diagnostics table).
+- [ ] **Step 7b. On-board annotations**: `BoardAnnotation`, `describe_action`, modes and toggles, tests.
+- [ ] **Step 8. Search tree seam view**.
+- [ ] **Step 9. Hardening + docs**: allocation and benchmark checks, leak census, Linux CI (Null backends), boundaries audit, update `observability.md`, `graphics.md` seam table, roadmap (multi-viewport), final `forge all` + `forge docs build`.
+- [ ] **Step 10 (optional). Replay**: JSON-lines reader into the feed.
+- [ ] **Step 11 (optional, gated). Multi-viewport**: go/no-go after Step 9, because it reshapes Core and Graphics, not just the dashboard. Ownership: **`Application` keeps owning only the main window, unchanged** (so headless runs, the one-window ownership rules and Core stay as they are). Secondary windows belong to the graphics side: `GraphicsLayer` owns a `SecondaryViewports` set (each entry: `UniquePtr<Window>`, `RHIViewport`, its own polled `Input`, a surface id), created on demand by tear-off and destroyed on re-dock or close; it polls their input and events itself instead of widening Core's event system. Closing the main window closes the application; closing a secondary window re-docks its panel. Scope if go: (a) `SecondaryViewports` plus per-window DPI/scale, a Metal `CAMetalLayer` per window, `NullWindow`/offscreen viewports for tests; (b) `GraphicsLayer` records one scene/frame per surface and presents each; clients (`IFrameClient`, `RenderSource`) learn their surface via `FrameInfo`; (c) `Draw2D`/`GUI` take a per-surface target and a screen-space origin, with `GuiContext` input routed by surface; (d) `PanelHost` tear-off: drag a tab outside the main window to create a secondary window hosting that panel, drop it back to re-dock; the layout record gains a surface id; (e) headless tests with `NullWindow` + `inject_*` for several surfaces. Sub-steps 11a window/viewport plumbing, 11b multi-surface frame, 11c tear-off. If the review says no, it moves to the roadmap with this scope recorded.

@@ -53,6 +53,16 @@ void MetalCommandContext::begin_pass(const RHIRenderPassDesc& pass)
         attachment->setStoreAction(to_mtl(pass.depth.store));
         attachment->setClearDepth(pass.depth.clear_depth);
     }
+    if (pass.colour_count > 0)
+    {
+        m_target_width = pass.colour[0].target->width();
+        m_target_height = pass.colour[0].target->height();
+    }
+    else
+    {
+        m_target_width = pass.depth.texture->width();
+        m_target_height = pass.depth.texture->height();
+    }
     m_encoder = require_object(NS::RetainPtr(m_commands.renderCommandEncoder(descriptor.get())), "a render encoder");
     m_pipeline = nullptr;
 }
@@ -92,7 +102,15 @@ void MetalCommandContext::set_viewport(const RHIViewportState& viewport)
 
 void MetalCommandContext::set_scissor(const RHIScissorRect& scissor)
 {
-    m_encoder->setScissorRect(MTL::ScissorRect{ static_cast<NS::UInteger>(scissor.x), static_cast<NS::UInteger>(scissor.y), scissor.width, scissor.height });
+    const uint32_t x = static_cast<uint32_t>(std::clamp<int32_t>(scissor.x, 0, static_cast<int32_t>(m_target_width)));
+    const uint32_t y = static_cast<uint32_t>(std::clamp<int32_t>(scissor.y, 0, static_cast<int32_t>(m_target_height)));
+    const uint32_t width = std::min(scissor.width, m_target_width - x);
+    const uint32_t height = std::min(scissor.height, m_target_height - y);
+    if (width == 0 || height == 0)
+    {
+        return;
+    }
+    m_encoder->setScissorRect(MTL::ScissorRect{ x, y, width, height });
 }
 
 void MetalCommandContext::set_vertex_buffer(uint32_t slot, RHIBuffer& buffer, uint32_t offset)

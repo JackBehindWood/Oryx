@@ -468,6 +468,7 @@ TEST_CASE("NullRHI executes MRT and depth passes, state commands and debug group
     CHECK(stats.draw_calls == 1);
     CHECK(stats.last_viewport.width == 2.0f);
     CHECK(stats.last_scissor.width == 1);
+    CHECK(stats.scissor_sets == 1);
     CHECK(stats.last_constants_binding == 0);
     CHECK(stats.last_constants.size() == sizeof(constants));
     CHECK(stats.debug_events == std::vector<std::string>{ "push:scene", "pop" });
@@ -599,4 +600,20 @@ TEST_CASE("NullRHI can be set to report a viewport's vsync")
     rhi.set_viewport_vsync(viewport.get(), true);
     CHECK(null_viewport.vsync());
     CHECK_THROWS_AS(rhi.set_viewport_vsync(nullptr, true), Error);
+}
+
+TEST_CASE("NullRHI resets the scissor at the start of each pass")
+{
+    NullRHI rhi;
+    RHITexturePtr texture = rhi.create_texture({ .width = 4, .height = 4, .usage = RHITextureUsage::RenderTarget });
+    RHIRenderTargetPtr target = rhi.create_render_target({ .colour = texture });
+    RHICommandList list;
+    list.begin_pass(target.get());
+    list.set_scissor({ 1, 1, 2, 2 });
+    list.end_pass();
+    list.begin_pass(target.get());
+    list.end_pass();
+    rhi.submit(list);
+    CHECK(rhi.stats().last_scissor.width == 0);
+    CHECK(rhi.stats().scissor_sets == 1);
 }

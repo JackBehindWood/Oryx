@@ -360,3 +360,182 @@ TEST_CASE("BatchRenderer2D: pipelines are acquired again after release_pipelines
     CHECK_NOTHROW(f.context->pipelines.resolve(f.sink[1].pipeline));
     CHECK_THROWS_AS(f.context->pipelines.resolve(before), Error);
 }
+
+namespace
+{
+
+BatchTarget target_for(BatchFixture& f, float width, float height)
+{
+    return { f.sink, { RHIFormat::BGRA8Unorm, RHIFormat::Undefined }, { width, height } };
+}
+
+} // namespace
+
+TEST_CASE("BatchRenderer2D: a clip change flushes and the draws carry the scissor")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 50.0f);
+    batcher.begin(camera, target_for(f, 200.0f, 100.0f));
+    batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, RED);
+    {
+        ClipScope clip(batcher, { 25.0f, 10.0f }, { 50.0f, 20.0f });
+        batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, RED);
+        batcher.draw_rect({ 6.0f, 5.0f }, { 2.0f, 2.0f }, RED);
+    }
+    batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, RED);
+    batcher.end();
+
+    REQUIRE(f.sink.size() == 3);
+    CHECK_FALSE(f.sink[0].has_scissor);
+    REQUIRE(f.sink[1].has_scissor);
+    CHECK(f.sink[1].scissor.x == 0);
+    CHECK(f.sink[1].scissor.y == 60);
+    CHECK(f.sink[1].scissor.width == 100);
+    CHECK(f.sink[1].scissor.height == 40);
+    CHECK_FALSE(f.sink[2].has_scissor);
+    CHECK(batcher.stats().flushes[static_cast<uint32_t>(FlushReason::ScissorChange)] == 2);
+}
+
+TEST_CASE("BatchRenderer2D: pushing the same clip again does not flush")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 50.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 50.0f));
+    {
+        ClipScope outer(batcher, { 25.0f, 25.0f }, { 50.0f, 50.0f });
+        batcher.draw_rect({ 5.0f, 5.0f }, { 2.0f, 2.0f }, RED);
+        ClipScope inner(batcher, { 25.0f, 25.0f }, { 50.0f, 50.0f });
+        batcher.draw_rect({ 6.0f, 5.0f }, { 2.0f, 2.0f }, RED);
+    }
+    batcher.end();
+    CHECK(f.sink.size() == 1);
+}
+
+TEST_CASE("BatchRenderer2D: nested clips intersect and the outer clip returns on pop")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    batcher.push_clip({ 30.0f, 70.0f }, { 60.0f, 60.0f });
+    batcher.push_clip({ 60.0f, 70.0f }, { 60.0f, 60.0f });
+    CHECK(batcher.clip_depth() == 2);
+    CHECK(batcher.clip_scissor().x == 30);
+    CHECK(batcher.clip_scissor().width == 30);
+    batcher.draw_rect({ 40.0f, 70.0f }, { 2.0f, 2.0f }, RED);
+    batcher.pop_clip();
+    CHECK(batcher.clip_scissor().x == 0);
+    CHECK(batcher.clip_scissor().width == 60);
+    batcher.draw_rect({ 40.0f, 70.0f }, { 2.0f, 2.0f }, RED);
+    batcher.pop_clip();
+    batcher.end();
+
+    REQUIRE(f.sink.size() == 2);
+    CHECK(f.sink[0].scissor.width == 30);
+    CHECK(f.sink[1].scissor.width == 60);
+}
+
+TEST_CASE("BatchRenderer2D: an empty clip culls draws without reaching the scissor")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    batcher.push_clip({ 10.0f, 10.0f }, { 10.0f, 10.0f });
+    batcher.push_clip({ 80.0f, 80.0f }, { 10.0f, 10.0f });
+    batcher.draw_rect({ 80.0f, 80.0f }, { 4.0f, 4.0f }, RED);
+    batcher.draw_circle({ 80.0f, 80.0f }, 2.0f, RED);
+    batcher.draw_line({ 0.0f, 0.0f }, { 1.0f, 1.0f }, RED);
+    CHECK(batcher.is_clipped({ 10.0f, 10.0f }, { 2.0f, 2.0f }));
+    batcher.pop_clip();
+    batcher.draw_rect({ 10.0f, 10.0f }, { 4.0f, 4.0f }, RED);
+    batcher.pop_clip();
+    batcher.end();
+
+    REQUIRE(f.sink.size() == 1);
+    CHECK(f.sink[0].scissor.width == 10);
+}
+
+TEST_CASE("BatchRenderer2D: a clip is clamped to the framebuffer and rounds outward")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    batcher.push_clip({ 95.0f, 50.25f }, { 30.0f, 1.0f });
+    CHECK(batcher.clip_scissor().x == 80);
+    CHECK(batcher.clip_scissor().width == 20);
+    CHECK(batcher.clip_scissor().y == 49);
+    CHECK(batcher.clip_scissor().height == 2);
+    batcher.pop_clip();
+    batcher.push_clip({ 500.0f, 500.0f }, { 10.0f, 10.0f });
+    CHECK(batcher.is_clipped({ 50.0f, 50.0f }, { 1.0f, 1.0f }));
+    batcher.pop_clip();
+    batcher.end();
+}
+
+TEST_CASE("BatchRenderer2D: is_clipped tests a rect against the active clip")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    CHECK_FALSE(batcher.is_clipped({ 500.0f, 500.0f }, { 1.0f, 1.0f }));
+    {
+        ClipScope clip(batcher, { 25.0f, 25.0f }, { 50.0f, 50.0f });
+        CHECK_FALSE(batcher.is_clipped({ 10.0f, 10.0f }, { 4.0f, 4.0f }));
+        CHECK_FALSE(batcher.is_clipped({ 50.0f, 50.0f }, { 4.0f, 4.0f }));
+        CHECK(batcher.is_clipped({ 80.0f, 80.0f }, { 4.0f, 4.0f }));
+    }
+    batcher.end();
+}
+
+TEST_CASE("BatchRenderer2D: clip errors")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    CHECK_THROWS_AS(batcher.push_clip({ 0.0f, 0.0f }, { 1.0f, 1.0f }), Error);
+    batcher.begin(camera);
+    CHECK_THROWS_AS(batcher.push_clip({ 0.0f, 0.0f }, { 1.0f, 1.0f }), Error);
+    CHECK_THROWS_AS(batcher.pop_clip(), Error);
+    batcher.end();
+}
+
+TEST_CASE("BatchRenderer2D: ClipScope pops when an exception unwinds")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    try
+    {
+        ClipScope clip(batcher, { 50.0f, 50.0f }, { 10.0f, 10.0f });
+        throw Error("boom");
+    }
+    catch (const Error&)
+    {
+    }
+    CHECK(batcher.clip_depth() == 0);
+    batcher.end();
+}
+
+TEST_CASE("BatchRenderer2D: a scene starts without the previous scene's clip")
+{
+    BatchFixture f;
+    BatchRenderer2D batcher(f.desc());
+    const Camera2D camera = Camera2D::screen_space(100.0f, 100.0f);
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    batcher.push_clip({ 50.0f, 50.0f }, { 10.0f, 10.0f });
+    batcher.draw_rect({ 50.0f, 50.0f }, { 2.0f, 2.0f }, RED);
+    batcher.end();
+    f.sink.clear();
+    batcher.begin(camera, target_for(f, 100.0f, 100.0f));
+    CHECK(batcher.clip_depth() == 0);
+    batcher.draw_rect({ 50.0f, 50.0f }, { 2.0f, 2.0f }, RED);
+    batcher.end();
+    REQUIRE(f.sink.size() == 1);
+    CHECK_FALSE(f.sink[0].has_scissor);
+}

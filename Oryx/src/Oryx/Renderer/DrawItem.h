@@ -30,8 +30,10 @@ struct DrawItem
     uint32_t first = 0;
     uint32_t first_instance = 0;
     int32_t base_vertex = 0;
+    RHIScissorRect scissor;
     uint16_t constants_size = 0;
     uint8_t texture_count = 0;
+    bool has_scissor = false;
     IndexType index_type = IndexType::U16;
     uint8_t constants[DRAW_ITEM_MAX_CONSTANTS] = {};
 };

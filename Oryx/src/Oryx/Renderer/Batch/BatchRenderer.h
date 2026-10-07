@@ -18,10 +18,11 @@ enum class FlushReason : uint8_t
     StreamChange,
     SamplerChange,
     TextureSlotsFull,
-    IndexLimit
+    IndexLimit,
+    ScissorChange
 };
 
-inline constexpr uint32_t FLUSH_REASON_COUNT = 6;
+inline constexpr uint32_t FLUSH_REASON_COUNT = 7;
 
 struct BatchStats
 {
@@ -77,6 +78,8 @@ struct BatchTarget
 {
     std::vector<DrawItem>& sink;
     PassFormats formats;
+    // Pixel size of the attachment the scene draws into; clip rectangles resolve against it. Zero until known.
+    Vec2f framebuffer;
 };
 
 // Accumulates transient primitives on the CPU and turns each run of identical state into one DrawItem pushed to the sink, in submission order.
@@ -85,6 +88,7 @@ class BatchRenderer
 {
 public:
     explicit BatchRenderer(const BatchRendererDesc& desc);
+    virtual ~BatchRenderer() = default;
 
     BatchRenderer(const BatchRenderer&) = delete;
     BatchRenderer& operator=(const BatchRenderer&) = delete;
@@ -116,6 +120,14 @@ protected:
     // Throws Error outside a scene.
     void require_open() const;
 
+    // Draws added after this carry the scissor; a change flushes the pending batch first.
+    void set_scissor(const RHIScissorRect& scissor);
+    void clear_scissor();
+    // Called at the start of every scene so subclasses drop per-scene state.
+    virtual void on_begin() {}
+    [[nodiscard]] const Mat4f& view_projection() const { return m_view_projection; }
+    [[nodiscard]] const Vec2f& framebuffer() const { return m_framebuffer; }
+
 private:
     void flush_batch(FlushReason reason);
     [[nodiscard]] TransientAllocation allocate(uint32_t bytes);
@@ -132,6 +144,9 @@ private:
     std::vector<uint8_t> m_staging;
     TextureSlotTable m_slots;
     BatchConstants m_constants = {};
+    Mat4f m_view_projection = Mat4f::identity();
+    Vec2f m_framebuffer;
+    RHIScissorRect m_scissor;
     BatchStats m_stats;
     RHISamplerPtr m_sampler;
     PassFormats m_default_formats;
@@ -142,6 +157,7 @@ private:
     uint32_t m_permutation;
     uint32_t m_primitives = 0;
     BatchStreamId m_stream = 0;
+    bool m_has_scissor = false;
     bool m_open = false;
 };
 

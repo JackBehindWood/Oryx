@@ -121,6 +121,7 @@ struct NullStats
     std::vector<uint8_t> last_constants;
     RHIViewportState last_viewport;
     RHIScissorRect last_scissor;
+    uint32_t scissor_sets = 0;
     std::vector<std::string> debug_events;
 };
 

@@ -82,11 +82,39 @@ void BatchRenderer::begin(const Camera& camera, const BatchTarget& target)
     m_sink = &target.sink;
     m_formats = target.formats;
     camera.to_gpu(m_constants.view_projection);
+    m_view_projection = camera.view_projection();
+    m_framebuffer = target.framebuffer;
+    m_has_scissor = false;
     m_staging.clear();
     m_slots.reset();
     m_sampler.reset();
     m_primitives = 0;
     m_open = true;
+    on_begin();
+}
+
+void BatchRenderer::set_scissor(const RHIScissorRect& scissor)
+{
+    require_open();
+    const bool same = m_has_scissor && m_scissor.x == scissor.x && m_scissor.y == scissor.y && m_scissor.width == scissor.width && m_scissor.height == scissor.height;
+    if (same)
+    {
+        return;
+    }
+    flush_batch(FlushReason::ScissorChange);
+    m_scissor = scissor;
+    m_has_scissor = true;
+}
+
+void BatchRenderer::clear_scissor()
+{
+    require_open();
+    if (!m_has_scissor)
+    {
+        return;
+    }
+    flush_batch(FlushReason::ScissorChange);
+    m_has_scissor = false;
 }
 
 void BatchRenderer::flush(FlushReason reason)
@@ -206,6 +234,8 @@ void BatchRenderer::flush_batch(FlushReason reason)
             }
         }
         item.sampler = m_sampler;
+        item.scissor = m_scissor;
+        item.has_scissor = m_has_scissor;
         m_sink->push_back(std::move(item));
 
         ++m_stats.draws;

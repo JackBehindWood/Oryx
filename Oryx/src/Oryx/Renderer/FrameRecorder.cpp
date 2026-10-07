@@ -54,6 +54,12 @@ private:
     SceneRenderer& m_scene;
 };
 
+struct ScissorState
+{
+    RHIScissorRect rect;
+    bool active = false;
+};
+
 const uint8_t k_zero_constants[RHI_MAX_CONSTANTS_SIZE] = {};
 
 void bind_textures(RHICommandList& commands, const GraphicsPipeline& pipeline, const DrawItem& item, const DefaultResources& defaults)
@@ -141,6 +147,31 @@ void record_draw_item(RHICommandList& commands, const DrawItem& item, const Grap
 namespace
 {
 
+bool same_rect(const RHIScissorRect& a, const RHIScissorRect& b)
+{
+    return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
+}
+
+// Passes start with the full extent, so only a change of state emits a command.
+void apply_scissor(RHICommandList& commands, const DrawItem& item, ScissorState& state)
+{
+    if (!item.has_scissor)
+    {
+        if (state.active)
+        {
+            commands.clear_scissor();
+            state.active = false;
+        }
+        return;
+    }
+    if (!state.active || !same_rect(state.rect, item.scissor))
+    {
+        commands.set_scissor(item.scissor);
+        state.rect = item.scissor;
+        state.active = true;
+    }
+}
+
 RHIRenderPassDesc make_pass_desc(const RenderPass& pass, RHIRenderTarget* back_buffer, const Colour& main_clear)
 {
     const RenderPassDesc& desc = pass.desc;
@@ -163,10 +194,12 @@ void record_pass(RendererContext& context, const RenderPass& pass, RHIRenderTarg
     {
         RHIDebugScope scope(context.commands, pass.desc.name.c_str());
         uint32_t batch = 0;
+        ScissorState scissor;
         for (const DrawItem& item : pass.items)
         {
             try
             {
+                apply_scissor(context.commands, item, scissor);
                 record_draw_item(context.commands, item, context.pipelines, context.defaults);
             }
             catch (const Error& error)

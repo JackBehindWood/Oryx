@@ -38,6 +38,8 @@ private:
     MTL::CommandBuffer& m_commands;
     NS::SharedPtr<MTL::RenderCommandEncoder> m_encoder;
     const MetalPipeline* m_pipeline = nullptr;
+    uint32_t m_target_width = 0;
+    uint32_t m_target_height = 0;
     MTL::Buffer* m_index_buffer = nullptr;
     uint32_t m_index_offset = 0;
     MTL::IndexType m_index_type = MTL::IndexTypeUInt16;

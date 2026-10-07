@@ -158,7 +158,8 @@ void SceneRenderer::run_stage(RenderStage stage, const RenderView& view)
 
     auto run_batched = [&](const Camera& camera)
     {
-        BatcherScope scope(m_batcher, camera, BatchTarget{ target.items, target.formats });
+        const Vec2f extent = target.desc.colour ? Vec2f(static_cast<float>(target.desc.colour->width()), static_cast<float>(target.desc.colour->height())) : view.framebuffer;
+        BatcherScope scope(m_batcher, camera, BatchTarget{ target.items, target.formats, extent });
         for (RenderSource* source : m_sources)
         {
             source->render_stage(stage, context);

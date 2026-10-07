@@ -27,7 +27,10 @@ public:
     void begin_pass(RHIRenderTarget* target, const RHIClear& clear = {});
     void set_pipeline(RHIGraphicsPipeline* pipeline);
     void set_viewport(const RHIViewportState& viewport);
+    // Non-empty and inside the pass attachments; every pass starts with the full extent.
     void set_scissor(const RHIScissorRect& scissor);
+    // Sets the full extent of the open pass.
+    void clear_scissor();
     void set_vertex_buffer(uint32_t slot, RHIBuffer* buffer, uint32_t offset = 0);
     void set_index_buffer(RHIBuffer* buffer, uint32_t offset = 0, bool index32 = true);
     // The bytes are copied into the list; at most RHI_MAX_CONSTANTS_SIZE and at most the binding's size.

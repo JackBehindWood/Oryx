@@ -31,11 +31,52 @@ public:
     // Draws UTF-8 text with `position` at the baseline start of the first line (y up, so '\n' moves down); a font that is not ready draws nothing. Throws Error outside a scene.
     void draw_text(const Vec2f& position, std::string_view text, Font& font, const TextStyle& style = {});
 
+    // Clips later draws to a world-space rect (centre and size, as draw_rect), intersected with the enclosing clip and the framebuffer; the rect resolves to whole
+    // framebuffer pixels, rounded outward. An empty result culls draws until the matching pop_clip. Throws Error outside a scene or before the framebuffer size is known.
+    void push_clip(const Vec2f& position, const Vec2f& size);
+    // Throws Error with no clip pushed.
+    void pop_clip();
+    [[nodiscard]] uint32_t clip_depth() const { return static_cast<uint32_t>(m_clips.size()); }
+    // The active clip in framebuffer pixels, top left origin; meaningful only while clip_depth() > 0.
+    [[nodiscard]] const RHIScissorRect& clip_scissor() const { return m_clips.back().pixels; }
+    // True when a rect (centre and size) lies fully outside the active clip, so callers can skip emitting it; false with no clip.
+    [[nodiscard]] bool is_clipped(const Vec2f& position, const Vec2f& size) const;
+
+protected:
+    void on_begin() override { m_clips.clear(); }
+
 private:
+    struct ClipEntry
+    {
+        RHIScissorRect pixels;
+    };
+
+    [[nodiscard]] RHIScissorRect to_pixels(const Vec2f& position, const Vec2f& size) const;
+    [[nodiscard]] bool culled() const { return !m_clips.empty() && (m_clips.back().pixels.width == 0 || m_clips.back().pixels.height == 0); }
+
     void write_quad(const Vec2f (&corners)[4], const RHITexturePtr& texture, const RHISamplerPtr& sampler, const Colour& colour, const Vec2f& uv_min, const Vec2f& uv_max);
     void write_glyph(const Vec2f (&corners)[4], const Texture2D& atlas_texture, float px_range, const Colour& colour, const Glyph& glyph);
 
     BatchStreamId m_streams[PRIMITIVE_2D_COUNT];
+    std::vector<ClipEntry> m_clips;
+};
+
+// Pushes a clip for its lifetime.
+class ClipScope
+{
+public:
+    ClipScope(BatchRenderer2D& batcher, const Vec2f& position, const Vec2f& size)
+        : m_batcher(batcher)
+    {
+        m_batcher.push_clip(position, size);
+    }
+    ~ClipScope() { m_batcher.pop_clip(); }
+
+    ClipScope(const ClipScope&) = delete;
+    ClipScope& operator=(const ClipScope&) = delete;
+
+private:
+    BatchRenderer2D& m_batcher;
 };
 
 } // namespace oryx

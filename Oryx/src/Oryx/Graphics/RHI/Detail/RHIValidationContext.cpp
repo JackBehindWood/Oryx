@@ -224,6 +224,10 @@ void RHIValidationContext::set_scissor(const RHIScissorRect& scissor)
     require_pass("set_scissor");
     const int64_t right = static_cast<int64_t>(scissor.x) + scissor.width;
     const int64_t bottom = static_cast<int64_t>(scissor.y) + scissor.height;
+    if (scissor.width == 0 || scissor.height == 0)
+    {
+        fail("set_scissor", "scissor has no area; cull the draw instead");
+    }
     if (scissor.x < 0 || scissor.y < 0 || right > m_pass_width || bottom > m_pass_height)
     {
         fail("set_scissor", "scissor lies outside the pass attachments");

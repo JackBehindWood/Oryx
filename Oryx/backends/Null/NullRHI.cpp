@@ -139,12 +139,17 @@ public:
                 m_depth_clears.emplace_back(&depth, pass.depth.clear_depth);
             }
         }
+        m_stats.last_scissor = {};
         ++m_stats.passes;
     }
 
     void set_pipeline(RHIGraphicsPipeline& pipeline) override { require_null<NullPipeline>(pipeline); }
     void set_viewport(const RHIViewportState& viewport) override { m_stats.last_viewport = viewport; }
-    void set_scissor(const RHIScissorRect& scissor) override { m_stats.last_scissor = scissor; }
+    void set_scissor(const RHIScissorRect& scissor) override
+    {
+        m_stats.last_scissor = scissor;
+        ++m_stats.scissor_sets;
+    }
     void set_vertex_buffer(uint32_t, RHIBuffer& buffer, uint32_t) override { require_null<NullBuffer>(buffer); }
     void set_index_buffer(RHIBuffer& buffer, uint32_t, bool) override { require_null<NullBuffer>(buffer); }
 
