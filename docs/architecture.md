@@ -923,7 +923,7 @@ The following should **not** be considered settled yet:
 * Evaluation API
 * Experiment representation — resolved in Phase 8: id-based `ExperimentSpec` ([Decision Log](design/decision-log.md))
 * Observability protocol — resolved in Phase 9: `IDecisionObserver` capability + `Decision`/`Diagnostics` ([Decision Log](design/decision-log.md)); dashboard transport stays open
-* Dashboard transport
+* Dashboard transport — resolved in Phase 11 for now: in-process `DashboardFeed` observer, single-threaded ([Dashboard](design/dashboard.md)); an external viewer or replay is a later transport onto the same plain-data records
 * Python ownership/lifetime beyond the scripting layer's scoped rules
   (below): how a pure-Python host owns C++ objects handed back to it, and
   interpreter-finalisation ordering

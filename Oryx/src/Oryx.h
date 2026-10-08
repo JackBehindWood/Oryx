@@ -92,6 +92,8 @@
 #include "Oryx/Strategy/Observability/TraceRecorder.h"
 #include "Oryx/Strategy/Observability/DiagnosticsAggregator.h"
 #include "Oryx/Strategy/Observability/JsonLinesWriter.h"
+#include "Oryx/Dashboard/Feed/DashboardFeed.h"
+#include "Oryx/Dashboard/Feed/DashboardModel.h"
 
 #include "Oryx/Simulation/ActionHistory.h"
 #include "Oryx/Simulation/Match.h"
