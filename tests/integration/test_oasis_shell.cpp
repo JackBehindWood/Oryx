@@ -255,7 +255,8 @@ TEST_CASE("OasisShell: Help opens the GUI showcase in the dashboard's place")
     rig.click_text("GUI Showcase");
     rig.frames(3);
     CHECK(rig.shell->showcase_open());
-    CHECK(rig.board_region().size[0] == doctest::Approx(with_panel));
+    CHECK(rig.board_region().size[0] == doctest::Approx(k_window[0] * 0.5f));
+    CHECK(rig.board_region().size[0] < with_panel);
 
     rig.click_text("Help");
     rig.frames(2);

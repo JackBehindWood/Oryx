@@ -9,6 +9,7 @@ Observability is a capability, not an interface change. `IStrategy::decide(const
 ```text
 IDecisionObserver            Strategy/Observability/   pure virtual
 └── on_decision(const IState&, const Decision&)
+└── on_match_start()          default no-op; marks a new match on the decision stream (Phase 11)
 
 Decision                     data only
 ├── player, chosen

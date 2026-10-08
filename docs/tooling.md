@@ -21,7 +21,7 @@ actually runs.
 forge                                   interactive menu (falls back to --help outside a TTY)
 forge init [--yes] [--template app]     derive forge.toml from an existing premake5.lua, or scaffold a new project
 forge configure | compile | all | clean
-forge run [TARGET[:PRESET]] [-- args]   e.g. forge run oasis:bench
+forge run [TARGET[:PRESET]] [-- args]   e.g. forge run oasis:bench, forge run -- --dashboard
 forge test [SUITE…] [--list] [-- args]  e.g. forge test unit -- --test-case="*Vec3*"
 forge config show | get KEY | set KEY VALUE | unset KEY [--local]
 forge target add|remove|list

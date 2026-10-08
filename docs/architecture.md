@@ -627,6 +627,8 @@ It is explicitly **not** intended to become a general-purpose engine comparable 
 
 The graphics modules are layered `Graphics/` (RHI and GPU resources) → `Shaders/` → `Renderer/`, all behind the `graphics` build option and never included by `Game/`, `Strategy/`, `Simulation/` or `Core/`. `Window`/`Input` abstractions and window, key and mouse events live in Core and Events and are always compiled; `Application` owns the window (null when headless) and a single `GraphicsLayer` overlay drives each frame (§3.6); its `graphics:` settings section (`vsync`, `max_fps`, `idle_sleep_ms`, `reload_key`) is reactive, and `GraphicsLayer` opens a `SceneRenderer` scene around its clients so boards draw through `RenderSource` stages (Scene2D, Overlay) inside that frame. `Renderer/` is organised into `Batch/` (batching stack) and `Scene/` (cameras, `RenderView`, `SceneRenderer`). `Board/` is split into the headless core, `Board/Layout/` (`BoardLayout`, `BoardLayout2D`), `Board/Console/` and the graphics-option `Board/Graphics/`. See [Graphics and Assets](design/graphics.md).
 
+**Input routing and the Oasis shell (Phase 11).** `Core/InputRouter` decides per frame who owns the pointer and keyboard (press-latched) and hands boards a filtered, region-local view of the window's `IInput`; `GraphicsLayer` owns it and runs interface clients before world clients. Graphical Oasis hosts menus, the dashboard and match switching in `OasisShell`; headless, simulation and console launches never create it. Details: [Dashboard](design/dashboard.md).
+
 ### Rendering pipeline framing
 
 ```text

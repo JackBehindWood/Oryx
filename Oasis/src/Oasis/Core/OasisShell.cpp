@@ -137,7 +137,13 @@ void OasisShell::build()
     gui::central_area();
     if (m_dashboard_open || m_showcase_open)
     {
-        gui::begin_side_panel(gui::Side::Right, static_cast<float>(m_settings.panel_width));
+        const float width = m_showcase_open ? m_window[0] : static_cast<float>(m_settings.panel_width);
+        ImStyle hosted = gui::theme().panel;
+        hosted.background.a = 0.0f;
+        hosted.border_width = 0.0f;
+        gui::WidgetOptions options;
+        options.style = m_showcase_open ? &hosted : nullptr;
+        gui::begin_side_panel(gui::Side::Right, width, options);
         if (!m_showcase_open)
         {
             draw_dashboard(m_panel, m_model);

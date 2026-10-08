@@ -168,6 +168,7 @@ uv run forge                          # interactive menu
 uv run forge editor vscode           # forge.local.toml + .vscode/{tasks,launch,...}.json
 uv run forge all                      # configure, compile, test
 uv run forge run                      # run the Oasis sandbox (`oasis:bench` = benchmark preset)
+uv run forge run -- --dashboard       # graphical Oasis with the strategy dashboard (`--no-dashboard` hides it; `dashboard:` in settings)
 uv run forge docs serve               # live-preview the documentation site
 ```
 

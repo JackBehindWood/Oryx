@@ -89,6 +89,26 @@ public:
 
 } // namespace
 
+class PendingStrategy : public IStrategy
+{
+public:
+    ActionId decide(const Context&) override { return PENDING_ACTION; }
+};
+
+TEST_CASE("Match emits no Decision while a strategy is still waiting for a move")
+{
+    DummyGame game(10);
+    PendingStrategy strategy_a;
+    PendingStrategy strategy_b;
+    RecordingObserver observer;
+    Match match(game, { &strategy_a, &strategy_b });
+    match.set_observer(&observer);
+
+    CHECK(match.decide() == PENDING_ACTION);
+    CHECK(match.decide() == PENDING_ACTION);
+    CHECK(observer.decisions.empty());
+}
+
 TEST_CASE("Match emits a minimal Decision per ply when the strategy publishes nothing")
 {
     DummyGame game(10);

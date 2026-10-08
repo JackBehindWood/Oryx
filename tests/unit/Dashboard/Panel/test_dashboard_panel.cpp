@@ -102,6 +102,17 @@ TEST_CASE("dashboard panel: collapsing a header hides its view")
     CHECK(dump_layout(f.context) != before);
 }
 
+TEST_CASE("dashboard panel: the header counts matches and decisions")
+{
+    PanelFixture f;
+    f.frames();
+    CHECK(f.find_text("Waiting for the first decision") != nullptr);
+    f.add_decision();
+    f.frames();
+    CHECK(f.find_text("Waiting for the first decision") == nullptr);
+    CHECK(f.find_text("Decisions") != nullptr);
+}
+
 TEST_CASE("dashboard panel: layout golden for a populated feed")
 {
     PanelFixture f;

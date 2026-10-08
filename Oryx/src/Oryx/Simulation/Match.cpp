@@ -63,7 +63,7 @@ ActionId Match::decide() const
                     "Match: current strategy requires a capability the game does not provide.");
     PlayerId player = current_player();
     ActionId action = strategy.decide(context);
-    if (!m_tracker.published())
+    if (!m_tracker.published() && is_game_action(action))
     {
         Decision decision;
         decision.player = player;
