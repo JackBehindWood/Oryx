@@ -369,3 +369,30 @@ TEST_CASE("graphics settings read their keys and reject bad values")
     reset_settings();
 }
 #endif
+
+TEST_CASE("dashboard settings default to off, read their keys and reject non-positive sizes")
+{
+    reset_settings();
+    const DashboardSettings& defaults = settings_of<DashboardSettings>();
+    CHECK_FALSE(defaults.enabled);
+    CHECK(defaults.panel_width == 360);
+    CHECK(defaults.history == 256);
+    CHECK(defaults.views == std::vector<std::string>{ "probabilities", "values" });
+
+    TempDir dir;
+    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  panel_width: 420\n  history: 64\n  views: [values]\n"));
+    const DashboardSettings& dashboard = settings_of<DashboardSettings>();
+    CHECK(dashboard.enabled);
+    CHECK(dashboard.panel_width == 420);
+    CHECK(dashboard.history == 64);
+    CHECK(dashboard.views == std::vector<std::string>{ "values" });
+
+    CHECK_THROWS_AS(load_from(dir.write("w.yaml", "dashboard:\n  panel_width: 0\n")), SettingsError);
+    CHECK_THROWS_AS(load_from(dir.write("h.yaml", "dashboard:\n  history: -4\n")), SettingsError);
+
+    int32_t calls = 0;
+    SettingsSubscription subscription = on_settings_changed<DashboardSettings>([&calls](const DashboardSettings&) { ++calls; });
+    update_settings<DashboardSettings>([](DashboardSettings& settings) { settings.enabled = false; });
+    CHECK(calls == 1);
+    reset_settings();
+}

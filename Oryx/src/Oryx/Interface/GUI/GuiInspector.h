@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Interface/GUI/GuiWidgets.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 
 namespace oryx::gui
 {

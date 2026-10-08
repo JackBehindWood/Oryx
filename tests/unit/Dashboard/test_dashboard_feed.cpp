@@ -287,6 +287,24 @@ TEST_CASE("begin_match groups decisions per match and numbers them within the ma
     CHECK(feed.view(2).record->decision_index == 0);
 }
 
+TEST_CASE("clear_at_next_match empties the ring when the next match begins and only then")
+{
+    DummyState state(10);
+    DashboardFeed feed(small_options(8));
+    feed.begin_match();
+    feed.on_decision(state, make_decision(0, 1, { 1 }));
+    feed.clear_at_next_match();
+    feed.on_decision(state, make_decision(0, 1, { 1 }));
+    CHECK(feed.size() == 2);
+
+    feed.begin_match();
+    CHECK(feed.size() == 0);
+    feed.on_decision(state, make_decision(0, 1, { 1 }));
+    feed.begin_match();
+    CHECK(feed.size() == 1);
+    CHECK(feed.view(0).record->sequence == 2);
+}
+
 TEST_CASE("A cleared feed never reuses a sequence number")
 {
     DummyState state(10);

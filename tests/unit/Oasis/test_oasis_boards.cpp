@@ -114,3 +114,21 @@ TEST_CASE("read_options takes Oasis' own and the board options from parsed argum
     CHECK(options.rhi == "null");
     CHECK_THROWS_AS(oryx::CommandLine::global().parse(std::vector<std::string>{ "--unknown" }), oryx::Error);
 }
+
+TEST_CASE("--dashboard and --no-dashboard set the flag, --no-dashboard wins, and neither changes the launch plan")
+{
+    CHECK(read_options(oryx::CommandLine::global().parse(std::vector<std::string>{})).dashboard == DashboardFlag::Default);
+    CHECK(read_options(oryx::CommandLine::global().parse(std::vector<std::string>{ "--dashboard" })).dashboard == DashboardFlag::On);
+    CHECK(read_options(oryx::CommandLine::global().parse(std::vector<std::string>{ "--no-dashboard" })).dashboard == DashboardFlag::Off);
+    CHECK(read_options(oryx::CommandLine::global().parse(std::vector<std::string>{ "--dashboard", "--no-dashboard" })).dashboard == DashboardFlag::Off);
+
+    Options plain;
+    Options flagged;
+    flagged.dashboard = DashboardFlag::On;
+    LaunchPlan plain_plan;
+    LaunchPlan flagged_plan;
+    CHECK(plan_launch(plain, true, plain_plan));
+    CHECK(plan_launch(flagged, true, flagged_plan));
+    CHECK(plain_plan.mode == flagged_plan.mode);
+    CHECK(plain_plan.game == flagged_plan.game);
+}

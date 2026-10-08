@@ -54,6 +54,7 @@ void BoardSession::on_match_start()
     m_restarting = false;
     m_game_over = false;
     m_seconds_over = 0.0;
+    m_moves = 0;
     m_board->reset(m_next_seat);
 }
 

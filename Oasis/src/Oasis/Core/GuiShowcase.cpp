@@ -167,7 +167,12 @@ void GuiShowcase::frame(const FrameInfo& info)
     ensure_image();
     m_window = info.logical;
     const Numbers numbers{ Renderer::last_frame_stats(), Renderer::pipeline_cache_stats() };
-    run(make_im_input(info.input, 0, info.logical, info.scale, static_cast<float>(info.delta_time)), numbers);
+    ImInput input = make_im_input(info.input, 0, info.logical, info.scale, static_cast<float>(info.delta_time));
+    if (m_input_blocked)
+    {
+        input.pointer = ImPointer{};
+    }
+    run(input, numbers);
     if (Window* window = Application::Get().window())
     {
         window->set_cursor_kind(static_cast<CursorKind>(m_context.output().cursor));
@@ -245,7 +250,8 @@ void GuiShowcase::run(const ImInput& input, const Numbers& numbers)
 void GuiShowcase::build(const Numbers& numbers)
 {
     const Vec2f surface = m_context.input().surface_size;
-    if (m_minimised)
+    const bool hosted = !is_empty(m_region);
+    if (m_minimised && !hosted)
     {
         LayoutStyle mini = gui::anchored(AttachPoint::TopRight, fit(), fit(), { -k_panel_margin, k_panel_margin });
         mini.direction = Direction::Row;
@@ -265,7 +271,8 @@ void GuiShowcase::build(const Numbers& numbers)
         gui::show_toasts();
         return;
     }
-    LayoutStyle layout = gui::anchored(AttachPoint::TopRight, fixed(k_panel_width * m_applied_scale), fixed(math::max(surface[1] - 2.0f * k_panel_margin, 0.0f)), { -k_panel_margin, k_panel_margin });
+    LayoutStyle layout = hosted ? gui::anchored(AttachPoint::TopLeft, fixed(m_region.size[0]), fixed(m_region.size[1]), m_region.min)
+                                : gui::anchored(AttachPoint::TopRight, fixed(k_panel_width * m_applied_scale), fixed(math::max(surface[1] - 2.0f * k_panel_margin, 0.0f)), { -k_panel_margin, k_panel_margin });
     layout.direction = Direction::Column;
     layout.padding = uniform_insets(8.0f);
     layout.gap = gui::spacing();
@@ -275,9 +282,9 @@ void GuiShowcase::build(const Numbers& numbers)
         gui::PanelScope panel("showcase", options);
         {
             gui::RowScope title("title", { .width = grow(), .align = Align::Centre });
-            gui::label("GUI showcase (temporary)");
+            gui::label("GUI showcase");
             gui::spacer();
-            if (gui::small_button("-").clicked)
+            if (!hosted && gui::small_button("-").clicked)
             {
                 m_minimised = true;
             }

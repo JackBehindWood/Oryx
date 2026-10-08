@@ -31,6 +31,7 @@ private:
     bool on_start_simulation(StartSimulationEvent& event);
     bool on_restart_simulation(RestartSimulationEvent& event);
     void apply_seat_order();
+    void reset_run();
 
     UniquePtr<IGame> m_game;
     SmallVector<UniquePtr<IStrategy>, 2> m_strategy_storage;
@@ -39,6 +40,7 @@ private:
     SmallVector<uint32_t, 2> m_next_seat_order;
     int32_t m_match_count = 0;
     SharedPtr<ITurnObserver> m_observer;
+    IDecisionObserver* m_decision_observer = nullptr;
     // A lingering simulation keeps a finished match until a restart is requested and runs until the application closes.
     bool m_linger = false;
     bool m_restart_requested = false;

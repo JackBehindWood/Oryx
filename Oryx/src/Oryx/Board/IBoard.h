@@ -27,5 +27,7 @@ public:
 
 // Makes the board for a game and seat (a player, or k_all_seats for hot-seat); applications supply it for a board that is not the terminal one.
 using BoardFactory = std::function<SharedPtr<IBoard>(const std::string& game, PlayerId seat)>;
+// Undoes what the factory registered for a board (a window client, say); called before the board is dropped, so nothing keeps a reference to it.
+using BoardReleaser = std::function<void(IBoard&)>;
 
 } // namespace oryx

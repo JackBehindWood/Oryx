@@ -16,13 +16,15 @@ public:
                           int32_t match_count,
                           SharedPtr<ITurnObserver> observer,
                           bool benchmark,
-                          bool linger = false)
+                          bool linger = false,
+                          IDecisionObserver* decision_observer = nullptr)
         : m_game(std::move(game))
         , m_strategies(std::move(strategies))
         , m_match_count(match_count)
         , m_observer(std::move(observer))
         , m_benchmark(benchmark)
         , m_linger(linger)
+        , m_decision_observer(decision_observer)
     {
     }
 
@@ -32,6 +34,8 @@ public:
     SharedPtr<ITurnObserver> take_observer() { return std::move(m_observer); }
     [[nodiscard]] bool benchmark() const { return m_benchmark; }
     [[nodiscard]] bool linger() const { return m_linger; }
+    // Non-owning; must outlive the simulation, as Match::set_observer requires.
+    [[nodiscard]] IDecisionObserver* decision_observer() const { return m_decision_observer; }
 
     OX_EVENT_CLASS_TYPE(StartSimulation)
     OX_EVENT_CLASS_CATEGORY(EventCategoryApplication)
@@ -43,6 +47,28 @@ private:
     SharedPtr<ITurnObserver> m_observer;
     bool m_benchmark;
     bool m_linger;
+    IDecisionObserver* m_decision_observer;
+};
+
+// Asks the board layer for a new match; an empty name keeps the current game or opponent. Applied at the layer's next update.
+class StartMatchEvent : public Event
+{
+public:
+    StartMatchEvent(std::string game, std::string opponent)
+        : m_game(std::move(game))
+        , m_opponent(std::move(opponent))
+    {
+    }
+
+    [[nodiscard]] const std::string& game() const { return m_game; }
+    [[nodiscard]] const std::string& opponent() const { return m_opponent; }
+
+    OX_EVENT_CLASS_TYPE(StartMatch)
+    OX_EVENT_CLASS_CATEGORY(EventCategoryApplication)
+
+private:
+    std::string m_game;
+    std::string m_opponent;
 };
 
 // Starts the next match of a lingering simulation once the finished one has been shown.

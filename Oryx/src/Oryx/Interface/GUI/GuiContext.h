@@ -22,6 +22,21 @@ struct GuiToast
 
 static_assert(std::is_trivially_copyable_v<GuiToast> && std::is_standard_layout_v<GuiToast>);
 
+// The solved areas of the frame's workspace; the whole surface and two empty panels when none was declared.
+struct WorkspaceRects
+{
+    Rect central;
+    Rect left;
+    Rect right;
+};
+
+enum class WorkspaceArea : uint8_t
+{
+    Central,
+    Left,
+    Right
+};
+
 // The immediate-mode context of the developer tooling: ImContext plus the GuiTheme. Make it the active one with a ContextScope<GuiContext> to use the oryx::gui functions.
 class GuiContext : public ImContext
 {
@@ -70,10 +85,24 @@ public:
     }
     [[nodiscard]] GuiToast* toasts() { return m_toasts; }
 
+    // Remembered by the workspace widgets so workspace() can find the boxes in the latest solve.
+    void note_workspace_area(WorkspaceArea area, ImId id) { m_workspace_ids[static_cast<uint32_t>(area)] = id; }
+    // Valid after end_frame.
+    [[nodiscard]] WorkspaceRects workspace() const
+    {
+        WorkspaceRects rects;
+        rects.central = { { 0.0f, 0.0f }, input().surface_size };
+        std::ignore = is_valid(m_workspace_ids[0]) && layout_rect(m_workspace_ids[0], rects.central);
+        std::ignore = is_valid(m_workspace_ids[1]) && layout_rect(m_workspace_ids[1], rects.left);
+        std::ignore = is_valid(m_workspace_ids[2]) && layout_rect(m_workspace_ids[2], rects.right);
+        return rects;
+    }
+
 private:
     GuiTheme m_gui_theme = dark_gui_theme();
     GuiToast m_toasts[k_max_toasts];
     uint64_t m_menu_close_frame = 0;
+    ImId m_workspace_ids[3];
 };
 
 } // namespace oryx

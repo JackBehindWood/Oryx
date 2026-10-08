@@ -2,7 +2,7 @@
 
 #include "Options.h"
 
-#include "GuiShowcase.h"
+#include "OasisShell.h"
 
 namespace oasis
 {
@@ -26,7 +26,7 @@ private:
 
     Options m_options;
 #ifdef OX_ENABLE_GRAPHICS
-    oryx::UniquePtr<GuiShowcase> m_showcase;
+    oryx::UniquePtr<OasisShell> m_shell;
 #endif
 };
 

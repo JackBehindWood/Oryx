@@ -62,6 +62,135 @@ TEST_CASE("BoardLayer fails with an error for an unknown game")
     CHECK(app.exit_code() == 1);
 }
 
+namespace
+{
+
+// A windowless board layer whose boards are fakes, so a test sees which boards were made and released.
+struct SwitchRig
+{
+    explicit SwitchRig(const std::string& game, const std::string& opponent)
+        : app({ 0, nullptr })
+    {
+        simulation = &app.push_layer<SimulationLayer>();
+        BoardFactory factory = [this](const std::string& name, PlayerId) -> SharedPtr<IBoard>
+        {
+            created.push_back(name);
+            boards.push_back(create_shared<FakeBoard>());
+            return boards.back();
+        };
+        BoardReleaser releaser = [this](IBoard& board) { released.push_back(&board); };
+        layer = &app.push_layer<BoardLayer>(BoardLayerDesc{ game, opponent, factory, false, releaser });
+    }
+
+    void frame()
+    {
+        simulation->update(0.016);
+        layer->update(0.016);
+    }
+
+    void request(const std::string& game, const std::string& opponent)
+    {
+        StartMatchEvent event(game, opponent);
+        app.post_event(event);
+    }
+
+    std::vector<std::string> created;
+    std::vector<SharedPtr<FakeBoard>> boards;
+    std::vector<IBoard*> released;
+    // Last, so the layers detach (and call the releaser) before the vectors above go.
+    Application app;
+    SimulationLayer* simulation = nullptr;
+    BoardLayer* layer = nullptr;
+};
+
+} // namespace
+
+TEST_CASE("A StartMatchEvent is only recorded when posted and applied at the layer's next update")
+{
+    SwitchRig rig("tictactoe", "minimax");
+    rig.frame();
+    REQUIRE(rig.created.size() == 1);
+
+    rig.request("hexapawn", "");
+    CHECK(rig.created.size() == 1);
+    CHECK(rig.released.empty());
+
+    rig.frame();
+    REQUIRE(rig.created.size() == 2);
+    CHECK(rig.created.back() == "hexapawn");
+    REQUIRE(rig.released.size() == 1);
+    CHECK(rig.released.front() == rig.boards.front().get());
+    CHECK_FALSE(rig.layer->is_disabled());
+}
+
+TEST_CASE("Changing the opponent alone keeps the game, and a game change drops an opponent that does not fit it")
+{
+    SwitchRig rig("tictactoe", "tictactoe/heuristic");
+    rig.frame();
+
+    rig.request("", "random");
+    rig.frame();
+    REQUIRE(rig.created.size() == 2);
+    CHECK(rig.created.back() == "tictactoe");
+
+    rig.request("", "tictactoe/heuristic");
+    rig.frame();
+    rig.request("hexapawn", "");
+    rig.frame();
+    REQUIRE(rig.created.size() == 4);
+    CHECK(rig.created.back() == "hexapawn");
+}
+
+TEST_CASE("A StartMatchEvent naming an unknown game or opponent is rejected and the current match carries on")
+{
+    SwitchRig rig("tictactoe", "minimax");
+    rig.frame();
+
+    rig.request("no-such-game", "");
+    rig.frame();
+    rig.request("", "no-such-strategy");
+    rig.frame();
+    rig.request("", "hexapawn/heuristic");
+    rig.frame();
+
+    CHECK(rig.created.size() == 1);
+    CHECK(rig.released.empty());
+    CHECK_FALSE(rig.layer->is_disabled());
+    CHECK_FALSE(rig.app.closing());
+
+    rig.request("", "random");
+    rig.frame();
+    CHECK(rig.created.size() == 2);
+}
+
+TEST_CASE("BoardLayer names its match and reports progress only after a move in a game that is not over")
+{
+    SwitchRig rig("tictactoe", selection::k_human_opponent);
+    CHECK(rig.layer->game_name() == "tictactoe");
+    CHECK(rig.layer->opponent_name() == selection::k_human_opponent);
+    rig.frame();
+    CHECK_FALSE(rig.layer->match_in_progress());
+
+    rig.boards.front()->next_action = 0;
+    rig.frame();
+    rig.boards.front()->next_action = PENDING_ACTION;
+    CHECK(rig.layer->match_in_progress());
+
+    rig.request("hexapawn", "");
+    rig.frame();
+    CHECK(rig.layer->game_name() == "hexapawn");
+    CHECK_FALSE(rig.layer->match_in_progress());
+}
+
+TEST_CASE("BoardLayer releases its board when it is detached")
+{
+    SwitchRig rig("tictactoe", "minimax");
+    rig.frame();
+    rig.layer->detach();
+    REQUIRE(rig.released.size() == 1);
+    CHECK(rig.released.front() == rig.boards.front().get());
+}
+
 #ifdef OX_ENABLE_GRAPHICS
 
 #include "NullWindow.h"
@@ -155,6 +284,33 @@ TEST_CASE("BoardLayer plays a presented game in a window from clicks alone, then
     }
     CHECK_FALSE(game.board->presentation().terminal());
     CHECK(game.board->presentation().view().status == "White to move");
+}
+
+TEST_CASE("Switching games in a window removes the old board from the GraphicsLayer")
+{
+    RendererScope renderer(RHIBackend::Null);
+    Application app({ 0, nullptr });
+    app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", 800, 600 }));
+    GraphicsLayer& graphics = app.push_overlay<GraphicsLayer>();
+    SimulationLayer& simulation = app.push_layer<SimulationLayer>();
+    BoardFactory factory = [&graphics](const std::string& game, PlayerId seat) -> SharedPtr<IBoard>
+    {
+        SharedPtr<IGraphicsBoard> board = create_graphics_board(game, seat);
+        graphics.add_client(*board);
+        return board;
+    };
+    BoardReleaser releaser = [&graphics](IBoard& board) { graphics.remove_client(dynamic_cast<IGraphicsBoard&>(board)); };
+    BoardLayer& layer = app.push_layer<BoardLayer>(BoardLayerDesc{ "tictactoe", selection::k_human_opponent, factory, false, releaser });
+    CHECK(graphics.client_count() == 1);
+
+    StartMatchEvent request("hexapawn", "");
+    app.post_event(request);
+    CHECK(graphics.client_count() == 1);
+    simulation.update(0.016);
+    layer.update(0.016);
+    graphics.update(0.016);
+    CHECK(graphics.client_count() == 1);
+    CHECK_FALSE(app.closing());
 }
 
 TEST_CASE("BoardLayer closes the application on Escape in a window")

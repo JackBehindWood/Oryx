@@ -7,7 +7,7 @@
 namespace oasis
 {
 
-// Temporary until the Dashboard panel of Phase 11 Step 6: a live tour of the GUI widgets over the Oasis window, with the renderer's own numbers.
+// A live tour of the GUI widgets with the renderer's own numbers: over the whole window, or inside the region the shell gives it.
 class GuiShowcase : public oryx::IFrameClient, public oryx::RenderSource
 {
 public:
@@ -26,6 +26,10 @@ public:
     // One frame of the panel without the renderer, for a test with a font of its own.
     void run(const oryx::ImInput& input, const Numbers& numbers);
     void set_font(oryx::Font* font);
+    // The panel fills this rect instead of floating at the window's top right; an empty rect restores that.
+    void set_region(const oryx::Rect& region) { m_region = region; }
+    // While true the frame sees no pointer, for a popup or modal of the host that sits over it.
+    void set_input_blocked(bool blocked) { m_input_blocked = blocked; }
     [[nodiscard]] const oryx::GuiContext& context() const { return m_context; }
 
 private:
@@ -61,6 +65,8 @@ private:
     oryx::BatchStats m_replay_batch;
     oryx::UniquePtr<oryx::Texture2D> m_image;
     oryx::Vec2f m_window{ 0.0f, 0.0f };
+    oryx::Rect m_region;
+    bool m_input_blocked = false;
     float m_frame_ms[k_history] = {};
     uint32_t m_frame_head = 0;
     float m_fps = 60.0f;

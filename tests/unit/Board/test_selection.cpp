@@ -74,3 +74,28 @@ TEST_CASE("choose_opponent offers human and the game's strategies")
     CHECK(choose_opponent("tictactoe", "", true, name));
     CHECK(name == "random");
 }
+
+TEST_CASE("creatable_games lists the registered games sorted, and a new registration appears with no other change")
+{
+    std::vector<std::string> before = creatable_games();
+    CHECK(std::is_sorted(before.begin(), before.end()));
+    CHECK(std::find(before.begin(), before.end(), "tictactoe") != before.end());
+    CHECK(std::find(before.begin(), before.end(), "zz-extra") == before.end());
+
+    ExtraGame extra;
+    std::vector<std::string> after = creatable_games();
+    CHECK(after.size() == before.size() + 1);
+    CHECK(std::find(after.begin(), after.end(), "zz-extra") != after.end());
+}
+
+TEST_CASE("opponents_for offers hot-seat first, then the strategies that fit the game")
+{
+    StrategyRegistry::register_factory("zz-other/strategy", [](const Params&) -> UniquePtr<IStrategy> { return nullptr; });
+    std::vector<std::string> opponents = opponents_for("tictactoe");
+    StrategyRegistry::unregister_factory("zz-other/strategy");
+    REQUIRE_FALSE(opponents.empty());
+    CHECK(opponents.front() == k_human_opponent);
+    CHECK(std::find(opponents.begin(), opponents.end(), "minimax") != opponents.end());
+    CHECK(std::find(opponents.begin(), opponents.end(), "zz-other/strategy") == opponents.end());
+    CHECK(std::find(opponents.begin(), opponents.end(), "tictactoe/heuristic") != opponents.end());
+}

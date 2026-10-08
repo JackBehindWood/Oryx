@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Interface/GUI/GuiPolicies.h"
-#include "Oryx/Interface/GUI/GuiWidgets.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 
 // Widgets that turn numbers into pixels. Data comes in as `Values` (a view of the caller's floats), the look from the theme; everything custom is the caller's own code between the calls of a scope.
 namespace oryx::gui

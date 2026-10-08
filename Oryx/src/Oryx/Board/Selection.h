@@ -26,6 +26,9 @@ struct BoardOptions
 // Oasis has no way to supply parameters yet, so an entry with required ones cannot be created; throws Error.
 void require_creatable(const char* what, const std::string& name, const EntryInfo* info);
 [[nodiscard]] std::vector<std::string> strategies_for(const std::string& game);
+// What a menu may offer: sorted registered games Oasis can create, and k_human_opponent first followed by the game's creatable strategies.
+[[nodiscard]] std::vector<std::string> creatable_games();
+[[nodiscard]] std::vector<std::string> opponents_for(const std::string& game);
 
 // A non-empty request must name a creatable entry. Otherwise the choice is prompted on stdin when `prompt` is set, else defaulted. False means exit.
 [[nodiscard]] bool choose_game(const std::string& requested, bool prompt, std::string& out_name);

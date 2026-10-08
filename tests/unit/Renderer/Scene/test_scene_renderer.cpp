@@ -276,3 +276,222 @@ TEST_CASE("SceneRenderer resolves a clip against the framebuffer scale and recor
     CHECK(Renderer::end_frame());
     Renderer::set_viewport({});
 }
+
+namespace
+{
+
+// Draws one rect in Scene2D and keeps the view and camera it was handed.
+class ViewProbe final : public RenderSource
+{
+public:
+    explicit ViewProbe(std::vector<std::string>* log = nullptr, std::string name = {})
+        : m_log(log)
+        , m_name(std::move(name))
+    {
+    }
+
+    void render_stage(RenderStage stage, StageContext& context) override
+    {
+        if (stage != RenderStage::Scene2D && stage != RenderStage::Overlay)
+        {
+            return;
+        }
+        if (m_log != nullptr)
+        {
+            m_log->push_back(m_name + ":" + render_stage_name(stage));
+        }
+        if (stage == RenderStage::Scene2D)
+        {
+            logical = context.view.logical;
+            framebuffer = context.view.framebuffer;
+            camera = &context.view.camera;
+            const Camera2D& camera_2d = static_cast<const Camera2D&>(context.view.camera);
+            origin = camera_2d.world_to_screen({ 0.0f, 0.0f });
+            far_corner = camera_2d.world_to_screen(context.view.logical);
+        }
+        context.batcher_2d.draw_rect({ 1.0f, 1.0f }, { 1.0f, 1.0f }, WHITE);
+    }
+
+    Vec2f logical;
+    Vec2f framebuffer;
+    Vec2f origin;
+    Vec2f far_corner;
+    const Camera* camera = nullptr;
+
+private:
+    std::vector<std::string>* m_log;
+    std::string m_name;
+};
+
+RenderView surface_view(const Camera& camera, float scale = 1.0f)
+{
+    return { camera, { 400.0f, 300.0f }, { 400.0f * scale, 300.0f * scale }, scale };
+}
+
+} // namespace
+
+TEST_CASE("SceneRenderer: a region source sees a region-sized view whose origin lands on the region corner and is clipped to it")
+{
+    RendererGuard guard;
+    const Camera2D camera = Camera2D::screen_space(400.0f, 300.0f);
+    ViewProbe probe;
+    SceneRenderer& scene = Renderer::scene();
+    scene.begin_scene(surface_view(camera));
+    {
+        SubmitScope region(scene, { { { 100.0f, 50.0f }, { 200.0f, 100.0f } }, true, k_layer_world });
+        scene.submit(probe);
+    }
+    scene.end_scene();
+
+    CHECK(probe.logical == Vec2f(200.0f, 100.0f));
+    CHECK(probe.framebuffer == Vec2f(200.0f, 100.0f));
+    CHECK(probe.origin[0] == doctest::Approx(100.0f));
+    CHECK(probe.origin[1] == doctest::Approx(150.0f));
+    CHECK(probe.far_corner[0] == doctest::Approx(300.0f));
+    CHECK(probe.far_corner[1] == doctest::Approx(50.0f));
+    const std::vector<DrawItem>& items = scene.pass(RENDER_PASS_MAIN).items;
+    REQUIRE(items.size() == 2);
+    for (const DrawItem& item : items)
+    {
+        REQUIRE(item.has_scissor);
+        CHECK(item.scissor.x == 100);
+        CHECK(item.scissor.y == 50);
+        CHECK(item.scissor.width == 200);
+        CHECK(item.scissor.height == 100);
+    }
+}
+
+TEST_CASE("SceneRenderer: a region keeps its place at a HiDPI scale")
+{
+    RendererGuard guard;
+    const Camera2D camera = Camera2D::screen_space(400.0f, 300.0f);
+    ViewProbe probe;
+    SceneRenderer& scene = Renderer::scene();
+    scene.begin_scene(surface_view(camera, 2.0f));
+    {
+        SubmitScope region(scene, { { { 100.0f, 50.0f }, { 200.0f, 100.0f } }, true, k_layer_world });
+        scene.submit(probe);
+    }
+    scene.end_scene();
+
+    CHECK(probe.framebuffer == Vec2f(400.0f, 200.0f));
+    const std::vector<DrawItem>& items = scene.pass(RENDER_PASS_MAIN).items;
+    REQUIRE(items.size() == 2);
+    for (const DrawItem& item : items)
+    {
+        REQUIRE(item.has_scissor);
+        CHECK(item.scissor.x == 200);
+        CHECK(item.scissor.y == 100);
+        CHECK(item.scissor.width == 400);
+        CHECK(item.scissor.height == 200);
+    }
+}
+
+TEST_CASE("SceneRenderer: a region covering the surface draws exactly like no region")
+{
+    RendererGuard guard;
+    const Camera2D camera = Camera2D::screen_space(400.0f, 300.0f);
+    ViewProbe plain;
+    ViewProbe covering;
+    SceneRenderer& scene = Renderer::scene();
+
+    scene.begin_scene(surface_view(camera));
+    scene.submit(plain);
+    scene.end_scene();
+    const std::vector<DrawItem> expected = scene.pass(RENDER_PASS_MAIN).items;
+    scene.clear_items();
+
+    scene.begin_scene(surface_view(camera));
+    {
+        SubmitScope region(scene, { { { 0.0f, 0.0f }, { 400.0f, 300.0f } }, true, k_layer_world });
+        scene.submit(covering);
+    }
+    scene.end_scene();
+    const std::vector<DrawItem>& actual = scene.pass(RENDER_PASS_MAIN).items;
+
+    REQUIRE(actual.size() == expected.size());
+    CHECK_FALSE(actual[0].has_scissor);
+    CHECK(covering.camera == &camera);
+    CHECK(covering.logical == plain.logical);
+    CHECK(std::memcmp(actual[0].constants, expected[0].constants, actual[0].constants_size) == 0);
+    CHECK(actual[0].vertex_count == expected[0].vertex_count);
+}
+
+TEST_CASE("SceneRenderer: each region source binds its own camera and the stages stay stage-major")
+{
+    RendererGuard guard;
+    const Camera2D camera = Camera2D::screen_space(400.0f, 300.0f);
+    std::vector<std::string> log;
+    ViewProbe left(&log, "left");
+    ViewProbe right(&log, "right");
+    SceneRenderer& scene = Renderer::scene();
+    scene.begin_scene(surface_view(camera));
+    {
+        SubmitScope region(scene, { { { 0.0f, 0.0f }, { 150.0f, 300.0f } }, true, k_layer_world });
+        scene.submit(left);
+    }
+    {
+        SubmitScope region(scene, { { { 200.0f, 0.0f }, { 200.0f, 300.0f } }, true, k_layer_world });
+        scene.submit(right);
+    }
+    scene.end_scene();
+
+    const std::vector<std::string> expected = { "left:Scene2D", "right:Scene2D", "left:Overlay", "right:Overlay" };
+    CHECK(log == expected);
+    CHECK(left.origin[0] == doctest::Approx(0.0f));
+    CHECK(right.origin[0] == doctest::Approx(200.0f));
+    const std::vector<DrawItem>& items = scene.pass(RENDER_PASS_MAIN).items;
+    REQUIRE(items.size() == 4);
+    CHECK(std::memcmp(items[0].constants, items[1].constants, items[0].constants_size) != 0);
+}
+
+TEST_CASE("SceneRenderer orders sources by layer, then by submission")
+{
+    RendererGuard guard;
+    const Camera2D camera = Camera2D::screen_space(400.0f, 300.0f);
+    std::vector<std::string> log;
+    ViewProbe interface_first(&log, "interface_first");
+    ViewProbe world_a(&log, "world_a");
+    ViewProbe world_b(&log, "world_b");
+    ViewProbe interface_second(&log, "interface_second");
+    SceneRenderer& scene = Renderer::scene();
+    scene.begin_scene(surface_view(camera));
+    {
+        SubmitScope layer(scene, { {}, false, k_layer_interface });
+        scene.submit(interface_first);
+    }
+    scene.submit(world_a);
+    scene.submit(world_b);
+    {
+        SubmitScope layer(scene, { {}, false, k_layer_interface });
+        scene.submit(interface_second);
+    }
+    scene.end_scene();
+
+    const std::vector<std::string> expected = { "world_a:Scene2D", "world_b:Scene2D", "interface_first:Scene2D", "interface_second:Scene2D",
+                                                "world_a:Overlay", "world_b:Overlay", "interface_first:Overlay", "interface_second:Overlay" };
+    CHECK(log == expected);
+}
+
+TEST_CASE("SubmitScope restores the previous submit context and a new scene starts from the default")
+{
+    RendererGuard guard;
+    const Camera2D camera = Camera2D::screen_space(400.0f, 300.0f);
+    SceneRenderer& scene = Renderer::scene();
+    scene.begin_scene(surface_view(camera));
+    {
+        SubmitScope outer(scene, { {}, false, k_layer_interface });
+        {
+            SubmitScope inner(scene, { { { 1.0f, 1.0f }, { 2.0f, 2.0f } }, true, 5 });
+            CHECK(scene.submit_context().layer == 5);
+        }
+        CHECK(scene.submit_context().layer == k_layer_interface);
+        scene.set_submit_context({ {}, false, 7 });
+    }
+    CHECK(scene.submit_context().layer == k_layer_world);
+    scene.set_submit_context({ {}, false, 9 });
+    scene.end_scene();
+    scene.begin_scene(surface_view(camera));
+    CHECK(scene.submit_context().layer == k_layer_world);
+    scene.end_scene();
+}

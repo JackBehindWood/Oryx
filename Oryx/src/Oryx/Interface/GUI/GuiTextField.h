@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Interface/GUI/GuiTextEdit.h"
-#include "Oryx/Interface/GUI/GuiWidgets.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 
 // Private to Interface/GUI: the editable box that text_input, input_float/int and the slider and drag entry share.
 namespace oryx::gui::detail

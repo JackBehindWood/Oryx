@@ -63,7 +63,7 @@ void OasisLayer::attach()
 void OasisLayer::detach()
 {
 #ifdef OX_ENABLE_GRAPHICS
-    m_showcase.reset();
+    m_shell.reset();
 #endif
 }
 
@@ -104,6 +104,8 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
 
     oryx::GraphicsLayer& graphics = app.push_overlay<oryx::GraphicsLayer>();
     app.push_layer<oryx::SimulationLayer>();
+    m_shell = oryx::create_unique<OasisShell>(graphics.router(), m_options.dashboard);
+    graphics.add_client(*m_shell, { oryx::FramePhase::Interface });
     oryx::BoardFactory create_board = [&graphics](const std::string& game, oryx::PlayerId seat) -> oryx::SharedPtr<oryx::IBoard>
     {
         oryx::SharedPtr<oryx::IGraphicsBoard> board = oryx::create_graphics_board(game, seat);
@@ -113,9 +115,15 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
         }
         return board;
     };
-    app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent, create_board, false });
-    m_showcase = oryx::create_unique<GuiShowcase>();
-    graphics.add_client(*m_showcase);
+    oryx::BoardReleaser release_board = [&graphics](oryx::IBoard& board)
+    {
+        if (oryx::IGraphicsBoard* graphics_board = dynamic_cast<oryx::IGraphicsBoard*>(&board))
+        {
+            graphics.remove_client(*graphics_board);
+        }
+    };
+    oryx::BoardLayer& board = app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent, create_board, false, release_board, &m_shell->feed() });
+    m_shell->bind(board);
     return true;
 #else
     return false;

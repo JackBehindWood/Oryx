@@ -12,6 +12,7 @@ enum class EventType
     ApplicationClose,
     StartSimulation,
     RestartSimulation,
+    StartMatch,
     SimulationComplete,
     ReloadScripts,
     WindowClose,

@@ -24,6 +24,7 @@ project "Tests"
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Game/HexapawnPresenter.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/Options.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/GuiShowcase.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/OasisShell.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Strategy/TicTacToeHeuristicStrategy.cpp",
     }
 
@@ -49,7 +50,7 @@ project "Tests"
     useOryxPython()
     useOryxGraphics()
     if not graphicsEnabled() then
-        removefiles { "unit/Renderer/**", "unit/Interface/**", "unit/Dashboard/View/**", "unit/Graphics/**", "unit/Shaders/**", "unit/Board/Graphics/**", "unit/Assets/test_gpu_*", "benchmark/bench_im_context.cpp", "benchmark/bench_gui.cpp" }
+        removefiles { "unit/Renderer/**", "unit/Interface/**", "unit/Dashboard/View/**", "unit/Dashboard/Panel/**", "unit/Graphics/**", "unit/Shaders/**", "unit/Board/Graphics/**", "unit/Assets/test_gpu_*", "benchmark/bench_im_context.cpp", "benchmark/bench_gui.cpp" }
     end
 
     useOryxWholeArchive()

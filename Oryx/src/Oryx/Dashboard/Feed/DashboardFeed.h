@@ -16,10 +16,13 @@ public:
     DashboardFeed& operator=(const DashboardFeed&) = delete;
 
     void on_decision(const IState& state, const Decision& decision) override;
+    void on_match_start() override { begin_match(); }
 
     void reset(const FeedOptions& options);
     void clear();
     void begin_match();
+    // The next begin_match clears the ring first, so a switch to another game starts empty even if the old match decides once more before it ends.
+    void clear_at_next_match() { m_clear_at_next_match = true; }
 
     [[nodiscard]] const FeedOptions& options() const { return m_options; }
     [[nodiscard]] size_t size() const { return m_total < m_records.size() ? static_cast<size_t>(m_total) : m_records.size(); }
@@ -56,6 +59,7 @@ private:
     std::vector<KeyStats> m_key_stats;
     FeedDrops m_drops;
     uint64_t m_total = 0;
+    bool m_clear_at_next_match = false;
     uint64_t m_base_sequence = 0;
     uint32_t m_match_index = 0;
     uint32_t m_decision_index = 0;

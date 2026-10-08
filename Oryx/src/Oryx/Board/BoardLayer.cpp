@@ -17,6 +17,8 @@ BoardLayer::BoardLayer(BoardLayerDesc desc)
     , m_requested_game(std::move(desc.game))
     , m_requested_opponent(std::move(desc.opponent))
     , m_create_board(std::move(desc.create_board))
+    , m_release_board(std::move(desc.release_board))
+    , m_decision_observer(desc.decision_observer)
     , m_terminal(desc.terminal)
 {
 }
@@ -25,12 +27,73 @@ void BoardLayer::attach()
 {
     try
     {
-        start();
+        std::string game_name;
+        std::string opponent_name;
+        if (!selection::choose_game(m_requested_game, m_terminal, game_name) || !selection::choose_opponent(game_name, m_requested_opponent, m_terminal, opponent_name))
+        {
+            Application::Get().close(1);
+            return;
+        }
+        start(game_name, opponent_name);
     }
     catch (const Error& error)
     {
         error.log();
         Application::Get().close(1);
+    }
+}
+
+void BoardLayer::detach()
+{
+    release_current_board();
+}
+
+void BoardLayer::event(Event& event)
+{
+    EventDispatcher dispatcher(event);
+    dispatcher.dispatch<StartMatchEvent>(OX_BIND_EVENT_FN(on_start_match));
+}
+
+bool BoardLayer::on_start_match(StartMatchEvent& event)
+{
+    m_pending_game = event.game();
+    m_pending_opponent = event.opponent();
+    m_switch_requested = true;
+    return true;
+}
+
+void BoardLayer::release_current_board()
+{
+    if (m_session && m_release_board)
+    {
+        m_release_board(m_session->board());
+    }
+}
+
+void BoardLayer::apply_pending_match()
+{
+    m_switch_requested = false;
+    try
+    {
+        std::string game_name = m_pending_game.empty() ? m_game_name : m_pending_game;
+        std::string requested_opponent = m_pending_opponent.empty() ? m_opponent_name : m_pending_opponent;
+        std::vector<std::string> fitting = selection::opponents_for(game_name);
+        if (m_pending_opponent.empty() && std::find(fitting.begin(), fitting.end(), requested_opponent) == fitting.end())
+        {
+            requested_opponent.clear();
+        }
+
+        std::string checked_game;
+        std::string opponent_name;
+        if (!selection::choose_game(game_name, false, checked_game) || !selection::choose_opponent(checked_game, requested_opponent, false, opponent_name))
+        {
+            return;
+        }
+        start(checked_game, opponent_name);
+    }
+    catch (const Error& error)
+    {
+        error.log();
     }
 }
 
@@ -49,6 +112,11 @@ void BoardLayer::update(double delta_time)
             Application::Get().close();
         }
         return;
+    }
+
+    if (m_switch_requested)
+    {
+        apply_pending_match();
     }
 
     m_session->advance(delta_time);
@@ -80,16 +148,8 @@ SmallVector<uint32_t, 2> BoardLayer::draw_next_seats()
     return m_seat_order;
 }
 
-void BoardLayer::start()
+void BoardLayer::start(const std::string& game_name, const std::string& opponent_name)
 {
-    std::string game_name;
-    std::string opponent_name;
-    if (!selection::choose_game(m_requested_game, m_terminal, game_name) || !selection::choose_opponent(game_name, m_requested_opponent, m_terminal, opponent_name))
-    {
-        Application::Get().close(1);
-        return;
-    }
-
     UniquePtr<IGame> game = create_game(game_name);
     OX_INFO("Playing {}.", game->name());
 
@@ -100,6 +160,13 @@ void BoardLayer::start()
     {
         human_seat = static_cast<PlayerId>(m_random.get_int(0, static_cast<int64_t>(seat_count) - 1));
     }
+
+    SharedPtr<IBoard> board = m_create_board ? m_create_board(game_name, human_seat) : SharedPtr<IBoard>(create_console_board(game_name, human_seat));
+    if (board == nullptr)
+    {
+        throw Error("No board is available for '" + game_name + "'");
+    }
+    release_current_board();
     m_human_seat = human_seat;
     m_human_slot = static_cast<uint32_t>(human_seat < 0 ? 0 : human_seat);
     m_seat_order.clear();
@@ -107,12 +174,8 @@ void BoardLayer::start()
     {
         m_seat_order.push_back(seat);
     }
-
-    SharedPtr<IBoard> board = m_create_board ? m_create_board(game_name, human_seat) : SharedPtr<IBoard>(create_console_board(game_name, human_seat));
-    if (board == nullptr)
-    {
-        throw Error("No board is available for '" + game_name + "'");
-    }
+    m_game_name = game_name;
+    m_opponent_name = opponent_name;
     m_session = create_shared<BoardSession>(board, m_terminal, human_seat);
 
     SmallVector<UniquePtr<IStrategy>, 2> strategies(seat_count);
@@ -130,7 +193,7 @@ void BoardLayer::start()
         OX_INFO("You are player {} against '{}'.", human_seat + 1, opponent_name);
     }
 
-    StartSimulationEvent event(std::move(game), std::move(strategies), 1, m_session, false, !m_terminal);
+    StartSimulationEvent event(std::move(game), std::move(strategies), 1, m_session, false, !m_terminal, m_decision_observer);
     Application::Get().post_event(event);
 }
 

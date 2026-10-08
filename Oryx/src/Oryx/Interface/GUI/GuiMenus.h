@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Interface/GUI/GuiWidgets.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 
 // Menus, popups and the overlays that float above the rest: they draw on the reserved popup and tooltip channels and, except for menu items and popup contents, never take input.
 namespace oryx::gui

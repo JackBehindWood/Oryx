@@ -38,6 +38,8 @@ struct GuiTheme : ImTheme
     float scroll_line_px = 40.0f;
     float scrollbar_width = 8.0f;
     float tooltip_delay = 0.5f;
+    // Covers everything beneath a modal.
+    Colour modal_dim = { 0.0f, 0.0f, 0.0f, 0.5f };
     // Left padding of the children of a tree node.
     float indent = 16.0f;
     // Categorical colours for series, legends and tags: the Okabe-Ito set, distinguishable with the common colour-vision deficiencies.

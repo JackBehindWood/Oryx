@@ -164,7 +164,7 @@ std::vector<std::string> strategies_for(const std::string& game)
     return sorted(std::move(names));
 }
 
-bool choose_game(const std::string& requested, bool prompt, std::string& out_name)
+std::vector<std::string> creatable_games()
 {
     std::vector<std::string> names;
     for (const std::string& name : sorted(GameRegistry::names()))
@@ -174,6 +174,19 @@ bool choose_game(const std::string& requested, bool prompt, std::string& out_nam
             names.push_back(name);
         }
     }
+    return names;
+}
+
+std::vector<std::string> opponents_for(const std::string& game)
+{
+    std::vector<std::string> opponents = strategies_for(game);
+    opponents.insert(opponents.begin(), k_human_opponent);
+    return opponents;
+}
+
+bool choose_game(const std::string& requested, bool prompt, std::string& out_name)
+{
+    std::vector<std::string> names = creatable_games();
 
     if (!requested.empty())
     {
@@ -213,8 +226,7 @@ bool choose_game(const std::string& requested, bool prompt, std::string& out_nam
 
 bool choose_opponent(const std::string& game, const std::string& requested, bool prompt, std::string& out_name)
 {
-    std::vector<std::string> opponents = strategies_for(game);
-    opponents.insert(opponents.begin(), k_human_opponent);
+    std::vector<std::string> opponents = opponents_for(game);
 
     if (!requested.empty())
     {

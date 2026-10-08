@@ -53,13 +53,29 @@ void SimulationLayer::apply_seat_order()
     m_next_seat_order.clear();
 }
 
+void SimulationLayer::reset_run()
+{
+    m_match.reset();
+    m_game.reset();
+    m_strategies.clear();
+    m_strategy_storage.clear();
+    m_next_seat_order.clear();
+    m_observer.reset();
+    m_decision_observer = nullptr;
+    m_restart_requested = false;
+    m_completed = 0;
+    m_result = BatchResult();
+}
+
 bool SimulationLayer::on_start_simulation(StartSimulationEvent& event)
 {
+    reset_run();
     m_game = event.take_game();
     m_strategy_storage = event.take_strategies();
     m_match_count = event.match_count();
     m_observer = event.take_observer();
     m_linger = event.linger();
+    m_decision_observer = event.decision_observer();
 
     m_strategies.reserve(m_strategy_storage.size());
     for (const UniquePtr<IStrategy>& strategy : m_strategy_storage)
@@ -126,7 +142,12 @@ void SimulationLayer::update(double)
         }
         apply_seat_order();
         m_match = create_unique<Match>(*m_game, m_strategies);
+        m_match->set_observer(m_decision_observer);
         m_restart_requested = false;
+        if (m_decision_observer)
+        {
+            m_decision_observer->on_match_start();
+        }
         if (m_observer)
         {
             m_observer->on_match_start();
@@ -179,6 +200,10 @@ void SimulationLayer::update(double)
 
     OX_CORE_ASSERT(is_game_action(action), "SimulationLayer: a strategy returned a reserved action id.");
     m_match->apply(action);
+    if (m_observer)
+    {
+        m_observer->on_move();
+    }
 }
 
 } // namespace oryx

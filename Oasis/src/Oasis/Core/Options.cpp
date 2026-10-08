@@ -37,7 +37,9 @@ public:
         command_line.flag("headless", "Run without a window or renderer (plays or simulates in the terminal)", { "console", "no-window" })
             .option("simulate", "A,B,N", "Run N matches between strategies A and B instead of playing (headless)")
             .flag("benchmark", "Report timing and memory for --simulate")
-            .option("rhi", "BACKEND", "Rendering backend (e.g. metal, null)");
+            .option("rhi", "BACKEND", "Rendering backend (e.g. metal, null)")
+            .flag("dashboard", "Show the strategy dashboard (overrides dashboard.enabled)")
+            .flag("no-dashboard", "Hide the strategy dashboard (overrides dashboard.enabled and --dashboard)");
     }
 };
 
@@ -56,6 +58,14 @@ Options read_options(const oryx::ParsedArgs& args)
     options.opponent = board.opponent;
     options.simulate = args.value("simulate");
     options.rhi = args.value("rhi");
+    if (args.has("no-dashboard"))
+    {
+        options.dashboard = DashboardFlag::Off;
+    }
+    else if (args.has("dashboard"))
+    {
+        options.dashboard = DashboardFlag::On;
+    }
     return options;
 }
 

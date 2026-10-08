@@ -235,3 +235,102 @@ TEST_CASE("A restart can seat the strategies in a new order and tells the observ
     CHECK(second_strategy_seats.back() == 0);
     CHECK(observer->matches_started == 2);
 }
+
+namespace
+{
+
+class MatchCountingObserver : public IDecisionObserver
+{
+public:
+    void on_decision(const IState&, const Decision&) override { ++decisions; }
+    void on_match_start() override { ++matches_started; }
+
+    int32_t decisions = 0;
+    int32_t matches_started = 0;
+};
+
+SmallVector<UniquePtr<IStrategy>, 2> counting_strategies(int32_t& first_calls, int32_t& second_calls)
+{
+    SmallVector<UniquePtr<IStrategy>, 2> strategies;
+    strategies.push_back(make_external([&first_calls](const Context& context) -> ActionId { ++first_calls; return context.state().legal_actions()[0]; }));
+    strategies.push_back(make_external([&second_calls](const Context& context) -> ActionId { ++second_calls; return context.state().legal_actions()[0]; }));
+    return strategies;
+}
+
+} // namespace
+
+TEST_CASE("A second StartSimulationEvent replaces the first run instead of appending to it")
+{
+    Application app({ 0, nullptr });
+    SimulationLayer& layer = app.push_layer<SimulationLayer>();
+
+    int32_t old_first = 0;
+    int32_t old_second = 0;
+    StartSimulationEvent first(create_unique<DummyGame>(10), counting_strategies(old_first, old_second), /*match_count=*/5, nullptr, /*benchmark=*/false);
+    app.post_event(first);
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        layer.update(0.0);
+    }
+    int32_t old_first_before = old_first;
+    int32_t old_second_before = old_second;
+    CHECK(old_first_before + old_second_before > 0);
+
+    int32_t new_first = 0;
+    int32_t new_second = 0;
+    StartSimulationEvent second(create_unique<DummyGame>(10), counting_strategies(new_first, new_second), /*match_count=*/1, nullptr, /*benchmark=*/false);
+    app.post_event(second);
+    CHECK(layer.result().matches == 0);
+
+    for (int32_t i = 0; i < 100 && !app.closing(); ++i)
+    {
+        layer.update(0.0);
+    }
+
+    CHECK(layer.result().matches == 1);
+    CHECK(layer.result().wins.size() == 2);
+    CHECK(new_first > 0);
+    CHECK(new_second > 0);
+    CHECK(old_first == old_first_before);
+    CHECK(old_second == old_second_before);
+}
+
+TEST_CASE("The decision observer of a start event is told about every match it will see")
+{
+    Application app({ 0, nullptr });
+    SimulationLayer& layer = app.push_layer<SimulationLayer>();
+
+    MatchCountingObserver observer;
+    SmallVector<UniquePtr<IStrategy>, 2> strategies;
+    strategies.push_back(create_unique<DummyGreedyStrategy>());
+    strategies.push_back(create_unique<DummyGreedyStrategy>());
+    StartSimulationEvent start(create_unique<DummyGame>(10), std::move(strategies), /*match_count=*/3, nullptr, /*benchmark=*/false, /*linger=*/false, &observer);
+    app.post_event(start);
+    app.run();
+
+    CHECK(layer.result().matches == 3);
+    CHECK(observer.matches_started == 3);
+}
+
+TEST_CASE("A dashboard feed receives the labelled decisions of Tic-Tac-Toe against Minimax, one match at a time")
+{
+    Application app({ 0, nullptr });
+    SimulationLayer& layer = app.push_layer<SimulationLayer>();
+
+    DashboardFeed feed;
+    SmallVector<UniquePtr<IStrategy>, 2> strategies;
+    strategies.push_back(StrategyRegistry::create("minimax"));
+    strategies.push_back(StrategyRegistry::create("minimax"));
+    StartSimulationEvent start(GameRegistry::create("tictactoe"), std::move(strategies), /*match_count=*/2, nullptr, /*benchmark=*/false, /*linger=*/false, &feed);
+    app.post_event(start);
+    app.run();
+
+    REQUIRE(layer.result().matches == 2);
+    REQUIRE(feed.size() > 0);
+    CHECK(feed.match_index() == 1);
+    CHECK(feed.view(0).record->match_index == 0);
+    RecordView last = feed.view(feed.size() - 1);
+    CHECK(last.record->match_index == 1);
+    CHECK(last.record->score_count > 0);
+    CHECK(last.record->chosen_label.length > 0);
+}

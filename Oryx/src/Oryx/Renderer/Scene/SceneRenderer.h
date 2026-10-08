@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Core/ViewRegion.h"
 #include "Oryx/Renderer/Batch/BatchRenderer2D.h"
 #include "Oryx/Renderer/Batch/DebugRenderer.h"
 #include "Oryx/Renderer/Scene/RenderPass.h"
@@ -29,6 +30,18 @@ public:
     virtual void render_stage(RenderStage, StageContext&) {}
 };
 
+// Sources draw in layer order, then submission order; the interface layer draws on top of the world.
+constexpr int32_t k_layer_world = 0;
+constexpr int32_t k_layer_interface = 100;
+
+// Where the sources submitted next draw: a sub-view of the scene's surface (logical points, origin top left) and their draw layer.
+struct SubmitContext
+{
+    ViewRegion region;
+    bool has_region = false;
+    int32_t layer = k_layer_world;
+};
+
 struct SceneRendererDesc
 {
     BatchRendererDesc batch;
@@ -49,8 +62,11 @@ public:
 
     // Throws Error when a scene is already open. The view's camera must outlive end_scene.
     void begin_scene(const RenderView& view);
-    // Queues a source for the open scene; it must outlive end_scene. Throws Error outside a scene.
+    // Queues a source for the open scene under the current submit context; it must outlive end_scene. Throws Error outside a scene.
     void submit(RenderSource& source);
+    // A source with a region sees a StageContext view of the region's size and draws clipped to it; screen-space scenes only.
+    void set_submit_context(const SubmitContext& context) { m_context = context; }
+    [[nodiscard]] const SubmitContext& submit_context() const { return m_context; }
     // Runs the stages and closes the scene even when a stage throws. Throws Error outside a scene.
     void end_scene();
     void render(const RenderView& view, RenderSource& source);
@@ -82,12 +98,41 @@ private:
     DebugRenderer* m_debug;
     RenderPassId m_route[RENDER_STAGE_COUNT];
     std::vector<RenderPass*> m_order;
-    std::vector<RenderSource*> m_sources;
+    struct Entry
+    {
+        RenderSource* source;
+        SubmitContext context;
+    };
+
+    [[nodiscard]] bool whole(const Entry& entry) const;
+
+    std::vector<Entry> m_sources;
+    SubmitContext m_context;
     const Camera* m_camera = nullptr;
     Vec2f m_logical;
     Vec2f m_framebuffer;
     float m_scale = 1.0f;
     bool m_open = false;
+};
+
+// Sets the submit context for its lifetime and restores the previous one.
+class SubmitScope
+{
+public:
+    SubmitScope(SceneRenderer& scene, const SubmitContext& context)
+        : m_scene(scene)
+        , m_previous(scene.submit_context())
+    {
+        m_scene.set_submit_context(context);
+    }
+    ~SubmitScope() { m_scene.set_submit_context(m_previous); }
+
+    SubmitScope(const SubmitScope&) = delete;
+    SubmitScope& operator=(const SubmitScope&) = delete;
+
+private:
+    SceneRenderer& m_scene;
+    SubmitContext m_previous;
 };
 
 // Opens a scene for its lifetime; the destructor ends it without throwing while another exception is unwinding.

@@ -21,10 +21,13 @@ public:
     void on_turn(IState& state) override;
     // The next match exists: the board forgets the finished game and takes the seat chosen by restart.
     void on_match_start() override;
+    void on_move() override { ++m_moves; }
     ActionId next_action(const Context& context) override;
 
     [[nodiscard]] IBoard& board() { return *m_board; }
     [[nodiscard]] bool game_over() const { return m_game_over; }
+    // Game actions applied since the match started.
+    [[nodiscard]] uint32_t moves() const { return m_moves; }
 
     void advance(double delta_time);
     // The finished game has been on screen long enough that a restart input should be honoured.
@@ -40,6 +43,7 @@ private:
     bool m_restarting = false;
     bool m_game_over = false;
     double m_seconds_over = 0.0;
+    uint32_t m_moves = 0;
 };
 
 } // namespace oryx

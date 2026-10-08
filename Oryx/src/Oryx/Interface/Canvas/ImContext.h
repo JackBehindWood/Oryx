@@ -214,6 +214,8 @@ public:
     [[nodiscard]] PopupResult begin_popup_layer(ImId box_id);
     void end_popup_layer();
     [[nodiscard]] uint32_t popup_depth() const { return m_popup_depth; }
+    // After end_frame: whether the frame opened any popup layer (a menu, popup or modal), so the owner leaves the pointer and keyboard to the interface.
+    [[nodiscard]] bool popup_open() const { return m_last_popup_count != 0; }
     // The box id the innermost open layer was begun with; the none id outside any layer.
     [[nodiscard]] ImId popup_id() const;
 

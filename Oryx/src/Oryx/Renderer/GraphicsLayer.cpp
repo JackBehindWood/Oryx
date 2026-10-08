@@ -47,32 +47,13 @@ void GraphicsLayer::attach()
 
 void GraphicsLayer::apply_settings(const GraphicsSettings& settings)
 {
-    m_idle_sleep = std::chrono::milliseconds(settings.idle_sleep_ms);
-    m_frame_period = settings.max_fps > 0 ? std::chrono::nanoseconds(1'000'000'000 / settings.max_fps) : std::chrono::nanoseconds(0);
-    m_next_frame = std::chrono::steady_clock::now();
+    m_idle_sleep_ms = settings.idle_sleep_ms;
+    m_pacer.set_rate(settings.max_fps);
     m_reload_key = key_from_name(settings.reload_key);
     if (m_viewport && Renderer::initialised() && settings.vsync != m_applied_vsync)
     {
         Renderer::rhi().set_viewport_vsync(m_viewport.get(), settings.vsync);
         m_applied_vsync = settings.vsync;
-    }
-}
-
-void GraphicsLayer::pace_frame()
-{
-    using clock = std::chrono::steady_clock;
-    const clock::time_point now = clock::now();
-    m_next_frame += m_frame_period;
-    if (now >= m_next_frame)
-    {
-        m_next_frame = now;
-        return;
-    }
-    // OS sleeps overshoot by about a millisecond, so sleep short of the deadline and yield-spin the rest.
-    std::this_thread::sleep_until(m_next_frame - std::chrono::milliseconds(1));
-    while (clock::now() < m_next_frame)
-    {
-        std::this_thread::yield();
     }
 }
 
@@ -87,14 +68,14 @@ void GraphicsLayer::detach()
     m_viewport.reset();
 }
 
-void GraphicsLayer::add_client(IFrameClient& client)
+void GraphicsLayer::add_client(IFrameClient& client, const ClientDesc& desc)
 {
-    m_clients.push_back(&client);
+    m_clients.push_back({ &client, desc });
 }
 
 void GraphicsLayer::remove_client(IFrameClient& client)
 {
-    m_clients.erase(std::remove(m_clients.begin(), m_clients.end(), &client), m_clients.end());
+    m_clients.erase(std::remove_if(m_clients.begin(), m_clients.end(), [&client](const Client& entry) { return entry.client == &client; }), m_clients.end());
 }
 
 void GraphicsLayer::set_clear_colour(const Colour& colour)
@@ -135,7 +116,7 @@ void GraphicsLayer::update(double delta_time)
         const Camera2D camera = Camera2D::screen_space(std::max(info.logical[0], 1.0f), std::max(info.logical[1], 1.0f));
         SceneRenderer& scene = Renderer::scene();
         scene.begin_scene(make_render_view(camera, info));
-        run_clients(info);
+        run_phases(info, &scene);
         cpu.clients_ms = lap_ms();
         try
         {
@@ -151,7 +132,7 @@ void GraphicsLayer::update(double delta_time)
     }
     else
     {
-        run_clients(info);
+        run_phases(info, nullptr);
     }
 
     bool idle = false;
@@ -168,24 +149,70 @@ void GraphicsLayer::update(double delta_time)
         Application::Get().close();
     }
 
-    if (idle && m_idle_sleep.count() > 0)
+    if (idle && m_idle_sleep_ms > 0)
     {
-        std::this_thread::sleep_for(m_idle_sleep);
-        m_next_frame = std::chrono::steady_clock::now();
+        FramePacer::sleep_ms(m_idle_sleep_ms);
+        m_pacer.reset();
     }
-    else if (m_frame_period.count() > 0)
+    else if (m_pacer.capped())
     {
-        pace_frame();
+        m_pacer.wait();
     }
 }
 
-void GraphicsLayer::run_clients(const FrameInfo& info)
+namespace
+{
+
+void call_client(IFrameClient& client, const FrameInfo& info, SceneRenderer* scene, const SubmitContext& context)
+{
+    if (scene == nullptr)
+    {
+        client.frame(info);
+        return;
+    }
+    SubmitScope submit(*scene, context);
+    client.frame(info);
+}
+
+} // namespace
+
+void GraphicsLayer::run_phases(const FrameInfo& info, SceneRenderer* scene)
+{
+    m_router.begin_frame(info.input, info.logical);
+    const FrameInfo interface_info{ m_router.interface_input(), info.logical, info.framebuffer, info.scale, info.delta_time };
+    run_clients(FramePhase::Interface, interface_info, scene);
+    m_router.begin_world();
+    run_clients(FramePhase::World, info, scene);
+}
+
+void GraphicsLayer::run_clients(FramePhase phase, const FrameInfo& info, SceneRenderer* scene)
 {
     for (size_t index = 0; index < m_clients.size();)
     {
+        const Client entry = m_clients[index];
+        if (entry.desc.phase != phase)
+        {
+            ++index;
+            continue;
+        }
         try
         {
-            m_clients[index]->frame(info);
+            if (phase == FramePhase::Interface)
+            {
+                call_client(*entry.client, info, scene, { {}, false, k_layer_interface });
+            }
+            else
+            {
+                ViewRegion region;
+                if (m_router.has_view(entry.desc.view))
+                {
+                    region = m_router.view(entry.desc.view);
+                }
+                const bool whole = math::approx_equal(region.size[0], info.logical[0]) && math::approx_equal(region.size[1], info.logical[1]);
+                const Vec2f framebuffer = whole ? info.framebuffer : Vec2f(region.size[0] * info.scale, region.size[1] * info.scale);
+                const FrameInfo view_info{ m_router.world_input(entry.desc.view), region.size, framebuffer, info.scale, info.delta_time };
+                call_client(*entry.client, view_info, scene, { region, true, k_layer_world });
+            }
             ++index;
         }
         catch (const Error& error)

@@ -93,6 +93,7 @@ void SceneRenderer::begin_scene(const RenderView& view)
     m_framebuffer = view.framebuffer;
     m_scale = view.scale;
     m_sources.clear();
+    m_context = {};
     m_open = true;
 }
 
@@ -102,7 +103,16 @@ void SceneRenderer::submit(RenderSource& source)
     {
         throw Error("submit needs an open scene", "call begin_scene first");
     }
-    m_sources.push_back(&source);
+    const auto after = std::upper_bound(m_sources.begin(), m_sources.end(), m_context.layer, [](int32_t layer, const Entry& entry) { return layer < entry.context.layer; });
+    m_sources.insert(after, Entry{ &source, m_context });
+}
+
+bool SceneRenderer::whole(const Entry& entry) const
+{
+    const ViewRegion& region = entry.context.region;
+    return !entry.context.has_region
+        || (math::approx_equal(region.min[0], 0.0f) && math::approx_equal(region.min[1], 0.0f)
+            && math::approx_equal(region.size[0], m_logical[0]) && math::approx_equal(region.size[1], m_logical[1]));
 }
 
 void SceneRenderer::end_scene()
@@ -146,36 +156,80 @@ void SceneRenderer::run_stage(RenderStage stage, const RenderView& view)
         return;
     }
     RenderPass& target = *m_passes[id];
-    StageContext context{ view, target, m_batcher };
+
+    const auto region_camera = [&view](const ViewRegion& region)
+    {
+        Camera2D camera = Camera2D::screen_space(view.logical[0], view.logical[1]);
+        camera.set_position({ view.logical[0] * 0.5f - region.min[0], view.logical[1] * 0.5f - (view.logical[1] - region.min[1] - region.size[1]) });
+        return camera;
+    };
+    const auto region_view = [&view](const Camera& camera, const ViewRegion& region) { return RenderView{ camera, region.size, Vec2f(region.size[0] * view.scale, region.size[1] * view.scale), view.scale }; };
+
     if (!batched_2d(stage))
     {
-        for (RenderSource* source : m_sources)
+        for (const Entry& entry : m_sources)
         {
-            source->render_stage(stage, context);
+            if (whole(entry))
+            {
+                StageContext context{ view, target, m_batcher };
+                entry.source->render_stage(stage, context);
+                continue;
+            }
+            const Camera2D camera = region_camera(entry.context.region);
+            const RenderView sub = region_view(camera, entry.context.region);
+            StageContext context{ sub, target, m_batcher };
+            entry.source->render_stage(stage, context);
         }
         return;
     }
-
-    auto run_batched = [&](const Camera& camera)
+    if (stage != RenderStage::Scene2D && !(view.logical[0] > 0.0f && view.logical[1] > 0.0f))
     {
-        const Vec2f extent = target.desc.colour ? Vec2f(static_cast<float>(target.desc.colour->width()), static_cast<float>(target.desc.colour->height())) : view.framebuffer;
-        BatcherScope scope(m_batcher, camera, BatchTarget{ target.items, target.formats, extent });
-        for (RenderSource* source : m_sources)
-        {
-            source->render_stage(stage, context);
-        }
-        if (stage == RenderStage::Scene2D && m_debug != nullptr)
-        {
-            m_debug->render(m_batcher);
-        }
-    };
-    if (stage == RenderStage::Scene2D)
-    {
-        run_batched(view.camera);
+        return;
     }
-    else if (view.logical[0] > 0.0f && view.logical[1] > 0.0f)
+
+    const Vec2f extent = target.desc.colour ? Vec2f(static_cast<float>(target.desc.colour->width()), static_cast<float>(target.desc.colour->height())) : view.framebuffer;
+    const BatchTarget batch_target{ target.items, target.formats, extent };
+    const Camera2D screen = Camera2D::screen_space(math::max(view.logical[0], 1.0f), math::max(view.logical[1], 1.0f));
+    const Camera& whole_camera = stage == RenderStage::Scene2D ? view.camera : screen;
+    const bool replay_debug = stage == RenderStage::Scene2D && m_debug != nullptr;
+    bool debug_replayed = false;
+
+    size_t index = 0;
+    while (index < m_sources.size())
     {
-        run_batched(Camera2D::screen_space(view.logical[0], view.logical[1]));
+        if (whole(m_sources[index]))
+        {
+            size_t end = index;
+            while (end < m_sources.size() && whole(m_sources[end]))
+            {
+                ++end;
+            }
+            BatcherScope scope(m_batcher, whole_camera, batch_target);
+            StageContext context{ view, target, m_batcher };
+            for (; index < end; ++index)
+            {
+                m_sources[index].source->render_stage(stage, context);
+            }
+            if (replay_debug && index == m_sources.size())
+            {
+                m_debug->render(m_batcher);
+                debug_replayed = true;
+            }
+            continue;
+        }
+        const Entry& entry = m_sources[index++];
+        const ViewRegion& region = entry.context.region;
+        const Camera2D camera = region_camera(region);
+        const RenderView sub = region_view(camera, region);
+        BatcherScope scope(m_batcher, camera, batch_target);
+        ClipScope clip(m_batcher, { region.size[0] * 0.5f, region.size[1] * 0.5f }, region.size);
+        StageContext context{ sub, target, m_batcher };
+        entry.source->render_stage(stage, context);
+    }
+    if (replay_debug && !debug_replayed)
+    {
+        BatcherScope scope(m_batcher, whole_camera, batch_target);
+        m_debug->render(m_batcher);
     }
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Oryx/Interface/GUI/GuiWidgets.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 
 // A table in the manner of ImGui's: declare the columns, draw the header, then submit only the rows that are visible. The caller owns the data and its order, and sorts it when the header says so.
 namespace oryx::gui

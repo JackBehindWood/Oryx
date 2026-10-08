@@ -57,6 +57,12 @@ void DashboardFeed::clear()
 
 void DashboardFeed::begin_match()
 {
+    if (m_clear_at_next_match)
+    {
+        m_clear_at_next_match = false;
+        clear();
+        return;
+    }
     if (m_decision_index > 0)
     {
         ++m_match_index;

@@ -143,7 +143,7 @@ TEST_CASE("GraphicsLayer calls each frame client once per frame with the window'
     CHECK(first.last_framebuffer == Vec2f(320.0f, 200.0f));
     CHECK(first.last_scale == 1.0f);
     CHECK(first.last_delta == 0.5);
-    CHECK(first.input == &app.window->input());
+    CHECK(first.input == &app.layer->router().world_input(k_main_view));
 
     app.window->inject_scale(2.0f);
     app.layer->update(0.25);

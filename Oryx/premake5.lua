@@ -117,6 +117,7 @@ project "Oryx"
             "src/Oryx/Renderer/**",
             "src/Oryx/Interface/**",
             "src/Oryx/Dashboard/View/**",
+            "src/Oryx/Dashboard/Panel/**",
             "src/Oryx/Board/Graphics/**",
             "src/Oryx/Assets/Gpu*"
         }
