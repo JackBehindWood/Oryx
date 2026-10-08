@@ -258,7 +258,7 @@ void GuiShowcase::build(const Numbers& numbers)
         mini.padding = uniform_insets(6.0f);
         mini.gap = gui::spacing();
         mini.align_y = Align::Centre;
-        gui::WidgetOptions mini_options;
+        gui::PanelOptions mini_options;
         mini_options.layout = &mini;
         {
             gui::PanelScope panel("showcase minimised", mini_options);
@@ -276,7 +276,7 @@ void GuiShowcase::build(const Numbers& numbers)
     layout.direction = Direction::Column;
     layout.padding = uniform_insets(8.0f);
     layout.gap = gui::spacing();
-    gui::WidgetOptions options;
+    gui::PanelOptions options;
     options.layout = &layout;
     {
         gui::PanelScope panel("showcase", options);

@@ -3,6 +3,7 @@
 #include "Oryx/Interface/Canvas/ActiveContext.h"
 #include "Oryx/Interface/Canvas/ImContext.h"
 #include "Oryx/Interface/Canvas/ImWidgets.h"
+#include "Oryx/Interface/GUI/Dock/GuiPanelHostState.h"
 #include "Oryx/Interface/GUI/GuiTheme.h"
 
 namespace oryx
@@ -98,7 +99,11 @@ public:
         return rects;
     }
 
+    // The dock host's registered panels and frame state; see GuiPanelHost.h.
+    [[nodiscard]] gui::PanelHostState& panel_host() { return m_panel_host; }
+
 private:
+    gui::PanelHostState m_panel_host;
     GuiTheme m_gui_theme = dark_gui_theme();
     GuiToast m_toasts[k_max_toasts];
     uint64_t m_menu_close_frame = 0;

@@ -15,6 +15,7 @@ inline constexpr uint32_t k_max_dock_closed = 32;
 inline constexpr uint32_t k_max_dock_surfaces = 2;
 inline constexpr uint32_t k_max_panels = 32;
 inline constexpr uint32_t k_panel_text_size = 48;
+inline constexpr uint32_t k_max_dock_rules = 4;
 
 inline constexpr int32_t k_no_node = -1;
 // A drop target meaning "the whole tree of surface 0" rather than one node.
@@ -91,6 +92,11 @@ struct PanelDesc
     float min_h = 0.0f;
     char name[k_panel_text_size] = {};
     char title[k_panel_text_size] = {};
+    // Optional docking limits: when dock_only is not empty the panel may only dock into (tab with or split beside) a node holding one of those panels; it never docks into a node holding a dock_never panel.
+    PanelId dock_only[k_max_dock_rules] = {};
+    PanelId dock_never[k_max_dock_rules] = {};
+    uint8_t dock_only_count = 0;
+    uint8_t dock_never_count = 0;
 };
 
 struct PanelTable
@@ -145,6 +151,33 @@ inline void copy_panel_text(char (&dst)[k_panel_text_size], std::string_view src
         if (table.descs[i].id == id)
             return &table.descs[i];
     return nullptr;
+}
+
+namespace detail
+{
+inline bool add_dock_rule(PanelId (&list)[k_max_dock_rules], uint8_t& count, PanelId other)
+{
+    if (!is_valid(other) || count >= k_max_dock_rules)
+        return false;
+    for (uint32_t i = 0; i < count; ++i)
+        if (list[i] == other)
+            return false;
+    list[count++] = other;
+    return true;
+}
+}
+
+// False when the panel is not registered, the list is full or the entry is already there.
+[[nodiscard]] inline bool add_dock_only(PanelTable& table, PanelId panel, PanelId target)
+{
+    PanelDesc* desc = find_panel(table, panel);
+    return desc != nullptr && detail::add_dock_rule(desc->dock_only, desc->dock_only_count, target);
+}
+
+[[nodiscard]] inline bool add_dock_never(PanelTable& table, PanelId panel, PanelId target)
+{
+    PanelDesc* desc = find_panel(table, panel);
+    return desc != nullptr && detail::add_dock_rule(desc->dock_never, desc->dock_never_count, target);
 }
 
 enum class DropZone : uint8_t

@@ -1,6 +1,7 @@
 #pragma once
 
 // Every oryx::gui widget in one include; the files below are the parts, for code that wants only one.
+#include "Oryx/Interface/GUI/Dock/GuiPanelHost.h"
 #include "Oryx/Interface/GUI/GuiControls.h"
 #include "Oryx/Interface/GUI/GuiData.h"
 #include "Oryx/Interface/GUI/GuiInspector.h"

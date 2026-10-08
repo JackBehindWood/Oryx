@@ -149,13 +149,26 @@ def clean(ctx: typer.Context):
     run.pm.hook.forge_post_clean(ctx=run)
 
 
-@command(name="all", label="All — configure, compile, and test", rich_help_panel="Build")
-def run_all(ctx: typer.Context):
-    """Configure, compile, and execute tests sequentially."""
+@command(
+    name="all",
+    label="All — configure, compile, and test",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    rich_help_panel="Build",
+)
+def run_all(
+    ctx: typer.Context,
+    suites: Optional[str] = typer.Argument(
+        None,
+        metavar="[SUITE[,SUITE...]]",
+        help="Comma-separated [tests] suites to run (default: every suite with default = true). "
+        "Arguments after `--` go to the test runner, e.g. `forge all unit -- --test-case=*Dock*`.",
+    ),
+):
+    """Configure, compile, and execute tests sequentially (incremental: nothing is cleaned)."""
     ctx.invoke(configure, ctx)
     ctx.invoke(compile_project, ctx)
     from pyforge.commands.test import run_suites
-    ctx.invoke(run_suites, ctx, suites=None, list_=False)
+    ctx.invoke(run_suites, ctx, suites=suites, list_=False)
 
 
 EXECUTABLE_KINDS = ("ConsoleApp", "WindowedApp")

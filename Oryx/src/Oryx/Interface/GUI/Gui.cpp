@@ -146,16 +146,6 @@ ItemState image_button(std::string_view name, ImageHandle image, const ImageButt
     return im::image_button(active(), name, image, resolved);
 }
 
-void begin_panel(std::string_view name, const WidgetOptions& options)
-{
-    im::begin_panel(active(), name, with_role(options, &GuiTheme::panel));
-}
-
-void end_panel()
-{
-    im::end_panel(active());
-}
-
 void begin_row(std::string_view name, const RowOptions& options)
 {
     im::begin_row(active(), name, options);

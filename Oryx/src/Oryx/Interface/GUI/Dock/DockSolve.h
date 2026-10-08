@@ -17,6 +17,8 @@ struct DockMetrics
     float edge_band = 0.25f;
     // Distance in points from the surface edge that docks beside the whole tree.
     float root_edge = 12.0f;
+    // Width reserved at the right end of a strip for the collapse chevron when every tab may collapse; zero reserves nothing.
+    float strip_button = 22.0f;
 };
 
 struct SolvedNode
@@ -26,6 +28,9 @@ struct SolvedNode
     Rect strip;
     Rect body;
     Rect tab_rects[k_max_dock_tabs];
+    // Tabs nodes: the collapse chevron's box, empty when collapsing is not permitted. Split nodes: the gap between the two children.
+    Rect collapse_button;
+    Rect splitter;
     uint8_t first_visible = 0;
     uint8_t visible_count = 0;
 };

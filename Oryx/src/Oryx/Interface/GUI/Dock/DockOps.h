@@ -25,7 +25,8 @@ enum class DockReason : uint8_t
     FloatsFull,
     PoolFull,
     AlreadyOpen,
-    AlreadyClosed
+    AlreadyClosed,
+    NotPermittedTarget
 };
 
 [[nodiscard]] const char* to_string(DockReason reason);
@@ -44,6 +45,14 @@ struct DockResult
 [[nodiscard]] DockReason can_resize(const PanelTable& panels, PanelId panel);
 [[nodiscard]] DockReason can_collapse(const PanelTable& panels, PanelId panel);
 [[nodiscard]] DockReason can_close(const PanelTable& panels, PanelId panel);
+
+// can_dock plus the panel's dock_only / dock_never rules against the Tabs node `target` (k_dock_root: only allowed without dock_only). Same set as dock_panel, for drop feedback.
+[[nodiscard]] DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target);
+
+// True when the panel sits in a Tabs node or a float.
+[[nodiscard]] bool is_open(const DockLayout& layout, PanelId panel);
+// True when set_split would not refuse for permission: a resize-capable panel sits on each side.
+[[nodiscard]] bool can_resize_split(const DockLayout& layout, const PanelTable& panels, int32_t node);
 
 // Centre tabs into the target Tabs node; an edge splits it with the panel on that side. target is a Tabs node, or k_dock_root for the surface-0 tree (an edge there wraps the whole tree).
 [[nodiscard]] DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target, DropZone zone);

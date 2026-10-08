@@ -7,7 +7,14 @@ using namespace oryx::test;
 namespace
 {
 
-const DockMetrics k_metrics;
+DockMetrics plain_metrics()
+{
+    DockMetrics metrics;
+    metrics.strip_button = 0.0f;
+    return metrics;
+}
+
+const DockMetrics k_metrics = plain_metrics();
 const Rect k_surface{ Vec2f(0.0f, 0.0f), Vec2f(400.0f, 300.0f) };
 
 SolvedLayout solved_sample(const PanelTable& panels, const DockLayout& layout) { return solve(layout, panels, k_metrics, k_surface); }
@@ -274,7 +281,7 @@ TEST_CASE("drop_target: with room to spare the preview is the rect the dock then
         if (zone == DropZone::Left)
             pointer = Vec2f(node.min[0] + 2.0f, 300.0f);
         else if (zone == DropZone::Right)
-            pointer = Vec2f(node.min[0] + node.size[0] - 2.0f, 300.0f);
+            pointer = Vec2f(node.min[0] + node.size[0] - 20.0f, 300.0f);
         else if (zone == DropZone::Top)
             pointer = Vec2f(mid_x, 40.0f);
         else
@@ -295,4 +302,35 @@ TEST_CASE("drop_target: with room to spare the preview is the rect the dock then
         const Rect& rect = after.nodes[placed].rect;
         check_rect(target.preview, rect.min[0], rect.min[1], rect.size[0], rect.size[1]);
     }
+}
+
+TEST_CASE("solve: a strip reserves the collapse button when every tab may collapse")
+{
+    PanelTable panels = make_panels();
+    const DockLayout layout = make_sample(panels);
+    const DockMetrics metrics;
+    SolvedLayout solved = solve(layout, panels, metrics, k_surface);
+    const SolvedNode& tabs = solved.nodes[1];
+    CHECK(tabs.collapse_button.size[0] == doctest::Approx(metrics.strip_button));
+    CHECK(tabs.collapse_button.min[0] + tabs.collapse_button.size[0] == doctest::Approx(tabs.strip.min[0] + tabs.strip.size[0]));
+    CHECK(tabs.tab_rects[1].min[0] + tabs.tab_rects[1].size[0] <= tabs.collapse_button.min[0] + 0.001f);
+
+    set_flags(panels, "b", panel_flag::all & ~panel_flag::collapse);
+    solved = solve(layout, panels, metrics, k_surface);
+    CHECK(is_empty(solved.nodes[1].collapse_button));
+    CHECK(solved.nodes[1].tab_rects[1].min[0] + solved.nodes[1].tab_rects[1].size[0] == doctest::Approx(solved.nodes[1].strip.size[0]));
+}
+
+TEST_CASE("solve: a split reports the gap between its children as the splitter")
+{
+    const PanelTable panels = make_panels();
+    const DockLayout layout = make_sample(panels);
+    const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
+    const Rect& first = solved.nodes[1].rect;
+    const Rect& second = solved.nodes[2].rect;
+    const Rect& gap = solved.nodes[0].splitter;
+    CHECK(gap.min[0] == doctest::Approx(first.min[0] + first.size[0]));
+    CHECK(gap.min[0] + gap.size[0] == doctest::Approx(second.min[0]));
+    CHECK(gap.size[0] == doctest::Approx(k_metrics.splitter));
+    CHECK(gap.size[1] == doctest::Approx(k_surface.size[1]));
 }

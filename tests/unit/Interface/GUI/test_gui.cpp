@@ -165,7 +165,9 @@ TEST_CASE("GUI: canvas hands out the rect, the local pointer and clipped paintin
     {
         LayoutStyle panel = fixed_box(100.0f, 60.0f);
         panel.padding = { 10.0f, 10.0f, 10.0f, 10.0f };
-        gui::PanelScope scope("panel", { .layout = &panel });
+        gui::PanelOptions options;
+        options.layout = &panel;
+        gui::PanelScope scope("panel", options);
         im::CanvasArea area = gui::canvas("view", grow(), grow());
         rect = area.rect;
         local = area.pointer_local;
@@ -269,7 +271,6 @@ TEST_CASE("GUI: wrappers mirror the UI signatures")
     static_assert(std::is_same_v<decltype(&gui::toggle), decltype(&ui::toggle)>);
     static_assert(std::is_same_v<decltype(&gui::image), decltype(&ui::image)>);
     static_assert(std::is_same_v<decltype(&gui::image_button), decltype(&ui::image_button)>);
-    static_assert(std::is_same_v<decltype(&gui::begin_panel), decltype(&ui::begin_panel)>);
     static_assert(std::is_same_v<decltype(&gui::end_panel), decltype(&ui::end_panel)>);
     static_assert(std::is_same_v<decltype(&gui::begin_row), decltype(&ui::begin_row)>);
     static_assert(std::is_same_v<decltype(&gui::end_row), decltype(&ui::end_row)>);

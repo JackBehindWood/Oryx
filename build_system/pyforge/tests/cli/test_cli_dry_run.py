@@ -51,6 +51,11 @@ DRY_RUN_COMMANDS = [
         [CONFIGURE.format(premake="{premake}", options=DUMMY_OPTIONS), COMPILE.format(build="{build}", token="debug_x64"), UNIT_TESTS],
         id="all-runs-configure-compile-test-in-order",
     ),
+    pytest.param(
+        ["all", "unit", "--", "--test-case=*Dock*"],
+        [CONFIGURE.format(premake="{premake}", options=DUMMY_OPTIONS), COMPILE.format(build="{build}", token="debug_x64"), " would run: {tests} --source-file=*tests/unit/* --test-case=*Dock*"],
+        id="all-selects-suites-and-passes-runner-arguments",
+    ),
     pytest.param(["test"], [UNIT_TESTS], id="test"),
     pytest.param(["test", "run"], ["Note: 'test run' is deprecated; use 'forge test'.", UNIT_TESTS], id="test-run-alias-is-deprecated"),
     pytest.param(["test", "benchmark"], [" would run: {tests} --source-file=*tests/benchmark/*"], id="test-benchmark"),

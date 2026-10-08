@@ -324,12 +324,6 @@ int32_t copy_node(const DockLayout& src, int32_t index, DockLayout& out, uint32_
     return dst;
 }
 
-bool is_open(const DockLayout& layout, PanelId panel)
-{
-    const Location at = locate(layout, panel);
-    return at.where == Where::InTabs || at.where == Where::InFloat;
-}
-
 bool same_node(const DockNode& a, const DockNode& b)
 {
     if (a.kind != b.kind)
@@ -569,8 +563,46 @@ const char* to_string(DockReason reason)
     case DockReason::PoolFull: return "record pool full";
     case DockReason::AlreadyOpen: return "panel already open";
     case DockReason::AlreadyClosed: return "panel already closed";
+    case DockReason::NotPermittedTarget: return "panel may not dock there";
     }
     return "?";
+}
+
+bool is_open(const DockLayout& layout, PanelId panel)
+{
+    const Location at = locate(layout, panel);
+    return at.where == Where::InTabs || at.where == Where::InFloat;
+}
+
+bool can_resize_split(const DockLayout& layout, const PanelTable& panels, int32_t node)
+{
+    if (!is_split(layout, node))
+        return false;
+    const DockNode& n = layout.nodes[node];
+    return side_resizable(layout, panels, n.first, 0) && side_resizable(layout, panels, n.second, 0);
+}
+
+DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target)
+{
+    if (const DockReason reason = can_dock(panels, panel); reason != DockReason::None)
+        return reason;
+    const PanelDesc* desc = find_panel(panels, panel);
+    const bool in_node = target != k_dock_root && is_tabs(layout, target);
+    if (desc->dock_only_count > 0 && !in_node)
+        return DockReason::NotPermittedTarget;
+    if (!in_node)
+        return DockReason::None;
+    const DockNode& node = layout.nodes[target];
+    bool allowed = desc->dock_only_count == 0;
+    for (uint32_t t = 0; t < node.count && t < k_max_dock_tabs; ++t)
+    {
+        for (uint32_t r = 0; r < desc->dock_never_count; ++r)
+            if (node.tabs[t] == desc->dock_never[r])
+                return DockReason::NotPermittedTarget;
+        for (uint32_t r = 0; r < desc->dock_only_count; ++r)
+            allowed = allowed || node.tabs[t] == desc->dock_only[r];
+    }
+    return allowed ? DockReason::None : DockReason::NotPermittedTarget;
 }
 
 DockReason can_reorder(const PanelTable& panels, PanelId panel) { return require_flag(panels, panel, panel_flag::reorder_in_host, DockReason::NotPermittedReorder); }
@@ -611,7 +643,7 @@ DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
     if (same_host && layout.nodes[resolved].count == 1)
         return refuse(DockReason::NoChange);
 
-    if (const DockReason reason = can_dock(panels, panel); reason != DockReason::None)
+    if (const DockReason reason = can_dock_into(layout, panels, panel, target == k_dock_root && zone == DropZone::Centre && is_tabs(layout, resolved) ? resolved : target); reason != DockReason::None)
         return refuse(reason);
 
     // Node indices shift once the emptied source host is pruned, so the target is re-found through a panel that stays put.

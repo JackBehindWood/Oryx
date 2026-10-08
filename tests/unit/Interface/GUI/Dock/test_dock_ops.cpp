@@ -400,3 +400,53 @@ TEST_CASE("diff and dump: deterministic text")
     CHECK(dump(a) == dump(a));
     CHECK(dump(a) != dump(b));
 }
+
+TEST_CASE("is_open and can_resize_split mirror the layout and the flags")
+{
+    PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    CHECK(is_open(layout, pid("a")));
+    CHECK(is_open(layout, pid("vp")));
+    CHECK_FALSE(is_open(layout, pid("c")));
+    CHECK(can_resize_split(layout, panels, 0));
+    CHECK_FALSE(can_resize_split(layout, panels, 1));
+    CHECK_FALSE(can_resize_split(layout, panels, 99));
+
+    set_flags(panels, "vp", panel_flag::reorder_in_host | panel_flag::dock_elsewhere);
+    CHECK_FALSE(can_resize_split(layout, panels, 0));
+    CHECK_FALSE(set_split(layout, panels, 0, DockSizeMode::Ratio, 0.5f, 0.0f).applied);
+}
+
+TEST_CASE("dock rules: dock_only limits the targets, dock_never excludes some, refusals leave the layout alone")
+{
+    PanelTable panels = make_panels();
+    const DockLayout base = make_sample(panels);
+    REQUIRE(add_dock_only(panels, pid("c"), pid("vp")));
+    REQUIRE(add_dock_never(panels, pid("d"), pid("vp")));
+    CHECK_FALSE(add_dock_only(panels, pid("c"), pid("vp")));
+    CHECK_FALSE(add_dock_only(panels, pid("nope"), pid("vp")));
+    CHECK_FALSE(add_dock_never(panels, pid("d"), PanelId{}));
+
+    CHECK(can_dock_into(base, panels, pid("c"), 1) == DockReason::NotPermittedTarget);
+    CHECK(can_dock_into(base, panels, pid("c"), k_dock_root) == DockReason::NotPermittedTarget);
+    CHECK(can_dock_into(base, panels, pid("c"), 2) == DockReason::None);
+    CHECK(can_dock_into(base, panels, pid("d"), 2) == DockReason::NotPermittedTarget);
+    CHECK(can_dock_into(base, panels, pid("d"), 1) == DockReason::None);
+    CHECK(can_dock_into(base, panels, pid("d"), k_dock_root) == DockReason::None);
+
+    DockLayout layout = base;
+    DockResult refused = dock_panel(layout, panels, pid("c"), 1, DropZone::Centre);
+    CHECK_FALSE(refused.applied);
+    CHECK(refused.reason == DockReason::NotPermittedTarget);
+    refused = dock_panel(layout, panels, pid("c"), 2, DropZone::Left);
+    CHECK(refused.applied);
+
+    DockLayout untouched = base;
+    CHECK(dock_panel(untouched, panels, pid("d"), 2, DropZone::Centre).reason == DockReason::NotPermittedTarget);
+    CHECK_FALSE(dock_panel(untouched, panels, pid("d"), 2, DropZone::Centre).applied);
+    CHECK(equal(untouched, base));
+    for (const char* name : { "f", "g", "h", "i" })
+        CHECK(add_dock_never(panels, pid("e"), pid(name)));
+    CHECK_FALSE(add_dock_never(panels, pid("e"), pid("j")));
+    CHECK(std::string_view(to_string(DockReason::NotPermittedTarget)) == "panel may not dock there");
+}

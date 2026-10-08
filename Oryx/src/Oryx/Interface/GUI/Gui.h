@@ -60,7 +60,9 @@ ItemState button(std::string_view text, const WidgetOptions& options = {});
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options = {});
 ItemState image(std::string_view name, ImageHandle image, const ImageOptions& options = {});
 ItemState image_button(std::string_view name, ImageHandle image, const ImageButtonOptions& options = {});
-void begin_panel(std::string_view name, const WidgetOptions& options = {});
+// Inside an active panel host (see GuiPanelHost.h) and outside any dock panel's body this is a dock panel: it returns whether the panel is visible (selected, expanded, open) and end_panel must follow either way.
+// Anywhere else it is a clipped container and returns true.
+bool begin_panel(std::string_view name, const PanelOptions& options = {});
 void end_panel();
 void begin_row(std::string_view name, const RowOptions& options = {});
 void end_row();
@@ -142,11 +144,19 @@ public:
 class PanelScope
 {
 public:
-    explicit PanelScope(std::string_view name, const WidgetOptions& options = {}) { begin_panel(name, options); }
+    explicit PanelScope(std::string_view name, const PanelOptions& options = {})
+        : m_visible(begin_panel(name, options))
+    {
+    }
     ~PanelScope() { end_panel(); }
+
+    [[nodiscard]] bool visible() const { return m_visible; }
 
     PanelScope(const PanelScope&) = delete;
     PanelScope& operator=(const PanelScope&) = delete;
+
+private:
+    bool m_visible;
 };
 
 } // namespace oryx::gui

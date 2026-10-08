@@ -1,5 +1,6 @@
 #include "oxpch.h"
 #include "Oryx/Interface/GUI/Dock/DockSolve.h"
+#include "Oryx/Interface/GUI/Dock/DockOps.h"
 
 namespace oryx::gui
 {
@@ -76,7 +77,15 @@ struct Solver
         s.body = Rect{ below, Vec2f(rect.size[0], n.collapsed != 0 ? 0.0f : rect.size[1] - strip_h) };
 
         const uint32_t count = math::min<uint32_t>(n.count, k_max_dock_tabs);
-        const float avail = rect.size[0];
+        float avail = rect.size[0];
+        bool collapsible = count > 0 && metrics.strip_button > 0.0f && avail > metrics.strip_button;
+        for (uint32_t t = 0; t < count && collapsible; ++t)
+            collapsible = can_collapse(panels, n.tabs[t]) == DockReason::None;
+        if (collapsible)
+        {
+            avail -= metrics.strip_button;
+            s.collapse_button = Rect{ Vec2f(rect.min[0] + avail, rect.min[1]), Vec2f(metrics.strip_button, strip_h) };
+        }
         if (count == 0 || !(avail > 0.0f))
             return;
 
@@ -141,6 +150,7 @@ struct Solver
             a = math::clamp(preferred, min_a, total - min_b);
         const float b = total - a;
 
+        out.nodes[node].splitter = horizontal ? Rect{ Vec2f(rect.min[0] + a, rect.min[1]), Vec2f(gap, rect.size[1]) } : Rect{ Vec2f(rect.min[0], rect.min[1] + a), Vec2f(rect.size[0], gap) };
         if (horizontal)
         {
             place(n.first, Rect{ rect.min, Vec2f(a, rect.size[1]) }, depth + 1);
