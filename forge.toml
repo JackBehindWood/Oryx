@@ -77,13 +77,14 @@ rules = [
   { rule = "Interface/UI !-> Interface/GUI Board Assets Game Strategy", why = "{module} is the player-facing UI layer; it must not include {target}" },
   { rule = "Interface/GUI !-> Interface/UI Board Assets Game Strategy Dashboard", why = "{module} is the developer-tooling UI layer, a peer of Interface/UI; it must not include {target}" },
   { rule = "Dashboard/Feed !-> Board Assets", why = "{module} consumes only Decision data and labels; it must not include {target}" },
+  { rule = "Dashboard/View !-> Board Assets", why = "{module} draws only feed records; it must not include {target}" },
   { rule = "Core Game Strategy Simulation !-> Dashboard", why = "{module} is below the dashboard; it must not include {target}" },
   "Graphics < Shaders < Renderer < Interface/Canvas < Interface/UI < Board/Graphics",
-  "Renderer < Interface/Canvas < Interface/GUI",
+  "Renderer < Interface/Canvas < Interface/GUI < Dashboard/View",
 ]
 
 [boundaries.sets]
-graphics = ["Graphics", "Shaders", "Renderer", "Interface/Canvas", "Interface/UI", "Interface/GUI", "Board/Graphics"]
+graphics = ["Graphics", "Shaders", "Renderer", "Interface/Canvas", "Interface/UI", "Interface/GUI", "Dashboard/View", "Board/Graphics"]
 headless = ["Game", "Strategy", "Simulation", "Core", "Text", "Board", "Dashboard/Feed"]
 backends = ["**/backends/**"]
 backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']

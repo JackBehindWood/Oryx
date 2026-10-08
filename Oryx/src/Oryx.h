@@ -180,6 +180,8 @@
 #include "Oryx/Interface/GUI/GuiPolicies.h"
 #include "Oryx/Interface/GUI/GuiData.h"
 #include "Oryx/Interface/GUI/GuiTable.h"
+#include "Oryx/Dashboard/View/IDashboardView.h"
+#include "Oryx/Dashboard/View/DashboardViewRegistry.h"
 #include "Oryx/Board/Graphics/BoardProjection2D.h"
 #include "Oryx/Board/Graphics/BoardOverlay2D.h"
 #include "Oryx/Board/Graphics/BoardRenderer2D.h"
