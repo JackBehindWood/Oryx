@@ -224,6 +224,7 @@ TEST_CASE("drop_target: window edges, strips, bodies and gaps")
     check_rect(target.preview, 0.0f, 0.0f, 118.8f, 300.0f);
 
     target = drop_target(layout, solved, Vec2f(100.0f, 10.0f));
+    CHECK(target.valid);
     CHECK(target.node == 1);
     CHECK(target.zone == DropZone::Centre);
     check_rect(target.preview, 0.0f, 0.0f, 277.2f, 300.0f);
@@ -241,7 +242,7 @@ TEST_CASE("drop_target: window edges, strips, bodies and gaps")
     CHECK(target.node == 1);
     CHECK(target.zone == DropZone::Bottom);
 
-    target = drop_target(layout, solved, Vec2f(300.0f, 150.0f));
+    target = drop_target(layout, solved, Vec2f(340.0f, 150.0f));
     CHECK(target.node == 2);
     CHECK(target.zone == DropZone::Centre);
 }
@@ -258,32 +259,40 @@ TEST_CASE("drop_target: an empty surface takes a centre drop")
     check_rect(target.preview, 0.0f, 0.0f, 400.0f, 300.0f);
 }
 
-TEST_CASE("drop_target: the preview is the rect the dock then takes")
+TEST_CASE("drop_target: with room to spare the preview is the rect the dock then takes")
 {
     const PanelTable panels = make_panels();
+    const Rect big{ Vec2f(0.0f, 0.0f), Vec2f(1000.0f, 600.0f) };
     const DropZone zones[] = { DropZone::Left, DropZone::Right, DropZone::Top, DropZone::Bottom };
     for (const DropZone zone : zones)
     {
         DockLayout layout = make_sample(panels);
-        const SolvedLayout before = solved_sample(panels, layout);
-        const Rect preview = [&] {
-            const Rect& node = before.nodes[2].rect;
-            switch (zone)
-            {
-            case DropZone::Left: return drop_target(layout, before, Vec2f(node.min[0] + 2.0f, 150.0f)).preview;
-            case DropZone::Right: return drop_target(layout, before, Vec2f(node.min[0] + node.size[0] - 2.0f, 150.0f)).preview;
-            case DropZone::Top: return drop_target(layout, before, Vec2f(node.min[0] + 59.0f, 40.0f)).preview;
-            default: return drop_target(layout, before, Vec2f(node.min[0] + 59.0f, 270.0f)).preview;
-            }
-        }();
+        const SolvedLayout before = solve(layout, panels, k_metrics, big);
+        const Rect& node = before.nodes[2].rect;
+        const float mid_x = node.min[0] + node.size[0] * 0.5f;
+        Vec2f pointer(mid_x, 300.0f);
+        if (zone == DropZone::Left)
+            pointer = Vec2f(node.min[0] + 2.0f, 300.0f);
+        else if (zone == DropZone::Right)
+            pointer = Vec2f(node.min[0] + node.size[0] - 2.0f, 300.0f);
+        else if (zone == DropZone::Top)
+            pointer = Vec2f(mid_x, 40.0f);
+        else
+            pointer = Vec2f(mid_x, 570.0f);
+
+        const DropTarget target = drop_target(layout, before, pointer);
+        REQUIRE(target.valid);
+        REQUIRE(target.node == 2);
+        REQUIRE(target.zone == zone);
 
         require_applied(dock_panel(layout, panels, pid("c"), 2, zone));
-        const SolvedLayout after = solved_sample(panels, layout);
+        const SolvedLayout after = solve(layout, panels, k_metrics, big);
         int32_t placed = k_no_node;
         for (uint32_t n = 0; n < layout.node_count; ++n)
             if (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].tabs[0] == pid("c"))
                 placed = static_cast<int32_t>(n);
         REQUIRE(placed != k_no_node);
-        check_rect(preview, after.nodes[placed].rect.min[0], after.nodes[placed].rect.min[1], after.nodes[placed].rect.size[0], after.nodes[placed].rect.size[1]);
+        const Rect& rect = after.nodes[placed].rect;
+        check_rect(target.preview, rect.min[0], rect.min[1], rect.size[0], rect.size[1]);
     }
 }

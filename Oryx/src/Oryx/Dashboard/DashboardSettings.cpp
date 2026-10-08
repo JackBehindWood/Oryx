@@ -28,6 +28,7 @@ void read_settings(DashboardSettings& settings, const SettingsNode& node)
     {
         settings.views = node.strings("views");
     }
+    settings.layout_file = node.path("layout_file", settings.layout_file);
 }
 
 } // namespace oryx

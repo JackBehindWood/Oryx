@@ -378,6 +378,7 @@ TEST_CASE("dashboard settings default to off, read their keys and reject non-pos
     CHECK(defaults.panel_width == 360);
     CHECK(defaults.history == 256);
     CHECK(defaults.views == std::vector<std::string>{ "probabilities", "values" });
+    CHECK(defaults.layout_file == std::filesystem::path("dashboard-layout.yaml"));
 
     TempDir dir;
     load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  panel_width: 420\n  history: 64\n  views: [values]\n"));
@@ -386,6 +387,11 @@ TEST_CASE("dashboard settings default to off, read their keys and reject non-pos
     CHECK(dashboard.panel_width == 420);
     CHECK(dashboard.history == 64);
     CHECK(dashboard.views == std::vector<std::string>{ "values" });
+    CHECK(dashboard.layout_file == (dir.path() / "dashboard-layout.yaml").lexically_normal());
+
+    load_from(dir.write("l.yaml", "dashboard:\n  layout_file: layouts/mine.yaml\n"));
+    CHECK(settings_of<DashboardSettings>().layout_file == (dir.path() / "layouts/mine.yaml").lexically_normal());
+    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  panel_width: 420\n  history: 64\n  views: [values]\n"));
 
     CHECK_THROWS_AS(load_from(dir.write("w.yaml", "dashboard:\n  panel_width: 0\n")), SettingsError);
     CHECK_THROWS_AS(load_from(dir.write("h.yaml", "dashboard:\n  history: -4\n")), SettingsError);

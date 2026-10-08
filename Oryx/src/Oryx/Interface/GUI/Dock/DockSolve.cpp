@@ -246,39 +246,38 @@ DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, con
     }
 
     const DockMetrics& metrics = solved.metrics;
+    int32_t hit = k_no_node;
+    for (uint32_t n = 0; n < solved.node_count; ++n)
+        if (layout.nodes[n].kind == DockNodeKind::Tabs && contains(solved.nodes[n].rect, pointer))
+        {
+            hit = static_cast<int32_t>(n);
+            break;
+        }
+
+    // A strip wins over the window-edge band so the top row of tabs stays a tab drop.
+    if (hit != k_no_node && contains(solved.nodes[hit].strip, pointer))
+        return { true, hit, DropZone::Centre, solved.nodes[hit].rect };
+
     float edge_distance = 0.0f;
     const DropZone edge = nearest_edge(pointer[0] - surface.min[0], surface.min[0] + surface.size[0] - pointer[0], pointer[1] - surface.min[1], surface.min[1] + surface.size[1] - pointer[1], edge_distance);
     if (edge_distance < metrics.root_edge)
-    {
-        result = { true, k_dock_root, edge, edge_preview(surface, edge, metrics) };
+        return { true, k_dock_root, edge, edge_preview(surface, edge, metrics) };
+
+    if (hit == k_no_node)
         return result;
-    }
-
-    for (uint32_t n = 0; n < solved.node_count; ++n)
-    {
-        if (layout.nodes[n].kind != DockNodeKind::Tabs)
-            continue;
-        const SolvedNode& s = solved.nodes[n];
-        if (!contains(s.rect, pointer))
-            continue;
-
-        result.valid = true;
-        result.node = static_cast<int32_t>(n);
-        result.zone = DropZone::Centre;
-        result.preview = s.rect;
-        if (contains(s.strip, pointer) || !(s.body.size[0] > 0.0f) || !(s.body.size[1] > 0.0f))
-            return result;
-
-        const float u = (pointer[0] - s.body.min[0]) / s.body.size[0];
-        const float v = (pointer[1] - s.body.min[1]) / s.body.size[1];
-        float band_distance = 0.0f;
-        const DropZone zone = nearest_edge(u, 1.0f - u, v, 1.0f - v, band_distance);
-        if (band_distance < metrics.edge_band)
-        {
-            result.zone = zone;
-            result.preview = edge_preview(s.rect, zone, metrics);
-        }
+    const SolvedNode& s = solved.nodes[hit];
+    result = { true, hit, DropZone::Centre, s.rect };
+    if (!(s.body.size[0] > 0.0f) || !(s.body.size[1] > 0.0f))
         return result;
+
+    const float u = (pointer[0] - s.body.min[0]) / s.body.size[0];
+    const float v = (pointer[1] - s.body.min[1]) / s.body.size[1];
+    float band_distance = 0.0f;
+    const DropZone zone = nearest_edge(u, 1.0f - u, v, 1.0f - v, band_distance);
+    if (band_distance < metrics.edge_band)
+    {
+        result.zone = zone;
+        result.preview = edge_preview(s.rect, zone, metrics);
     }
     return result;
 }

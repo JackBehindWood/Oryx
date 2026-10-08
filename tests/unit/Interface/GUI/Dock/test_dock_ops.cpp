@@ -220,16 +220,20 @@ TEST_CASE("float_panel: the float pool is capped")
 TEST_CASE("close_panel and open_panel: reopen at the recorded home")
 {
     const PanelTable panels = make_panels();
-    const DockLayout original = make_sample(panels);
+    DockLayout original;
+    require_applied(dock_panel(original, panels, pid("a"), k_dock_root, DropZone::Centre));
+    require_applied(dock_panel(original, panels, pid("b"), 0, DropZone::Centre));
+    require_applied(dock_panel(original, panels, pid("c"), k_dock_root, DropZone::Right));
+    CHECK(named(original, panels) == "dock v1\nsurface 0\n  split h ratio 0.700\n    tabs [a b*]\n    tabs [c*]\n");
 
     DockLayout layout = original;
-    require_applied(close_panel(layout, panels, pid("vp")));
-    CHECK(named(layout, panels) == "dock v1\nsurface 0\n  tabs [a b*]\nhome vp sibling a right\nclosed vp\n");
-    require_applied(open_panel(layout, panels, pid("vp")));
+    require_applied(close_panel(layout, panels, pid("c")));
+    CHECK(named(layout, panels) == "dock v1\nsurface 0\n  tabs [a b*]\nhome c sibling a right\nclosed c\n");
+    require_applied(open_panel(layout, panels, pid("c")));
     CHECK(equal(layout, original));
 
     require_applied(close_panel(layout, panels, pid("b")));
-    CHECK(named(layout, panels) == "dock v1\nsurface 0\n  split h ratio 0.700\n    tabs [a*]\n    tabs [vp*]\nhome b sibling a centre\nclosed b\n");
+    CHECK(named(layout, panels) == "dock v1\nsurface 0\n  split h ratio 0.700\n    tabs [a*]\n    tabs [c*]\nhome b sibling a centre\nclosed b\n");
     require_applied(open_panel(layout, panels, pid("b")));
     CHECK(equal(layout, original));
 }

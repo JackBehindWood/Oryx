@@ -45,7 +45,7 @@ struct SolvedLayout
 // Tabs that do not fit keep tab_min_width and scroll so the selected one is visible; a surface smaller than the panels' minimums shrinks both sides proportionally and bodies clip.
 [[nodiscard]] SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface = 0);
 
-// Where a dragged panel would land. Combine with can_dock; floats are ignored.
+// Where a dragged panel would land. Combine with can_dock; floats are ignored. The preview is the ratio rect of the new split; panel minimums can make the solved rect larger.
 struct DropTarget
 {
     bool valid = false;
