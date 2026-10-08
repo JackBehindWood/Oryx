@@ -87,6 +87,55 @@ TEST_CASE("Benchmark: GUI frame of 500 widgets")
     MESSAGE("500 widgets: " << ms << " ms/frame");
 }
 
+TEST_CASE("Benchmark: GUI dock host frame with a float and a tab drag")
+{
+    using namespace oryx::gui;
+    Scene scene;
+    for (const char* name : { "a", "b", "c", "d", "e" })
+        REQUIRE(gui::register_panel(name));
+    const PanelTable& table = gui::panels();
+    DockLayout layout;
+    REQUIRE(dock_panel(layout, table, make_panel_id("a"), k_dock_root, DropZone::Centre).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("b"), k_dock_root, DropZone::Centre).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("c"), k_dock_root, DropZone::Right).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("d"), k_dock_root, DropZone::Bottom).applied);
+    REQUIRE(float_panel(layout, table, make_panel_id("e"), Rect{ Vec2f(400.0f, 200.0f), Vec2f(300.0f, 200.0f) }).applied);
+
+    const auto draw = [&]
+    {
+        gui::PanelHostScope host(layout);
+        for (const char* name : { "a", "b", "c", "d", "e" })
+        {
+            gui::PanelScope panel(name);
+            if (panel.visible())
+                gui::label("body");
+        }
+    };
+    for (uint32_t warm = 0; warm < 4; ++warm)
+    {
+        scene.context.begin_frame(scene.input);
+        { LayoutStyle root; root.width = grow(); root.height = grow(); gui::BoxScope box("root", root); draw(); }
+        scene.context.end_frame();
+    }
+    const Rect tab = scene.context.panel_host().solved.nodes[1].tab_rects[0];
+    scene.input.pointer.position = Vec2f(tab.min[0] + tab.size[0] * 0.5f, tab.min[1] + tab.size[1] * 0.5f);
+    scene.input.pointer.buttons[0].down = true;
+    scene.input.pointer.buttons[0].pressed = true;
+    scene.context.begin_frame(scene.input);
+    { LayoutStyle root; root.width = grow(); root.height = grow(); gui::BoxScope box("root", root); draw(); }
+    scene.context.end_frame();
+    scene.input.pointer.buttons[0].pressed = false;
+
+    uint32_t tick = 0;
+    const double ms = scene.milliseconds_per_frame(200, [&]
+    {
+        ++tick;
+        scene.input.pointer.position = Vec2f(300.0f + static_cast<float>(tick % 200), 250.0f + static_cast<float>(tick % 90));
+        draw();
+    });
+    MESSAGE("dock host, 5 panels, float, tab drag: " << ms << " ms/frame");
+}
+
 TEST_CASE("Benchmark: GUI frame of a 1000-row virtualised table")
 {
     Scene scene;

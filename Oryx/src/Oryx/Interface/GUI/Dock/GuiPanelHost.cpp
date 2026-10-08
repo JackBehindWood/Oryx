@@ -61,12 +61,29 @@ void keep_valid(PanelHostState& h, DockLayout& layout)
     }
 }
 
-DockMetrics metrics_of(const GuiTheme& theme)
+void apply_history_request(PanelHostState& h, DockLayout& layout)
+{
+    const HistoryRequest request = h.history_request;
+    h.history_request = HistoryRequest::None;
+    if (request == HistoryRequest::None || h.drag.source != DragSource::None)
+        return;
+    DockLayout snapshot;
+    if (!(request == HistoryRequest::Undo ? undo(h.history, snapshot) : redo(h.history, snapshot)))
+        return;
+    layout = snapshot;
+    keep_valid(h, layout);
+    h.result.layout_changed = true;
+}
+
+DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
 {
     const ImStyle& tab = theme.tab;
     const float scale = tab.text_height / 16.0f;
+    const float density = style.compact ? 0.8f : 1.0f;
     DockMetrics metrics;
-    metrics.strip_height = tab.text_height + tab.padding.top + tab.padding.bottom;
+    metrics.style = style;
+    metrics.strip_height = (tab.text_height + tab.padding.top + tab.padding.bottom) * density;
+    metrics.toolbar_height = (theme.button.text_height + theme.button.padding.top + theme.button.padding.bottom + 4.0f * scale) * density;
     metrics.splitter = 4.0f * scale;
     metrics.tab_min_width = 48.0f * scale;
     metrics.tab_max_width = 160.0f * scale;
@@ -75,9 +92,10 @@ DockMetrics metrics_of(const GuiTheme& theme)
     return metrics;
 }
 
-LayoutStyle placed(const PanelHostState& h, const Rect& rect)
+LayoutStyle placed(const PanelHostState& h, const Rect& rect, uint32_t channel = 0)
 {
     LayoutStyle style;
+    style.channel = channel;
     style.width = fixed(rect.size[0]);
     style.height = fixed(rect.size[1]);
     style.floating = { true, AttachPoint::TopLeft, AttachPoint::TopLeft, FloatTarget::Element, h.host_id, { rect.min[0] - h.host_rect.min[0], rect.min[1] - h.host_rect.min[1] } };
@@ -85,9 +103,9 @@ LayoutStyle placed(const PanelHostState& h, const Rect& rect)
 }
 
 // Opens a filled floating box at `rect`; the caller closes it with end_box.
-uint32_t open_fill(GuiContext& ctx, const PanelHostState& h, const Rect& rect, const ImStyle& style, const Colour& fill, bool border)
+uint32_t open_fill(GuiContext& ctx, const PanelHostState& h, const Rect& rect, const ImStyle& style, const Colour& fill, bool border, uint32_t channel = 0)
 {
-    const uint32_t index = ctx.begin_box(ImId{}, placed(h, rect));
+    const uint32_t index = ctx.begin_box(ImId{}, placed(h, rect, channel));
     BoxPaint& paint = ctx.layout().node(index).paint;
     im::paint_surface(paint, style, fill);
     if (!border)
@@ -95,38 +113,47 @@ uint32_t open_fill(GuiContext& ctx, const PanelHostState& h, const Rect& rect, c
     return index;
 }
 
-const PanelBody* find_body(const PanelHostState& h, PanelId id)
+int32_t find_body_index(const PanelHostState& h, PanelId id)
 {
     for (uint32_t i = 0; i < h.body_count; ++i)
         if (h.bodies[i].panel == id)
-            return &h.bodies[i];
-    return nullptr;
+            return static_cast<int32_t>(i);
+    return -1;
 }
 
-void add_body(PanelHostState& h, PanelId id, const Rect& rect, bool viewport)
+const PanelBody* find_body(const PanelHostState& h, PanelId id)
+{
+    const int32_t index = find_body_index(h, id);
+    return index < 0 ? nullptr : &h.bodies[index];
+}
+
+void add_body(PanelHostState& h, PanelId id, const Rect& rect, const Rect& toolbar, uint32_t channel, bool viewport)
 {
     if (h.body_count < k_max_panels)
-        h.bodies[h.body_count++] = PanelBody{ id, rect, viewport };
+        h.bodies[h.body_count++] = PanelBody{ id, rect, toolbar, channel, viewport };
 }
 
-void draw_body(GuiContext& ctx, PanelHostState& h, const DockNode& node, const SolvedNode& solved)
+// Records a panel's body and toolbar for begin_panel and draws their backdrops; true when the body took a press.
+bool place_body(GuiContext& ctx, PanelHostState& h, PanelId id, const Rect& body, const Rect& toolbar, uint32_t channel)
 {
-    if (node.collapsed != 0 || node.selected >= node.count || is_empty(solved.body))
-        return;
-    const PanelId id = node.tabs[node.selected];
     const PanelDesc* desc = find_panel(h.panels, id);
     if (desc == nullptr)
     {
         report_unregistered(h, id);
-        return;
+        return false;
     }
-    add_body(h, id, solved.body, desc->kind == PanelKind::Viewport);
-    if (desc->kind == PanelKind::Viewport)
-        return;
+    add_body(h, id, body, toolbar, channel, desc->kind == PanelKind::Viewport);
+    if (!is_empty(toolbar))
+    {
+        const GuiTheme& theme = ctx.gui_theme();
+        open_fill(ctx, h, toolbar, theme.header, theme.header.background, false, channel);
+        ctx.end_box();
+    }
+    if (desc->kind == PanelKind::Viewport || is_empty(body))
+        return false;
     const GuiTheme& theme = ctx.gui_theme();
-    const bool focused = h.focused == id;
-    open_fill(ctx, h, solved.body, theme.panel, theme.panel.background, false);
-    if (focused)
+    open_fill(ctx, h, body, theme.panel, theme.panel.background, false, channel);
+    if (h.focused == id)
     {
         BoxPaint& paint = ctx.layout().current().paint;
         paint.border_width = 1.0f;
@@ -134,8 +161,40 @@ void draw_body(GuiContext& ctx, PanelHostState& h, const DockNode& node, const S
     }
     ctx.end_box();
     IdScope scope(ctx, ctx.index_id(id.hash));
-    if (ctx.item(ctx.id("body"), solved.body).pressed)
+    return ctx.item(ctx.id("body"), body).pressed;
+}
+
+void draw_body(GuiContext& ctx, PanelHostState& h, const DockNode& node, const SolvedNode& solved)
+{
+    if (node.collapsed != 0 || node.selected >= node.count || is_empty(solved.body))
+        return;
+    const PanelId id = node.tabs[node.selected];
+    if (place_body(ctx, h, id, solved.body, solved.toolbar, 0))
         h.focused = id;
+}
+
+void begin_drag(PanelHostState& h, DragSource source, PanelId panel, const Vec2f& grab)
+{
+    if (h.drag.source != DragSource::None)
+        return;
+    h.drag = DragState{ source, panel, grab, {} };
+}
+
+void close_mark(GuiContext& ctx, const ImStyle& style, const ItemState& close, float pad)
+{
+    LayoutStyle mark;
+    mark.width = fixed(k_close_size);
+    mark.height = fixed(k_close_size);
+    mark.floating = { true, AttachPoint::CentreRight, AttachPoint::CentreRight, FloatTarget::Parent, {}, { -pad, 0.0f } };
+    const uint32_t mark_index = ctx.begin_box(ImId{}, mark);
+    BoxPaint& paint = ctx.layout().node(mark_index).paint;
+    paint.has_fill = close.hovered;
+    paint.fill = close.held ? style.pressed : style.hover;
+    paint.radius = uniform_radius(style.radius);
+    paint.icon = Icon::Cross;
+    paint.icon_colour = close.hovered ? style.text : Colour{ style.text.r, style.text.g, style.text.b, style.text.a * 0.6f };
+    paint.icon_size = 8.0f;
+    ctx.end_box();
 }
 
 void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const DockNode& node, uint32_t index, const Rect& rect, PanelId& pending_close)
@@ -148,22 +207,29 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         return;
     }
     const ImStyle& style = ctx.gui_theme().tab;
+    const CloseButtons close_buttons = h.options.style.close_buttons;
     const bool chosen = index == node.selected;
-    const bool closable = can_close(h.panels, id) == DockReason::None;
+    const bool closable = can_close(h.panels, id) == DockReason::None && close_buttons != CloseButtons::Never;
+    const bool dragged = h.drag.source == DragSource::Tab && h.drag.panel == id;
     const float pad = style.padding.right * 0.5f;
     const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - k_close_size, rect.min[1] + (rect.size[1] - k_close_size) * 0.5f), Vec2f(k_close_size, k_close_size) };
 
     IdScope scope(ctx, ctx.index_id(id.hash));
-    const ItemState tab = ctx.item(ctx.id("tab"), rect);
+    const ImId tab_id = ctx.id("tab");
+    const ItemState tab = ctx.item(tab_id, rect);
+    const ItemDrag drag = ctx.item_drag(tab_id);
+    const bool show_close = closable && (close_buttons == CloseButtons::Always || chosen || tab.hovered);
     ItemState close;
-    if (closable)
+    if (show_close)
         close = ctx.item(ctx.id("close"), close_rect);
     if (tab.hovered)
         ctx.request_cursor(CursorShape::Hand);
+    if (drag.started && !close.held)
+        begin_drag(h, DragSource::Tab, id, drag.start - rect.min);
 
     LayoutStyle box = placed(h, rect);
     box.padding = style.padding;
-    box.padding.right += closable ? k_close_size + pad : 0.0f;
+    box.padding.right += show_close ? k_close_size + pad : 0.0f;
     box.align_y = Align::Centre;
     const uint32_t box_index = ctx.begin_box(ImId{}, box);
     {
@@ -174,29 +240,22 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         paint.text_height = style.text_height;
         paint.text_colour = style.text;
         paint.ellipsis = true;
+        if (dragged)
+        {
+            paint.fill.a *= k_disabled_alpha;
+            paint.text_colour.a *= k_disabled_alpha;
+        }
     }
-    if (closable)
-    {
-        LayoutStyle mark;
-        mark.width = fixed(k_close_size);
-        mark.height = fixed(k_close_size);
-        mark.floating = { true, AttachPoint::CentreRight, AttachPoint::CentreRight, FloatTarget::Parent, {}, { -pad, 0.0f } };
-        const uint32_t mark_index = ctx.begin_box(ImId{}, mark);
-        BoxPaint& paint = ctx.layout().node(mark_index).paint;
-        paint.has_fill = close.hovered;
-        paint.fill = close.held ? style.pressed : style.hover;
-        paint.radius = uniform_radius(style.radius);
-        paint.icon = Icon::Cross;
-        paint.icon_colour = close.hovered ? style.text : Colour{ style.text.r, style.text.g, style.text.b, style.text.a * 0.6f };
-        paint.icon_size = 8.0f;
-        ctx.end_box();
-    }
+    if (show_close)
+        close_mark(ctx, style, close, pad);
     if (chosen)
     {
         LayoutStyle underline;
         underline.width = grow();
         underline.height = fixed(2.0f);
-        underline.floating = { true, AttachPoint::BottomLeft, AttachPoint::BottomLeft, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
+        const bool bottom = h.options.style.tab_position == TabPosition::Bottom;
+        const AttachPoint edge = bottom ? AttachPoint::TopLeft : AttachPoint::BottomLeft;
+        underline.floating = { true, edge, edge, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
         const uint32_t line_index = ctx.begin_box(ImId{}, underline);
         BoxPaint& paint = ctx.layout().node(line_index).paint;
         paint.has_fill = true;
@@ -204,7 +263,8 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         ctx.end_box();
     }
     ctx.end_box();
-    tooltip(tab, desc->title);
+    if (h.drag.source == DragSource::None)
+        tooltip(tab, desc->title);
 
     if (tab.pressed && !close.hovered)
     {
@@ -300,6 +360,327 @@ void draw_splitter(GuiContext& ctx, PanelHostState& h, int32_t node_index)
     ctx.end_box();
 }
 
+struct Grip
+{
+    const char* name;
+    Rect rect;
+    CursorShape cursor;
+    bool width;
+    bool height;
+};
+
+void draw_grips(GuiContext& ctx, PanelHostState& h, uint32_t f)
+{
+    const Rect& rect = h.solved.floats[f];
+    const float band = 6.0f;
+    const float title = h.solved.float_parts[f].title.size[1];
+    const float right = rect.min[0] + rect.size[0];
+    const float bottom = rect.min[1] + rect.size[1];
+    const Grip grips[3] = {
+        { "grip_corner", Rect{ Vec2f(right - band * 2.0f, bottom - band * 2.0f), Vec2f(band * 2.0f, band * 2.0f) }, CursorShape::ResizeHorizontal, true, true },
+        { "grip_right", Rect{ Vec2f(right - band * 0.5f, rect.min[1] + title), Vec2f(band, rect.size[1] - title - band * 2.0f) }, CursorShape::ResizeHorizontal, true, false },
+        { "grip_bottom", Rect{ Vec2f(rect.min[0], bottom - band * 0.5f), Vec2f(rect.size[0] - band * 2.0f, band) }, CursorShape::ResizeVertical, false, true },
+    };
+    for (const Grip& grip : grips)
+    {
+        const ImId id = ctx.id(grip.name);
+        const ItemState state = ctx.item(id, grip.rect);
+        const ItemDrag drag = ctx.item_drag(id);
+        if (state.hovered || state.held)
+            ctx.request_cursor(grip.cursor);
+        h.result.interacting = h.result.interacting || state.held;
+        if ((drag.started || drag.dragging) && (drag.delta[0] != 0.0f || drag.delta[1] != 0.0f))
+        {
+            Rect resized = rect;
+            resized.size = Vec2f(rect.size[0] + (grip.width ? drag.delta[0] : 0.0f), rect.size[1] + (grip.height ? drag.delta[1] : 0.0f));
+            h.layout->floats[f].rect = resized;
+            h.result.layout_changed = true;
+        }
+    }
+}
+
+void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending_close, PanelId& pending_raise)
+{
+    const PanelId id = h.layout->floats[f].panel;
+    const PanelDesc* desc = find_panel(h.panels, id);
+    if (desc == nullptr)
+    {
+        report_unregistered(h, id);
+        return;
+    }
+    const GuiTheme& theme = ctx.gui_theme();
+    const ImStyle& style = theme.tab;
+    const Rect& rect = h.solved.floats[f];
+    const SolvedFloat& parts = h.solved.float_parts[f];
+    const bool focused = h.focused == id;
+    const bool closable = can_close(h.panels, id) == DockReason::None;
+    const float pad = style.padding.right * 0.5f;
+    const Rect close_rect{ Vec2f(parts.title.min[0] + parts.title.size[0] - pad - k_close_size, parts.title.min[1] + (parts.title.size[1] - k_close_size) * 0.5f), Vec2f(k_close_size, k_close_size) };
+
+    IdScope scope(ctx, ctx.index_id(id.hash));
+    ctx.add_shield(rect);
+    ctx.begin_shield_layer();
+    open_fill(ctx, h, rect, theme.panel, theme.panel.background, true, k_channel_popup);
+    if (focused)
+        ctx.layout().current().paint.border = theme.panel.accent;
+    ctx.end_box();
+
+    const bool pressed_body = place_body(ctx, h, id, parts.body, parts.toolbar, k_channel_popup);
+    if (pressed_body)
+    {
+        h.focused = id;
+        pending_raise = id;
+    }
+
+    const ImId title_id = ctx.id("title");
+    const ItemState title = ctx.item(title_id, parts.title);
+    const ItemDrag drag = ctx.item_drag(title_id);
+    ItemState close;
+    if (closable)
+        close = ctx.item(ctx.id("close"), close_rect);
+    if (title.hovered)
+        ctx.request_cursor(CursorShape::Hand);
+    if (drag.started && !close.held)
+        begin_drag(h, DragSource::Float, id, drag.start - rect.min);
+
+    LayoutStyle bar = placed(h, parts.title, k_channel_popup);
+    bar.padding = style.padding;
+    bar.padding.right += closable ? k_close_size + pad : 0.0f;
+    bar.align_y = Align::Centre;
+    const uint32_t bar_index = ctx.begin_box(ImId{}, bar);
+    BoxPaint& paint = ctx.layout().node(bar_index).paint;
+    im::paint_surface(paint, style, focused ? style.selected : style.background);
+    paint.border_width = 0.0f;
+    paint.text = ctx.arena().store(desc->title);
+    paint.text_height = style.text_height;
+    paint.text_colour = style.text;
+    paint.ellipsis = true;
+    if (closable)
+        close_mark(ctx, style, close, pad);
+    ctx.end_box();
+
+    if (title.pressed && !close.hovered)
+    {
+        h.focused = id;
+        pending_raise = id;
+    }
+    if (close.clicked)
+        pending_close = id;
+    draw_grips(ctx, h, f);
+    ctx.end_shield_layer();
+}
+
+void raise_float(PanelHostState& h, PanelId panel)
+{
+    DockLayout& layout = *h.layout;
+    for (uint32_t f = 0; f + 1 < layout.float_count; ++f)
+    {
+        if (layout.floats[f].panel != panel)
+            continue;
+        const DockFloat raised = layout.floats[f];
+        for (uint32_t i = f; i + 1 < layout.float_count; ++i)
+            layout.floats[i] = layout.floats[i + 1];
+        layout.floats[layout.float_count - 1] = raised;
+        h.result.layout_changed = true;
+        return;
+    }
+}
+
+void overlay(GuiContext& ctx, const PanelHostState& h, const Rect& rect, const Colour& fill, const Colour& border, float border_width)
+{
+    if (is_empty(rect))
+        return;
+    const uint32_t index = ctx.begin_box(ImId{}, placed(h, rect, k_channel_drag));
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    paint.has_fill = fill.a > 0.0f;
+    paint.fill = fill;
+    paint.border_width = border_width;
+    paint.border = border;
+    ctx.end_box();
+}
+
+Rect target_rect(const PanelHostState& h, const DropPlan& plan)
+{
+    if (plan.node == k_dock_root)
+        return h.solved.surface_rect;
+    if (plan.node >= 0 && static_cast<uint32_t>(plan.node) < h.solved.node_count)
+        return h.solved.nodes[plan.node].rect;
+    return {};
+}
+
+void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
+{
+    const DragState& d = h.drag;
+    const DropPlan& plan = d.plan;
+    const GuiTheme& theme = ctx.gui_theme();
+    const Colour accent = theme.panel.accent;
+    Colour preview = theme.dock_preview;
+    preview.a *= h.options.style.preview_opacity;
+    overlay(ctx, h, plan.preview, preview, accent, 1.0f);
+    overlay(ctx, h, plan.marker, accent, accent, 0.0f);
+
+    const bool refused = plan.action == DropAction::Cancel && plan.reason != DockReason::TargetInvalid && plan.reason != DockReason::NotFound;
+    if (refused)
+    {
+        const Colour danger = theme.palette[5];
+        overlay(ctx, h, target_rect(h, plan), Colour{ danger.r, danger.g, danger.b, 0.12f }, danger, 1.0f);
+    }
+    if (d.source != DragSource::Tab)
+        return;
+
+    const ImStyle& style = theme.tab;
+    const Vec2f at = ctx.input().pointer.position - d.grab;
+    const Rect ghost{ at, Vec2f(h.solved.metrics.tab_max_width, h.solved.metrics.strip_height) };
+    const PanelDesc* desc = find_panel(h.panels, d.panel);
+    LayoutStyle chip = placed(h, ghost, k_channel_drag);
+    chip.padding = style.padding;
+    chip.align_y = Align::Centre;
+    const uint32_t index = ctx.begin_box(ImId{}, chip);
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    im::paint_surface(paint, style, style.selected);
+    paint.border_width = 1.0f;
+    paint.border = refused ? theme.palette[5] : accent;
+    paint.text = ctx.arena().store(desc != nullptr ? std::string_view(desc->title) : std::string_view());
+    paint.text_height = style.text_height;
+    paint.text_colour = style.text;
+    paint.ellipsis = true;
+    ctx.end_box();
+    if (!refused)
+        return;
+    const ImStyle& note_style = theme.overlay;
+    LayoutStyle label = placed(h, Rect{ Vec2f(at[0], at[1] + ghost.size[1] + 2.0f), Vec2f(0.0f, 0.0f) }, k_channel_drag);
+    label.width = fit();
+    label.height = fit();
+    label.padding = note_style.padding;
+    const uint32_t label_index = ctx.begin_box(ImId{}, label);
+    BoxPaint& label_paint = ctx.layout().node(label_index).paint;
+    im::paint_surface(label_paint, note_style, note_style.background);
+    label_paint.text = ctx.arena().store(to_string(plan.reason));
+    label_paint.text_height = note_style.text_height;
+    label_paint.text_colour = note_style.text;
+    ctx.end_box();
+}
+
+void apply_drop(PanelHostState& h, const DragState& d)
+{
+    DockLayout& layout = *h.layout;
+    const DropPlan& plan = d.plan;
+    if (plan.action == DropAction::Reorder)
+    {
+        note(h, reorder_tab(layout, h.panels, d.panel, plan.slot));
+    }
+    else if (plan.action == DropAction::Dock)
+    {
+        const DockResult docked = dock_panel(layout, h.panels, d.panel, plan.node, plan.zone);
+        note(h, docked);
+        if (docked.applied && plan.zone == DropZone::Centre)
+            note(h, reorder_tab(layout, h.panels, d.panel, plan.slot));
+    }
+    else if (plan.action == DropAction::Float)
+    {
+        note(h, float_panel(layout, h.panels, d.panel, plan.preview));
+    }
+}
+
+void move_dragged_float(PanelHostState& h, const Vec2f& pointer)
+{
+    DockLayout& layout = *h.layout;
+    const Rect& surface = h.solved.surface_rect;
+    for (uint32_t f = 0; f < layout.float_count; ++f)
+    {
+        if (layout.floats[f].panel != h.drag.panel)
+            continue;
+        const Rect& size = h.solved.floats[f];
+        const Vec2f at(math::clamp(pointer[0] - h.drag.grab[0], surface.min[0], surface.min[0] + surface.size[0] - size.size[0]), math::clamp(pointer[1] - h.drag.grab[1], surface.min[1], surface.min[1] + surface.size[1] - size.size[1]));
+        if (at[0] != layout.floats[f].rect.min[0] || at[1] != layout.floats[f].rect.min[1] || size.size[0] != layout.floats[f].rect.size[0] || size.size[1] != layout.floats[f].rect.size[1])
+        {
+            layout.floats[f].rect = Rect{ at, size.size };
+            h.result.layout_changed = true;
+        }
+        return;
+    }
+}
+
+// Runs after the frame's drawing so no op reshapes the tree while its tabs are still being drawn.
+void update_drag(GuiContext& ctx, PanelHostState& h)
+{
+    DragState& d = h.drag;
+    if (d.source == DragSource::None)
+        return;
+    const ImInput& input = ctx.input();
+    if (key_pressed(input.keys, ImKey::Escape) || !is_open(*h.layout, d.panel))
+    {
+        d = DragState{};
+        return;
+    }
+    const Vec2f pointer = input.pointer.position;
+    if (d.source == DragSource::Float)
+        move_dragged_float(h, pointer);
+    d.plan = resolve_drop(*h.layout, h.panels, h.solved, d.panel, pointer, input.keys.shift);
+    if (!button_of(input, MouseCode::Left).down)
+    {
+        apply_drop(h, d);
+        d = DragState{};
+        return;
+    }
+    h.result.interacting = true;
+    h.result.dragging = true;
+    const bool accepted = d.plan.action == DropAction::Dock || d.plan.action == DropAction::Float || d.plan.action == DropAction::Reorder;
+    ctx.request_cursor(accepted ? CursorShape::Hand : CursorShape::Arrow);
+    draw_drag_feedback(ctx, h);
+}
+
+// Ctrl+Tab walks the tabs of the focused panel's node; a node with one tab hands the walk to the next node.
+void cycle_tabs(PanelHostState& h, const ImKeys& keys)
+{
+    if (!keys.ctrl || !key_pressed(keys, ImKey::Tab) || h.drag.source != DragSource::None)
+        return;
+    DockLayout& layout = *h.layout;
+    const int32_t step = keys.shift ? -1 : 1;
+    int32_t current = k_no_node;
+    for (uint32_t n = 0; n < layout.node_count && current == k_no_node; ++n)
+    {
+        const DockNode& node = layout.nodes[n];
+        for (uint32_t t = 0; node.kind == DockNodeKind::Tabs && t < node.count; ++t)
+            if (node.tabs[t] == h.focused)
+                current = static_cast<int32_t>(n);
+    }
+    if (current == k_no_node)
+    {
+        for (uint32_t n = 0; n < layout.node_count && current == k_no_node; ++n)
+            if (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].count > 0)
+                current = static_cast<int32_t>(n);
+        if (current == k_no_node)
+            return;
+        h.focused = layout.nodes[current].tabs[layout.nodes[current].selected];
+        return;
+    }
+    const DockNode& node = layout.nodes[current];
+    int32_t target = current;
+    uint32_t index = 0;
+    if (node.count > 1)
+    {
+        index = static_cast<uint32_t>((static_cast<int32_t>(node.selected) + step + static_cast<int32_t>(node.count)) % static_cast<int32_t>(node.count));
+    }
+    else
+    {
+        const int32_t total = static_cast<int32_t>(layout.node_count);
+        for (int32_t i = 1; i <= total; ++i)
+        {
+            const int32_t candidate = ((current + step * i) % total + total) % total;
+            if (layout.nodes[candidate].kind == DockNodeKind::Tabs && layout.nodes[candidate].count > 0)
+            {
+                target = candidate;
+                break;
+            }
+        }
+        index = layout.nodes[target].selected;
+    }
+    note(h, select_tab(layout, target, index));
+    h.focused = layout.nodes[target].tabs[index];
+    h.result.layout_changed = true;
+}
+
 void draw_empty(GuiContext& ctx, PanelHostState& h)
 {
     LayoutStyle box;
@@ -321,15 +702,17 @@ void draw_empty(GuiContext& ctx, PanelHostState& h)
 
 void draw_host(GuiContext& ctx, PanelHostState& h)
 {
-    h.solved = solve(*h.layout, h.panels, metrics_of(ctx.gui_theme()), h.host_rect, static_cast<uint8_t>(ctx.input().surface));
+    h.solved = solve(*h.layout, h.panels, metrics_of(ctx.gui_theme(), h.options.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface));
     const int32_t root = h.layout->roots[ctx.input().surface];
-    if (root == k_no_node)
+    if (root == k_no_node && h.layout->float_count == 0)
     {
         draw_empty(ctx, h);
         return;
     }
     ctx.push_id("panel_host");
+    cycle_tabs(h, ctx.input().keys);
     PanelId pending_close;
+    PanelId pending_raise;
     const uint32_t count = h.solved.node_count;
     for (uint32_t n = 0; n < count; ++n)
     {
@@ -357,7 +740,15 @@ void draw_host(GuiContext& ctx, PanelHostState& h)
             ctx.pop_id();
         }
     }
+    ctx.push_id("floats");
+    for (uint32_t f = 0; f < h.solved.float_count; ++f)
+        if (h.layout->floats[f].surface == h.solved.surface)
+            draw_float(ctx, h, f, pending_close, pending_raise);
     ctx.pop_id();
+    ctx.pop_id();
+    update_drag(ctx, h);
+    if (is_valid(pending_raise))
+        raise_float(h, pending_raise);
     if (is_valid(pending_close))
         note(h, close_panel(*h.layout, h.panels, pending_close));
 }
@@ -369,7 +760,10 @@ bool register_panel(std::string_view name, const PanelOptions& options)
     PanelHostState& h = host_of(context());
     if (!add_panel(h.panels, name, options.title.empty() ? name : options.title, options.kind, options.min_w, options.min_h))
         return false;
-    find_panel(h.panels, make_panel_id(name))->flags = PanelFlags{ flags_of(options) };
+    PanelDesc* desc = find_panel(h.panels, make_panel_id(name));
+    desc->flags = PanelFlags{ flags_of(options) };
+    desc->toolbar = options.toolbar;
+    desc->toolbar_placement = options.toolbar_placement;
     return true;
 }
 
@@ -402,8 +796,16 @@ void begin_panel_host(DockLayout& layout, const PanelHostOptions& options)
     h.options = options;
     h.result = {};
     h.body_count = 0;
+    h.current_body = -1;
+    h.toolbar_open = false;
     h.solved.node_count = 0;
     keep_valid(h, layout);
+    if (!h.history_seeded)
+    {
+        reset(h.history, layout);
+        h.history_seeded = true;
+    }
+    apply_history_request(h, layout);
 
     h.host_id = ctx.id("panel_host");
     LayoutStyle area;
@@ -424,11 +826,15 @@ void end_panel_host()
         throw Error("end_panel_host without begin_panel_host", "every end_panel_host needs a begin_panel_host");
     if (h.depth != 0)
         throw Error("end_panel_host with a panel still open", "every begin_panel needs an end_panel");
+    if (h.toolbar_open)
+        throw Error("end_panel_host with a toolbar still open", "every begin_panel_toolbar needs an end_panel_toolbar");
     if (h.result.layout_changed)
     {
         h.last_good = *h.layout;
         h.has_good = true;
     }
+    if (!h.result.interacting)
+        push(h.history, *h.layout);
     h.in_host = false;
     h.layout = nullptr;
 }
@@ -451,7 +857,8 @@ bool begin_panel(std::string_view name, const PanelOptions& options)
     const PanelId id = make_panel_id(name);
     if (find_panel(h.panels, id) == nullptr)
         std::ignore = register_panel(name, options);
-    const PanelBody* body = find_body(h, id);
+    const int32_t body_index = find_body_index(h, id);
+    const PanelBody* body = body_index < 0 ? nullptr : &h.bodies[body_index];
     if (body == nullptr || body->viewport)
     {
         h.stack[h.depth++] = PanelCall::DockHidden;
@@ -462,15 +869,20 @@ bool begin_panel(std::string_view name, const PanelOptions& options)
     box.align_x = Align::Start;
     box.align_y = Align::Start;
     box.overflow = Overflow::Clip;
-    const LayoutStyle frame = placed(h, body->rect);
+    const LayoutStyle frame = placed(h, body->rect, body->channel);
     box.width = frame.width;
     box.height = frame.height;
     box.floating = frame.floating;
+    box.channel = frame.channel;
+    const bool floating = body->channel != 0;
+    if (floating)
+        ctx.begin_shield_layer();
     ctx.begin_box(name, box);
     ctx.push_id(name);
     begin_scroll("content");
     h.dock_body_open = true;
-    h.stack[h.depth++] = PanelCall::Dock;
+    h.current_body = body_index;
+    h.stack[h.depth++] = floating ? PanelCall::DockFloat : PanelCall::Dock;
     return true;
 }
 
@@ -485,11 +897,16 @@ void end_panel()
     {
         im::end_panel(ctx);
     }
-    else if (call == PanelCall::Dock)
+    else if (call == PanelCall::Dock || call == PanelCall::DockFloat)
     {
+        if (h.toolbar_open)
+            throw Error("end_panel with a toolbar still open", "every begin_panel_toolbar needs an end_panel_toolbar");
+        h.current_body = -1;
         end_scroll();
         ctx.pop_id();
         ctx.end_box();
+        if (call == PanelCall::DockFloat)
+            ctx.end_shield_layer();
         h.dock_body_open = false;
     }
 }
@@ -513,6 +930,73 @@ PanelId focused_panel()
 void set_focused_panel(PanelId panel)
 {
     host_of(context()).focused = panel;
+}
+
+bool begin_panel_toolbar()
+{
+    GuiContext& ctx = context();
+    PanelHostState& h = host_of(ctx);
+    if (!host_active(h, ctx) || !h.dock_body_open || h.current_body < 0)
+        return false;
+    if (h.toolbar_open)
+        throw Error("begin_panel_toolbar called twice", "close the toolbar with end_panel_toolbar");
+    const PanelBody& body = h.bodies[h.current_body];
+    if (is_empty(body.toolbar))
+        return false;
+    LayoutStyle box = placed(h, body.toolbar, body.channel);
+    box.direction = Direction::Row;
+    box.align_y = Align::Centre;
+    box.gap = ctx.gui_theme().spacing;
+    box.padding = { ctx.gui_theme().spacing, 0.0f, ctx.gui_theme().spacing, 0.0f };
+    box.overflow = Overflow::Clip;
+    ctx.begin_box(ctx.id("toolbar"), box);
+    ctx.push_id("toolbar");
+    h.toolbar_open = true;
+    return true;
+}
+
+void end_panel_toolbar()
+{
+    GuiContext& ctx = context();
+    PanelHostState& h = host_of(ctx);
+    if (!h.toolbar_open)
+        throw Error("end_panel_toolbar without begin_panel_toolbar", "every end_panel_toolbar needs a begin_panel_toolbar");
+    ctx.pop_id();
+    ctx.end_box();
+    h.toolbar_open = false;
+}
+
+Rect panel_toolbar_rect(std::string_view name)
+{
+    const PanelBody* body = find_body(host_of(context()), make_panel_id(name));
+    return body != nullptr ? body->toolbar : Rect{};
+}
+
+void undo_layout()
+{
+    host_of(context()).history_request = HistoryRequest::Undo;
+}
+
+void redo_layout()
+{
+    host_of(context()).history_request = HistoryRequest::Redo;
+}
+
+bool can_undo_layout()
+{
+    return can_undo(host_of(context()).history);
+}
+
+bool can_redo_layout()
+{
+    return can_redo(host_of(context()).history);
+}
+
+void reset_layout_history(const DockLayout& layout)
+{
+    PanelHostState& h = host_of(context());
+    reset(h.history, layout);
+    h.history_seeded = true;
 }
 
 }

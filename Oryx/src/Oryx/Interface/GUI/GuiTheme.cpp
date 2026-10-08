@@ -86,6 +86,8 @@ GuiTheme build(const Seed& seed)
     theme.scroll.hover = shift(rgb(seed.thumb), math::abs(seed.hover_step) * 2.0f * (seed.hover_step >= 0.0f ? 1.0f : -1.0f));
     theme.overlay = role(seed, seed.overlay, seed.field_border, math::max(1.0f, seed.border_width));
     theme.min_hit_size = 18.0f;
+    theme.dock_preview = theme.panel.accent;
+    theme.dock_preview.a = 0.28f;
     return theme;
 }
 

@@ -25,6 +25,14 @@ struct Solver
     MinSize mins[k_max_dock_nodes];
 
     bool valid(int32_t node) const { return node >= 0 && static_cast<uint32_t>(node) < layout.node_count; }
+    const PanelDesc* selected_desc(const DockNode& n) const { return n.selected < n.count ? find_panel(panels, n.tabs[n.selected]) : nullptr; }
+
+    float toolbar_height(const DockNode& n) const
+    {
+        const PanelDesc* desc = selected_desc(n);
+        return metrics.style.toolbars && desc != nullptr && desc->toolbar && n.collapsed == 0 ? metrics.toolbar_height : 0.0f;
+    }
+
     bool collapsed_tabs(int32_t node) const { return valid(node) && layout.nodes[node].kind == DockNodeKind::Tabs && layout.nodes[node].collapsed != 0; }
 
     MinSize compute_min(int32_t node, uint32_t depth)
@@ -51,7 +59,7 @@ struct Solver
                     w = math::max(w, desc->min_w);
                     h = math::max(h, desc->min_h);
                 }
-                result = { w, metrics.strip_height + h };
+                result = { w, metrics.strip_height + toolbar_height(n) + h };
             }
         }
         else if (n.kind == DockNodeKind::Split)
@@ -72,9 +80,17 @@ struct Solver
         const DockNode& n = layout.nodes[node];
         SolvedNode& s = out.nodes[node];
         const float strip_h = math::min(metrics.strip_height, rect.size[1]);
-        s.strip = Rect{ rect.min, Vec2f(rect.size[0], strip_h) };
-        const Vec2f below(rect.min[0], rect.min[1] + strip_h);
-        s.body = Rect{ below, Vec2f(rect.size[0], n.collapsed != 0 ? 0.0f : rect.size[1] - strip_h) };
+        const float tool_h = math::min(toolbar_height(n), rect.size[1] - strip_h);
+        const float stack_h = strip_h + tool_h;
+        const bool bottom = metrics.style.tab_position == TabPosition::Bottom;
+        const PanelDesc* desc = selected_desc(n);
+        const bool above = tool_h > 0.0f && desc != nullptr && resolve_toolbar_placement(metrics.style, *desc, n.count) == ToolbarPlacement::AboveTabs;
+        const float stack_y = bottom ? rect.min[1] + rect.size[1] - stack_h : rect.min[1];
+        const float strip_y = stack_y + (above ? tool_h : 0.0f);
+        s.strip = Rect{ Vec2f(rect.min[0], strip_y), Vec2f(rect.size[0], strip_h) };
+        if (tool_h > 0.0f)
+            s.toolbar = Rect{ Vec2f(rect.min[0], stack_y + (above ? 0.0f : strip_h)), Vec2f(rect.size[0], tool_h) };
+        s.body = Rect{ Vec2f(rect.min[0], bottom ? rect.min[1] : rect.min[1] + stack_h), Vec2f(rect.size[0], n.collapsed != 0 ? 0.0f : rect.size[1] - stack_h) };
 
         const uint32_t count = math::min<uint32_t>(n.count, k_max_dock_tabs);
         float avail = rect.size[0];
@@ -84,7 +100,7 @@ struct Solver
         if (collapsible)
         {
             avail -= metrics.strip_button;
-            s.collapse_button = Rect{ Vec2f(rect.min[0] + avail, rect.min[1]), Vec2f(metrics.strip_button, strip_h) };
+            s.collapse_button = Rect{ Vec2f(rect.min[0] + avail, strip_y), Vec2f(metrics.strip_button, strip_h) };
         }
         if (count == 0 || !(avail > 0.0f))
             return;
@@ -106,7 +122,7 @@ struct Solver
         s.first_visible = static_cast<uint8_t>(first);
         s.visible_count = static_cast<uint8_t>(visible);
         for (uint32_t i = 0; i < visible; ++i)
-            s.tab_rects[first + i] = Rect{ Vec2f(rect.min[0] + tab_w * static_cast<float>(i), rect.min[1]), Vec2f(tab_w, strip_h) };
+            s.tab_rects[first + i] = Rect{ Vec2f(rect.min[0] + tab_w * static_cast<float>(i), strip_y), Vec2f(tab_w, strip_h) };
     }
 
     void place(int32_t node, Rect rect, uint32_t depth)
@@ -207,6 +223,15 @@ DropZone nearest_edge(float left, float right, float top, float bottom, float& d
 
 }
 
+ToolbarPlacement resolve_toolbar_placement(const DockStyle& style, const PanelDesc& panel, uint32_t tab_count)
+{
+    if (style.toolbar_placement != ToolbarPlacement::Auto)
+        return style.toolbar_placement;
+    if (panel.toolbar_placement != ToolbarPlacement::Auto)
+        return panel.toolbar_placement;
+    return tab_count <= 1 ? ToolbarPlacement::AboveTabs : ToolbarPlacement::BelowTabs;
+}
+
 SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface)
 {
     SolvedLayout out;
@@ -231,12 +256,20 @@ SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const Doc
             continue;
         const PanelDesc* desc = find_panel(panels, fl.panel);
         const float min_w = desc != nullptr ? desc->min_w : 0.0f;
-        const float min_h = desc != nullptr ? desc->min_h + metrics.strip_height : metrics.strip_height;
+        const float tool_h = metrics.style.toolbars && desc != nullptr && desc->toolbar ? metrics.toolbar_height : 0.0f;
+        const float min_h = (desc != nullptr ? desc->min_h : 0.0f) + metrics.strip_height + tool_h;
         const float w = math::min(math::max(fl.rect.size[0], min_w), out.surface_rect.size[0]);
         const float h = math::min(math::max(fl.rect.size[1], min_h), out.surface_rect.size[1]);
         const float x = math::clamp(fl.rect.min[0], out.surface_rect.min[0], out.surface_rect.min[0] + out.surface_rect.size[0] - w);
         const float y = math::clamp(fl.rect.min[1], out.surface_rect.min[1], out.surface_rect.min[1] + out.surface_rect.size[1] - h);
         out.floats[f] = Rect{ Vec2f(x, y), Vec2f(w, h) };
+        const float title_h = math::min(metrics.strip_height, h);
+        const float bar_h = math::min(tool_h, h - title_h);
+        SolvedFloat& parts = out.float_parts[f];
+        parts.title = Rect{ Vec2f(x, y), Vec2f(w, title_h) };
+        if (bar_h > 0.0f)
+            parts.toolbar = Rect{ Vec2f(x, y + title_h), Vec2f(w, bar_h) };
+        parts.body = Rect{ Vec2f(x, y + title_h + bar_h), Vec2f(w, h - title_h - bar_h) };
     }
     return out;
 }
@@ -290,6 +323,151 @@ DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, con
         result.preview = edge_preview(s.rect, zone, metrics);
     }
     return result;
+}
+
+namespace
+{
+
+int32_t tab_node_of(const DockLayout& layout, PanelId panel)
+{
+    for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
+    {
+        const DockNode& node = layout.nodes[n];
+        if (node.kind != DockNodeKind::Tabs)
+            continue;
+        for (uint32_t t = 0; t < node.count && t < k_max_dock_tabs; ++t)
+            if (node.tabs[t] == panel)
+                return static_cast<int32_t>(n);
+    }
+    return k_no_node;
+}
+
+bool is_floating(const DockLayout& layout, PanelId panel)
+{
+    for (uint32_t f = 0; f < layout.float_count && f < k_max_dock_floats; ++f)
+        if (layout.floats[f].panel == panel)
+            return true;
+    return false;
+}
+
+// The gap before the first visible tab whose midpoint lies right of x, counted in tab indices.
+uint32_t insertion_slot(const DockNode& node, const SolvedNode& solved, float x)
+{
+    uint32_t slot = solved.first_visible;
+    const uint32_t end = math::min<uint32_t>(solved.first_visible + solved.visible_count, node.count);
+    for (uint32_t i = solved.first_visible; i < end; ++i)
+        if (x >= solved.tab_rects[i].min[0] + solved.tab_rects[i].size[0] * 0.5f)
+            slot = i + 1;
+    return slot;
+}
+
+Rect insertion_marker(const DockNode& node, const SolvedNode& solved, uint32_t slot)
+{
+    if (solved.visible_count == 0)
+        return {};
+    const uint32_t first = solved.first_visible;
+    const uint32_t end = math::min<uint32_t>(first + solved.visible_count, node.count);
+    float x = solved.tab_rects[first].min[0];
+    if (slot > first)
+    {
+        const Rect& tab = solved.tab_rects[math::min(slot, end) - 1u];
+        x = tab.min[0] + tab.size[0];
+    }
+    return Rect{ Vec2f(x - 1.0f, solved.strip.min[1]), Vec2f(2.0f, solved.strip.size[1]) };
+}
+
+Rect float_preview(const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer)
+{
+    const PanelDesc* desc = find_panel(panels, panel);
+    const DockMetrics& metrics = solved.metrics;
+    const float tool_h = metrics.style.toolbars && desc != nullptr && desc->toolbar ? metrics.toolbar_height : 0.0f;
+    const Rect& surface = solved.surface_rect;
+    const float w = math::min(math::max(k_dock_float_width, desc != nullptr ? desc->min_w : 0.0f), surface.size[0]);
+    const float h = math::min(math::max(k_dock_float_height, (desc != nullptr ? desc->min_h : 0.0f) + metrics.strip_height + tool_h), surface.size[1]);
+    const float x = math::clamp(pointer[0] - w * 0.5f, surface.min[0], surface.min[0] + surface.size[0] - w);
+    const float y = math::clamp(pointer[1] - metrics.strip_height * 0.5f, surface.min[1], surface.min[1] + surface.size[1] - h);
+    return Rect{ Vec2f(x, y), Vec2f(w, h) };
+}
+
+DropPlan refused(DockReason reason, int32_t node = k_no_node, DropZone zone = DropZone::Centre)
+{
+    DropPlan plan;
+    plan.action = DropAction::Cancel;
+    plan.reason = reason;
+    plan.node = node;
+    plan.zone = zone;
+    return plan;
+}
+
+}
+
+DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only)
+{
+    const int32_t source = tab_node_of(layout, panel);
+    const bool floating = is_floating(layout, panel);
+    if (source == k_no_node && !floating)
+        return refused(DockReason::NotFound);
+
+    const bool inside = contains(solved.surface_rect, pointer);
+    if (!float_only && inside)
+    {
+        if (source != k_no_node && contains(solved.nodes[source].strip, pointer))
+        {
+            const DockReason reason = can_reorder(panels, panel);
+            if (reason != DockReason::None)
+                return refused(reason, source);
+            const DockNode& node = layout.nodes[source];
+            const uint32_t insertion = insertion_slot(node, solved.nodes[source], pointer[0]);
+            uint32_t slot = insertion;
+            uint32_t current = 0;
+            while (current < node.count && node.tabs[current] != panel)
+                ++current;
+            slot = slot > current ? slot - 1u : slot;
+            DropPlan plan;
+            plan.action = slot == current ? DropAction::None : DropAction::Reorder;
+            plan.node = source;
+            plan.slot = slot;
+            if (plan.action == DropAction::Reorder)
+                plan.marker = insertion_marker(node, solved.nodes[source], insertion);
+            return plan;
+        }
+
+        const DropTarget target = drop_target(layout, solved, pointer);
+        if (target.valid)
+        {
+            if (target.node == source && source != k_no_node && (target.zone == DropZone::Centre || layout.nodes[source].count == 1))
+                return DropPlan{};
+            // A float only docks into a strip or an edge zone, so it can be moved across a body without sticking.
+            if (floating && target.zone == DropZone::Centre && target.node != k_dock_root && !contains(solved.nodes[target.node].strip, pointer))
+                return DropPlan{};
+            const DockReason reason = can_dock_into(layout, panels, panel, target.node);
+            if (reason != DockReason::None)
+                return refused(reason, target.node, target.zone);
+            DropPlan plan;
+            plan.action = DropAction::Dock;
+            plan.node = target.node;
+            plan.zone = target.zone;
+            plan.preview = target.preview;
+            plan.slot = target.node != k_dock_root ? layout.nodes[target.node].count : 0u;
+            if (target.zone == DropZone::Centre && target.node != k_dock_root && contains(solved.nodes[target.node].strip, pointer))
+            {
+                plan.slot = insertion_slot(layout.nodes[target.node], solved.nodes[target.node], pointer[0]);
+                plan.marker = insertion_marker(layout.nodes[target.node], solved.nodes[target.node], plan.slot);
+            }
+            return plan;
+        }
+        return refused(DockReason::TargetInvalid);
+    }
+
+    if (floating)
+        return DropPlan{};
+    const DockReason reason = can_float(panels, panel);
+    if (reason != DockReason::None)
+        return refused(reason);
+    DropPlan plan;
+    plan.action = DropAction::Float;
+    plan.preview = float_preview(panels, solved, panel, pointer);
+    return plan;
 }
 
 }

@@ -25,9 +25,42 @@ void end_panel_host();
 [[nodiscard]] Rect viewport_rect(std::string_view name);
 [[nodiscard]] PanelHostResult panel_host_result();
 
+// The toolbar strip reserved for the panel being drawn (PanelOptions::toolbar); false, with nothing to close, when the panel has none, is hidden or this is not a docked panel. Call between begin_panel and end_panel.
+[[nodiscard]] bool begin_panel_toolbar();
+void end_panel_toolbar();
+// The strip in the latest frame; empty when absent. Valid outside a frame.
+[[nodiscard]] Rect panel_toolbar_rect(std::string_view name);
+
+// Layout history: one entry per finished change (a drag, a close, a Panels-menu toggle), none while a splitter or panel is held. The request is applied at the next begin_panel_host and ignored mid-drag.
+void undo_layout();
+void redo_layout();
+[[nodiscard]] bool can_undo_layout();
+[[nodiscard]] bool can_redo_layout();
+// Starts the history afresh from `layout`; call after loading or resetting a layout the user should not undo into.
+void reset_layout_history(const DockLayout& layout);
+
 // The panel that last took a press; the owner may set it too (the board, a shortcut).
 [[nodiscard]] PanelId focused_panel();
 void set_focused_panel(PanelId panel);
+
+class PanelToolbarScope
+{
+public:
+    PanelToolbarScope() : m_open(begin_panel_toolbar()) {}
+    ~PanelToolbarScope()
+    {
+        if (m_open)
+            end_panel_toolbar();
+    }
+
+    [[nodiscard]] bool visible() const { return m_open; }
+
+    PanelToolbarScope(const PanelToolbarScope&) = delete;
+    PanelToolbarScope& operator=(const PanelToolbarScope&) = delete;
+
+private:
+    bool m_open;
+};
 
 class PanelHostScope
 {

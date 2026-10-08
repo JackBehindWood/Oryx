@@ -1,10 +1,37 @@
 #pragma once
 
 #include "Oryx/Interface/GUI/Dock/DockLayout.h"
+#include "Oryx/Interface/GUI/Dock/DockOps.h"
 
 // Pure geometry for a DockLayout: no context, no drawing, input is a surface rect and a pointer. Assumes a layout that passed validate.
 namespace oryx::gui
 {
+
+enum class TabPosition : uint8_t
+{
+    Top,
+    Bottom
+};
+
+enum class CloseButtons : uint8_t
+{
+    OnHover,
+    Always,
+    Never
+};
+
+// The user's look-and-feel choices, all plain values so a settings loader fills them. Precedence for toolbars: this style, then the panel's own placement, then the node's context rule.
+struct DockStyle
+{
+    ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
+    bool toolbars = true;
+    TabPosition tab_position = TabPosition::Top;
+    CloseButtons close_buttons = CloseButtons::Always;
+    // Scales strip and toolbar heights and tab padding.
+    bool compact = false;
+    // Alpha factor of the drop preview fill.
+    float preview_opacity = 1.0f;
+};
 
 // Points; the host scales them by the theme scale.
 struct DockMetrics
@@ -19,6 +46,8 @@ struct DockMetrics
     float root_edge = 12.0f;
     // Width reserved at the right end of a strip for the collapse chevron when every tab may collapse; zero reserves nothing.
     float strip_button = 22.0f;
+    float toolbar_height = 24.0f;
+    DockStyle style;
 };
 
 struct SolvedNode
@@ -31,8 +60,18 @@ struct SolvedNode
     // Tabs nodes: the collapse chevron's box, empty when collapsing is not permitted. Split nodes: the gap between the two children.
     Rect collapse_button;
     Rect splitter;
+    // Tabs nodes: the selected panel's toolbar strip, empty when it has none (or the node is collapsed).
+    Rect toolbar;
     uint8_t first_visible = 0;
     uint8_t visible_count = 0;
+};
+
+// A float's parts: a title bar of strip_height, then the toolbar when the panel has one, then the body.
+struct SolvedFloat
+{
+    Rect title;
+    Rect toolbar;
+    Rect body;
 };
 
 struct SolvedLayout
@@ -45,7 +84,11 @@ struct SolvedLayout
     SolvedNode nodes[k_max_dock_nodes];
     // Parallel to DockLayout::floats: clamped inside the surface, zero for floats of other surfaces.
     Rect floats[k_max_dock_floats];
+    SolvedFloat float_parts[k_max_dock_floats];
 };
+
+// The placement a node's selected panel gets after style, panel and context are weighed.
+[[nodiscard]] ToolbarPlacement resolve_toolbar_placement(const DockStyle& style, const PanelDesc& panel, uint32_t tab_count);
 
 // Tabs that do not fit keep tab_min_width and scroll so the selected one is visible; a surface smaller than the panels' minimums shrinks both sides proportionally and bodies clip.
 [[nodiscard]] SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface = 0);
@@ -60,5 +103,34 @@ struct DropTarget
 };
 
 [[nodiscard]] DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);
+
+enum class DropAction : uint8_t
+{
+    // Nothing to apply and nothing to preview (the pointer is where the drag began, or a float is only being moved).
+    None,
+    Reorder,
+    Dock,
+    Float,
+    Cancel
+};
+
+// What releasing a dragged panel at the pointer would do. `slot` is the tab position for Reorder and for a Centre dock; reason says why a Cancel was refused.
+struct DropPlan
+{
+    DropAction action = DropAction::None;
+    int32_t node = k_no_node;
+    DropZone zone = DropZone::Centre;
+    uint32_t slot = 0;
+    Rect preview;
+    // The insertion bar in the target strip for Reorder and a Centre dock; empty otherwise.
+    Rect marker;
+    DockReason reason = DockReason::None;
+};
+
+inline constexpr float k_dock_float_width = 320.0f;
+inline constexpr float k_dock_float_height = 240.0f;
+
+// The one place that decides a drag, shared by the host's preview and its release. `float_only` (Shift) skips every dock target; a pointer outside the surface also floats when the panel may.
+[[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only);
 
 }

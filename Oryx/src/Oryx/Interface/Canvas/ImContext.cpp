@@ -38,6 +38,8 @@ void ImContext::begin_frame(const ImInput& input)
     m_press_claimed = false;
     m_popup_count = 0;
     m_popup_depth = 0;
+    m_shield_count = 0;
+    m_shield_depth = 0;
     m_disabled = 0;
     m_layout.set_alpha(1.0f);
 }
@@ -73,6 +75,10 @@ void ImContext::end_frame()
     {
         throw Error("ImContext frame ended with a disabled scope open", "every begin_disabled needs an end_disabled");
     }
+    if (m_shield_depth != 0)
+    {
+        throw Error("ImContext frame ended with a shield layer open", "every begin_shield_layer needs an end_shield_layer");
+    }
     if (m_popup_depth != 0)
     {
         throw Error("ImContext frame ended with a popup layer open", "every begin_popup_layer needs an end_popup_layer");
@@ -107,6 +113,8 @@ void ImContext::abort_frame()
     m_hits.clear();
     m_popup_depth = 0;
     m_popup_count = 0;
+    m_shield_depth = 0;
+    m_shield_count = 0;
     m_disabled = 0;
     m_layout.set_alpha(1.0f);
     m_open = false;
@@ -140,6 +148,8 @@ void ImContext::solve_layout()
     {
         std::ignore = m_layout.rect_of(m_popups[index].id, m_popups[index].rect);
     }
+    m_last_shields = m_shields;
+    m_last_shield_count = m_shield_count;
     m_last_popups = m_popups;
     m_last_popup_count = m_popup_count;
 }
@@ -228,7 +238,7 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
     const Rect hit = intersect(intersect(at_least(rect, Vec2f(m_theme.min_hit_size, m_theme.min_hit_size)), m_draw.current_clip()), layout_clip);
     m_hits.push_back({ id, hit });
     const bool inside = m_input.pointer.valid && contains(hit, m_input.pointer.position);
-    const bool covered = inside && m_popup_depth == 0 && under_popup(m_input.pointer.position);
+    const bool covered = inside && ((m_popup_depth == 0 && under_popup(m_input.pointer.position)) || (m_shield_depth == 0 && under_shield(m_input.pointer.position)));
     state.hovered = inside && !covered && (!is_valid(m_active) || m_active == id || (m_press_claimed && left.pressed));
     if (state.hovered)
     {
@@ -279,6 +289,43 @@ bool ImContext::under_popup(const Vec2f& point) const
         }
     }
     return false;
+}
+
+bool ImContext::under_shield(const Vec2f& point) const
+{
+    for (uint32_t index = 0; index < m_last_shield_count; ++index)
+    {
+        if (contains(m_last_shields[index], point))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ImContext::add_shield(const Rect& rect)
+{
+    require_frame("add_shield");
+    if (m_shield_count < k_max_shields_per_frame)
+    {
+        m_shields[m_shield_count++] = rect;
+    }
+}
+
+void ImContext::begin_shield_layer()
+{
+    require_frame("begin_shield_layer");
+    ++m_shield_depth;
+}
+
+void ImContext::end_shield_layer()
+{
+    require_frame("end_shield_layer");
+    if (m_shield_depth == 0)
+    {
+        throw Error("ImContext has no shield layer to end", "every end_shield_layer needs a begin_shield_layer");
+    }
+    --m_shield_depth;
 }
 
 PopupResult ImContext::begin_popup_layer(ImId box_id)

@@ -67,6 +67,14 @@ inline constexpr uint8_t close = 1u << 5;
 inline constexpr uint8_t all = 0x3Fu;
 }
 
+// Where a panel's toolbar strip sits against the tab strip of its node; Auto lets the node decide (a lone panel puts it above the tabs, tabbed panels below).
+enum class ToolbarPlacement : uint8_t
+{
+    Auto,
+    AboveTabs,
+    BelowTabs
+};
+
 // Independent permission bits, not a mode: a pinned panel clears dock_elsewhere and tear_off yet still reorders and resizes.
 struct PanelFlags
 {
@@ -97,6 +105,9 @@ struct PanelDesc
     PanelId dock_never[k_max_dock_rules] = {};
     uint8_t dock_only_count = 0;
     uint8_t dock_never_count = 0;
+    // Reserves a toolbar strip of DockMetrics::toolbar_height for the panel.
+    bool toolbar = false;
+    ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
 };
 
 struct PanelTable

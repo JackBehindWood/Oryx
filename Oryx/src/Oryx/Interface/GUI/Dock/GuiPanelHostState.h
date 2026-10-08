@@ -25,6 +25,9 @@ struct PanelOptions : im::WidgetOptions
     bool no_resize = false;
     bool no_reorder = false;
     bool no_tear_off = false;
+    // Reserves a toolbar strip drawn with begin_panel_toolbar; where it sits against the tabs follows DockStyle, then this placement, then the node.
+    bool toolbar = false;
+    ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
 };
 
 static_assert(std::is_trivially_copyable_v<PanelOptions>);
@@ -35,6 +38,7 @@ struct PanelHostOptions
     bool require_viewport = false;
     // When set, an empty surface offers a Reset button that copies it over the layout. Read during the call.
     const DockLayout* default_layout = nullptr;
+    DockStyle style;
 };
 
 // What the last host frame did to the layout, for the owner to push history on release or debounce a save.
@@ -43,6 +47,8 @@ struct PanelHostResult
     bool layout_changed = false;
     // A splitter is held.
     bool interacting = false;
+    // A tab or float is being dragged.
+    bool dragging = false;
 };
 
 static_assert(std::is_trivially_copyable_v<PanelHostResult> && std::is_standard_layout_v<PanelHostResult>);
@@ -52,6 +58,9 @@ struct PanelBody
 {
     PanelId panel;
     Rect rect;
+    // Empty when the panel has no toolbar or it is hidden.
+    Rect toolbar;
+    uint32_t channel = 0;
     bool viewport = false;
 };
 
@@ -59,7 +68,32 @@ enum class PanelCall : uint8_t
 {
     Plain,
     Dock,
+    DockFloat,
     DockHidden
+};
+
+enum class DragSource : uint8_t
+{
+    None,
+    Tab,
+    Float
+};
+
+// The one drag in flight: plain values, so it needs no allocation and survives a rebuilt tree.
+struct DragState
+{
+    DragSource source = DragSource::None;
+    PanelId panel;
+    // Pointer minus the dragged tab's or float's top-left corner when the drag began.
+    Vec2f grab{ 0.0f, 0.0f };
+    DropPlan plan;
+};
+
+enum class HistoryRequest : uint8_t
+{
+    None,
+    Undo,
+    Redo
 };
 
 struct PanelHostState
@@ -84,6 +118,14 @@ struct PanelHostState
     PanelHostResult result;
     PanelCall stack[k_max_panel_stack] = {};
     uint32_t depth = 0;
+    int32_t current_body = -1;
+    bool toolbar_open = false;
+    DragState drag;
+    LayoutHistory history;
+    bool history_seeded = false;
+    HistoryRequest history_request = HistoryRequest::None;
 };
+
+static_assert(sizeof(LayoutHistory) < 256u * 1024u, "history lives in the context, keep it small");
 
 }

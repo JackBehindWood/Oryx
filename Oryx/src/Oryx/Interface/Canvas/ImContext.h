@@ -81,6 +81,7 @@ inline constexpr float k_disabled_alpha = 0.45f;
 
 inline constexpr uint32_t k_max_popup_depth = 8;
 inline constexpr uint32_t k_max_popups_per_frame = 16;
+inline constexpr uint32_t k_max_shields_per_frame = 8;
 
 // Why a popup should close this frame, from last frame's rects (no callbacks): a left press outside it and its nested popups, or Escape while it is the innermost.
 struct PopupResult
@@ -219,6 +220,12 @@ public:
     // The box id the innermost open layer was begun with; the none id outside any layer.
     [[nodiscard]] ImId popup_id() const;
 
+    // Shields: a floating panel that is not a popup. While the pointer is over last frame's shield rect, items outside any shield layer are not hovered or pressed; items between begin_shield_layer and end_shield_layer are unaffected.
+    // Shields do not count as popups (popup_open stays false). Extra rects past k_max_shields_per_frame are ignored; end_shield_layer throws with no layer open.
+    void add_shield(const Rect& rect);
+    void begin_shield_layer();
+    void end_shield_layer();
+
     // The topmost item (the last one submitted) whose hit area held the point in the latest finished frame; the none id when there is none. Valid inside a frame too, where it still answers from the frame before.
     [[nodiscard]] ImId item_at(const Vec2f& point) const;
 
@@ -254,6 +261,7 @@ private:
     ItemState item_clipped(ImId id, const Rect& rect, const Rect& layout_clip);
     [[nodiscard]] ImId hash_parent() const { return m_id_stack.empty() ? ImId{ m_id_seed } : m_id_stack.back(); }
     [[nodiscard]] bool under_popup(const Vec2f& point) const;
+    [[nodiscard]] bool under_shield(const Vec2f& point) const;
     void solve_layout();
     void* state_slot(ImId id, uint32_t size, const void* tag, bool& created);
 
@@ -286,6 +294,11 @@ private:
         uint32_t depth = 0;
     };
 
+    std::array<Rect, k_max_shields_per_frame> m_shields;
+    std::array<Rect, k_max_shields_per_frame> m_last_shields;
+    uint32_t m_shield_count = 0;
+    uint32_t m_last_shield_count = 0;
+    uint32_t m_shield_depth = 0;
     std::array<PopupEntry, k_max_popups_per_frame> m_popups;
     std::array<PopupEntry, k_max_popups_per_frame> m_last_popups;
     uint32_t m_popup_count = 0;
