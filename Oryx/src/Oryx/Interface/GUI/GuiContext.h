@@ -3,6 +3,7 @@
 #include "Oryx/Interface/Canvas/ActiveContext.h"
 #include "Oryx/Interface/Canvas/ImContext.h"
 #include "Oryx/Interface/Canvas/ImWidgets.h"
+#include "Oryx/Interface/GUI/Dock/GuiDockTheme.h"
 #include "Oryx/Interface/GUI/Dock/GuiPanelHostState.h"
 #include "Oryx/Interface/GUI/GuiTheme.h"
 
@@ -45,6 +46,7 @@ public:
     GuiContext()
         : ImContext(k_gui_id_seed)
     {
+        m_dock_view.model = &m_dock_owned;
     }
 
     using ImContext::set_theme;
@@ -53,8 +55,12 @@ public:
     {
         ImContext::set_theme(theme);
         m_gui_theme = theme;
+        m_dock_theme = gui::derive_dock_theme(theme);
     }
     [[nodiscard]] const GuiTheme& gui_theme() const { return m_gui_theme; }
+    // Derived from the GuiTheme at every set_theme; assign after it for a custom dock look.
+    [[nodiscard]] const gui::GuiDockTheme& dock_theme() const { return m_dock_theme; }
+    void set_dock_theme(const gui::GuiDockTheme& theme) { m_dock_theme = theme; }
 
     // The style a widget of this role draws with: the call's own style, else its variant when the theme has one, else the theme's role.
     [[nodiscard]] const ImStyle& role_style(const im::WidgetOptions& options, const ImStyle GuiTheme::* role) const
@@ -99,12 +105,22 @@ public:
         return rects;
     }
 
-    // The dock host's registered panels and frame state; see GuiPanelHost.h.
-    [[nodiscard]] gui::PanelHostState& panel_host() { return m_panel_host; }
+    // The dock's registered panels, layout and history, and this context's frame state; see GuiPanelHost.h.
+    [[nodiscard]] gui::DockModel& dock_model() { return *m_dock_model; }
+    [[nodiscard]] gui::DockView& dock_view() { return m_dock_view; }
+    // Makes this context draw the dock `primary` owns (a secondary window's surface); only the primary writes the layout file.
+    void share_dock_model(GuiContext& primary)
+    {
+        m_dock_model = primary.m_dock_model;
+        m_dock_view.model = m_dock_model;
+    }
 
 private:
-    gui::PanelHostState m_panel_host;
+    gui::DockModel m_dock_owned;
+    gui::DockModel* m_dock_model = &m_dock_owned;
+    gui::DockView m_dock_view;
     GuiTheme m_gui_theme = dark_gui_theme();
+    gui::GuiDockTheme m_dock_theme = gui::derive_dock_theme(m_gui_theme);
     GuiToast m_toasts[k_max_toasts];
     uint64_t m_menu_close_frame = 0;
     ImId m_workspace_ids[3];

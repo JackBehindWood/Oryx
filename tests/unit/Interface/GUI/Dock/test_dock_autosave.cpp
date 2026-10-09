@@ -98,13 +98,15 @@ TEST_CASE("panel host: panel_rect reports any visible panel and panel_occluded s
 {
     GuiFixture f;
     f.driver.input().surface_size = { 800.0f, 600.0f };
-    f.context.panel_host().panels = make_panels();
-    DockLayout layout = make_sample(f.context.panel_host().panels);
+    f.context.dock_model().panels = make_panels();
+    DockLayout& layout = f.context.dock_model().layout;
+    layout = make_sample(f.context.dock_model().panels);
+    settle_dock(f.context.dock_model());
     PanelOptions foreign;
     foreign.foreign_body = true;
     const auto draw = [&]
     {
-        PanelHostScope host(layout);
+        PanelHostScope host;
         for (const char* name : { "a", "b", "vp" })
         {
             PanelScope panel(name);

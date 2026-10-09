@@ -16,11 +16,16 @@ struct GuiFixture
     ContextScope<GuiContext> scope{ context };
     test::ImTestDriver<GuiContext> driver{ context, { 200.0f, 100.0f } };
 
+    GuiSettings saved_settings = settings_of<GuiSettings>();
+
     GuiFixture()
     {
         theme.font = &font;
         context.set_theme(theme);
+        update_settings<GuiSettings>([](GuiSettings& settings) { settings.layout_file.clear(); settings.docking = true; });
     }
+
+    ~GuiFixture() { update_settings<GuiSettings>([this](GuiSettings& settings) { settings = saved_settings; }); }
 
     template<typename Body>
     auto frame_of(Body&& body)

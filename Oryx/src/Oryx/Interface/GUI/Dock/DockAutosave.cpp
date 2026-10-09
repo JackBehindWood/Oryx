@@ -4,6 +4,25 @@
 namespace oryx::gui
 {
 
+DockFileLoad load_layout_file(const std::filesystem::path& file, const PanelTable& panels, const DockLayout& fallback)
+{
+    DockFileLoad result;
+    DockLayout loaded;
+    DockYamlStatus status = DockYamlStatus::Ok;
+    if (load_layout_yaml(loaded, panels, file, &status))
+    {
+        result.layout = loaded;
+        result.from_file = true;
+        return result;
+    }
+    result.layout = fallback;
+    if (status == DockYamlStatus::NewerVersion)
+        result.autosave_allowed = false;
+    else if (status == DockYamlStatus::Corrupt || status == DockYamlStatus::Invalid)
+        static_cast<void>(quarantine_layout_file(file));
+    return result;
+}
+
 DockAutosave::DockAutosave(const DockLayout& initial, bool allowed)
     : m_seen(initial)
     , m_allowed(allowed)

@@ -18,8 +18,20 @@ inline constexpr uint32_t k_panel_text_size = 48;
 inline constexpr uint32_t k_max_dock_rules = 4;
 
 inline constexpr int32_t k_no_node = -1;
-// A drop target meaning "the whole tree of surface 0" rather than one node.
+// A drop target node meaning "the whole tree of the target's surface" rather than one node.
 inline constexpr int32_t k_dock_root = -1;
+
+// Where an operation lands: a Tabs node, or k_dock_root for the whole tree, on a surface. A bare node index means surface 0.
+struct DockTarget
+{
+    int32_t node = k_dock_root;
+    uint8_t surface = 0;
+
+    constexpr DockTarget() = default;
+    constexpr DockTarget(int32_t target_node, uint8_t target_surface = 0) : node(target_node), surface(target_surface) {}
+};
+
+[[nodiscard]] constexpr DockTarget dock_root(uint8_t surface = 0) { return DockTarget{ k_dock_root, surface }; }
 
 inline constexpr float k_dock_new_ratio = 0.3f;
 inline constexpr float k_dock_min_ratio = 0.05f;

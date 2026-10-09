@@ -374,6 +374,7 @@ TEST_CASE("gui settings default, read the layout file and dock look-and-feel and
     reset_settings();
     const GuiSettings& defaults = settings_of<GuiSettings>();
     CHECK(defaults.layout_file == std::filesystem::path("gui-layout.yaml"));
+    CHECK(defaults.docking);
     CHECK(defaults.dock.toolbars);
     CHECK(defaults.dock.toolbar_placement == gui::ToolbarPlacement::Auto);
     CHECK(defaults.dock.tab_position == gui::TabPosition::Top);
@@ -386,6 +387,10 @@ TEST_CASE("gui settings default, read the layout file and dock look-and-feel and
     TempDir dir;
     load_from(dir.write("l.yaml", "gui:\n  layout_file: layouts/mine.yaml\n"));
     CHECK(settings_of<GuiSettings>().layout_file == (dir.path() / "layouts/mine.yaml").lexically_normal());
+
+    load_from(dir.write("d.yaml", "gui:\n  docking: false\n  layout_file: \"\"\n"));
+    CHECK_FALSE(settings_of<GuiSettings>().docking);
+    CHECK(settings_of<GuiSettings>().layout_file.empty());
 
     load_from(dir.write("s.yaml", "gui:\n  dock_toolbars: false\n  dock_toolbar_placement: below_tabs\n  dock_tab_position: bottom\n  dock_close_buttons: on_hover\n  dock_compact: true\n  dock_preview_opacity: 40\n  dock_guides: false\n  dock_drop_flash: false\n"));
     const GuiSettings& styled = settings_of<GuiSettings>();

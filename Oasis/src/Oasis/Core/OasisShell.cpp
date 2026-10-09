@@ -28,7 +28,6 @@ OasisShell::OasisShell(InputRouter& router, DashboardFlag flag)
     : m_router(router)
     , m_feed(feed_options(settings_of<DashboardSettings>()))
     , m_settings(settings_of<DashboardSettings>())
-    , m_showcase_panel(k_showcase_panel)
 {
     m_model.feed = &m_feed;
     m_panel = make_panel_state(m_settings.views);
@@ -51,33 +50,30 @@ OasisShell::OasisShell(InputRouter& router, DashboardFlag flag)
     showcase.dock_near = k_viewport_panel;
     static_cast<void>(gui::register_panel(k_showcase_panel, showcase));
 
-    m_dock = create_unique<gui::DockSession>();
     if (flag != DashboardFlag::Default)
     {
-        m_dock->override_group_open(k_dashboard_group, flag == DashboardFlag::On);
+        static_cast<void>(gui::set_group_open(k_dashboard_group, flag == DashboardFlag::On, gui::GroupEdit::SessionOnly));
     }
 }
 
-OasisShell::~OasisShell() noexcept
+OasisShell::~OasisShell() noexcept = default;
+
+const gui::DockLayout& OasisShell::layout()
 {
-    try
-    {
-        ContextScope<GuiContext> scope(m_context);
-        m_dock->flush();
-    }
-    catch (...)
-    {
-    }
+    ContextScope<GuiContext> scope(m_context);
+    return gui::dock_layout();
 }
 
-bool OasisShell::dashboard_open() const
+bool OasisShell::dashboard_open()
 {
-    return m_dock->group_open(k_dashboard_group);
+    ContextScope<GuiContext> scope(m_context);
+    return gui::is_group_open(k_dashboard_group);
 }
 
-bool OasisShell::showcase_open() const
+bool OasisShell::showcase_open()
 {
-    return gui::is_open(m_dock->layout(), gui::make_panel_id(k_showcase_panel));
+    ContextScope<GuiContext> scope(m_context);
+    return gui::is_panel_open(k_showcase_panel);
 }
 
 void OasisShell::set_font(Font* font)
@@ -123,12 +119,14 @@ void OasisShell::frame(const FrameInfo& info)
 
 void OasisShell::draw_showcase(const FrameInfo& info)
 {
-    if (!m_showcase_panel.visible())
+    ContextScope<GuiContext> scope(m_context);
+    const Rect region = gui::panel_rect(k_showcase_panel);
+    if (is_empty(region))
     {
         return;
     }
-    m_showcase.set_region(m_showcase_panel.rect());
-    m_showcase.set_input_blocked(m_showcase_panel.blocked());
+    m_showcase.set_region(region);
+    m_showcase.set_input_blocked(gui::panel_blocked(k_showcase_panel));
     m_showcase.frame(info);
     claim_input();
 }
@@ -152,24 +150,19 @@ void OasisShell::run(const ImInput& input)
     if (!is_empty(board))
     {
         m_router.set_view(k_main_view, ViewRegion{ board.min, board.size });
-        if (input.pointer.buttons[0].pressed && contains(board, input.pointer.position) && !m_context.wants_mouse())
-        {
-            gui::set_focused_panel(gui::make_panel_id(k_viewport_panel));
-        }
     }
-    m_showcase_panel.update(input.pointer.position);
-    m_dock->update();
     claim_input();
 }
 
 void OasisShell::claim_input()
 {
+    ContextScope<GuiContext> scope(m_context);
     const GuiContext& other = m_showcase.context();
-    if (m_context.wants_mouse() || m_context.popup_open() || m_showcase_panel.claims_pointer(other))
+    if (m_context.wants_mouse() || m_context.popup_open() || gui::panel_claims_pointer(k_showcase_panel, other))
     {
         m_router.claim_pointer();
     }
-    if (m_context.wants_keyboard() || m_context.popup_open() || m_showcase_panel.claims_keyboard(other))
+    if (m_context.wants_keyboard() || m_context.popup_open() || gui::panel_claims_keyboard(k_showcase_panel, other))
     {
         m_router.claim_keyboard();
     }
@@ -190,7 +183,7 @@ void OasisShell::build()
     menus();
     gui::begin_body();
     {
-        gui::PanelHostScope host(m_dock->layout(), m_dock->host_options());
+        gui::PanelHostScope host;
         for (size_t index = 0; index < m_panel.views.size(); ++index)
         {
             draw_dashboard_panel(m_panel, index, m_model);
@@ -211,9 +204,9 @@ void OasisShell::menus()
     view_menu();
     if (gui::begin_menu("Help"))
     {
-        if (gui::menu_item("GUI Showcase", showcase_open()).clicked)
+        if (gui::menu_item("GUI Showcase", gui::is_panel_open(k_showcase_panel)).clicked)
         {
-            m_dock->toggle_panel(gui::make_panel_id(k_showcase_panel));
+            static_cast<void>(gui::toggle_panel(k_showcase_panel));
         }
         gui::end_menu();
     }
@@ -226,11 +219,11 @@ void OasisShell::view_menu()
     {
         return;
     }
-    if (gui::menu_item("Dashboard", dashboard_open()).clicked)
+    if (gui::menu_item("Dashboard", gui::is_group_open(k_dashboard_group)).clicked)
     {
-        m_dock->set_group_open(k_dashboard_group, !dashboard_open());
+        static_cast<void>(gui::set_group_open(k_dashboard_group, !gui::is_group_open(k_dashboard_group)));
     }
-    gui::dock_menu(*m_dock);
+    gui::dock_menu();
     gui::end_menu();
 }
 

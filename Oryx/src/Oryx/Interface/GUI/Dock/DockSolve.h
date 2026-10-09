@@ -58,6 +58,11 @@ struct DockMetrics
     DockStyle style;
 };
 
+// Width of a collapsed column in a horizontal split: one title tab with its close button, plus the chevron.
+[[nodiscard]] inline float rail_width(const DockMetrics& metrics) { return metrics.tab_min_width + metrics.strip_button; }
+// The expander's side; a zero strip_button still gets one when a node is collapsed.
+[[nodiscard]] inline float expander_size(const DockMetrics& metrics) { return metrics.strip_button > 0.0f ? metrics.strip_button : metrics.strip_height; }
+
 struct SolvedNode
 {
     Rect rect;
@@ -72,6 +77,9 @@ struct SolvedNode
     Rect toolbar;
     uint8_t first_visible = 0;
     uint8_t visible_count = 0;
+    // Tabs nodes: collapsed as drawn (an all-collapsed root is laid out expanded) and, within that, a slim column of a horizontal split.
+    bool collapsed = false;
+    bool rail = false;
 };
 
 // A float's parts: a title bar of strip_height, then the toolbar when the panel has one, then the body.
@@ -95,6 +103,11 @@ struct SolvedLayout
     SolvedFloat float_parts[k_max_dock_floats];
 };
 
+// The smallest a float may be: the panel's own minimum plus its title bar and toolbar. Zero width when the panel is unknown.
+[[nodiscard]] Vec2f float_min_size(const PanelTable& panels, PanelId panel, const DockMetrics& metrics);
+// `rect` grown to at least `min_size`, then fitted inside `surface` (the surface wins when it is smaller than the minimum).
+[[nodiscard]] Rect clamp_float(const Rect& rect, const Vec2f& min_size, const Rect& surface);
+
 // The placement a node's selected panel gets after style, panel and context are weighed.
 [[nodiscard]] ToolbarPlacement resolve_toolbar_placement(const DockStyle& style, const PanelDesc& panel, uint32_t tab_count);
 
@@ -108,6 +121,7 @@ struct DropTarget
     int32_t node = k_no_node;
     DropZone zone = DropZone::Centre;
     Rect preview;
+    uint8_t surface = 0;
 };
 
 [[nodiscard]] DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);
@@ -128,6 +142,8 @@ struct DropGuides
 {
     DropGuide guides[k_max_drop_guides];
     uint32_t count = 0;
+    // The surface the guides belong to; every guide targets it.
+    uint8_t surface = 0;
 };
 
 // The compass for dragging `panel` with the pointer at `pointer`: centre plus four edge guides around the hovered node's body, and four outer guides at the surface edges. A node whose body is too small for
@@ -162,6 +178,7 @@ struct DropPlan
     DockReason reason = DockReason::None;
     // The guide under the pointer that decided the plan, or -1 when a band did.
     int32_t guide = -1;
+    uint8_t surface = 0;
 };
 
 inline constexpr float k_dock_float_width = 320.0f;

@@ -6,6 +6,18 @@
 namespace oryx::gui
 {
 
+struct DockFileLoad
+{
+    DockLayout layout;
+    // False when the file came from a newer build: it must never be overwritten.
+    bool autosave_allowed = true;
+    // True when the layout was read from the file, so it is the user's and not the default.
+    bool from_file = false;
+};
+
+// Missing file: `fallback`, silently. Corrupt or invalid file: logged, moved aside to `<file>.bad`, `fallback`. Newer version: logged, `fallback`, autosave off. Never throws.
+[[nodiscard]] DockFileLoad load_layout_file(const std::filesystem::path& file, const PanelTable& panels, const DockLayout& fallback);
+
 // Writes a layout file as soon as a change is complete: the frame it happens, or the frame a held drag or splitter is released. No timers; at exit flush covers a write that failed.
 // Never throws; a failed write is logged once and retried on the next change or flush.
 class DockAutosave

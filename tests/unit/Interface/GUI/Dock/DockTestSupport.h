@@ -41,6 +41,20 @@ inline gui::DockLayout make_sample(const gui::PanelTable& panels)
     return layout;
 }
 
+// Marks a model's panels and layout as the loaded state, so the host never reads a file or rebuilds a default over them.
+inline void settle_dock(gui::DockModel& model)
+{
+    model.load = gui::DockLoad::DefaultOnly;
+    model.default_layout = model.layout;
+    gui::reset(model.history, model.layout);
+    model.history_seeded = true;
+}
+
+inline void set_dock_style(const std::function<void(gui::DockStyle&)>& edit)
+{
+    update_settings<GuiSettings>([&edit](GuiSettings& settings) { edit(settings.dock); });
+}
+
 // Deterministic generator so fuzz failures reproduce.
 struct Lcg
 {

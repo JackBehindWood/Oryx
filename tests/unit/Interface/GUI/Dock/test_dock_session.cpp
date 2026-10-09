@@ -1,7 +1,6 @@
 #include "unit/Interface/GUI/Dock/DockTestSupport.h"
 #include "unit/TestLogCapture.h"
 
-#include "Oryx/Interface/GUI/Dock/DockSession.h"
 #include "Oryx/Interface/GUI/GuiSettings.h"
 
 using namespace oryx;
@@ -185,7 +184,7 @@ TEST_CASE("load_layout_file: a missing file gives the default silently")
     const gui::PanelTable panels = hinted_panels();
     TempDir dir;
     ClientLogCapture log;
-    const gui::DockFileLoad load = gui::load_layout_file(dir.path / "layout.yaml", panels);
+    const gui::DockFileLoad load = gui::load_layout_file(dir.path / "layout.yaml", panels, gui::build_default_layout(panels));
     CHECK(load.autosave_allowed);
     CHECK_FALSE(load.from_file);
     CHECK(gui::equal(load.layout, gui::build_default_layout(panels)));
@@ -200,7 +199,7 @@ TEST_CASE("load_layout_file: save then load returns the saved layout")
     gui::DockLayout layout = gui::build_default_layout(panels);
     REQUIRE(gui::set_split(layout, panels, layout.roots[0], gui::DockSizeMode::Ratio, 0.4f, 0.0f).applied);
     REQUIRE(gui::save_layout_yaml(layout, panels, file));
-    const gui::DockFileLoad load = gui::load_layout_file(file, panels);
+    const gui::DockFileLoad load = gui::load_layout_file(file, panels, gui::build_default_layout(panels));
     CHECK(load.from_file);
     CHECK(gui::equal(load.layout, layout));
 }
@@ -212,7 +211,7 @@ TEST_CASE("load_layout_file: a corrupt file is moved aside and replaced by the d
     const std::filesystem::path file = dir.path / "layout.yaml";
     { std::ofstream(file) << "version: 1\nsurfaces: nope\n"; }
     ClientLogCapture log;
-    const gui::DockFileLoad load = gui::load_layout_file(file, panels);
+    const gui::DockFileLoad load = gui::load_layout_file(file, panels, gui::build_default_layout(panels));
     CHECK(load.autosave_allowed);
     CHECK(gui::equal(load.layout, gui::build_default_layout(panels)));
     CHECK_FALSE(std::filesystem::exists(file));
@@ -227,47 +226,61 @@ TEST_CASE("load_layout_file: a newer file is kept and autosave is switched off")
     const std::filesystem::path file = dir.path / "layout.yaml";
     { std::ofstream(file) << "version: 99\nsurfaces: []\n"; }
     ClientLogCapture log;
-    const gui::DockFileLoad load = gui::load_layout_file(file, panels);
+    const gui::DockFileLoad load = gui::load_layout_file(file, panels, gui::build_default_layout(panels));
     CHECK_FALSE(load.autosave_allowed);
     CHECK(gui::equal(load.layout, gui::build_default_layout(panels)));
     CHECK(std::filesystem::exists(file));
 }
 
-TEST_CASE("DockSession: a session override changes layout and default but writes nothing; a user edit is saved")
+namespace
+{
+
+void register_hinted(const gui::PanelTable& table)
+{
+    for (uint32_t i = 0; i < table.count; ++i)
+    {
+        gui::PanelOptions options;
+        options.title = table.descs[i].title;
+        options.kind = table.descs[i].kind;
+        options.group = i == 0 ? "" : "views";
+        options.dock_near = i == 0 ? "" : k_board;
+        options.dock_size = 360.0f;
+        options.initial_open = i == 0;
+        REQUIRE(gui::register_panel(table.descs[i].name, options));
+    }
+}
+
+}
+
+TEST_CASE("the context owns the layout file: a session override writes nothing, a user edit is saved on destruction, a later run reads it")
 {
     TempDir dir;
     const std::filesystem::path file = dir.path / "layout.yaml";
     update_settings<GuiSettings>([&file](GuiSettings& settings) { settings.layout_file = file; });
+    const gui::PanelTable table = hinted_panels();
     {
         GuiContext context;
         ContextScope<GuiContext> scope(context);
-        const gui::PanelTable table = hinted_panels();
-        for (uint32_t i = 0; i < table.count; ++i)
-        {
-            gui::PanelOptions options;
-            options.title = table.descs[i].title;
-            options.kind = table.descs[i].kind;
-            options.group = i == 0 ? "" : "views";
-            options.dock_near = i == 0 ? "" : k_board;
-            options.dock_size = 360.0f;
-            options.initial_open = i == 0;
-            REQUIRE(gui::register_panel(table.descs[i].name, options));
-        }
-        gui::DockSession session;
-        CHECK_FALSE(session.from_file());
-        CHECK_FALSE(session.group_open("views"));
-
-        session.override_group_open("views", true);
-        CHECK(session.group_open("views"));
-        CHECK(gui::equal(session.layout(), session.default_layout()));
-        session.flush();
-        CHECK_FALSE(std::filesystem::exists(file));
-
-        session.set_group_open("views", false);
-        session.flush();
-        CHECK(std::filesystem::exists(file));
-        session.reset_layout();
-        CHECK(session.group_open("views"));
+        register_hinted(table);
+        CHECK_FALSE(gui::is_group_open("views"));
+        static_cast<void>(gui::set_group_open("views", true, gui::GroupEdit::SessionOnly));
+        CHECK(gui::is_group_open("views"));
+    }
+    CHECK_FALSE(std::filesystem::exists(file));
+    {
+        GuiContext context;
+        ContextScope<GuiContext> scope(context);
+        register_hinted(table);
+        REQUIRE(gui::set_group_open("views", true).applied);
+    }
+    CHECK(std::filesystem::exists(file));
+    {
+        GuiContext context;
+        ContextScope<GuiContext> scope(context);
+        register_hinted(table);
+        CHECK(gui::is_group_open("views"));
+        gui::reset_layout();
+        CHECK_FALSE(gui::is_group_open("views"));
     }
     reset_settings();
 }

@@ -176,7 +176,7 @@ PanelId first_panel(const DockLayout& layout, int32_t node)
 }
 
 // Never mutates on failure, so callers may try another target afterwards.
-DockReason insert_panel(DockLayout& layout, PanelId panel, int32_t target, DropZone zone)
+DockReason insert_panel(DockLayout& layout, PanelId panel, int32_t target, DropZone zone, uint8_t surface = 0)
 {
     if (target == k_no_node)
     {
@@ -187,7 +187,7 @@ DockReason insert_panel(DockLayout& layout, PanelId panel, int32_t target, DropZ
         n.kind = DockNodeKind::Tabs;
         n.count = 1;
         n.tabs[0] = panel;
-        layout.roots[0] = root;
+        layout.roots[surface] = root;
         return DockReason::None;
     }
 
@@ -201,6 +201,7 @@ DockReason insert_panel(DockLayout& layout, PanelId panel, int32_t target, DropZ
         n.tabs[n.count] = panel;
         n.selected = n.count;
         ++n.count;
+        n.collapsed = 0;
         return DockReason::None;
     }
 
@@ -217,14 +218,7 @@ DockReason insert_panel(DockLayout& layout, PanelId panel, int32_t target, DropZ
     l.tabs[0] = panel;
 
     replace_child(layout, target, split);
-    const bool leaf_first = zone == DropZone::Left || zone == DropZone::Top;
-    DockNode& s = layout.nodes[split];
-    s.kind = DockNodeKind::Split;
-    s.axis = (zone == DropZone::Left || zone == DropZone::Right) ? DockAxis::Horizontal : DockAxis::Vertical;
-    s.mode = DockSizeMode::Ratio;
-    s.ratio = leaf_first ? k_dock_new_ratio : 1.0f - k_dock_new_ratio;
-    s.first = leaf_first ? leaf : target;
-    s.second = leaf_first ? target : leaf;
+    init_split(layout.nodes[split], zone, leaf, target);
     return DockReason::None;
 }
 
@@ -242,7 +236,7 @@ void fix_new_split(DockLayout& layout, PanelId panel, DropZone zone, float point
 }
 
 // Never mutates on failure; the sibling-open check of a home is the caller's.
-DockReason place_by_hints(DockLayout& layout, const PanelDesc& desc)
+DockReason place_by_hints(DockLayout& layout, const PanelDesc& desc, uint8_t surface = 0)
 {
     if (is_valid(desc.dock_tabbed_with))
     {
@@ -256,7 +250,7 @@ DockReason place_by_hints(DockLayout& layout, const PanelDesc& desc)
     if (is_valid(desc.dock_near) && near.where == Where::InTabs)
         target = near.node;
     else if (is_valid(desc.dock_near) || desc.dock_size > 0.0f)
-        target = layout.roots[0];
+        target = layout.roots[surface];
     if (target == k_no_node)
         return DockReason::TargetInvalid;
     const DockReason placed = insert_panel(layout, desc.id, target, side);
@@ -305,6 +299,51 @@ bool side_resizable(const DockLayout& layout, const PanelTable& panels, int32_t 
     if (n.kind == DockNodeKind::Split)
         return side_resizable(layout, panels, n.first, depth + 1) || side_resizable(layout, panels, n.second, depth + 1);
     return false;
+}
+
+bool all_collapsed_at(const DockLayout& layout, int32_t node, uint32_t depth)
+{
+    if (!valid_node(layout, node) || depth > k_max_depth)
+        return false;
+    const DockNode& n = layout.nodes[node];
+    if (n.kind == DockNodeKind::Tabs)
+        return n.collapsed != 0;
+    return n.kind == DockNodeKind::Split && all_collapsed_at(layout, n.first, depth + 1) && all_collapsed_at(layout, n.second, depth + 1);
+}
+
+int32_t root_of(const DockLayout& layout, int32_t node)
+{
+    for (uint32_t depth = 0; depth < k_max_depth; ++depth)
+    {
+        const int32_t parent = parent_of(layout, node);
+        if (parent < 0)
+            return node;
+        node = parent;
+    }
+    return node;
+}
+
+bool holds_viewport(const DockLayout& layout, const PanelTable& panels, int32_t node)
+{
+    const DockNode& n = layout.nodes[node];
+    for (uint32_t t = 0; t < n.count && t < k_max_dock_tabs; ++t)
+    {
+        const PanelDesc* desc = find_panel(panels, n.tabs[t]);
+        if (desc != nullptr && desc->kind == PanelKind::Viewport)
+            return true;
+    }
+    return false;
+}
+
+bool all_may_collapse(const DockNode& n, const PanelTable& panels)
+{
+    for (uint32_t t = 0; t < n.count && t < k_max_dock_tabs; ++t)
+    {
+        const PanelDesc* desc = find_panel(panels, n.tabs[t]);
+        if (desc != nullptr && !has_flag(desc->flags, panel_flag::collapse))
+            return false;
+    }
+    return true;
 }
 
 int32_t prune(DockLayout& layout, int32_t node, uint32_t depth)
@@ -601,6 +640,7 @@ const char* to_string(DockReason reason)
     case DockReason::AlreadyOpen: return "panel already open";
     case DockReason::AlreadyClosed: return "panel already closed";
     case DockReason::NotPermittedTarget: return "panel may not dock there";
+    case DockReason::Collapsed: return "node is collapsed";
     }
     return "?";
 }
@@ -611,11 +651,18 @@ bool is_open(const DockLayout& layout, PanelId panel)
     return at.where == Where::InTabs || at.where == Where::InFloat;
 }
 
+bool all_collapsed(const DockLayout& layout, int32_t node)
+{
+    return all_collapsed_at(layout, node, 0);
+}
+
 bool can_resize_split(const DockLayout& layout, const PanelTable& panels, int32_t node)
 {
     if (!is_split(layout, node))
         return false;
     const DockNode& n = layout.nodes[node];
+    if (n.axis == DockAxis::Vertical && (all_collapsed(layout, n.first) || all_collapsed(layout, n.second)))
+        return false;
     return side_resizable(layout, panels, n.first, 0) && side_resizable(layout, panels, n.second, 0);
 }
 
@@ -649,12 +696,16 @@ DockReason can_resize(const PanelTable& panels, PanelId panel) { return require_
 DockReason can_collapse(const PanelTable& panels, PanelId panel) { return require_flag(panels, panel, panel_flag::collapse, DockReason::NotPermittedCollapse); }
 DockReason can_close(const PanelTable& panels, PanelId panel) { return require_flag(panels, panel, panel_flag::close, DockReason::NotPermittedClose); }
 
-DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target, DropZone zone)
+DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, DockTarget at_target, DropZone zone)
 {
+    const int32_t target = at_target.node;
+    const uint8_t surface = at_target.surface;
+    if (surface >= k_max_dock_surfaces)
+        return refuse(DockReason::TargetInvalid);
     if (find_panel(panels, panel) == nullptr)
         return refuse(DockReason::UnknownPanel);
 
-    const int32_t resolved = target == k_dock_root ? layout.roots[0] : target;
+    const int32_t resolved = target == k_dock_root ? layout.roots[surface] : target;
     if (target != k_dock_root && !is_tabs(layout, target))
         return refuse(DockReason::TargetInvalid);
     if (target == k_dock_root && resolved != k_no_node && zone == DropZone::Centre && !is_tabs(layout, resolved))
@@ -692,19 +743,21 @@ DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
 
     DockLayout work = layout;
     detach(work, panel, at);
-    normalize(work);
-    const int32_t node = target == k_dock_root ? work.roots[0] : locate(work, anchor).node;
+    normalize(work, panels);
+    const int32_t node = target == k_dock_root ? work.roots[surface] : locate(work, anchor).node;
     if (target != k_dock_root && node == k_no_node)
         return refuse(DockReason::TargetInvalid);
-    if (const DockReason reason = insert_panel(work, panel, node, zone); reason != DockReason::None)
+    if (const DockReason reason = insert_panel(work, panel, node, zone, surface); reason != DockReason::None)
         return refuse(reason);
-    normalize(work);
+    normalize(work, panels);
     layout = work;
     return accept();
 }
 
-DockResult float_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, const Rect& rect)
+DockResult float_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, const Rect& rect, uint8_t surface)
 {
+    if (surface >= k_max_dock_surfaces)
+        return refuse(DockReason::BadArgument);
     if (find_panel(panels, panel) == nullptr)
         return refuse(DockReason::UnknownPanel);
     if (const DockReason reason = can_float(panels, panel); reason != DockReason::None)
@@ -727,9 +780,9 @@ DockResult float_panel(DockLayout& layout, const PanelTable& panels, PanelId pan
     detach(work, panel, at);
     DockFloat& slot = work.floats[work.float_count++];
     slot.panel = panel;
-    slot.surface = 0;
+    slot.surface = surface;
     slot.rect = rect;
-    normalize(work);
+    normalize(work, panels);
     layout = work;
     return accept();
 }
@@ -751,13 +804,15 @@ DockResult close_panel(DockLayout& layout, const PanelTable& panels, PanelId pan
     detach(work, panel, at);
     push_home(work, home);
     work.closed[work.closed_count++] = panel;
-    normalize(work);
+    normalize(work, panels);
     layout = work;
     return accept();
 }
 
-DockResult open_panel(DockLayout& layout, const PanelTable& panels, PanelId panel)
+DockResult open_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, uint8_t surface)
 {
+    if (surface >= k_max_dock_surfaces)
+        return refuse(DockReason::BadArgument);
     if (find_panel(panels, panel) == nullptr)
         return refuse(DockReason::UnknownPanel);
     const Location at = locate(layout, panel);
@@ -786,30 +841,47 @@ DockResult open_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
         }
     }
 
-    if (placed != DockReason::None && work.roots[0] != k_no_node)
-        placed = place_by_hints(work, desc);
+    if (placed != DockReason::None && work.roots[surface] != k_no_node)
+        placed = place_by_hints(work, desc, surface);
 
     if (placed != DockReason::None)
     {
-        const int32_t root = work.roots[0];
+        const int32_t root = work.roots[surface];
         if (root == k_no_node)
         {
-            placed = insert_panel(work, panel, k_no_node, DropZone::Centre);
+            placed = insert_panel(work, panel, k_no_node, DropZone::Centre, surface);
         }
         else
         {
             placed = DockReason::TabsFull;
             for (uint32_t n = 0; n < work.node_count && placed != DockReason::None; ++n)
-                if (work.nodes[n].kind == DockNodeKind::Tabs && work.nodes[n].count < k_max_dock_tabs)
+                if (work.nodes[n].kind == DockNodeKind::Tabs && root_of(work, static_cast<int32_t>(n)) == root && work.nodes[n].count < k_max_dock_tabs && !holds_viewport(work, panels, static_cast<int32_t>(n)))
+                    placed = insert_panel(work, panel, static_cast<int32_t>(n), DropZone::Centre);
+            if (placed != DockReason::None)
+                placed = insert_panel(work, panel, root, DropZone::Right);
+            for (uint32_t n = 0; n < work.node_count && placed != DockReason::None; ++n)
+                if (work.nodes[n].kind == DockNodeKind::Tabs && root_of(work, static_cast<int32_t>(n)) == root && work.nodes[n].count < k_max_dock_tabs)
                     placed = insert_panel(work, panel, static_cast<int32_t>(n), DropZone::Centre);
         }
     }
     if (placed != DockReason::None)
         return refuse(placed);
 
-    normalize(work);
+    normalize(work, panels);
     layout = work;
     return accept();
+}
+
+void init_split(DockNode& split, DropZone zone, int32_t leaf, int32_t target, float points)
+{
+    const bool leaf_first = zone == DropZone::Left || zone == DropZone::Top;
+    split.kind = DockNodeKind::Split;
+    split.axis = (zone == DropZone::Left || zone == DropZone::Right) ? DockAxis::Horizontal : DockAxis::Vertical;
+    split.mode = points > 0.0f ? (leaf_first ? DockSizeMode::FixedFirst : DockSizeMode::FixedSecond) : DockSizeMode::Ratio;
+    split.ratio = leaf_first ? k_dock_new_ratio : 1.0f - k_dock_new_ratio;
+    split.points = points > 0.0f ? points : split.points;
+    split.first = leaf_first ? leaf : target;
+    split.second = leaf_first ? target : leaf;
 }
 
 bool group_open(const DockLayout& layout, const PanelTable& panels, PanelId group)
@@ -893,13 +965,18 @@ DockResult set_collapsed(DockLayout& layout, const PanelTable& panels, int32_t n
     if (!is_tabs(layout, node))
         return refuse(DockReason::TargetInvalid);
     DockNode& n = layout.nodes[node];
-    for (uint32_t t = 0; t < n.count && t < k_max_dock_tabs; ++t)
+    for (uint32_t t = 0; collapsed && t < n.count && t < k_max_dock_tabs; ++t)
         if (const DockReason reason = can_collapse(panels, n.tabs[t]); reason != DockReason::None)
             return refuse(reason);
     const uint8_t value = collapsed ? 1 : 0;
     if (n.collapsed == value)
         return refuse(DockReason::NoChange);
     n.collapsed = value;
+    if (collapsed && all_collapsed(layout, root_of(layout, node)))
+    {
+        n.collapsed = 0;
+        return refuse(DockReason::Collapsed);
+    }
     return accept();
 }
 
@@ -910,6 +987,8 @@ DockResult set_split(DockLayout& layout, const PanelTable& panels, int32_t node,
     DockNode& n = layout.nodes[node];
     if (!side_resizable(layout, panels, n.first, 0) || !side_resizable(layout, panels, n.second, 0))
         return refuse(DockReason::NotPermittedResize);
+    if (n.axis == DockAxis::Vertical && (all_collapsed(layout, n.first) || all_collapsed(layout, n.second)))
+        return refuse(DockReason::Collapsed);
     if (!std::isfinite(ratio) || !std::isfinite(points))
         return refuse(DockReason::BadArgument);
 
@@ -948,6 +1027,49 @@ void normalize(DockLayout& layout)
             out.closed[out.closed_count++] = layout.closed[c];
 
     layout = out;
+}
+
+void normalize(DockLayout& layout, const PanelTable& panels)
+{
+    normalize(layout);
+    for (uint32_t n = 0; n < layout.node_count; ++n)
+        if (layout.nodes[n].kind == DockNodeKind::Tabs && !all_may_collapse(layout.nodes[n], panels))
+            layout.nodes[n].collapsed = 0;
+}
+
+void migrate_surfaces(DockLayout& layout, const PanelTable& panels, uint32_t surface_count)
+{
+    for (uint32_t f = 0; f < layout.float_count && f < k_max_dock_floats; ++f)
+        if (layout.floats[f].surface >= surface_count)
+            layout.floats[f].surface = 0;
+    for (uint32_t s = math::max(surface_count, 1u); s < k_max_dock_surfaces; ++s)
+    {
+        const int32_t root = layout.roots[s];
+        if (root == k_no_node)
+            continue;
+        PanelId moved[k_max_panels];
+        uint32_t moved_count = 0;
+        for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
+        {
+            const DockNode& node = layout.nodes[n];
+            if (node.kind != DockNodeKind::Tabs || root_of(layout, static_cast<int32_t>(n)) != root)
+                continue;
+            for (uint32_t t = 0; t < node.count && t < k_max_dock_tabs && moved_count < k_max_panels; ++t)
+                moved[moved_count++] = node.tabs[t];
+        }
+        layout.roots[s] = k_no_node;
+        normalize(layout, panels);
+        for (uint32_t m = 0; m < moved_count; ++m)
+        {
+            const DockReason placed = layout.roots[0] == k_no_node ? insert_panel(layout, moved[m], k_no_node, DropZone::Centre) : DockReason::TargetInvalid;
+            if (placed == DockReason::None)
+                continue;
+            for (uint32_t n = 0; n < layout.node_count; ++n)
+                if (layout.nodes[n].kind == DockNodeKind::Tabs && root_of(layout, static_cast<int32_t>(n)) == layout.roots[0] && insert_panel(layout, moved[m], static_cast<int32_t>(n), DropZone::Centre) == DockReason::None)
+                    break;
+        }
+    }
+    normalize(layout, panels);
 }
 
 void validate(const DockLayout& layout)
@@ -1014,6 +1136,9 @@ void validate(const DockLayout& layout)
 void validate(const DockLayout& layout, const PanelTable& panels, ValidateFlags flags)
 {
     validate(layout);
+    for (uint32_t n = 0; n < layout.node_count; ++n)
+        if (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].collapsed != 0 && !all_may_collapse(layout.nodes[n], panels))
+            fail("tabs node " + std::to_string(n) + " is collapsed but holds a panel that may not collapse");
     if (!flags.require_viewport)
         return;
     for (uint32_t n = 0; n < layout.node_count; ++n)

@@ -91,19 +91,23 @@ TEST_CASE("Benchmark: GUI dock host frame with a float and a tab drag")
 {
     using namespace oryx::gui;
     Scene scene;
+    update_settings<GuiSettings>([](GuiSettings& settings) { settings.layout_file.clear(); });
     for (const char* name : { "a", "b", "c", "d", "e" })
         REQUIRE(gui::register_panel(name));
     const PanelTable& table = gui::panels();
-    DockLayout layout;
+    DockLayout& layout = scene.context.dock_model().layout;
     REQUIRE(dock_panel(layout, table, make_panel_id("a"), k_dock_root, DropZone::Centre).applied);
     REQUIRE(dock_panel(layout, table, make_panel_id("b"), k_dock_root, DropZone::Centre).applied);
     REQUIRE(dock_panel(layout, table, make_panel_id("c"), k_dock_root, DropZone::Right).applied);
     REQUIRE(dock_panel(layout, table, make_panel_id("d"), k_dock_root, DropZone::Bottom).applied);
     REQUIRE(float_panel(layout, table, make_panel_id("e"), Rect{ Vec2f(400.0f, 200.0f), Vec2f(300.0f, 200.0f) }).applied);
+    scene.context.dock_model().load = DockLoad::DefaultOnly;
+    reset(scene.context.dock_model().history, layout);
+    scene.context.dock_model().history_seeded = true;
 
     const auto draw = [&]
     {
-        gui::PanelHostScope host(layout);
+        gui::PanelHostScope host;
         for (const char* name : { "a", "b", "c", "d", "e" })
         {
             gui::PanelScope panel(name);
@@ -117,7 +121,7 @@ TEST_CASE("Benchmark: GUI dock host frame with a float and a tab drag")
         { LayoutStyle root; root.width = grow(); root.height = grow(); gui::BoxScope box("root", root); draw(); }
         scene.context.end_frame();
     }
-    const Rect tab = scene.context.panel_host().solved.nodes[1].tab_rects[0];
+    const Rect tab = scene.context.dock_view().solved.nodes[1].tab_rects[0];
     scene.input.pointer.position = Vec2f(tab.min[0] + tab.size[0] * 0.5f, tab.min[1] + tab.size[1] * 0.5f);
     scene.input.pointer.buttons[0].down = true;
     scene.input.pointer.buttons[0].pressed = true;

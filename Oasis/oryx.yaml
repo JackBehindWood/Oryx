@@ -12,3 +12,14 @@ assets:
 #   slangc: tools/slangc   # relative to this file; OX_SLANGC overrides it
 graphics:
   vsync: true
+gui:
+  docking: true   # false: no dock chrome, no layout file; the board fills the window
+  layout_file: gui-layout.yaml   # relative to this file, created on the first layout change; empty ("") keeps the layout in memory only
+  dock_toolbars: true
+  dock_toolbar_placement: auto   # auto | above_tabs | below_tabs
+  dock_tab_position: top   # top | bottom
+  dock_close_buttons: always   # always | on_hover | never
+  dock_compact: false
+  dock_preview_opacity: 100   # percent, 0-100
+  dock_guides: true
+  dock_drop_flash: true

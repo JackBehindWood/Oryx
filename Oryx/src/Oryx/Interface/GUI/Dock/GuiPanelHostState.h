@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Oryx/Interface/Canvas/ImWidgets.h"
+#include "Oryx/Interface/GUI/Dock/DockAutosave.h"
 #include "Oryx/Interface/GUI/Dock/DockOps.h"
 #include "Oryx/Interface/GUI/Dock/DockSolve.h"
 
-// The data behind the panel host: options, the per-context state and the frame's body table. Behaviour lives in GuiPanelHost.h; GuiContext owns one PanelHostState.
+// The data behind the panel host. DockModel is what the user edits and saves (panels, layout, history, drag, focus, autosave) and is shared between the contexts of one app; DockView is one context's frame state
+// (rects, solve, bodies). Behaviour lives in GuiPanelHost.h; GuiContext owns one DockModel (or borrows another's) and one DockView.
 namespace oryx::gui
 {
 
@@ -41,15 +43,6 @@ struct PanelOptions : im::WidgetOptions
 };
 
 static_assert(std::is_trivially_copyable_v<PanelOptions>);
-
-struct PanelHostOptions
-{
-    // Checked by validate: a layout without a Viewport panel is rejected.
-    bool require_viewport = false;
-    // When set, an empty surface offers a Reset button that copies it over the layout. Read during the call.
-    const DockLayout* default_layout = nullptr;
-    DockStyle style;
-};
 
 // What the last host frame did to the layout, for the owner to push history on release or debounce a save.
 struct PanelHostResult
@@ -99,6 +92,9 @@ struct DragState
     // Pointer minus the dragged tab's or float's top-left corner when the drag began.
     Vec2f grab{ 0.0f, 0.0f };
     DropPlan plan;
+    // A tab drag reorders its strip live; where the tab started, so Esc or a refused drop can put it back.
+    uint32_t origin_slot = 0;
+    bool reordered = false;
 };
 
 enum class HistoryRequest : uint8_t
@@ -108,20 +104,64 @@ enum class HistoryRequest : uint8_t
     Redo
 };
 
-struct PanelHostState
+// Sizes captured when a splitter or float grip drag starts, so every frame applies the press-relative total instead of a clamped per-frame delta.
+struct DragAnchor
 {
+    float size = 0.0f;
+    Rect rect;
+};
+
+enum class DockLoad : uint8_t
+{
+    None,
+    // Built from hints or set_default_layout; no file was read (docking off, or no layout_file).
+    DefaultOnly,
+    File
+};
+
+struct DockModel
+{
+    DockModel() = default;
+    // Writes a pending layout when this model owns the file.
+    ~DockModel();
+    DockModel(const DockModel&) = delete;
+    DockModel& operator=(const DockModel&) = delete;
+
     PanelTable panels;
+    DockLayout layout;
+    DockLayout default_layout;
+    bool default_set = false;
     DockLayout last_good;
     bool has_good = false;
     PanelId focused;
     uint32_t reported[k_max_reported_panels] = {};
     uint32_t reported_count = 0;
+    DragState drag;
+    DragAnchor anchor;
+    LayoutHistory history;
+    bool history_seeded = false;
+    HistoryRequest history_request = HistoryRequest::None;
+    // The panel that last landed from a drop and the seconds since, for the flash.
+    PanelId landed;
+    float landed_age = 0.0f;
+    DockLoad load = DockLoad::None;
+    bool from_file = false;
+    // Surfaces that exist; a saved float or tree beyond it migrates to surface 0 at load.
+    uint32_t surface_count = 1;
+    // The layout file as read at load, so the final flush needs no settings.
+    std::filesystem::path file;
+    UniquePtr<DockAutosave> autosave;
+};
 
+struct DockView
+{
+    DockModel* model = nullptr;
     bool in_host = false;
     uint64_t frame = 0;
     bool dock_body_open = false;
     DockLayout* layout = nullptr;
-    PanelHostOptions options;
+    bool require_viewport = false;
+    DockStyle style;
     ImId host_id;
     Rect host_rect;
     SolvedLayout solved;
@@ -136,13 +176,6 @@ struct PanelHostState
     Rect float_rects[k_max_dock_floats];
     PanelId float_panels[k_max_dock_floats];
     uint32_t float_count = 0;
-    DragState drag;
-    LayoutHistory history;
-    bool history_seeded = false;
-    HistoryRequest history_request = HistoryRequest::None;
-    // The panel that last landed from a drop and the seconds since, for the flash.
-    PanelId landed;
-    float landed_age = 0.0f;
 };
 
 static_assert(sizeof(LayoutHistory) < 256u * 1024u, "history lives in the context, keep it small");

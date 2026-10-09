@@ -38,7 +38,8 @@ T choose(const SettingsNode& node, std::string_view key, T fallback, const Choic
 
 void read_settings(GuiSettings& settings, const SettingsNode& node)
 {
-    settings.layout_file = node.path("layout_file", settings.layout_file);
+    settings.docking = node.boolean("docking", settings.docking);
+    settings.layout_file = node.has("layout_file") && node.string("layout_file").empty() ? std::filesystem::path() : node.path("layout_file", settings.layout_file);
     gui::DockStyle& dock = settings.dock;
     dock.toolbars = node.boolean("dock_toolbars", dock.toolbars);
     dock.toolbar_placement = choose<gui::ToolbarPlacement>(node, "dock_toolbar_placement", dock.toolbar_placement,

@@ -2,6 +2,8 @@
 #include "Oryx/Interface/GUI/Dock/GuiPanelHost.h"
 #include "Oryx/Interface/GUI/GuiControls.h"
 #include "Oryx/Interface/GUI/GuiMenus.h"
+#include "Oryx/Interface/GUI/GuiSettings.h"
+#include "Oryx/Interface/GUI/GuiWidgets.h"
 
 namespace oryx::gui
 {
@@ -13,9 +15,9 @@ constexpr float k_landing_flash_seconds = 0.6f;
 
 constexpr float k_close_size = 14.0f;
 
-PanelHostState& host_of(GuiContext& ctx) { return ctx.panel_host(); }
+DockView& host_of(GuiContext& ctx) { return ctx.dock_view(); }
 
-bool host_active(const PanelHostState& h, const GuiContext& ctx) { return h.in_host && h.frame == ctx.frame(); }
+bool host_active(const DockView& h, const GuiContext& ctx) { return h.in_host && h.frame == ctx.frame(); }
 
 uint8_t without(uint8_t bits, bool clear, uint8_t flag) { return clear ? static_cast<uint8_t>(bits & ~flag) : bits; }
 
@@ -31,46 +33,46 @@ uint8_t flags_of(const PanelOptions& options)
     return bits;
 }
 
-void report_unregistered(PanelHostState& h, PanelId id)
+void report_unregistered(DockView& h, PanelId id)
 {
-    for (uint32_t i = 0; i < h.reported_count; ++i)
-        if (h.reported[i] == id.hash)
+    for (uint32_t i = 0; i < h.model->reported_count; ++i)
+        if (h.model->reported[i] == id.hash)
             return;
-    if (h.reported_count < k_max_reported_panels)
-        h.reported[h.reported_count++] = id.hash;
+    if (h.model->reported_count < k_max_reported_panels)
+        h.model->reported[h.model->reported_count++] = id.hash;
     OX_WARN("Dock layout names an unregistered panel (hash {:08x}); it is skipped until registered", id.hash);
 }
 
-void note(PanelHostState& h, const DockResult& result) { h.result.layout_changed = h.result.layout_changed || result.applied; }
+void note(DockView& h, const DockResult& result) { h.result.layout_changed = h.result.layout_changed || result.applied; }
 
 // The last good layout is the only copy the host keeps; a bad one is swapped for it so the frame never throws.
-void keep_valid(PanelHostState& h, DockLayout& layout)
+void keep_valid(DockView& h, DockLayout& layout)
 {
-    if (h.has_good && equal(layout, h.last_good))
+    if (h.model->has_good && equal(layout, h.model->last_good))
         return;
     try
     {
-        validate(layout, h.panels, ValidateFlags{ h.options.require_viewport });
-        h.last_good = layout;
-        h.has_good = true;
+        validate(layout, h.model->panels, ValidateFlags{ h.require_viewport });
+        h.model->last_good = layout;
+        h.model->has_good = true;
     }
     catch (const Error& error)
     {
         OX_ERROR("Dock layout rejected, keeping the last good one: {}", error.what());
-        layout = h.has_good ? h.last_good : DockLayout{};
-        h.last_good = layout;
-        h.has_good = true;
+        layout = h.model->has_good ? h.model->last_good : DockLayout{};
+        h.model->last_good = layout;
+        h.model->has_good = true;
     }
 }
 
-void apply_history_request(PanelHostState& h, DockLayout& layout)
+void apply_history_request(DockView& h, DockLayout& layout)
 {
-    const HistoryRequest request = h.history_request;
-    h.history_request = HistoryRequest::None;
-    if (request == HistoryRequest::None || h.drag.source != DragSource::None)
+    const HistoryRequest request = h.model->history_request;
+    h.model->history_request = HistoryRequest::None;
+    if (request == HistoryRequest::None || h.model->drag.source != DragSource::None)
         return;
     DockLayout snapshot;
-    if (!(request == HistoryRequest::Undo ? undo(h.history, snapshot) : redo(h.history, snapshot)))
+    if (!(request == HistoryRequest::Undo ? undo(h.model->history, snapshot) : redo(h.model->history, snapshot)))
         return;
     layout = snapshot;
     keep_valid(h, layout);
@@ -94,7 +96,7 @@ DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
     return metrics;
 }
 
-LayoutStyle placed(const PanelHostState& h, const Rect& rect, uint32_t channel = 0)
+LayoutStyle placed(const DockView& h, const Rect& rect, uint32_t channel = 0)
 {
     LayoutStyle style;
     style.channel = channel;
@@ -105,7 +107,7 @@ LayoutStyle placed(const PanelHostState& h, const Rect& rect, uint32_t channel =
 }
 
 // Opens a filled floating box at `rect`; the caller closes it with end_box.
-uint32_t open_fill(GuiContext& ctx, const PanelHostState& h, const Rect& rect, const ImStyle& style, const Colour& fill, bool border, uint32_t channel = 0)
+uint32_t open_fill(GuiContext& ctx, const DockView& h, const Rect& rect, const ImStyle& style, const Colour& fill, bool border, uint32_t channel = 0)
 {
     const uint32_t index = ctx.begin_box(ImId{}, placed(h, rect, channel));
     BoxPaint& paint = ctx.layout().node(index).paint;
@@ -115,7 +117,7 @@ uint32_t open_fill(GuiContext& ctx, const PanelHostState& h, const Rect& rect, c
     return index;
 }
 
-int32_t find_body_index(const PanelHostState& h, PanelId id)
+int32_t find_body_index(const DockView& h, PanelId id)
 {
     for (uint32_t i = 0; i < h.body_count; ++i)
         if (h.bodies[i].panel == id)
@@ -123,22 +125,22 @@ int32_t find_body_index(const PanelHostState& h, PanelId id)
     return -1;
 }
 
-const PanelBody* find_body(const PanelHostState& h, PanelId id)
+const PanelBody* find_body(const DockView& h, PanelId id)
 {
     const int32_t index = find_body_index(h, id);
     return index < 0 ? nullptr : &h.bodies[index];
 }
 
-void add_body(PanelHostState& h, PanelId id, const Rect& rect, const Rect& toolbar, uint32_t channel, bool viewport)
+void add_body(DockView& h, PanelId id, const Rect& rect, const Rect& toolbar, uint32_t channel, bool viewport)
 {
     if (h.body_count < k_max_panels)
         h.bodies[h.body_count++] = PanelBody{ id, rect, toolbar, channel, viewport };
 }
 
 // Records a panel's body and toolbar for begin_panel and draws their backdrops; true when the body took a press.
-bool place_body(GuiContext& ctx, PanelHostState& h, PanelId id, const Rect& body, const Rect& toolbar, uint32_t channel)
+bool place_body(GuiContext& ctx, DockView& h, PanelId id, const Rect& body, const Rect& toolbar, uint32_t channel)
 {
-    const PanelDesc* desc = find_panel(h.panels, id);
+    const PanelDesc* desc = find_panel(h.model->panels, id);
     if (desc == nullptr)
     {
         report_unregistered(h, id);
@@ -157,11 +159,11 @@ bool place_body(GuiContext& ctx, PanelHostState& h, PanelId id, const Rect& body
     if (!desc->foreign_body)
     {
         open_fill(ctx, h, body, theme.panel, theme.panel.background, false, channel);
-        if (h.focused == id)
+        if (h.model->focused == id)
         {
             BoxPaint& paint = ctx.layout().current().paint;
             paint.border_width = 1.0f;
-            paint.border = theme.panel.accent;
+            paint.border = ctx.dock_theme().focus_ring;
         }
         ctx.end_box();
     }
@@ -169,20 +171,20 @@ bool place_body(GuiContext& ctx, PanelHostState& h, PanelId id, const Rect& body
     return ctx.item(ctx.id("body"), body).pressed;
 }
 
-void draw_body(GuiContext& ctx, PanelHostState& h, const DockNode& node, const SolvedNode& solved)
+void draw_body(GuiContext& ctx, DockView& h, const DockNode& node, const SolvedNode& solved)
 {
-    if (node.collapsed != 0 || node.selected >= node.count || is_empty(solved.body))
+    if (solved.collapsed || node.selected >= node.count || is_empty(solved.body))
         return;
     const PanelId id = node.tabs[node.selected];
     if (place_body(ctx, h, id, solved.body, solved.toolbar, 0))
-        h.focused = id;
+        h.model->focused = id;
 }
 
-void begin_drag(PanelHostState& h, DragSource source, PanelId panel, const Vec2f& grab)
+void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& grab)
 {
-    if (h.drag.source != DragSource::None)
+    if (h.model->drag.source != DragSource::None)
         return;
-    h.drag = DragState{ source, panel, grab, {} };
+    h.model->drag = DragState{ source, panel, grab, {} };
 }
 
 void close_mark(GuiContext& ctx, const ImStyle& style, const ItemState& close, float pad)
@@ -202,20 +204,20 @@ void close_mark(GuiContext& ctx, const ImStyle& style, const ItemState& close, f
     ctx.end_box();
 }
 
-void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const DockNode& node, uint32_t index, const Rect& rect, PanelId& pending_close)
+void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& node, uint32_t index, const Rect& rect, PanelId& pending_close)
 {
     const PanelId id = node.tabs[index];
-    const PanelDesc* desc = find_panel(h.panels, id);
+    const PanelDesc* desc = find_panel(h.model->panels, id);
     if (desc == nullptr)
     {
         report_unregistered(h, id);
         return;
     }
     const ImStyle& style = ctx.gui_theme().tab;
-    const CloseButtons close_buttons = h.options.style.close_buttons;
+    const CloseButtons close_buttons = h.style.close_buttons;
     const bool chosen = index == node.selected;
-    const bool closable = can_close(h.panels, id) == DockReason::None && close_buttons != CloseButtons::Never;
-    const bool dragged = h.drag.source == DragSource::Tab && h.drag.panel == id;
+    const bool closable = can_close(h.model->panels, id) == DockReason::None && close_buttons != CloseButtons::Never;
+    const bool dragged = h.model->drag.source == DragSource::Tab && h.model->drag.panel == id;
     const float pad = style.padding.right * 0.5f;
     const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - k_close_size, rect.min[1] + (rect.size[1] - k_close_size) * 0.5f), Vec2f(k_close_size, k_close_size) };
 
@@ -231,6 +233,8 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         ctx.request_cursor(CursorShape::Hand);
     if (drag.started && !close.held)
         begin_drag(h, DragSource::Tab, id, drag.start - rect.min);
+    if (drag.started && !close.held && h.model->drag.panel == id)
+        h.model->drag.origin_slot = index;
 
     LayoutStyle box = placed(h, rect);
     box.padding = style.padding;
@@ -258,7 +262,7 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         LayoutStyle underline;
         underline.width = grow();
         underline.height = fixed(2.0f);
-        const bool bottom = h.options.style.tab_position == TabPosition::Bottom;
+        const bool bottom = h.style.tab_position == TabPosition::Bottom;
         const AttachPoint edge = bottom ? AttachPoint::TopLeft : AttachPoint::BottomLeft;
         underline.floating = { true, edge, edge, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
         const uint32_t line_index = ctx.begin_box(ImId{}, underline);
@@ -268,12 +272,12 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         ctx.end_box();
     }
     ctx.end_box();
-    if (h.drag.source == DragSource::None)
+    if (h.model->drag.source == DragSource::None)
         tooltip(tab, desc->title);
 
     if (tab.pressed && !close.hovered)
     {
-        h.focused = id;
+        h.model->focused = id;
         if (!chosen)
             note(h, select_tab(*h.layout, node_index, index));
     }
@@ -281,14 +285,20 @@ void draw_tab(GuiContext& ctx, PanelHostState& h, int32_t node_index, const Dock
         pending_close = id;
 }
 
-void draw_strip(GuiContext& ctx, PanelHostState& h, int32_t node_index, PanelId& pending_close)
+void draw_strip(GuiContext& ctx, DockView& h, int32_t node_index, PanelId& pending_close)
 {
     const DockNode& node = h.layout->nodes[node_index];
     const SolvedNode& solved = h.solved.nodes[node_index];
     const GuiTheme& theme = ctx.gui_theme();
     const ImStyle& style = theme.tab;
-    const bool collapsed = node.collapsed != 0;
+    const bool collapsed = solved.collapsed;
 
+    if (solved.rail)
+    {
+        const float below = solved.strip.size[1];
+        open_fill(ctx, h, Rect{ Vec2f(solved.rect.min[0], solved.rect.min[1] + below), Vec2f(solved.rect.size[0], solved.rect.size[1] - below) }, ctx.gui_theme().panel, ctx.gui_theme().panel.background, false);
+        ctx.end_box();
+    }
     open_fill(ctx, h, solved.strip, style, style.background, false);
     ctx.end_box();
 
@@ -325,17 +335,17 @@ void draw_strip(GuiContext& ctx, PanelHostState& h, int32_t node_index, PanelId&
         paint.icon_size = 8.0f;
         ctx.end_box();
         if (chevron.clicked)
-            note(h, set_collapsed(*h.layout, h.panels, node_index, !collapsed));
+            note(h, set_collapsed(*h.layout, h.model->panels, node_index, node.collapsed == 0));
     }
 }
 
-void draw_splitter(GuiContext& ctx, PanelHostState& h, int32_t node_index)
+void draw_splitter(GuiContext& ctx, DockView& h, int32_t node_index)
 {
     const DockNode& node = h.layout->nodes[node_index];
     const SolvedNode& solved = h.solved.nodes[node_index];
     const ImStyle& style = ctx.gui_theme().panel;
     ItemState state;
-    if (can_resize_split(*h.layout, h.panels, node_index))
+    if (can_resize_split(*h.layout, h.model->panels, node_index))
     {
         IdScope scope(ctx, ctx.index_id(static_cast<uint64_t>(node_index)));
         const ImId id = ctx.id("splitter");
@@ -346,18 +356,20 @@ void draw_splitter(GuiContext& ctx, PanelHostState& h, int32_t node_index)
         if (state.hovered || state.held)
             ctx.request_cursor(horizontal ? CursorShape::ResizeHorizontal : CursorShape::ResizeVertical);
         h.result.interacting = h.result.interacting || state.held;
-        if ((drag.started || drag.dragging) && drag.delta[axis] != 0.0f)
+        if (drag.started)
+            h.model->anchor.size = h.solved.nodes[node.first].rect.size[axis];
+        if (drag.started || drag.dragging)
         {
-            const float first = h.solved.nodes[node.first].rect.size[axis] + drag.delta[axis];
+            const float first = h.model->anchor.size + drag.total[axis];
             const float total = solved.rect.size[axis] - solved.splitter.size[axis];
             if (total > 0.0f)
             {
                 if (node.mode == DockSizeMode::Ratio)
-                    note(h, set_split(*h.layout, h.panels, node_index, node.mode, first / total, node.points));
+                    note(h, set_split(*h.layout, h.model->panels, node_index, node.mode, first / total, node.points));
                 else if (node.mode == DockSizeMode::FixedFirst)
-                    note(h, set_split(*h.layout, h.panels, node_index, node.mode, node.ratio, first));
+                    note(h, set_split(*h.layout, h.model->panels, node_index, node.mode, node.ratio, first));
                 else
-                    note(h, set_split(*h.layout, h.panels, node_index, node.mode, node.ratio, total - first));
+                    note(h, set_split(*h.layout, h.model->panels, node_index, node.mode, node.ratio, total - first));
             }
         }
     }
@@ -374,7 +386,7 @@ struct Grip
     bool height;
 };
 
-void draw_grips(GuiContext& ctx, PanelHostState& h, uint32_t f)
+void draw_grips(GuiContext& ctx, DockView& h, uint32_t f)
 {
     const Rect& rect = h.solved.floats[f];
     const float band = 6.0f;
@@ -394,23 +406,29 @@ void draw_grips(GuiContext& ctx, PanelHostState& h, uint32_t f)
         if (state.hovered || state.held)
             ctx.request_cursor(grip.cursor);
         h.result.interacting = h.result.interacting || state.held;
-        if ((drag.started || drag.dragging) && (drag.delta[0] != 0.0f || drag.delta[1] != 0.0f))
+        if (drag.started)
+            h.model->anchor.rect = rect;
+        if (drag.started || drag.dragging)
         {
-            Rect resized = rect;
-            resized.size = Vec2f(rect.size[0] + (grip.width ? drag.delta[0] : 0.0f), rect.size[1] + (grip.height ? drag.delta[1] : 0.0f));
-            h.layout->floats[f].rect = resized;
-            h.result.layout_changed = true;
+            Rect resized = h.model->anchor.rect;
+            resized.size = Vec2f(resized.size[0] + (grip.width ? drag.total[0] : 0.0f), resized.size[1] + (grip.height ? drag.total[1] : 0.0f));
+            resized = clamp_float(resized, float_min_size(h.model->panels, h.layout->floats[f].panel, h.solved.metrics), h.solved.surface_rect);
+            if (!(resized == h.layout->floats[f].rect))
+            {
+                h.layout->floats[f].rect = resized;
+                h.result.layout_changed = true;
+            }
         }
     }
 }
 
-void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending_close, PanelId& pending_raise)
+void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close, PanelId& pending_raise)
 {
     const PanelId id = h.layout->floats[f].panel;
     h.float_rects[f] = h.solved.floats[f];
     h.float_panels[f] = id;
     h.float_count = f + 1;
-    const PanelDesc* desc = find_panel(h.panels, id);
+    const PanelDesc* desc = find_panel(h.model->panels, id);
     if (desc == nullptr)
     {
         report_unregistered(h, id);
@@ -420,8 +438,8 @@ void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending
     const ImStyle& style = theme.tab;
     const Rect& rect = h.solved.floats[f];
     const SolvedFloat& parts = h.solved.float_parts[f];
-    const bool focused = h.focused == id;
-    const bool closable = can_close(h.panels, id) == DockReason::None;
+    const bool focused = h.model->focused == id;
+    const bool closable = can_close(h.model->panels, id) == DockReason::None;
     const float pad = style.padding.right * 0.5f;
     const Rect close_rect{ Vec2f(parts.title.min[0] + parts.title.size[0] - pad - k_close_size, parts.title.min[1] + (parts.title.size[1] - k_close_size) * 0.5f), Vec2f(k_close_size, k_close_size) };
 
@@ -430,13 +448,13 @@ void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending
     ctx.begin_shield_layer();
     open_fill(ctx, h, rect, theme.panel, theme.panel.background, true, k_channel_popup);
     if (focused)
-        ctx.layout().current().paint.border = theme.panel.accent;
+        ctx.layout().current().paint.border = ctx.dock_theme().focus_ring;
     ctx.end_box();
 
     const bool pressed_body = place_body(ctx, h, id, parts.body, parts.toolbar, k_channel_popup);
     if (pressed_body)
     {
-        h.focused = id;
+        h.model->focused = id;
         pending_raise = id;
     }
 
@@ -469,7 +487,7 @@ void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending
 
     if (title.pressed && !close.hovered)
     {
-        h.focused = id;
+        h.model->focused = id;
         pending_raise = id;
     }
     if (close.clicked)
@@ -478,7 +496,7 @@ void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending
     ctx.end_shield_layer();
 }
 
-void raise_float(PanelHostState& h, PanelId panel)
+void raise_float(DockView& h, PanelId panel)
 {
     DockLayout& layout = *h.layout;
     for (uint32_t f = 0; f + 1 < layout.float_count; ++f)
@@ -494,7 +512,7 @@ void raise_float(PanelHostState& h, PanelId panel)
     }
 }
 
-void overlay(GuiContext& ctx, const PanelHostState& h, const Rect& rect, const Colour& fill, const Colour& border, float border_width)
+void overlay(GuiContext& ctx, const DockView& h, const Rect& rect, const Colour& fill, const Colour& border, float border_width)
 {
     if (is_empty(rect))
         return;
@@ -507,7 +525,7 @@ void overlay(GuiContext& ctx, const PanelHostState& h, const Rect& rect, const C
     ctx.end_box();
 }
 
-Rect target_rect(const PanelHostState& h, const DropPlan& plan)
+Rect target_rect(const DockView& h, const DropPlan& plan)
 {
     if (plan.node == k_dock_root)
         return h.solved.surface_rect;
@@ -516,7 +534,7 @@ Rect target_rect(const PanelHostState& h, const DropPlan& plan)
     return {};
 }
 
-void reason_label(GuiContext& ctx, const PanelHostState& h, const Vec2f& at, DockReason reason)
+void reason_label(GuiContext& ctx, const DockView& h, const Vec2f& at, DockReason reason)
 {
     const ImStyle& note_style = ctx.gui_theme().overlay;
     LayoutStyle label = placed(h, Rect{ at, Vec2f(0.0f, 0.0f) }, k_channel_drag);
@@ -538,20 +556,19 @@ Colour faded(Colour colour, float factor)
     return colour;
 }
 
-void draw_guides(GuiContext& ctx, const PanelHostState& h, const DropGuides& guides)
+void draw_guides(GuiContext& ctx, const DockView& h, const DropGuides& guides)
 {
-    const GuiTheme& theme = ctx.gui_theme();
-    const Colour accent = theme.panel.accent;
+    const GuiDockTheme& dock = ctx.dock_theme();
     for (uint32_t i = 0; i < guides.count; ++i)
     {
         const DropGuide& guide = guides.guides[i];
-        const bool hovered = static_cast<int32_t>(i) == h.drag.plan.guide;
+        const bool hovered = static_cast<int32_t>(i) == h.model->drag.plan.guide;
         const float alpha = guide.allowed ? 1.0f : k_disabled_alpha;
-        overlay(ctx, h, guide.rect, faded(hovered ? theme.dock_guide_hover : theme.dock_guide, alpha), faded(accent, alpha), 1.0f);
-        const Colour glyph = hovered ? theme.overlay.background : accent;
+        overlay(ctx, h, guide.rect, faded(hovered ? dock.guide_hover : dock.guide, alpha), faded(dock.guide_border, alpha), 1.0f);
+        const Colour glyph = hovered ? dock.guide_glyph_hover : dock.guide_glyph;
         overlay(ctx, h, guide_glyph(guide.rect, guide.zone), faded(glyph, alpha), Colour{ 0.0f, 0.0f, 0.0f, 0.0f }, 0.0f);
     }
-    const int32_t hovered = h.drag.plan.guide;
+    const int32_t hovered = h.model->drag.plan.guide;
     if (hovered >= 0 && static_cast<uint32_t>(hovered) < guides.count && !guides.guides[hovered].allowed)
     {
         const Rect& rect = guides.guides[hovered].rect;
@@ -559,66 +576,68 @@ void draw_guides(GuiContext& ctx, const PanelHostState& h, const DropGuides& gui
     }
 }
 
-const Rect* landed_rect(const PanelHostState& h)
+const Rect* landed_rect(const DockView& h)
 {
     for (uint32_t n = 0; n < h.solved.node_count; ++n)
     {
         const DockNode& node = h.layout->nodes[n];
         for (uint32_t t = 0; node.kind == DockNodeKind::Tabs && t < node.count; ++t)
-            if (node.tabs[t] == h.landed)
+            if (node.tabs[t] == h.model->landed)
                 return &h.solved.nodes[n].rect;
     }
     for (uint32_t f = 0; f < h.solved.float_count; ++f)
-        if (h.layout->floats[f].panel == h.landed)
+        if (h.layout->floats[f].panel == h.model->landed)
             return &h.solved.floats[f];
     return nullptr;
 }
 
 // A fading accent frame on the panel that just docked, its tab stack or float.
-void draw_landing_flash(GuiContext& ctx, PanelHostState& h)
+void draw_landing_flash(GuiContext& ctx, DockView& h)
 {
     // The drop that set it also reshaped the layout after this frame's solve, so the flash starts next frame.
-    if (!is_valid(h.landed) || h.result.landed == h.landed)
+    if (!is_valid(h.model->landed) || h.result.landed == h.model->landed)
         return;
-    h.landed_age += ctx.delta_time();
-    const float t = h.landed_age / k_landing_flash_seconds;
+    h.model->landed_age += ctx.delta_time();
+    const float t = h.model->landed_age / k_landing_flash_seconds;
     const Rect* rect = landed_rect(h);
-    if (t >= 1.0f || rect == nullptr || !h.options.style.drop_flash)
+    if (t >= 1.0f || rect == nullptr || !h.style.drop_flash)
     {
-        h.landed = PanelId{};
+        h.model->landed = PanelId{};
         return;
     }
-    const Colour accent = ctx.gui_theme().panel.accent;
+    const Colour flash = ctx.dock_theme().landing_flash;
     const float fade = 1.0f - t;
-    overlay(ctx, h, *rect, faded(accent, 0.22f * fade), faded(accent, fade), 2.0f);
+    overlay(ctx, h, *rect, faded(flash, 0.22f * fade), faded(flash, fade), 2.0f);
 }
 
-void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
+void draw_drag_feedback(GuiContext& ctx, DockView& h)
 {
-    const DragState& d = h.drag;
+    const DragState& d = h.model->drag;
     const DropPlan& plan = d.plan;
     const GuiTheme& theme = ctx.gui_theme();
-    const Colour accent = theme.panel.accent;
-    Colour preview = theme.dock_preview;
-    preview.a *= h.options.style.preview_opacity;
-    overlay(ctx, h, plan.preview, preview, accent, 1.0f);
-    overlay(ctx, h, plan.marker, accent, accent, 0.0f);
+    const GuiDockTheme& dock = ctx.dock_theme();
+    Colour preview = dock.preview;
+    preview.a *= h.style.preview_opacity;
+    overlay(ctx, h, plan.preview, preview, dock.preview_border, 1.0f);
+    overlay(ctx, h, plan.marker, dock.preview_border, dock.preview_border, 0.0f);
     if (plan.action != DropAction::Float && !ctx.input().keys.shift)
-        draw_guides(ctx, h, drop_guides(*h.layout, h.panels, h.solved, d.panel, ctx.input().pointer.position));
+        draw_guides(ctx, h, drop_guides(*h.layout, h.model->panels, h.solved, d.panel, ctx.input().pointer.position));
 
     const bool refused = plan.action == DropAction::Cancel && plan.reason != DockReason::TargetInvalid && plan.reason != DockReason::NotFound;
     if (refused)
     {
-        const Colour danger = theme.palette[5];
+        const Colour danger = dock.refusal;
         overlay(ctx, h, target_rect(h, plan), Colour{ danger.r, danger.g, danger.b, 0.12f }, danger, 1.0f);
     }
     if (d.source != DragSource::Tab)
         return;
 
     const ImStyle& style = theme.tab;
-    const Vec2f at = ctx.input().pointer.position - d.grab;
+    Vec2f at = ctx.input().pointer.position - d.grab;
+    if (plan.action == DropAction::None && plan.node != k_no_node && static_cast<uint32_t>(plan.node) < h.solved.node_count)
+        at[1] = h.solved.nodes[plan.node].strip.min[1];
     const Rect ghost{ at, Vec2f(h.solved.metrics.tab_max_width, h.solved.metrics.strip_height) };
-    const PanelDesc* desc = find_panel(h.panels, d.panel);
+    const PanelDesc* desc = find_panel(h.model->panels, d.panel);
     LayoutStyle chip = placed(h, ghost, k_channel_drag);
     chip.padding = style.padding;
     chip.align_y = Align::Centre;
@@ -626,7 +645,7 @@ void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
     BoxPaint& paint = ctx.layout().node(index).paint;
     im::paint_surface(paint, style, style.selected);
     paint.border_width = 1.0f;
-    paint.border = refused ? theme.palette[5] : accent;
+    paint.border = refused ? dock.refusal : dock.chip_border;
     paint.text = ctx.arena().store(desc != nullptr ? std::string_view(desc->title) : std::string_view());
     paint.text_height = style.text_height;
     paint.text_colour = style.text;
@@ -636,44 +655,44 @@ void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
         reason_label(ctx, h, Vec2f(at[0], at[1] + ghost.size[1] + 2.0f), plan.reason);
 }
 
-void apply_drop(PanelHostState& h, const DragState& d)
+void apply_drop(DockView& h, const DragState& d)
 {
     DockLayout& layout = *h.layout;
     const DropPlan& plan = d.plan;
     const DockLayout before = layout;
     if (plan.action == DropAction::Reorder)
     {
-        note(h, reorder_tab(layout, h.panels, d.panel, plan.slot));
+        note(h, reorder_tab(layout, h.model->panels, d.panel, plan.slot));
     }
     else if (plan.action == DropAction::Dock)
     {
-        const DockResult docked = dock_panel(layout, h.panels, d.panel, plan.node, plan.zone);
+        const DockResult docked = dock_panel(layout, h.model->panels, d.panel, DockTarget{ plan.node, plan.surface }, plan.zone);
         note(h, docked);
         if (docked.applied && plan.zone == DropZone::Centre)
-            note(h, reorder_tab(layout, h.panels, d.panel, plan.slot));
+            note(h, reorder_tab(layout, h.model->panels, d.panel, plan.slot));
     }
     else if (plan.action == DropAction::Float)
     {
-        note(h, float_panel(layout, h.panels, d.panel, plan.preview));
+        note(h, float_panel(layout, h.model->panels, d.panel, plan.preview, plan.surface));
     }
     if (!equal(before, layout))
     {
-        h.landed = d.panel;
-        h.landed_age = 0.0f;
+        h.model->landed = d.panel;
+        h.model->landed_age = 0.0f;
         h.result.landed = d.panel;
     }
 }
 
-void move_dragged_float(PanelHostState& h, const Vec2f& pointer)
+void move_dragged_float(DockView& h, const Vec2f& pointer)
 {
     DockLayout& layout = *h.layout;
     const Rect& surface = h.solved.surface_rect;
     for (uint32_t f = 0; f < layout.float_count; ++f)
     {
-        if (layout.floats[f].panel != h.drag.panel)
+        if (layout.floats[f].panel != h.model->drag.panel)
             continue;
         const Rect& size = h.solved.floats[f];
-        const Vec2f at(math::clamp(pointer[0] - h.drag.grab[0], surface.min[0], surface.min[0] + surface.size[0] - size.size[0]), math::clamp(pointer[1] - h.drag.grab[1], surface.min[1], surface.min[1] + surface.size[1] - size.size[1]));
+        const Vec2f at(math::clamp(pointer[0] - h.model->drag.grab[0], surface.min[0], surface.min[0] + surface.size[0] - size.size[0]), math::clamp(pointer[1] - h.model->drag.grab[1], surface.min[1], surface.min[1] + surface.size[1] - size.size[1]));
         if (at[0] != layout.floats[f].rect.min[0] || at[1] != layout.floats[f].rect.min[1] || size.size[0] != layout.floats[f].rect.size[0] || size.size[1] != layout.floats[f].rect.size[1])
         {
             layout.floats[f].rect = Rect{ at, size.size };
@@ -683,24 +702,64 @@ void move_dragged_float(PanelHostState& h, const Vec2f& pointer)
     }
 }
 
-// Runs after the frame's drawing so no op reshapes the tree while its tabs are still being drawn.
-void update_drag(GuiContext& ctx, PanelHostState& h)
+// Moves the dragged tab to where the pointer is: it passes a neighbour once the pointer crosses that neighbour's centre, so a swap never flips back under the same pointer.
+void reorder_live(DockView& h, DragState& d, const Vec2f& pointer)
 {
-    DragState& d = h.drag;
+    const DockNode& node = h.layout->nodes[d.plan.node];
+    const SolvedNode& solved = h.solved.nodes[d.plan.node];
+    uint32_t current = 0;
+    while (current < node.count && node.tabs[current] != d.panel)
+        ++current;
+    const uint32_t first = solved.first_visible;
+    const uint32_t last = math::min<uint32_t>(first + solved.visible_count, node.count) - 1u;
+    if (solved.visible_count == 0 || current < first || current > last)
+        return;
+    const auto centre = [&solved](uint32_t i) { return solved.tab_rects[i].min[0] + solved.tab_rects[i].size[0] * 0.5f; };
+    uint32_t target = current;
+    while (target > first && pointer[0] < centre(target - 1u))
+        --target;
+    while (target < last && pointer[0] > centre(target + 1u))
+        ++target;
+    if (target != current && reorder_tab(*h.layout, h.model->panels, d.panel, target).applied)
+    {
+        d.reordered = true;
+        h.result.layout_changed = true;
+    }
+}
+
+void restore_reorder(DockView& h, DragState& d)
+{
+    if (d.reordered && reorder_tab(*h.layout, h.model->panels, d.panel, d.origin_slot).applied)
+        h.result.layout_changed = true;
+}
+
+// Runs after the frame's drawing so no op reshapes the tree while its tabs are still being drawn.
+void update_drag(GuiContext& ctx, DockView& h)
+{
+    DragState& d = h.model->drag;
     if (d.source == DragSource::None)
         return;
     const ImInput& input = ctx.input();
     if (key_pressed(input.keys, ImKey::Escape) || !is_open(*h.layout, d.panel))
     {
+        if (key_pressed(input.keys, ImKey::Escape))
+            restore_reorder(h, d);
         d = DragState{};
         return;
     }
     const Vec2f pointer = input.pointer.position;
     if (d.source == DragSource::Float)
         move_dragged_float(h, pointer);
-    d.plan = resolve_drop(*h.layout, h.panels, h.solved, d.panel, pointer, input.keys.shift);
+    d.plan = resolve_drop(*h.layout, h.model->panels, h.solved, d.panel, pointer, input.keys.shift);
+    if (d.source == DragSource::Tab && d.plan.action == DropAction::Reorder)
+    {
+        reorder_live(h, d, pointer);
+        d.plan = DropPlan{ DropAction::None, d.plan.node };
+    }
     if (!button_of(input, MouseCode::Left).down)
     {
+        if (d.plan.action == DropAction::Cancel)
+            restore_reorder(h, d);
         apply_drop(h, d);
         d = DragState{};
         return;
@@ -708,14 +767,15 @@ void update_drag(GuiContext& ctx, PanelHostState& h)
     h.result.interacting = true;
     h.result.dragging = true;
     const bool accepted = d.plan.action == DropAction::Dock || d.plan.action == DropAction::Float || d.plan.action == DropAction::Reorder;
-    ctx.request_cursor(accepted ? CursorShape::Hand : CursorShape::Arrow);
+    const bool in_own_strip = d.source == DragSource::Tab && d.plan.action == DropAction::None && d.plan.node != k_no_node;
+    ctx.request_cursor(accepted || in_own_strip ? CursorShape::Hand : CursorShape::Arrow);
     draw_drag_feedback(ctx, h);
 }
 
 // Ctrl+Tab walks the tabs of the focused panel's node; a node with one tab hands the walk to the next node.
-void cycle_tabs(PanelHostState& h, const ImKeys& keys)
+void cycle_tabs(DockView& h, const ImKeys& keys)
 {
-    if (!keys.ctrl || !key_pressed(keys, ImKey::Tab) || h.drag.source != DragSource::None)
+    if (!keys.ctrl || !key_pressed(keys, ImKey::Tab) || h.model->drag.source != DragSource::None)
         return;
     DockLayout& layout = *h.layout;
     const int32_t step = keys.shift ? -1 : 1;
@@ -724,7 +784,7 @@ void cycle_tabs(PanelHostState& h, const ImKeys& keys)
     {
         const DockNode& node = layout.nodes[n];
         for (uint32_t t = 0; node.kind == DockNodeKind::Tabs && t < node.count; ++t)
-            if (node.tabs[t] == h.focused)
+            if (node.tabs[t] == h.model->focused)
                 current = static_cast<int32_t>(n);
     }
     if (current == k_no_node)
@@ -734,7 +794,7 @@ void cycle_tabs(PanelHostState& h, const ImKeys& keys)
                 current = static_cast<int32_t>(n);
         if (current == k_no_node)
             return;
-        h.focused = layout.nodes[current].tabs[layout.nodes[current].selected];
+        h.model->focused = layout.nodes[current].tabs[layout.nodes[current].selected];
         return;
     }
     const DockNode& node = layout.nodes[current];
@@ -759,11 +819,11 @@ void cycle_tabs(PanelHostState& h, const ImKeys& keys)
         index = layout.nodes[target].selected;
     }
     note(h, select_tab(layout, target, index));
-    h.focused = layout.nodes[target].tabs[index];
+    h.model->focused = layout.nodes[target].tabs[index];
     h.result.layout_changed = true;
 }
 
-void draw_empty(GuiContext& ctx, PanelHostState& h)
+void draw_empty(GuiContext& ctx, DockView& h)
 {
     LayoutStyle box;
     box.direction = Direction::Column;
@@ -773,18 +833,18 @@ void draw_empty(GuiContext& ctx, PanelHostState& h)
     ctx.begin_box("panel_host_empty", box);
     ctx.push_id("panel_host_empty");
     label("No panels open");
-    if (h.options.default_layout != nullptr && button("Reset layout").clicked)
+    if (button("Reset layout").clicked)
     {
-        *h.layout = *h.options.default_layout;
+        *h.layout = h.model->default_layout;
         h.result.layout_changed = true;
     }
     ctx.pop_id();
     ctx.end_box();
 }
 
-void draw_host(GuiContext& ctx, PanelHostState& h)
+void draw_host(GuiContext& ctx, DockView& h)
 {
-    h.solved = solve(*h.layout, h.panels, metrics_of(ctx.gui_theme(), h.options.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface));
+    h.solved = solve(*h.layout, h.model->panels, metrics_of(ctx.gui_theme(), h.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface));
     const int32_t root = h.layout->roots[ctx.input().surface];
     if (root == k_no_node && h.layout->float_count == 0)
     {
@@ -833,17 +893,122 @@ void draw_host(GuiContext& ctx, PanelHostState& h)
     if (is_valid(pending_raise))
         raise_float(h, pending_raise);
     if (is_valid(pending_close))
-        note(h, close_panel(*h.layout, h.panels, pending_close));
+        note(h, close_panel(*h.layout, h.model->panels, pending_close));
 }
 
-} // namespace
+
+bool has_viewport(const PanelTable& panels)
+{
+    for (uint32_t i = 0; i < panels.count; ++i)
+        if (panels.descs[i].kind == PanelKind::Viewport)
+            return true;
+    return false;
+}
+
+bool viewport_open(const DockLayout& layout, const PanelTable& panels)
+{
+    for (uint32_t i = 0; i < panels.count; ++i)
+        if (panels.descs[i].kind == PanelKind::Viewport && is_open(layout, panels.descs[i].id))
+            return true;
+    return false;
+}
+
+// Loads the layout on first use: the file when docking is on and a layout_file is set, else the in-memory default. Registration must be done by then.
+void ensure_loaded(DockModel& m)
+{
+    const GuiSettings& settings = settings_of<GuiSettings>();
+    const bool use_file = settings.docking && !settings.layout_file.empty();
+    if (m.load == DockLoad::File || (m.load == DockLoad::DefaultOnly && !use_file))
+        return;
+    if (!m.default_set)
+        m.default_layout = build_default_layout(m.panels);
+    DockFileLoad loaded;
+    loaded.layout = m.default_layout;
+    if (use_file)
+        loaded = load_layout_file(settings.layout_file, m.panels, m.default_layout);
+    migrate_surfaces(loaded.layout, m.panels, m.surface_count);
+    const bool usable = !has_viewport(m.panels) || viewport_open(loaded.layout, m.panels);
+    m.layout = usable ? loaded.layout : m.default_layout;
+    m.from_file = loaded.from_file && usable;
+    m.has_good = false;
+    m.file = use_file ? settings.layout_file : std::filesystem::path();
+    m.autosave = use_file ? create_unique<DockAutosave>(m.layout, loaded.autosave_allowed) : nullptr;
+    m.load = use_file ? DockLoad::File : DockLoad::DefaultOnly;
+    reset(m.history, m.layout);
+    m.history_seeded = true;
+}
+
+DockModel& loaded_model()
+{
+    DockModel& m = context().dock_model();
+    ensure_loaded(m);
+    return m;
+}
+
+bool tab_location(const DockLayout& layout, PanelId panel, int32_t& node, uint32_t& index)
+{
+    for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
+    {
+        const DockNode& candidate = layout.nodes[n];
+        for (uint32_t t = 0; candidate.kind == DockNodeKind::Tabs && t < candidate.count && t < k_max_dock_tabs; ++t)
+            if (candidate.tabs[t] == panel)
+            {
+                node = static_cast<int32_t>(n);
+                index = t;
+                return true;
+            }
+    }
+    return false;
+}
+
+DockResult unknown_panel() { return DockResult{ false, DockReason::UnknownPanel }; }
+
+// The panels' viewport body takes the whole host while docking is off.
+void draw_flat_host(DockView& h)
+{
+    const PanelTable& table = h.model->panels;
+    for (uint32_t i = 0; i < table.count; ++i)
+        if (table.descs[i].kind == PanelKind::Viewport)
+        {
+            add_body(h, table.descs[i].id, h.host_rect, Rect{}, 0, true);
+            return;
+        }
+}
+
+// A press inside a viewport body that no widget took focuses it.
+void focus_pressed_viewport(GuiContext& ctx, DockView& h)
+{
+    const ImInput& input = ctx.input();
+    if (!input.pointer.buttons[0].pressed || ctx.wants_mouse() || ctx.popup_open())
+        return;
+    for (uint32_t i = 0; i < h.body_count; ++i)
+        if (h.bodies[i].viewport && contains(h.bodies[i].rect, input.pointer.position))
+        {
+            h.model->focused = h.bodies[i].panel;
+            return;
+        }
+}
+
+}
+
+DockModel::~DockModel()
+{
+    try
+    {
+        if (autosave != nullptr && load == DockLoad::File)
+            autosave->flush(layout, file, panels);
+    }
+    catch (...)
+    {
+    }
+}
 
 bool register_panel(std::string_view name, const PanelOptions& options)
 {
-    PanelHostState& h = host_of(context());
-    if (!add_panel(h.panels, name, options.title.empty() ? name : options.title, options.kind, options.min_w, options.min_h))
+    DockModel& m = context().dock_model();
+    if (!add_panel(m.panels, name, options.title.empty() ? name : options.title, options.kind, options.min_w, options.min_h))
         return false;
-    PanelDesc* desc = find_panel(h.panels, make_panel_id(name));
+    PanelDesc* desc = find_panel(m.panels, make_panel_id(name));
     desc->flags = PanelFlags{ flags_of(options) };
     desc->toolbar = options.toolbar;
     desc->toolbar_placement = options.toolbar_placement;
@@ -860,44 +1025,51 @@ bool register_panel(std::string_view name, const PanelOptions& options)
 
 const PanelTable& panels()
 {
-    return host_of(context()).panels;
+    return context().dock_model().panels;
 }
 
 bool dock_only_in(std::string_view panel, std::string_view target)
 {
-    return add_dock_only(host_of(context()).panels, make_panel_id(panel), make_panel_id(target));
+    return add_dock_only(context().dock_model().panels, make_panel_id(panel), make_panel_id(target));
 }
 
 bool never_dock_in(std::string_view panel, std::string_view target)
 {
-    return add_dock_never(host_of(context()).panels, make_panel_id(panel), make_panel_id(target));
+    return add_dock_never(context().dock_model().panels, make_panel_id(panel), make_panel_id(target));
 }
 
-void begin_panel_host(DockLayout& layout, const PanelHostOptions& options)
+void begin_panel_host()
 {
     GuiContext& ctx = context();
-    PanelHostState& h = host_of(ctx);
+    DockView& h = host_of(ctx);
+    DockModel& m = *h.model;
     if (host_active(h, ctx))
         throw Error("begin_panel_host called inside a panel host", "call end_panel_host first");
+    ensure_loaded(m);
+    const GuiSettings& settings = settings_of<GuiSettings>();
     h.in_host = true;
     h.frame = ctx.frame();
     h.dock_body_open = false;
     h.depth = 0;
-    h.layout = &layout;
-    h.options = options;
+    h.layout = &m.layout;
+    h.require_viewport = has_viewport(m.panels);
+    h.style = settings.dock;
     h.result = {};
     h.body_count = 0;
     h.current_body = -1;
     h.toolbar_open = false;
     h.float_count = 0;
     h.solved.node_count = 0;
-    keep_valid(h, layout);
-    if (!h.history_seeded)
+    if (settings.docking)
     {
-        reset(h.history, layout);
-        h.history_seeded = true;
+        keep_valid(h, m.layout);
+        apply_history_request(h, m.layout);
     }
-    apply_history_request(h, layout);
+    else
+    {
+        m.drag = DragState{};
+        m.history_request = HistoryRequest::None;
+    }
 
     h.host_id = ctx.id("panel_host");
     LayoutStyle area;
@@ -906,35 +1078,45 @@ void begin_panel_host(DockLayout& layout, const PanelHostOptions& options)
     ctx.begin_box(h.host_id, area);
     ctx.end_box();
     const bool known = ctx.layout_rect(h.host_id, h.host_rect);
-    if (known && ctx.input().surface < k_max_dock_surfaces)
+    if (!known)
+        return;
+    if (!settings.docking)
+        draw_flat_host(h);
+    else if (ctx.input().surface < k_max_dock_surfaces)
         draw_host(ctx, h);
 }
 
 void end_panel_host()
 {
     GuiContext& ctx = context();
-    PanelHostState& h = host_of(ctx);
+    DockView& h = host_of(ctx);
+    DockModel& m = *h.model;
     if (!host_active(h, ctx))
         throw Error("end_panel_host without begin_panel_host", "every end_panel_host needs a begin_panel_host");
     if (h.depth != 0)
         throw Error("end_panel_host with a panel still open", "every begin_panel needs an end_panel");
     if (h.toolbar_open)
         throw Error("end_panel_host with a toolbar still open", "every begin_panel_toolbar needs an end_panel_toolbar");
-    if (h.result.layout_changed)
+    const GuiSettings& settings = settings_of<GuiSettings>();
+    focus_pressed_viewport(ctx, h);
+    if (settings.docking)
     {
-        h.last_good = *h.layout;
-        h.has_good = true;
+        if (h.result.layout_changed)
+            keep_valid(h, m.layout);
+        if (is_valid(m.focused) && !is_open(m.layout, m.focused))
+            m.focused = PanelId{};
+        if (!h.result.interacting)
+            push(m.history, m.layout);
+        if (m.autosave != nullptr && !settings.layout_file.empty())
+            static_cast<void>(m.autosave->update(m.layout, h.result.interacting || m.drag.source != DragSource::None, settings.layout_file, m.panels));
     }
-    if (!h.result.interacting)
-        push(h.history, *h.layout);
     h.in_host = false;
-    h.layout = nullptr;
 }
 
 bool begin_panel(std::string_view name, const PanelOptions& options)
 {
     GuiContext& ctx = context();
-    PanelHostState& h = host_of(ctx);
+    DockView& h = host_of(ctx);
     if (h.depth >= k_max_panel_stack)
         throw Error("begin_panel nests too deep", "close panels with end_panel");
     if (!host_active(h, ctx) || h.dock_body_open)
@@ -947,7 +1129,7 @@ bool begin_panel(std::string_view name, const PanelOptions& options)
     }
 
     const PanelId id = make_panel_id(name);
-    if (find_panel(h.panels, id) == nullptr)
+    if (find_panel(h.model->panels, id) == nullptr)
         std::ignore = register_panel(name, options);
     const int32_t body_index = find_body_index(h, id);
     const PanelBody* body = body_index < 0 ? nullptr : &h.bodies[body_index];
@@ -981,7 +1163,7 @@ bool begin_panel(std::string_view name, const PanelOptions& options)
 void end_panel()
 {
     GuiContext& ctx = context();
-    PanelHostState& h = host_of(ctx);
+    DockView& h = host_of(ctx);
     if (h.depth == 0)
         throw Error("end_panel without begin_panel", "every end_panel needs a begin_panel");
     const PanelCall call = h.stack[--h.depth];
@@ -1017,7 +1199,7 @@ Rect panel_rect(std::string_view name)
 
 bool panel_occluded(std::string_view name, const Vec2f& point)
 {
-    const PanelHostState& h = host_of(context());
+    const DockView& h = host_of(context());
     const PanelId id = make_panel_id(name);
     uint32_t above = 0;
     for (uint32_t f = 0; f < h.float_count; ++f)
@@ -1029,25 +1211,31 @@ bool panel_occluded(std::string_view name, const Vec2f& point)
     return false;
 }
 
+bool panel_blocked(std::string_view name)
+{
+    GuiContext& ctx = context();
+    return panel_occluded(name, ctx.input().pointer.position) || ctx.popup_open();
+}
+
+bool panel_claims_pointer(std::string_view name, const GuiContext& other)
+{
+    return !is_empty(panel_rect(name)) && (other.wants_mouse() || other.popup_open());
+}
+
+bool panel_claims_keyboard(std::string_view name, const GuiContext& other)
+{
+    return !is_empty(panel_rect(name)) && (other.wants_keyboard() || other.popup_open());
+}
+
 PanelHostResult panel_host_result()
 {
     return host_of(context()).result;
 }
 
-PanelId focused_panel()
-{
-    return host_of(context()).focused;
-}
-
-void set_focused_panel(PanelId panel)
-{
-    host_of(context()).focused = panel;
-}
-
 bool begin_panel_toolbar()
 {
     GuiContext& ctx = context();
-    PanelHostState& h = host_of(ctx);
+    DockView& h = host_of(ctx);
     if (!host_active(h, ctx) || !h.dock_body_open || h.current_body < 0)
         return false;
     if (h.toolbar_open)
@@ -1070,7 +1258,7 @@ bool begin_panel_toolbar()
 void end_panel_toolbar()
 {
     GuiContext& ctx = context();
-    PanelHostState& h = host_of(ctx);
+    DockView& h = host_of(ctx);
     if (!h.toolbar_open)
         throw Error("end_panel_toolbar without begin_panel_toolbar", "every end_panel_toolbar needs a begin_panel_toolbar");
     ctx.pop_id();
@@ -1084,31 +1272,200 @@ Rect panel_toolbar_rect(std::string_view name)
     return body != nullptr ? body->toolbar : Rect{};
 }
 
+bool is_panel_open(std::string_view name)
+{
+    return is_open(loaded_model().layout, make_panel_id(name));
+}
+
+DockResult set_panel_open(std::string_view name, bool open)
+{
+    DockModel& m = loaded_model();
+    const PanelId id = make_panel_id(name);
+    if (find_panel(m.panels, id) == nullptr)
+        return unknown_panel();
+    return open ? open_panel(m.layout, m.panels, id) : close_panel(m.layout, m.panels, id);
+}
+
+DockResult toggle_panel(std::string_view name)
+{
+    return set_panel_open(name, !is_panel_open(name));
+}
+
+bool is_panel_focused(std::string_view name)
+{
+    return loaded_model().focused == make_panel_id(name);
+}
+
+void focus_panel(std::string_view name)
+{
+    DockModel& m = loaded_model();
+    const PanelId id = make_panel_id(name);
+    if (find_panel(m.panels, id) != nullptr)
+        m.focused = id;
+}
+
+bool is_group_open(std::string_view group)
+{
+    DockModel& m = loaded_model();
+    return group_open(m.layout, m.panels, make_panel_id(group));
+}
+
+DockResult set_group_open(std::string_view group, bool open, GroupEdit edit)
+{
+    DockModel& m = loaded_model();
+    const PanelId id = make_panel_id(group);
+    const DockResult result = set_group_open(m.layout, m.panels, id, open);
+    if (edit == GroupEdit::SessionOnly)
+    {
+        static_cast<void>(set_group_open(m.default_layout, m.panels, id, open));
+        if (m.autosave != nullptr)
+            m.autosave->rebase(m.layout);
+        reset(m.history, m.layout);
+    }
+    return result;
+}
+
+void reset_layout()
+{
+    DockModel& m = loaded_model();
+    m.layout = m.default_layout;
+    reset(m.history, m.layout);
+}
+
+const DockLayout& dock_layout()
+{
+    return loaded_model().layout;
+}
+
+bool set_dock_layout(const DockLayout& layout)
+{
+    DockModel& m = loaded_model();
+    try
+    {
+        validate(layout, m.panels, ValidateFlags{ has_viewport(m.panels) });
+    }
+    catch (const Error& error)
+    {
+        OX_ERROR("set_dock_layout rejected the layout: {}", error.what());
+        return false;
+    }
+    m.layout = layout;
+    push(m.history, m.layout);
+    return true;
+}
+
+bool set_default_layout(const DockLayout& layout)
+{
+    DockModel& m = context().dock_model();
+    try
+    {
+        validate(layout, m.panels, ValidateFlags{ has_viewport(m.panels) });
+    }
+    catch (const Error& error)
+    {
+        OX_ERROR("set_default_layout rejected the layout: {}", error.what());
+        return false;
+    }
+    m.default_layout = layout;
+    m.default_set = true;
+    return true;
+}
+
+DockResult dock_panel(std::string_view panel, std::string_view target, DropZone zone)
+{
+    DockModel& m = loaded_model();
+    const PanelId id = make_panel_id(panel);
+    if (find_panel(m.panels, id) == nullptr)
+        return unknown_panel();
+    if (target.empty())
+        return dock_panel(m.layout, m.panels, id, dock_root(), zone);
+    int32_t node = k_no_node;
+    uint32_t index = 0;
+    if (!tab_location(m.layout, make_panel_id(target), node, index))
+        return DockResult{ false, DockReason::TargetInvalid };
+    return dock_panel(m.layout, m.panels, id, DockTarget{ node }, zone);
+}
+
+DockResult float_panel(std::string_view panel, const Rect& rect)
+{
+    DockModel& m = loaded_model();
+    const PanelId id = make_panel_id(panel);
+    if (find_panel(m.panels, id) == nullptr)
+        return unknown_panel();
+    return float_panel(m.layout, m.panels, id, rect);
+}
+
+DockResult select_panel(std::string_view panel)
+{
+    DockModel& m = loaded_model();
+    int32_t node = k_no_node;
+    uint32_t index = 0;
+    if (!tab_location(m.layout, make_panel_id(panel), node, index))
+        return find_panel(m.panels, make_panel_id(panel)) == nullptr ? unknown_panel() : DockResult{ false, DockReason::NotFound };
+    return select_tab(m.layout, node, index);
+}
+
+DockResult set_panel_collapsed(std::string_view panel, bool collapsed)
+{
+    DockModel& m = loaded_model();
+    int32_t node = k_no_node;
+    uint32_t index = 0;
+    if (!tab_location(m.layout, make_panel_id(panel), node, index))
+        return find_panel(m.panels, make_panel_id(panel)) == nullptr ? unknown_panel() : DockResult{ false, DockReason::NotFound };
+    return set_collapsed(m.layout, m.panels, node, collapsed);
+}
+
 void undo_layout()
 {
-    host_of(context()).history_request = HistoryRequest::Undo;
+    context().dock_model().history_request = HistoryRequest::Undo;
 }
 
 void redo_layout()
 {
-    host_of(context()).history_request = HistoryRequest::Redo;
+    context().dock_model().history_request = HistoryRequest::Redo;
 }
 
 bool can_undo_layout()
 {
-    return can_undo(host_of(context()).history);
+    return can_undo(context().dock_model().history);
 }
 
 bool can_redo_layout()
 {
-    return can_redo(host_of(context()).history);
+    return can_redo(context().dock_model().history);
 }
 
-void reset_layout_history(const DockLayout& layout)
+void dock_menu()
 {
-    PanelHostState& h = host_of(context());
-    reset(h.history, layout);
-    h.history_seeded = true;
+    if (!settings_of<GuiSettings>().docking)
+        return;
+    DockModel& m = loaded_model();
+    if (begin_menu("Panels"))
+    {
+        for (uint32_t index = 0; index < m.panels.count; ++index)
+        {
+            const PanelDesc& desc = m.panels.descs[index];
+            if (desc.kind == PanelKind::Viewport)
+                continue;
+            const bool open = is_open(m.layout, desc.id);
+            DisabledScope disabled(open && can_close(m.panels, desc.id) != DockReason::None);
+            if (menu_item(desc.title, open).clicked)
+                static_cast<void>(open ? close_panel(m.layout, m.panels, desc.id) : open_panel(m.layout, m.panels, desc.id));
+        }
+        end_menu();
+    }
+    if (menu_item("Reset layout").clicked)
+        reset_layout();
+    {
+        DisabledScope disabled(!can_undo_layout());
+        if (menu_item("Undo layout").clicked)
+            undo_layout();
+    }
+    {
+        DisabledScope disabled(!can_redo_layout());
+        if (menu_item("Redo layout").clicked)
+            redo_layout();
+    }
 }
 
 }

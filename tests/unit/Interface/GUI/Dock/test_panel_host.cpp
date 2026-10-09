@@ -16,8 +16,7 @@ namespace
 struct HostScene
 {
     GuiFixture f;
-    DockLayout layout;
-    PanelHostOptions options;
+    DockLayout& layout = f.context.dock_model().layout;
     bool reversed = false;
     bool a_visible = false;
     bool b_visible = false;
@@ -26,16 +25,18 @@ struct HostScene
     explicit HostScene(float width = 800.0f, float height = 600.0f)
     {
         f.driver.input().surface_size = { width, height };
-        panel_host().panels = make_panels();
-        layout = make_sample(panel_host().panels);
+        model().panels = make_panels();
+        layout = make_sample(model().panels);
+        settle_dock(model());
     }
 
-    PanelHostState& panel_host() { return f.context.panel_host(); }
+    DockView& panel_host() { return f.context.dock_view(); }
+    DockModel& model() { return f.context.dock_model(); }
     const SolvedLayout& solved() { return panel_host().solved; }
 
     void draw()
     {
-        PanelHostScope host(layout, options);
+        PanelHostScope host;
         if (reversed)
             draw_b();
         {
@@ -169,7 +170,7 @@ TEST_CASE("panel host: clicking a tab selects it and reports the change")
     CHECK(scene.layout.nodes[1].selected == 1);
     scene.click(centre(scene.solved().nodes[1].tab_rects[0]));
     CHECK(scene.layout.nodes[1].selected == 0);
-    CHECK(focused_panel() == pid("a"));
+    CHECK(is_panel_focused("a"));
     scene.frames();
     CHECK(scene.a_visible);
     CHECK_FALSE(scene.b_visible);
@@ -190,7 +191,7 @@ TEST_CASE("panel host: the close button closes the panel and records its home")
 TEST_CASE("panel host: a panel without the close flag has no close button")
 {
     HostScene scene;
-    set_flags(scene.panel_host().panels, "a", panel_flag::all & ~panel_flag::close);
+    set_flags(scene.model().panels, "a", panel_flag::all & ~panel_flag::close);
     scene.frames();
     const Rect tab = scene.solved().nodes[1].tab_rects[0];
     scene.click(centre(close_rect_of(scene, tab)));
@@ -214,7 +215,7 @@ TEST_CASE("panel host: the chevron collapses a node and hides its body")
 TEST_CASE("panel host: a panel without the collapse flag has no chevron")
 {
     HostScene scene;
-    set_flags(scene.panel_host().panels, "b", panel_flag::all & ~panel_flag::collapse);
+    set_flags(scene.model().panels, "b", panel_flag::all & ~panel_flag::collapse);
     scene.frames();
     CHECK(is_empty(scene.solved().nodes[1].collapse_button));
 }
@@ -251,7 +252,7 @@ TEST_CASE("panel host: dragging a splitter edits the ratio, points or both modes
 TEST_CASE("panel host: a splitter next to a non-resizable side does not move")
 {
     HostScene scene;
-    set_flags(scene.panel_host().panels, "vp", panel_flag::reorder_in_host | panel_flag::dock_elsewhere);
+    set_flags(scene.model().panels, "vp", panel_flag::reorder_in_host | panel_flag::dock_elsewhere);
     scene.frames();
     const DockLayout before = scene.layout;
     const Rect gap = scene.solved().nodes[0].splitter;
@@ -263,7 +264,7 @@ TEST_CASE("panel host: the wheel over an overflowing strip steps the selected ta
 {
     HostScene scene(300.0f, 400.0f);
     for (const char* name : { "c", "d", "e", "f", "g", "h" })
-        require_applied(dock_panel(scene.layout, scene.panel_host().panels, pid(name), 1, DropZone::Centre));
+        require_applied(dock_panel(scene.layout, scene.model().panels, pid(name), 1, DropZone::Centre));
     scene.frames();
     const SolvedNode& node = scene.solved().nodes[1];
     REQUIRE(node.visible_count < scene.layout.nodes[1].count);
@@ -279,11 +280,11 @@ TEST_CASE("panel host: a press in a body or tab moves the focus seam")
     HostScene scene;
     scene.frames();
     scene.click(centre(scene.solved().nodes[1].body));
-    CHECK(focused_panel() == pid("b"));
+    CHECK(is_panel_focused("b"));
     scene.click(centre(scene.solved().nodes[1].tab_rects[0]));
-    CHECK(focused_panel() == pid("a"));
-    set_focused_panel(pid("vp"));
-    CHECK(focused_panel() == pid("vp"));
+    CHECK(is_panel_focused("a"));
+    focus_panel("vp");
+    CHECK(is_panel_focused("vp"));
 }
 
 TEST_CASE("panel host: strips, splitters and bodies claim the pointer but a viewport rect does not")
@@ -309,7 +310,7 @@ TEST_CASE("panel host: an unregistered id in the layout is skipped and reported 
     DockNode& tabs = scene.layout.nodes[1];
     tabs.tabs[tabs.count++] = PanelId{ 0xBEEF };
     scene.frames(6);
-    CHECK(scene.panel_host().reported_count == 1);
+    CHECK(scene.model().reported_count == 1);
     CHECK(scene.b_visible);
     CHECK(scene.layout.nodes[1].count == 3);
 }
@@ -327,11 +328,10 @@ TEST_CASE("panel host: an invalid layout is replaced by the last good one withou
 TEST_CASE("panel host: a layout without the required viewport is replaced by the last good one")
 {
     HostScene scene;
-    scene.options.require_viewport = true;
     scene.frames();
     const DockLayout good = scene.layout;
     DockLayout without;
-    require_applied(dock_panel(without, scene.panel_host().panels, pid("a"), k_dock_root, DropZone::Centre));
+    require_applied(dock_panel(without, scene.model().panels, pid("a"), k_dock_root, DropZone::Centre));
     scene.layout = without;
     scene.frames();
     CHECK(equal(scene.layout, good));
@@ -341,8 +341,9 @@ TEST_CASE("panel host: an empty surface offers a reset to the default layout")
 {
     HostScene scene;
     const DockLayout defaults = scene.layout;
+    find_panel(scene.model().panels, pid("vp"))->kind = PanelKind::View;
+    REQUIRE(set_default_layout(defaults));
     scene.layout = DockLayout{};
-    scene.options.default_layout = &defaults;
     scene.frames();
     const LayoutNode* hint = scene.f.find_text("No panels open");
     REQUIRE(hint != nullptr);
@@ -391,7 +392,7 @@ TEST_CASE("begin_panel: a plain container nested in a dock body still pairs")
     auto build = scene.f.frame_of(
         [&]
         {
-            PanelHostScope host(scene.layout);
+            PanelHostScope host;
             PanelScope b("b");
             if (b.visible())
             {

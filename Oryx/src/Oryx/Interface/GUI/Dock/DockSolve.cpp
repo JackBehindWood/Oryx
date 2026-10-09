@@ -23,6 +23,8 @@ struct Solver
     const DockMetrics& metrics;
     SolvedLayout& out;
     MinSize mins[k_max_dock_nodes];
+    // An all-collapsed root has nothing to give the space to, so it is laid out expanded.
+    bool ignore_collapse = false;
 
     bool valid(int32_t node) const { return node >= 0 && static_cast<uint32_t>(node) < layout.node_count; }
     const PanelDesc* selected_desc(const DockNode& n) const { return n.selected < n.count ? find_panel(panels, n.tabs[n.selected]) : nullptr; }
@@ -30,10 +32,11 @@ struct Solver
     float toolbar_height(const DockNode& n) const
     {
         const PanelDesc* desc = selected_desc(n);
-        return metrics.style.toolbars && desc != nullptr && desc->toolbar && n.collapsed == 0 ? metrics.toolbar_height : 0.0f;
+        return metrics.style.toolbars && desc != nullptr && desc->toolbar && !is_collapsed(n) ? metrics.toolbar_height : 0.0f;
     }
 
-    bool collapsed_tabs(int32_t node) const { return valid(node) && layout.nodes[node].kind == DockNodeKind::Tabs && layout.nodes[node].collapsed != 0; }
+    bool is_collapsed(const DockNode& n) const { return !ignore_collapse && n.collapsed != 0; }
+    bool collapsed_side(int32_t node) const { return !ignore_collapse && all_collapsed(layout, node); }
 
     MinSize compute_min(int32_t node, uint32_t depth)
     {
@@ -43,9 +46,9 @@ struct Solver
         MinSize result;
         if (n.kind == DockNodeKind::Tabs)
         {
-            if (n.collapsed != 0)
+            if (is_collapsed(n))
             {
-                result = { metrics.strip_height, metrics.strip_height };
+                result = { rail_width(metrics), metrics.strip_height };
             }
             else
             {
@@ -75,10 +78,13 @@ struct Solver
         return result;
     }
 
-    void place_tabs(int32_t node, const Rect& rect)
+    void place_tabs(int32_t node, const Rect& rect, bool rail)
     {
         const DockNode& n = layout.nodes[node];
         SolvedNode& s = out.nodes[node];
+        const bool collapsed = is_collapsed(n);
+        s.collapsed = collapsed;
+        s.rail = collapsed && rail;
         const float strip_h = math::min(metrics.strip_height, rect.size[1]);
         const float tool_h = math::min(toolbar_height(n), rect.size[1] - strip_h);
         const float stack_h = strip_h + tool_h;
@@ -90,14 +96,21 @@ struct Solver
         s.strip = Rect{ Vec2f(rect.min[0], strip_y), Vec2f(rect.size[0], strip_h) };
         if (tool_h > 0.0f)
             s.toolbar = Rect{ Vec2f(rect.min[0], stack_y + (above ? 0.0f : strip_h)), Vec2f(rect.size[0], tool_h) };
-        s.body = Rect{ Vec2f(rect.min[0], bottom ? rect.min[1] : rect.min[1] + stack_h), Vec2f(rect.size[0], n.collapsed != 0 ? 0.0f : rect.size[1] - stack_h) };
+        s.body = Rect{ Vec2f(rect.min[0], bottom ? rect.min[1] : rect.min[1] + stack_h), Vec2f(rect.size[0], collapsed ? 0.0f : rect.size[1] - stack_h) };
 
         const uint32_t count = math::min<uint32_t>(n.count, k_max_dock_tabs);
         float avail = rect.size[0];
         bool collapsible = count > 0 && metrics.strip_button > 0.0f && avail > metrics.strip_button;
         for (uint32_t t = 0; t < count && collapsible; ++t)
             collapsible = can_collapse(panels, n.tabs[t]) == DockReason::None;
-        if (collapsible)
+        // A collapsed node always keeps its expander, whatever its width or permissions, so it can never be stranded.
+        if (collapsed)
+        {
+            const float button = math::min(expander_size(metrics), avail);
+            avail -= button;
+            s.collapse_button = Rect{ Vec2f(rect.min[0] + avail, strip_y), Vec2f(button, strip_h) };
+        }
+        else if (collapsible)
         {
             avail -= metrics.strip_button;
             s.collapse_button = Rect{ Vec2f(rect.min[0] + avail, strip_y), Vec2f(metrics.strip_button, strip_h) };
@@ -125,7 +138,7 @@ struct Solver
             s.tab_rects[first + i] = Rect{ Vec2f(rect.min[0] + tab_w * static_cast<float>(i), strip_y), Vec2f(tab_w, strip_h) };
     }
 
-    void place(int32_t node, Rect rect, uint32_t depth)
+    void place(int32_t node, Rect rect, uint32_t depth, bool rail)
     {
         if (!valid(node) || depth > k_max_depth)
             return;
@@ -134,7 +147,7 @@ struct Solver
         const DockNode& n = layout.nodes[node];
         if (n.kind == DockNodeKind::Tabs)
         {
-            place_tabs(node, rect);
+            place_tabs(node, rect, rail);
             return;
         }
         if (n.kind != DockNodeKind::Split)
@@ -146,12 +159,15 @@ struct Solver
         const float total = extent - gap;
         const float min_a = horizontal ? mins[n.first].w : mins[n.first].h;
         const float min_b = horizontal ? mins[n.second].w : mins[n.second].h;
-        const bool collapsed_a = collapsed_tabs(n.first);
-        const bool collapsed_b = collapsed_tabs(n.second);
+        const bool collapsed_a = collapsed_side(n.first);
+        const bool collapsed_b = collapsed_side(n.second);
 
         float preferred = 0.0f;
-        if (collapsed_a != collapsed_b)
-            preferred = collapsed_a ? metrics.strip_height : total - metrics.strip_height;
+        // Only a vertical split shrinks a collapsed side to its strip; a horizontal one keeps the user's width (never below the rail minimum).
+        if (!horizontal && collapsed_a != collapsed_b)
+            preferred = collapsed_a ? min_a : total - min_b;
+        else if (!horizontal && collapsed_a)
+            preferred = min_a;
         else if (n.mode == DockSizeMode::Ratio)
             preferred = total * n.ratio;
         else if (n.mode == DockSizeMode::FixedFirst)
@@ -169,13 +185,13 @@ struct Solver
         out.nodes[node].splitter = horizontal ? Rect{ Vec2f(rect.min[0] + a, rect.min[1]), Vec2f(gap, rect.size[1]) } : Rect{ Vec2f(rect.min[0], rect.min[1] + a), Vec2f(rect.size[0], gap) };
         if (horizontal)
         {
-            place(n.first, Rect{ rect.min, Vec2f(a, rect.size[1]) }, depth + 1);
-            place(n.second, Rect{ Vec2f(rect.min[0] + a + gap, rect.min[1]), Vec2f(b, rect.size[1]) }, depth + 1);
+            place(n.first, Rect{ rect.min, Vec2f(a, rect.size[1]) }, depth + 1, true);
+            place(n.second, Rect{ Vec2f(rect.min[0] + a + gap, rect.min[1]), Vec2f(b, rect.size[1]) }, depth + 1, true);
         }
         else
         {
-            place(n.first, Rect{ rect.min, Vec2f(rect.size[0], a) }, depth + 1);
-            place(n.second, Rect{ Vec2f(rect.min[0], rect.min[1] + a + gap), Vec2f(rect.size[0], b) }, depth + 1);
+            place(n.first, Rect{ rect.min, Vec2f(rect.size[0], a) }, depth + 1, false);
+            place(n.second, Rect{ Vec2f(rect.min[0], rect.min[1] + a + gap), Vec2f(rect.size[0], b) }, depth + 1, false);
         }
     }
 };
@@ -232,6 +248,22 @@ ToolbarPlacement resolve_toolbar_placement(const DockStyle& style, const PanelDe
     return tab_count <= 1 ? ToolbarPlacement::AboveTabs : ToolbarPlacement::BelowTabs;
 }
 
+Vec2f float_min_size(const PanelTable& panels, PanelId panel, const DockMetrics& metrics)
+{
+    const PanelDesc* desc = find_panel(panels, panel);
+    const float tool_h = metrics.style.toolbars && desc != nullptr && desc->toolbar ? metrics.toolbar_height : 0.0f;
+    return Vec2f(desc != nullptr ? desc->min_w : 0.0f, (desc != nullptr ? desc->min_h : 0.0f) + metrics.strip_height + tool_h);
+}
+
+Rect clamp_float(const Rect& rect, const Vec2f& min_size, const Rect& surface)
+{
+    const float w = math::min(math::max(rect.size[0], min_size[0]), surface.size[0]);
+    const float h = math::min(math::max(rect.size[1], min_size[1]), surface.size[1]);
+    const float x = math::clamp(rect.min[0], surface.min[0], surface.min[0] + surface.size[0] - w);
+    const float y = math::clamp(rect.min[1], surface.min[1], surface.min[1] + surface.size[1] - h);
+    return Rect{ Vec2f(x, y), Vec2f(w, h) };
+}
+
 SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface)
 {
     SolvedLayout out;
@@ -245,8 +277,9 @@ SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const Doc
     const int32_t root = surface < k_max_dock_surfaces ? layout.roots[surface] : k_no_node;
     if (root != k_no_node)
     {
+        solver.ignore_collapse = all_collapsed(layout, root);
         solver.compute_min(root, 0);
-        solver.place(root, out.surface_rect, 0);
+        solver.place(root, out.surface_rect, 0, false);
     }
 
     for (uint32_t f = 0; f < out.float_count; ++f)
@@ -255,13 +288,12 @@ SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const Doc
         if (fl.surface != surface)
             continue;
         const PanelDesc* desc = find_panel(panels, fl.panel);
-        const float min_w = desc != nullptr ? desc->min_w : 0.0f;
         const float tool_h = metrics.style.toolbars && desc != nullptr && desc->toolbar ? metrics.toolbar_height : 0.0f;
-        const float min_h = (desc != nullptr ? desc->min_h : 0.0f) + metrics.strip_height + tool_h;
-        const float w = math::min(math::max(fl.rect.size[0], min_w), out.surface_rect.size[0]);
-        const float h = math::min(math::max(fl.rect.size[1], min_h), out.surface_rect.size[1]);
-        const float x = math::clamp(fl.rect.min[0], out.surface_rect.min[0], out.surface_rect.min[0] + out.surface_rect.size[0] - w);
-        const float y = math::clamp(fl.rect.min[1], out.surface_rect.min[1], out.surface_rect.min[1] + out.surface_rect.size[1] - h);
+        const Rect fitted = clamp_float(fl.rect, float_min_size(panels, fl.panel, metrics), out.surface_rect);
+        const float x = fitted.min[0];
+        const float y = fitted.min[1];
+        const float w = fitted.size[0];
+        const float h = fitted.size[1];
         out.floats[f] = Rect{ Vec2f(x, y), Vec2f(w, h) };
         const float title_h = math::min(metrics.strip_height, h);
         const float bar_h = math::min(tool_h, h - title_h);
@@ -274,7 +306,16 @@ SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const Doc
     return out;
 }
 
+static DropTarget find_drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);
+
 DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer)
+{
+    DropTarget target = find_drop_target(layout, solved, pointer);
+    target.surface = solved.surface;
+    return target;
+}
+
+static DropTarget find_drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer)
 {
     DropTarget result;
     const Rect& surface = solved.surface_rect;
@@ -384,19 +425,31 @@ bool floating_panel(const DockLayout& layout, PanelId panel)
     return false;
 }
 
-bool drop_changes_nothing(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t node, DropZone zone)
+struct DropProbe
+{
+    DockReason reason = DockReason::None;
+    bool changes_nothing = false;
+};
+
+DropProbe probe_drop(const DockLayout& layout, const PanelTable& panels, PanelId panel, DockTarget target, DropZone zone)
 {
     DockLayout probe = layout;
-    const DockResult result = dock_panel(probe, panels, panel, node, zone);
-    return result.reason == DockReason::NoChange || (result.applied && same_arrangement(layout, probe));
+    const DockResult result = dock_panel(probe, panels, panel, target, zone);
+    const bool full = result.reason == DockReason::TabsFull || result.reason == DockReason::NodesFull;
+    return { full ? result.reason : DockReason::None, result.reason == DockReason::NoChange || (result.applied && same_arrangement(layout, probe)) };
 }
 
 void add_guide(DropGuides& out, const DockLayout& layout, const PanelTable& panels, PanelId panel, DropZone zone, int32_t node, const Rect& rect)
 {
-    const DockReason reason = can_dock_into(layout, panels, panel, node);
-    // A drop that would leave the arrangement as it is (onto its own node, or beside the tree where it already sits) is not offered.
-    if (reason == DockReason::None && drop_changes_nothing(layout, panels, panel, node, zone))
-        return;
+    DockReason reason = can_dock_into(layout, panels, panel, node);
+    if (reason == DockReason::None)
+    {
+        const DropProbe probe = probe_drop(layout, panels, panel, DockTarget{ node, out.surface }, zone);
+        // A drop that would leave the arrangement as it is (onto its own node, or beside the tree where it already sits) is not offered.
+        if (probe.changes_nothing)
+            return;
+        reason = probe.reason;
+    }
     DropGuide& guide = out.guides[out.count++];
     guide.zone = zone;
     guide.node = node;
@@ -412,9 +465,19 @@ Rect box_at(const Vec2f& centre, float size)
 
 }
 
+static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer);
+
 DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer)
 {
+    DropGuides out = build_drop_guides(layout, panels, solved, panel, pointer);
+    out.surface = solved.surface;
+    return out;
+}
+
+static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer)
+{
     DropGuides out;
+    out.surface = solved.surface;
     const DockMetrics& metrics = solved.metrics;
     const Rect& surface = solved.surface_rect;
     const int32_t root = solved.surface < k_max_dock_surfaces ? layout.roots[solved.surface] : k_no_node;
@@ -566,7 +629,16 @@ DropPlan refused(DockReason reason, int32_t node = k_no_node, DropZone zone = Dr
 
 }
 
+static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only);
+
 DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only)
+{
+    DropPlan plan = decide_drop(layout, panels, solved, panel, pointer, float_only);
+    plan.surface = solved.surface;
+    return plan;
+}
+
+static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only)
 {
     const int32_t source = tab_node_of(layout, panel);
     const bool floating = is_floating(layout, panel);
@@ -633,7 +705,10 @@ DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const 
             const DockReason reason = can_dock_into(layout, panels, panel, target.node);
             if (reason != DockReason::None)
                 return refused(reason, target.node, target.zone);
-            if (drop_changes_nothing(layout, panels, panel, target.node, target.zone) && !contains(solved.nodes[target.node != k_dock_root ? target.node : 0].strip, pointer))
+            const DropProbe probe = probe_drop(layout, panels, panel, DockTarget{ target.node, solved.surface }, target.zone);
+            if (probe.reason != DockReason::None)
+                return refused(probe.reason, target.node, target.zone);
+            if (probe.changes_nothing && !contains(solved.nodes[target.node != k_dock_root ? target.node : 0].strip, pointer))
                 return DropPlan{};
             DropPlan plan;
             plan.action = DropAction::Dock;
@@ -656,6 +731,8 @@ DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const 
     const DockReason reason = can_float(panels, panel);
     if (reason != DockReason::None)
         return refused(reason);
+    if (layout.float_count >= k_max_dock_floats)
+        return refused(DockReason::FloatsFull);
     DropPlan plan;
     plan.action = DropAction::Float;
     plan.preview = float_preview(panels, solved, panel, pointer);

@@ -16,26 +16,27 @@ namespace
 struct DragScene
 {
     GuiFixture f;
-    DockLayout layout;
+    DockLayout& layout = f.context.dock_model().layout;
     DockLayout original;
-    PanelHostOptions options;
 
     DragScene()
     {
         f.driver.input().surface_size = { 800.0f, 600.0f };
-        panel_host().panels = make_panels();
-        layout = make_sample(panel_host().panels);
+        model().panels = make_panels();
+        layout = make_sample(model().panels);
+        settle_dock(model());
         original = layout;
         frames(4);
     }
 
-    PanelHostState& panel_host() { return f.context.panel_host(); }
-    PanelTable& table() { return panel_host().panels; }
+    DockView& panel_host() { return f.context.dock_view(); }
+    DockModel& model() { return f.context.dock_model(); }
+    PanelTable& table() { return model().panels; }
     const SolvedLayout& solved() { return panel_host().solved; }
 
     void draw()
     {
-        PanelHostScope host(layout, options);
+        PanelHostScope host;
         for (const char* name : { "a", "b", "vp" })
         {
             PanelScope panel(name);
@@ -171,7 +172,7 @@ TEST_CASE("panel host drag: a float moves over a body, and re-docks on an edge z
     const Rect body = scene.solved().nodes[1].body;
     scene.press_at(centre(moved));
     scene.move_to(Vec2f(body.min[0] + body.size[0] - 10.0f, body.min[1] + body.size[1] * 0.5f));
-    CHECK(scene.panel_host().drag.source == DragSource::Float);
+    CHECK(scene.model().drag.source == DragSource::Float);
     scene.release_drag();
     CHECK(scene.layout.float_count == 0);
     CHECK(scene.layout.node_count == 5);
@@ -187,7 +188,7 @@ TEST_CASE("panel host drag: a forbidden target shows no preview, refuses the dro
     scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
     scene.move_to(Vec2f(body.min[0] + body.size[0] - 10.0f, body.min[1] + body.size[1] * 0.5f));
 
-    const DropPlan& plan = scene.panel_host().drag.plan;
+    const DropPlan& plan = scene.model().drag.plan;
     CHECK(plan.action == DropAction::Cancel);
     CHECK(plan.reason == DockReason::NotPermittedTarget);
     CHECK(is_empty(plan.preview));
@@ -231,7 +232,7 @@ TEST_CASE("panel host drag: escape cancels and the layout is unchanged")
 TEST_CASE("panel host drag: ctrl+tab cycles the focused node's tabs and wraps, shift reverses")
 {
     DragScene scene;
-    set_focused_panel(pid("b"));
+    focus_panel("b");
     auto press_tab = [&](bool shift)
     {
         scene.f.driver.input().keys.ctrl = true;
@@ -242,10 +243,10 @@ TEST_CASE("panel host drag: ctrl+tab cycles the focused node's tabs and wraps, s
     REQUIRE(scene.layout.nodes[1].selected == 1);
     press_tab(false);
     CHECK(scene.layout.nodes[1].selected == 0);
-    CHECK(focused_panel() == pid("a"));
+    CHECK(is_panel_focused("a"));
     press_tab(true);
     CHECK(scene.layout.nodes[1].selected == 1);
-    CHECK(focused_panel() == pid("b"));
+    CHECK(is_panel_focused("b"));
 }
 
 TEST_CASE("panel host drag: warm drag frames allocate nothing")
@@ -266,17 +267,18 @@ TEST_CASE("panel host drag: a panel toolbar is offered only when reserved and th
 {
     GuiFixture f;
     f.driver.input().surface_size = { 800.0f, 600.0f };
-    PanelHostState& state = f.context.panel_host();
+    DockModel& state = f.context.dock_model();
     state.panels = make_panels();
     find_panel(state.panels, pid("a"))->toolbar = true;
-    DockLayout layout = make_sample(state.panels);
+    DockLayout& layout = state.layout;
+    layout = make_sample(state.panels);
     layout.nodes[1].selected = 0;
-    PanelHostOptions options;
+    settle_dock(state);
     bool a_toolbar = false;
     auto build = f.frame_of(
         [&]
         {
-            PanelHostScope host(layout, options);
+            PanelHostScope host;
             PanelScope a("a");
             if (a.visible())
             {
@@ -290,7 +292,7 @@ TEST_CASE("panel host drag: a panel toolbar is offered only when reserved and th
     CHECK(a_toolbar);
     CHECK_FALSE(is_empty(panel_toolbar_rect("a")));
 
-    options.style.toolbars = false;
+    set_dock_style([](DockStyle& style) { style.toolbars = false; });
     f.driver.run_frames(4, build);
     CHECK_FALSE(a_toolbar);
     CHECK(is_empty(panel_toolbar_rect("a")));
@@ -319,8 +321,8 @@ TEST_CASE("panel host drag: dropping on a compass guide docks exactly like dock_
     const DropGuide* top = find_guide(guides, 2, DropZone::Top);
     REQUIRE(top != nullptr);
     scene.move_to(centre(top->rect));
-    CHECK(scene.panel_host().drag.plan.guide >= 0);
-    CHECK(scene.panel_host().drag.plan.zone == DropZone::Top);
+    CHECK(scene.model().drag.plan.guide >= 0);
+    CHECK(scene.model().drag.plan.zone == DropZone::Top);
 
     DockLayout expected = scene.original;
     REQUIRE(dock_panel(expected, scene.table(), pid("b"), 2, DropZone::Top).applied);
@@ -331,13 +333,13 @@ TEST_CASE("panel host drag: dropping on a compass guide docks exactly like dock_
 TEST_CASE("panel host drag: guides can be turned off and the bands still decide")
 {
     DragScene scene;
-    scene.options.style.guides = false;
+    set_dock_style([](DockStyle& style) { style.guides = false; });
     scene.frames(2);
     const Rect vp_body = scene.solved().nodes[2].body;
     scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
     scene.move_to(centre(vp_body));
-    CHECK(scene.panel_host().drag.plan.guide == -1);
-    CHECK(scene.panel_host().drag.plan.action == DropAction::Dock);
+    CHECK(scene.model().drag.plan.guide == -1);
+    CHECK(scene.model().drag.plan.action == DropAction::Dock);
     scene.release_drag();
 }
 
@@ -351,29 +353,29 @@ TEST_CASE("panel host drag: the panel that landed flashes, then the flash ends")
     scene.f.driver.release();
     scene.frames(1);
     CHECK(panel_host_result().landed == pid("b"));
-    CHECK(scene.panel_host().landed == pid("b"));
+    CHECK(scene.model().landed == pid("b"));
     scene.frames(2);
-    CHECK(is_valid(scene.panel_host().landed));
+    CHECK(is_valid(scene.model().landed));
     scene.frames(8);
-    CHECK_FALSE(is_valid(scene.panel_host().landed));
+    CHECK_FALSE(is_valid(scene.model().landed));
 }
 
 TEST_CASE("panel host drag: no flash when the style turns it off or the drop changed nothing")
 {
     {
         DragScene scene;
-        scene.options.style.drop_flash = false;
+        set_dock_style([](DockStyle& style) { style.drop_flash = false; });
         scene.frames(2);
         const Rect vp_body = scene.solved().nodes[2].body;
         scene.drag(centre(scene.solved().nodes[1].tab_rects[1]), centre(vp_body));
         scene.frames(2);
-        CHECK_FALSE(is_valid(scene.panel_host().landed));
+        CHECK_FALSE(is_valid(scene.model().landed));
     }
     {
         DragScene scene;
         const Vec2f from = centre(scene.solved().nodes[1].tab_rects[1]);
         scene.drag(from, from + Vec2f(6.0f, 0.0f));
-        CHECK_FALSE(is_valid(scene.panel_host().landed));
+        CHECK_FALSE(is_valid(scene.model().landed));
     }
 }
 
@@ -394,4 +396,51 @@ TEST_CASE("panel host drag: warm frames hovering a compass guide allocate nothin
     scene.frames(2);
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
     scene.release_drag();
+}
+
+TEST_CASE("panel host drag: a tab reorders live while held, and escape puts it back")
+{
+    DragScene scene;
+    const SolvedNode& strip = scene.solved().nodes[1];
+    REQUIRE(tab_at(scene.layout, 1, 1) == pid("b"));
+    const Rect first = strip.tab_rects[0];
+    scene.press_at(centre(strip.tab_rects[1]));
+    scene.move_to(Vec2f(first.min[0] + 4.0f, first.min[1] + first.size[1] * 0.5f));
+    REQUIRE(panel_host_result().dragging);
+    CHECK(tab_at(scene.layout, 1, 0) == pid("b"));
+    CHECK(tab_at(scene.layout, 1, 1) == pid("a"));
+
+    scene.f.driver.key_press(ImKey::Escape);
+    scene.frames(1);
+    CHECK_FALSE(panel_host_result().dragging);
+    CHECK(tab_at(scene.layout, 1, 1) == pid("b"));
+    scene.release_drag();
+    CHECK(diff(scene.layout, scene.original).empty());
+    CHECK_FALSE(can_undo_layout());
+}
+
+TEST_CASE("panel host drag: a live reorder is one undo step and a refused drop restores the order")
+{
+    DragScene scene;
+    const SolvedNode& strip = scene.solved().nodes[1];
+    const Rect first = strip.tab_rects[0];
+    scene.press_at(centre(strip.tab_rects[1]));
+    scene.move_to(Vec2f(first.min[0] + 4.0f, first.min[1] + first.size[1] * 0.5f));
+    CHECK(tab_at(scene.layout, 1, 0) == pid("b"));
+    scene.release_drag();
+    CHECK(tab_at(scene.layout, 1, 0) == pid("b"));
+    undo_layout();
+    scene.frames(2);
+    CHECK(diff(scene.layout, scene.original).empty());
+    CHECK_FALSE(can_undo_layout());
+
+    set_flags(scene.model().panels, "b", panel_flag::all & ~panel_flag::tear_off & ~panel_flag::dock_elsewhere);
+    scene.frames(2);
+    const SolvedNode& again = scene.solved().nodes[1];
+    scene.press_at(centre(again.tab_rects[1]));
+    scene.move_to(Vec2f(again.tab_rects[0].min[0] + 4.0f, again.tab_rects[0].min[1] + 4.0f));
+    CHECK(tab_at(scene.layout, 1, 0) == pid("b"));
+    scene.move_to(Vec2f(900.0f, 300.0f));
+    scene.release_drag();
+    CHECK(tab_at(scene.layout, 1, 0) == pid("a"));
 }

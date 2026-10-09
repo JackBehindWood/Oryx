@@ -38,11 +38,6 @@ struct GuiTheme : ImTheme
     float scroll_line_px = 40.0f;
     float scrollbar_width = 8.0f;
     float tooltip_delay = 0.5f;
-    // Fill of the dock drop preview; its border uses panel.accent.
-    Colour dock_preview = { 0.25f, 0.72f, 0.65f, 0.28f };
-    // Fill of a drop guide and of the guide under the pointer; the glyph and border use panel.accent.
-    Colour dock_guide = { 0.14f, 0.14f, 0.14f, 0.88f };
-    Colour dock_guide_hover = { 0.25f, 0.72f, 0.65f, 0.95f };
     // Covers everything beneath a modal.
     Colour modal_dim = { 0.0f, 0.0f, 0.0f, 0.5f };
     // Left padding of the children of a tree node.

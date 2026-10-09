@@ -208,11 +208,13 @@ bool as_bool(const YAML::Node& node, const char* what)
     return value;
 }
 
-PanelId read_panel(const YAML::Node& node)
+PanelId read_panel(const YAML::Node& node, bool allow_none = false)
 {
     if (node.IsMap())
     {
         const uint32_t hash = as_uint(get(node, "hash"), "panel hash", std::numeric_limits<uint32_t>::max());
+        if (hash == 0 && allow_none)
+            return PanelId{};
         if (hash == 0)
             corrupt("panel hash 0 is reserved");
         return PanelId{ hash };
@@ -344,7 +346,7 @@ void read_document(DockLayout& layout, const YAML::Node& doc)
         {
             DockHome& item = layout.homes[layout.home_count++];
             item.panel = read_panel(get(homes[i], "panel"));
-            item.sibling = read_panel(get(homes[i], "sibling"));
+            item.sibling = read_panel(get(homes[i], "sibling"), true);
             item.zone = read_zone(as_text(get(homes[i], "zone"), "home zone"));
         }
     }
@@ -438,7 +440,7 @@ bool deserialize_with_migrations(DockLayout& out, const PanelTable& panels, std:
         auto scratch = std::make_unique<DockLayout>();
         read_document(*scratch, doc);
         scratch->version = k_dock_version;
-        normalize(*scratch);
+        normalize(*scratch, panels);
         try
         {
             validate(*scratch, panels, ValidateFlags{});

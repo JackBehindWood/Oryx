@@ -11,7 +11,7 @@ namespace oasis
 {
 
 // The windowed Oasis chrome: Game, Opponent and Help menus over a dock host holding the board (viewport/0), the dashboard views and the GUI showcase as panels. The board's rect goes to the input router.
-// An interface client; owns the dashboard feed, which the board layer feeds with every decision. Placement, the layout file and the View menu are the GUI's (gui::DockSession).
+// An interface client; owns the dashboard feed, which the board layer feeds with every decision. Placement, the layout file, focus and the View menu are the GUI's: the shell only registers panels and asks by name.
 class OasisShell : public oryx::IFrameClient, public oryx::RenderSource
 {
 public:
@@ -30,10 +30,10 @@ public:
 
     [[nodiscard]] oryx::DashboardFeed& feed() { return m_feed; }
     [[nodiscard]] const oryx::GuiContext& context() const { return m_context; }
-    [[nodiscard]] const oryx::gui::DockLayout& layout() const { return m_dock->layout(); }
+    [[nodiscard]] const oryx::gui::DockLayout& layout();
     // Any dashboard view panel is open.
-    [[nodiscard]] bool dashboard_open() const;
-    [[nodiscard]] bool showcase_open() const;
+    [[nodiscard]] bool dashboard_open();
+    [[nodiscard]] bool showcase_open();
     [[nodiscard]] bool switch_pending() const { return m_switch_pending; }
 
 private:
@@ -59,8 +59,6 @@ private:
     oryx::SettingsSubscription m_settings_subscription;
     oryx::DashboardSettings m_settings;
     bool m_settings_dirty = false;
-    oryx::UniquePtr<oryx::gui::DockSession> m_dock;
-    oryx::gui::ForeignPanel m_showcase_panel;
     bool m_switch_pending = false;
     bool m_confirm_requested = false;
     std::string m_pending_game;
