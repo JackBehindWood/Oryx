@@ -28,6 +28,16 @@ struct PanelOptions : im::WidgetOptions
     // Reserves a toolbar strip drawn with begin_panel_toolbar; where it sits against the tabs follows DockStyle, then this placement, then the node.
     bool toolbar = false;
     ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
+    // The body belongs to another context drawn beneath the host (see panel_rect): no backdrop.
+    bool foreign_body = false;
+    // Placement hints (see PanelDesc): names of other panels and of a group; the GUI builds the default layout and reopens from them.
+    std::string_view dock_near;
+    std::string_view dock_tabbed_with;
+    std::string_view group;
+    DropZone dock_side = DropZone::Right;
+    float dock_size = 0.0f;
+    int32_t order = 0;
+    bool initial_open = true;
 };
 
 static_assert(std::is_trivially_copyable_v<PanelOptions>);
@@ -49,6 +59,8 @@ struct PanelHostResult
     bool interacting = false;
     // A tab or float is being dragged.
     bool dragging = false;
+    // The panel a drop placed this frame, else invalid.
+    PanelId landed;
 };
 
 static_assert(std::is_trivially_copyable_v<PanelHostResult> && std::is_standard_layout_v<PanelHostResult>);
@@ -120,10 +132,17 @@ struct PanelHostState
     uint32_t depth = 0;
     int32_t current_body = -1;
     bool toolbar_open = false;
+    // Last frame's floats back to front, for panel_occluded.
+    Rect float_rects[k_max_dock_floats];
+    PanelId float_panels[k_max_dock_floats];
+    uint32_t float_count = 0;
     DragState drag;
     LayoutHistory history;
     bool history_seeded = false;
     HistoryRequest history_request = HistoryRequest::None;
+    // The panel that last landed from a drop and the seconds since, for the flash.
+    PanelId landed;
+    float landed_age = 0.0f;
 };
 
 static_assert(sizeof(LayoutHistory) < 256u * 1024u, "history lives in the context, keep it small");

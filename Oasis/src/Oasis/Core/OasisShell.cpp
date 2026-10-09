@@ -11,6 +11,9 @@ namespace
 using namespace oryx;
 
 constexpr const char* k_confirm = "Switch match?";
+constexpr const char* k_showcase_panel = "view/gui-showcase";
+constexpr float k_showcase_min_width = 320.0f;
+constexpr float k_showcase_min_height = 240.0f;
 
 oryx::FeedOptions feed_options(const DashboardSettings& settings)
 {
@@ -25,7 +28,7 @@ OasisShell::OasisShell(InputRouter& router, DashboardFlag flag)
     : m_router(router)
     , m_feed(feed_options(settings_of<DashboardSettings>()))
     , m_settings(settings_of<DashboardSettings>())
-    , m_dashboard_open(flag != DashboardFlag::Default ? flag == DashboardFlag::On : settings_of<DashboardSettings>().enabled)
+    , m_showcase_panel(k_showcase_panel)
 {
     m_model.feed = &m_feed;
     m_panel = make_panel_state(m_settings.views);
@@ -35,9 +38,47 @@ OasisShell::OasisShell(InputRouter& router, DashboardFlag flag)
             m_settings = changed;
             m_settings_dirty = true;
         });
+
+    ContextScope<GuiContext> scope(m_context);
+    register_dashboard_panels(m_panel, m_settings.enabled);
+    gui::PanelOptions showcase;
+    showcase.title = "GUI Showcase";
+    showcase.min_w = k_showcase_min_width;
+    showcase.min_h = k_showcase_min_height;
+    showcase.foreign_body = true;
+    showcase.initial_open = false;
+    showcase.dock_tabbed_with = m_panel.panels.empty() ? std::string_view() : std::string_view(m_panel.panels[0]);
+    showcase.dock_near = k_viewport_panel;
+    static_cast<void>(gui::register_panel(k_showcase_panel, showcase));
+
+    m_dock = create_unique<gui::DockSession>();
+    if (flag != DashboardFlag::Default)
+    {
+        m_dock->override_group_open(k_dashboard_group, flag == DashboardFlag::On);
+    }
 }
 
-OasisShell::~OasisShell() noexcept = default;
+OasisShell::~OasisShell() noexcept
+{
+    try
+    {
+        ContextScope<GuiContext> scope(m_context);
+        m_dock->flush();
+    }
+    catch (...)
+    {
+    }
+}
+
+bool OasisShell::dashboard_open() const
+{
+    return m_dock->group_open(k_dashboard_group);
+}
+
+bool OasisShell::showcase_open() const
+{
+    return gui::is_open(m_dock->layout(), gui::make_panel_id(k_showcase_panel));
+}
 
 void OasisShell::set_font(Font* font)
 {
@@ -52,7 +93,10 @@ void OasisShell::apply_settings()
     if (m_settings_dirty)
     {
         m_settings_dirty = false;
-        m_panel = make_panel_state(m_settings.views);
+        DashboardPanelState fresh = make_panel_state(m_settings.views);
+        ContextScope<GuiContext> scope(m_context);
+        register_dashboard_panels(fresh, m_settings.enabled);
+        m_panel = std::move(fresh);
     }
 }
 
@@ -73,14 +117,20 @@ void OasisShell::frame(const FrameInfo& info)
             window->set_clipboard_text(m_context.output().copy_text);
         }
     }
-    if (m_showcase_open)
-    {
-        m_showcase.set_region(m_context.workspace().right);
-        m_showcase.set_input_blocked(m_context.popup_open());
-        m_showcase.frame(info);
-        claim_input();
-    }
+    draw_showcase(info);
     Renderer::scene().submit(*this);
+}
+
+void OasisShell::draw_showcase(const FrameInfo& info)
+{
+    if (!m_showcase_panel.visible())
+    {
+        return;
+    }
+    m_showcase.set_region(m_showcase_panel.rect());
+    m_showcase.set_input_blocked(m_showcase_panel.blocked());
+    m_showcase.frame(info);
+    claim_input();
 }
 
 void OasisShell::run(const ImInput& input)
@@ -98,23 +148,28 @@ void OasisShell::run(const ImInput& input)
         m_context.abort_frame();
         throw;
     }
-    const Rect central = m_context.workspace().central;
-    if (!is_empty(central))
+    const Rect board = gui::viewport_rect(k_viewport_panel);
+    if (!is_empty(board))
     {
-        m_router.set_view(k_main_view, ViewRegion{ central.min, central.size });
+        m_router.set_view(k_main_view, ViewRegion{ board.min, board.size });
+        if (input.pointer.buttons[0].pressed && contains(board, input.pointer.position) && !m_context.wants_mouse())
+        {
+            gui::set_focused_panel(gui::make_panel_id(k_viewport_panel));
+        }
     }
+    m_showcase_panel.update(input.pointer.position);
+    m_dock->update();
     claim_input();
 }
 
 void OasisShell::claim_input()
 {
-    const bool showcase = m_showcase_open;
     const GuiContext& other = m_showcase.context();
-    if (m_context.wants_mouse() || m_context.popup_open() || (showcase && (other.wants_mouse() || other.popup_open())))
+    if (m_context.wants_mouse() || m_context.popup_open() || m_showcase_panel.claims_pointer(other))
     {
         m_router.claim_pointer();
     }
-    if (m_context.wants_keyboard() || m_context.popup_open() || (showcase && (other.wants_keyboard() || other.popup_open())))
+    if (m_context.wants_keyboard() || m_context.popup_open() || m_showcase_panel.claims_keyboard(other))
     {
         m_router.claim_keyboard();
     }
@@ -134,21 +189,14 @@ void OasisShell::build()
     gui::begin_workspace("shell");
     menus();
     gui::begin_body();
-    gui::central_area();
-    if (m_dashboard_open || m_showcase_open)
     {
-        const float width = m_showcase_open ? m_window[0] : static_cast<float>(m_settings.panel_width);
-        ImStyle hosted = gui::theme().panel;
-        hosted.background.a = 0.0f;
-        hosted.border_width = 0.0f;
-        gui::WidgetOptions options;
-        options.style = m_showcase_open ? &hosted : nullptr;
-        gui::begin_side_panel(gui::Side::Right, width, options);
-        if (!m_showcase_open)
+        gui::PanelHostScope host(m_dock->layout(), m_dock->host_options());
+        for (size_t index = 0; index < m_panel.views.size(); ++index)
         {
-            draw_dashboard(m_panel, m_model);
+            draw_dashboard_panel(m_panel, index, m_model);
         }
-        gui::end_side_panel();
+        static_cast<void>(gui::begin_panel(k_showcase_panel));
+        gui::end_panel();
     }
     gui::end_body();
     gui::end_workspace();
@@ -160,24 +208,30 @@ void OasisShell::menus()
     gui::begin_menu_bar("menu");
     game_menu();
     opponent_menu();
-    if (gui::begin_menu("View"))
-    {
-        if (gui::menu_item("Dashboard", m_dashboard_open && !m_showcase_open).clicked)
-        {
-            m_dashboard_open = !m_dashboard_open || m_showcase_open;
-            m_showcase_open = false;
-        }
-        gui::end_menu();
-    }
+    view_menu();
     if (gui::begin_menu("Help"))
     {
-        if (gui::menu_item("GUI Showcase", m_showcase_open).clicked)
+        if (gui::menu_item("GUI Showcase", showcase_open()).clicked)
         {
-            m_showcase_open = !m_showcase_open;
+            m_dock->toggle_panel(gui::make_panel_id(k_showcase_panel));
         }
         gui::end_menu();
     }
     gui::end_menu_bar();
+}
+
+void OasisShell::view_menu()
+{
+    if (!gui::begin_menu("View"))
+    {
+        return;
+    }
+    if (gui::menu_item("Dashboard", dashboard_open()).clicked)
+    {
+        m_dock->set_group_open(k_dashboard_group, !dashboard_open());
+    }
+    gui::dock_menu(*m_dock);
+    gui::end_menu();
 }
 
 void OasisShell::game_menu()

@@ -58,8 +58,14 @@ struct DockResult
 [[nodiscard]] DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target, DropZone zone);
 [[nodiscard]] DockResult float_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, const Rect& rect);
 [[nodiscard]] DockResult close_panel(DockLayout& layout, const PanelTable& panels, PanelId panel);
-// Reopens at the recorded home when its sibling is open, else tabs into the first Tabs node of surface 0.
+// Reopens at the recorded home when its sibling is open, else by the panel's placement hints (see PanelDesc), else tabs into the first Tabs node of surface 0.
 [[nodiscard]] DockResult open_panel(DockLayout& layout, const PanelTable& panels, PanelId panel);
+// True when any panel registered in `group` is open.
+[[nodiscard]] bool group_open(const DockLayout& layout, const PanelTable& panels, PanelId group);
+// Opens (each at its home or hinted place) or closes every panel of the group; NoChange when none moved, NotFound when the group has no panel.
+[[nodiscard]] DockResult set_group_open(DockLayout& layout, const PanelTable& panels, PanelId group, bool open);
+// The default layout from the registered panels: every panel with initial_open, in (order, registration) order, placed by its hints on an empty layout.
+[[nodiscard]] DockLayout build_default_layout(const PanelTable& panels);
 [[nodiscard]] DockResult reorder_tab(DockLayout& layout, const PanelTable& panels, PanelId panel, uint32_t index);
 [[nodiscard]] DockResult select_tab(DockLayout& layout, int32_t node, uint32_t index);
 [[nodiscard]] DockResult set_collapsed(DockLayout& layout, const PanelTable& panels, int32_t node, bool collapsed);

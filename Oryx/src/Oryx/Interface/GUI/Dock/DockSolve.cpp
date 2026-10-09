@@ -328,6 +328,171 @@ DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, con
 namespace
 {
 
+Rect intersection(const Rect& a, const Rect& b)
+{
+    const float x0 = math::max(a.min[0], b.min[0]);
+    const float y0 = math::max(a.min[1], b.min[1]);
+    const float x1 = math::min(a.min[0] + a.size[0], b.min[0] + b.size[0]);
+    const float y1 = math::min(a.min[1] + a.size[1], b.min[1] + b.size[1]);
+    return Rect{ Vec2f(x0, y0), Vec2f(math::max(x1 - x0, 0.0f), math::max(y1 - y0, 0.0f)) };
+}
+
+bool same_subtree(const DockLayout& a, int32_t ia, const DockLayout& b, int32_t ib, uint32_t depth)
+{
+    if (ia == k_no_node || ib == k_no_node || depth > k_max_dock_nodes)
+        return ia == ib;
+    const DockNode& x = a.nodes[ia];
+    const DockNode& y = b.nodes[ib];
+    if (x.kind != y.kind)
+        return false;
+    if (x.kind == DockNodeKind::Tabs)
+    {
+        if (x.count != y.count)
+            return false;
+        for (uint32_t t = 0; t < x.count; ++t)
+            if (x.tabs[t] != y.tabs[t])
+                return false;
+        return true;
+    }
+    return x.axis == y.axis && same_subtree(a, x.first, b, y.first, depth + 1) && same_subtree(a, x.second, b, y.second, depth + 1);
+}
+
+// Sizes, ratios and selection are ignored: a drop that only rebuilds the same tree is not a move.
+bool same_arrangement(const DockLayout& a, const DockLayout& b)
+{
+    for (uint32_t s = 0; s < k_max_dock_surfaces; ++s)
+        if (!same_subtree(a, a.roots[s], b, b.roots[s], 0))
+            return false;
+    if (a.float_count != b.float_count)
+        return false;
+    for (uint32_t f = 0; f < a.float_count; ++f)
+    {
+        bool found = false;
+        for (uint32_t g = 0; g < b.float_count; ++g)
+            found = found || a.floats[f].panel == b.floats[g].panel;
+        if (!found)
+            return false;
+    }
+    return true;
+}
+
+bool floating_panel(const DockLayout& layout, PanelId panel)
+{
+    for (uint32_t f = 0; f < layout.float_count && f < k_max_dock_floats; ++f)
+        if (layout.floats[f].panel == panel)
+            return true;
+    return false;
+}
+
+bool drop_changes_nothing(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t node, DropZone zone)
+{
+    DockLayout probe = layout;
+    const DockResult result = dock_panel(probe, panels, panel, node, zone);
+    return result.reason == DockReason::NoChange || (result.applied && same_arrangement(layout, probe));
+}
+
+void add_guide(DropGuides& out, const DockLayout& layout, const PanelTable& panels, PanelId panel, DropZone zone, int32_t node, const Rect& rect)
+{
+    const DockReason reason = can_dock_into(layout, panels, panel, node);
+    // A drop that would leave the arrangement as it is (onto its own node, or beside the tree where it already sits) is not offered.
+    if (reason == DockReason::None && drop_changes_nothing(layout, panels, panel, node, zone))
+        return;
+    DropGuide& guide = out.guides[out.count++];
+    guide.zone = zone;
+    guide.node = node;
+    guide.rect = rect;
+    guide.reason = reason;
+    guide.allowed = reason == DockReason::None;
+}
+
+Rect box_at(const Vec2f& centre, float size)
+{
+    return Rect{ Vec2f(centre[0] - size * 0.5f, centre[1] - size * 0.5f), Vec2f(size, size) };
+}
+
+}
+
+DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer)
+{
+    DropGuides out;
+    const DockMetrics& metrics = solved.metrics;
+    const Rect& surface = solved.surface_rect;
+    const int32_t root = solved.surface < k_max_dock_surfaces ? layout.roots[solved.surface] : k_no_node;
+    if (!metrics.style.guides || root == k_no_node || !contains(surface, pointer) || can_dock(panels, panel) != DockReason::None)
+        return out;
+
+    const float size = metrics.guide_size;
+    const float gap = metrics.guide_gap;
+    const float band = metrics.guide_inset + size;
+    if (!(surface.size[0] >= 2.0f * band + size) || !(surface.size[1] >= 2.0f * band + size))
+        return out;
+
+    const Vec2f mid(surface.min[0] + surface.size[0] * 0.5f, surface.min[1] + surface.size[1] * 0.5f);
+    const float left = surface.min[0] + metrics.guide_inset + size * 0.5f;
+    const float right = surface.min[0] + surface.size[0] - metrics.guide_inset - size * 0.5f;
+    const float top = surface.min[1] + metrics.guide_inset + size * 0.5f;
+    const float bottom = surface.min[1] + surface.size[1] - metrics.guide_inset - size * 0.5f;
+    add_guide(out, layout, panels, panel, DropZone::Left, k_dock_root, box_at(Vec2f(left, mid[1]), size));
+    add_guide(out, layout, panels, panel, DropZone::Right, k_dock_root, box_at(Vec2f(right, mid[1]), size));
+    add_guide(out, layout, panels, panel, DropZone::Top, k_dock_root, box_at(Vec2f(mid[0], top), size));
+    add_guide(out, layout, panels, panel, DropZone::Bottom, k_dock_root, box_at(Vec2f(mid[0], bottom), size));
+
+    int32_t hit = k_no_node;
+    for (uint32_t n = 0; n < solved.node_count; ++n)
+        if (layout.nodes[n].kind == DockNodeKind::Tabs && contains(solved.nodes[n].rect, pointer))
+        {
+            hit = static_cast<int32_t>(n);
+            break;
+        }
+    if (hit == k_no_node)
+        return out;
+
+    const SolvedNode& node = solved.nodes[hit];
+    const Rect body = node.body.size[0] > 0.0f && node.body.size[1] > 0.0f ? node.body : node.rect;
+    const Rect inner{ Vec2f(surface.min[0] + band, surface.min[1] + band), Vec2f(surface.size[0] - 2.0f * band, surface.size[1] - 2.0f * band) };
+    const Rect area = intersection(body, inner);
+    const float cluster = 3.0f * size + 2.0f * gap;
+    const Vec2f centre(area.min[0] + area.size[0] * 0.5f, area.min[1] + area.size[1] * 0.5f);
+    if (area.size[0] >= cluster && area.size[1] >= cluster)
+    {
+        const float step = size + gap;
+        add_guide(out, layout, panels, panel, DropZone::Left, hit, box_at(Vec2f(centre[0] - step, centre[1]), size));
+        add_guide(out, layout, panels, panel, DropZone::Right, hit, box_at(Vec2f(centre[0] + step, centre[1]), size));
+        add_guide(out, layout, panels, panel, DropZone::Top, hit, box_at(Vec2f(centre[0], centre[1] - step), size));
+        add_guide(out, layout, panels, panel, DropZone::Bottom, hit, box_at(Vec2f(centre[0], centre[1] + step), size));
+    }
+    if (area.size[0] >= size && area.size[1] >= size && !floating_panel(layout, panel))
+        add_guide(out, layout, panels, panel, DropZone::Centre, hit, box_at(centre, size));
+    return out;
+}
+
+int32_t guide_at(const DropGuides& guides, const Vec2f& pointer)
+{
+    for (uint32_t i = 0; i < guides.count; ++i)
+        if (contains(guides.guides[i].rect, pointer))
+            return static_cast<int32_t>(i);
+    return -1;
+}
+
+Rect guide_glyph(const Rect& guide, DropZone zone)
+{
+    const float pad = guide.size[0] * 0.2f;
+    const Vec2f min(guide.min[0] + pad, guide.min[1] + pad);
+    const Vec2f size(guide.size[0] - 2.0f * pad, guide.size[1] - 2.0f * pad);
+    switch (zone)
+    {
+    case DropZone::Left: return Rect{ min, Vec2f(size[0] * 0.5f, size[1]) };
+    case DropZone::Right: return Rect{ Vec2f(min[0] + size[0] * 0.5f, min[1]), Vec2f(size[0] * 0.5f, size[1]) };
+    case DropZone::Top: return Rect{ min, Vec2f(size[0], size[1] * 0.5f) };
+    case DropZone::Bottom: return Rect{ Vec2f(min[0], min[1] + size[1] * 0.5f), Vec2f(size[0], size[1] * 0.5f) };
+    case DropZone::Centre: break;
+    }
+    return Rect{ Vec2f(min[0] + size[0] * 0.2f, min[1] + size[1] * 0.2f), Vec2f(size[0] * 0.6f, size[1] * 0.6f) };
+}
+
+namespace
+{
+
 int32_t tab_node_of(const DockLayout& layout, PanelId panel)
 {
     for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
@@ -411,6 +576,31 @@ DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const 
     const bool inside = contains(solved.surface_rect, pointer);
     if (!float_only && inside)
     {
+        // A guide over a strip still wins, so the compass is never half-hidden by tabs.
+        const DropGuides guides = drop_guides(layout, panels, solved, panel, pointer);
+        const int32_t hovered = guide_at(guides, pointer);
+        if (hovered >= 0)
+        {
+            const DropGuide& guide = guides.guides[hovered];
+            DropPlan plan;
+            plan.guide = hovered;
+            if (guide.node == source && source != k_no_node && (guide.zone == DropZone::Centre || layout.nodes[source].count == 1))
+                return plan;
+            if (!guide.allowed)
+            {
+                plan = refused(guide.reason, guide.node, guide.zone);
+                plan.guide = hovered;
+                return plan;
+            }
+            plan.action = DropAction::Dock;
+            plan.node = guide.node;
+            plan.zone = guide.zone;
+            const Rect& whole = guide.node == k_dock_root ? solved.surface_rect : solved.nodes[guide.node].rect;
+            plan.preview = guide.zone == DropZone::Centre ? whole : edge_preview(whole, guide.zone, solved.metrics);
+            plan.slot = guide.node != k_dock_root ? layout.nodes[guide.node].count : 0u;
+            return plan;
+        }
+
         if (source != k_no_node && contains(solved.nodes[source].strip, pointer))
         {
             const DockReason reason = can_reorder(panels, panel);
@@ -443,6 +633,8 @@ DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const 
             const DockReason reason = can_dock_into(layout, panels, panel, target.node);
             if (reason != DockReason::None)
                 return refused(reason, target.node, target.zone);
+            if (drop_changes_nothing(layout, panels, panel, target.node, target.zone) && !contains(solved.nodes[target.node != k_dock_root ? target.node : 0].strip, pointer))
+                return DropPlan{};
             DropPlan plan;
             plan.action = DropAction::Dock;
             plan.node = target.node;

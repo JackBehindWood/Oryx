@@ -228,6 +228,43 @@ DockReason insert_panel(DockLayout& layout, PanelId panel, int32_t target, DropZ
     return DockReason::None;
 }
 
+void fix_new_split(DockLayout& layout, PanelId panel, DropZone zone, float points)
+{
+    if (!(points > 0.0f))
+        return;
+    const Location at = locate(layout, panel);
+    const int32_t parent = at.where == Where::InTabs ? parent_of(layout, at.node) : k_no_node;
+    if (parent < 0)
+        return;
+    DockNode& split = layout.nodes[parent];
+    split.mode = (zone == DropZone::Left || zone == DropZone::Top) ? DockSizeMode::FixedFirst : DockSizeMode::FixedSecond;
+    split.points = points;
+}
+
+// Never mutates on failure; the sibling-open check of a home is the caller's.
+DockReason place_by_hints(DockLayout& layout, const PanelDesc& desc)
+{
+    if (is_valid(desc.dock_tabbed_with))
+    {
+        const Location with = locate(layout, desc.dock_tabbed_with);
+        if (with.where == Where::InTabs && insert_panel(layout, desc.id, with.node, DropZone::Centre) == DockReason::None)
+            return DockReason::None;
+    }
+    const DropZone side = desc.dock_side == DropZone::Centre ? DropZone::Right : desc.dock_side;
+    const Location near = locate(layout, desc.dock_near);
+    int32_t target = k_no_node;
+    if (is_valid(desc.dock_near) && near.where == Where::InTabs)
+        target = near.node;
+    else if (is_valid(desc.dock_near) || desc.dock_size > 0.0f)
+        target = layout.roots[0];
+    if (target == k_no_node)
+        return DockReason::TargetInvalid;
+    const DockReason placed = insert_panel(layout, desc.id, target, side);
+    if (placed == DockReason::None)
+        fix_new_split(layout, desc.id, side, desc.dock_size);
+    return placed;
+}
+
 DockHome make_home(const DockLayout& layout, PanelId panel, const Location& at)
 {
     DockHome home;
@@ -731,16 +768,26 @@ DockResult open_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
     if (at.where == Where::InClosed)
         remove_closed(work, at.index);
 
+    const PanelDesc& desc = *find_panel(panels, panel);
+    const bool tab_anchor_open = is_valid(desc.dock_tabbed_with) && locate(work, desc.dock_tabbed_with).where == Where::InTabs;
     DockReason placed = DockReason::TargetInvalid;
     for (uint32_t h = 0; h < work.home_count && placed != DockReason::None; ++h)
     {
         const DockHome& home = work.homes[h];
-        if (home.panel != panel || !is_valid(home.sibling))
+        // A split home loses to the tab stack the panel asks to join, so a family stays together.
+        if (home.panel != panel || !is_valid(home.sibling) || (tab_anchor_open && home.zone != DropZone::Centre))
             continue;
         const Location sibling = locate(work, home.sibling);
         if (sibling.where == Where::InTabs)
+        {
             placed = insert_panel(work, panel, sibling.node, home.zone);
+            if (placed == DockReason::None && home.zone != DropZone::Centre)
+                fix_new_split(work, panel, home.zone, desc.dock_size);
+        }
     }
+
+    if (placed != DockReason::None && work.roots[0] != k_no_node)
+        placed = place_by_hints(work, desc);
 
     if (placed != DockReason::None)
     {
@@ -761,6 +808,37 @@ DockResult open_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
         return refuse(placed);
 
     normalize(work);
+    layout = work;
+    return accept();
+}
+
+bool group_open(const DockLayout& layout, const PanelTable& panels, PanelId group)
+{
+    for (uint32_t i = 0; i < panels.count && i < k_max_panels; ++i)
+        if (panels.descs[i].group == group && is_open(layout, panels.descs[i].id))
+            return true;
+    return false;
+}
+
+DockResult set_group_open(DockLayout& layout, const PanelTable& panels, PanelId group, bool open)
+{
+    if (!is_valid(group))
+        return refuse(DockReason::BadArgument);
+    DockLayout work = layout;
+    bool any = false;
+    bool found = false;
+    for (uint32_t i = 0; i < panels.count && i < k_max_panels; ++i)
+    {
+        const PanelDesc& desc = panels.descs[i];
+        if (desc.group != group)
+            continue;
+        found = true;
+        any = (open ? open_panel(work, panels, desc.id) : close_panel(work, panels, desc.id)).applied || any;
+    }
+    if (!found)
+        return refuse(DockReason::NotFound);
+    if (!any)
+        return refuse(DockReason::NoChange);
     layout = work;
     return accept();
 }
@@ -1068,6 +1146,24 @@ bool redo(LayoutHistory& history, DockLayout& out)
     ++history.cursor;
     out = history.snapshots[(history.oldest + history.cursor) % k_dock_history_size];
     return true;
+}
+
+DockLayout build_default_layout(const PanelTable& panels)
+{
+    DockLayout layout;
+    uint32_t order[k_max_panels] = {};
+    const uint32_t count = panels.count < k_max_panels ? panels.count : k_max_panels;
+    for (uint32_t i = 0; i < count; ++i)
+        order[i] = i;
+    std::stable_sort(order, order + count, [&panels](uint32_t a, uint32_t b) { return panels.descs[a].order < panels.descs[b].order; });
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const PanelDesc& desc = panels.descs[order[i]];
+        if (desc.initial_open)
+            static_cast<void>(open_panel(layout, panels, desc.id));
+    }
+    normalize(layout);
+    return layout;
 }
 
 }

@@ -6,10 +6,11 @@
 namespace oryx
 {
 
-// The views a panel shows, in display order.
+// The views a panel shows, in display order; panels[i] is the dock panel name of views[i] ("view/<id>").
 struct DashboardPanelState
 {
     std::vector<UniquePtr<IDashboardView>> views;
+    std::vector<std::string> panels;
 };
 
 // Creates the registered views named by `view_ids`; an unknown id is logged and skipped.

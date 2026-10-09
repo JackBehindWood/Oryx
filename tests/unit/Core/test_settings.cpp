@@ -368,6 +368,39 @@ TEST_CASE("graphics settings read their keys and reject bad values")
     CHECK(key_from_name("") == KeyCode::Unknown);
     reset_settings();
 }
+
+TEST_CASE("gui settings default, read the layout file and dock look-and-feel and reject bad choices")
+{
+    reset_settings();
+    const GuiSettings& defaults = settings_of<GuiSettings>();
+    CHECK(defaults.layout_file == std::filesystem::path("gui-layout.yaml"));
+    CHECK(defaults.dock.toolbars);
+    CHECK(defaults.dock.toolbar_placement == gui::ToolbarPlacement::Auto);
+    CHECK(defaults.dock.tab_position == gui::TabPosition::Top);
+    CHECK(defaults.dock.close_buttons == gui::CloseButtons::Always);
+    CHECK_FALSE(defaults.dock.compact);
+    CHECK(defaults.dock.preview_opacity == doctest::Approx(1.0f));
+    CHECK(defaults.dock.guides);
+    CHECK(defaults.dock.drop_flash);
+
+    TempDir dir;
+    load_from(dir.write("l.yaml", "gui:\n  layout_file: layouts/mine.yaml\n"));
+    CHECK(settings_of<GuiSettings>().layout_file == (dir.path() / "layouts/mine.yaml").lexically_normal());
+
+    load_from(dir.write("s.yaml", "gui:\n  dock_toolbars: false\n  dock_toolbar_placement: below_tabs\n  dock_tab_position: bottom\n  dock_close_buttons: on_hover\n  dock_compact: true\n  dock_preview_opacity: 40\n  dock_guides: false\n  dock_drop_flash: false\n"));
+    const GuiSettings& styled = settings_of<GuiSettings>();
+    CHECK_FALSE(styled.dock.toolbars);
+    CHECK(styled.dock.toolbar_placement == gui::ToolbarPlacement::BelowTabs);
+    CHECK(styled.dock.tab_position == gui::TabPosition::Bottom);
+    CHECK(styled.dock.close_buttons == gui::CloseButtons::OnHover);
+    CHECK(styled.dock.compact);
+    CHECK(styled.dock.preview_opacity == doctest::Approx(0.4f));
+    CHECK_FALSE(styled.dock.guides);
+    CHECK_FALSE(styled.dock.drop_flash);
+    CHECK_THROWS_AS(load_from(dir.write("b.yaml", "gui:\n  dock_tab_position: left\n")), SettingsError);
+    CHECK_THROWS_AS(load_from(dir.write("o.yaml", "gui:\n  dock_preview_opacity: 101\n")), SettingsError);
+    reset_settings();
+}
 #endif
 
 TEST_CASE("dashboard settings default to off, read their keys and reject non-positive sizes")
@@ -375,25 +408,16 @@ TEST_CASE("dashboard settings default to off, read their keys and reject non-pos
     reset_settings();
     const DashboardSettings& defaults = settings_of<DashboardSettings>();
     CHECK_FALSE(defaults.enabled);
-    CHECK(defaults.panel_width == 360);
     CHECK(defaults.history == 256);
     CHECK(defaults.views == std::vector<std::string>{ "probabilities", "values" });
-    CHECK(defaults.layout_file == std::filesystem::path("dashboard-layout.yaml"));
 
     TempDir dir;
-    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  panel_width: 420\n  history: 64\n  views: [values]\n"));
+    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  history: 64\n  views: [values]\n"));
     const DashboardSettings& dashboard = settings_of<DashboardSettings>();
     CHECK(dashboard.enabled);
-    CHECK(dashboard.panel_width == 420);
     CHECK(dashboard.history == 64);
     CHECK(dashboard.views == std::vector<std::string>{ "values" });
-    CHECK(dashboard.layout_file == (dir.path() / "dashboard-layout.yaml").lexically_normal());
 
-    load_from(dir.write("l.yaml", "dashboard:\n  layout_file: layouts/mine.yaml\n"));
-    CHECK(settings_of<DashboardSettings>().layout_file == (dir.path() / "layouts/mine.yaml").lexically_normal());
-    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  panel_width: 420\n  history: 64\n  views: [values]\n"));
-
-    CHECK_THROWS_AS(load_from(dir.write("w.yaml", "dashboard:\n  panel_width: 0\n")), SettingsError);
     CHECK_THROWS_AS(load_from(dir.write("h.yaml", "dashboard:\n  history: -4\n")), SettingsError);
 
     int32_t calls = 0;

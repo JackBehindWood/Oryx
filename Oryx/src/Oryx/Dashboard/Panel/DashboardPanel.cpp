@@ -16,6 +16,7 @@ DashboardPanelState make_panel_state(const std::vector<std::string>& view_ids)
             continue;
         }
         state.views.push_back(std::move(view));
+        state.panels.push_back("view/" + id);
     }
     return state;
 }

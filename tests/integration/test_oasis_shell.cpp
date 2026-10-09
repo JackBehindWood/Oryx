@@ -18,6 +18,35 @@ namespace
 
 constexpr Vec2f k_window = { 800.0f, 600.0f };
 
+// Points the GUI's layout file at a scratch directory so no test reads or writes the real one.
+struct LayoutFile
+{
+    LayoutFile()
+    {
+        std::filesystem::remove_all(dir);
+        std::filesystem::create_directories(dir);
+        update_settings<GuiSettings>([this](GuiSettings& settings) { settings.layout_file = file(); });
+    }
+
+    ~LayoutFile()
+    {
+        reset_settings();
+        std::filesystem::remove_all(dir);
+    }
+
+    [[nodiscard]] std::filesystem::path file() const { return dir / "layout.yaml"; }
+
+    [[nodiscard]] std::string text() const
+    {
+        std::ifstream in(file());
+        return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+
+    void write(const std::string& content) const { std::ofstream(file()) << content; }
+
+    std::filesystem::path dir = std::filesystem::temp_directory_path() / "oryx_oasis_shell_test";
+};
+
 // Declared before the Application so the device outlives the layers that hold RHI resources.
 struct RendererScope
 {
@@ -49,10 +78,16 @@ public:
 
 struct ShellRig
 {
-    ShellRig(oasis::DashboardFlag flag, const std::string& game, const std::string& opponent)
+    LayoutFile layout_file;
+
+    ShellRig(oasis::DashboardFlag flag, const std::string& game, const std::string& opponent, const std::string& layout_text = std::string())
         : renderer(RHIBackend::Null)
         , app({ 0, nullptr })
     {
+        if (!layout_text.empty())
+        {
+            layout_file.write(layout_text);
+        }
         window = static_cast<NullWindow*>(&app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", static_cast<int32_t>(k_window[0]), static_cast<int32_t>(k_window[1]) })));
         graphics = &app.push_overlay<GraphicsLayer>();
         simulation = &app.push_layer<SimulationLayer>();
@@ -139,6 +174,8 @@ struct ShellRig
 
     [[nodiscard]] const ViewRegion& board_region() const { return graphics->router().view(k_main_view); }
 
+    [[nodiscard]] bool panel_open(std::string_view name) const { return gui::is_open(shell->layout(), gui::make_panel_id(name)); }
+
     RendererScope renderer;
     Application app;
     NullWindow* window = nullptr;
@@ -152,16 +189,16 @@ struct ShellRig
 
 } // namespace
 
-TEST_CASE("OasisShell hands the board the area its side panel leaves")
+TEST_CASE("OasisShell hands the board the viewport panel's rect, which the views beside it narrow")
 {
     {
         ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
         rig.frames(3);
-        const float panel = static_cast<float>(settings_of<DashboardSettings>().panel_width);
-        CHECK(rig.board_region().size[0] == doctest::Approx(k_window[0] - panel));
+        CHECK(rig.board_region().size[0] < k_window[0]);
+        CHECK(rig.board_region().size[0] > 0.0f);
         CHECK(rig.board_region().min[1] > 0.0f);
         CHECK(rig.board_region().min[1] + rig.board_region().size[1] == doctest::Approx(k_window[1]));
-        CHECK(rig.probe.size[0] == doctest::Approx(k_window[0] - panel));
+        CHECK(rig.probe.size[0] == doctest::Approx(rig.board_region().size[0]));
     }
     ShellRig rig(oasis::DashboardFlag::Off, "hexapawn", selection::k_human_opponent);
     rig.frames(3);
@@ -170,6 +207,7 @@ TEST_CASE("OasisShell hands the board the area its side panel leaves")
 
 TEST_CASE("OasisShell starts with the dashboard the flag or the setting asks for")
 {
+    LayoutFile layout_file;
     InputRouter router;
     CHECK_FALSE(oasis::OasisShell(router, oasis::DashboardFlag::Default).dashboard_open());
     CHECK(oasis::OasisShell(router, oasis::DashboardFlag::On).dashboard_open());
@@ -179,7 +217,6 @@ TEST_CASE("OasisShell starts with the dashboard the flag or the setting asks for
     CHECK(oasis::OasisShell(router, oasis::DashboardFlag::Default).dashboard_open());
     CHECK(oasis::OasisShell(router, oasis::DashboardFlag::On).dashboard_open());
     CHECK_FALSE(oasis::OasisShell(router, oasis::DashboardFlag::Off).dashboard_open());
-    reset_settings();
 }
 
 TEST_CASE("OasisShell: a click on the panel never reaches the board, a click on the board does")
@@ -244,25 +281,111 @@ TEST_CASE("OasisShell: the View menu hides and shows the dashboard and the board
     CHECK(rig.board_region().size[0] == doctest::Approx(with_panel));
 }
 
-TEST_CASE("OasisShell: Help opens the GUI showcase in the dashboard's place")
+TEST_CASE("OasisShell: Help opens the GUI showcase as a docked panel beside the views")
 {
     ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
     rig.frames(3);
     const float with_panel = rig.board_region().size[0];
+    CHECK_FALSE(rig.shell->showcase_open());
 
     rig.click_text("Help");
     rig.frames(2);
     rig.click_text("GUI Showcase");
     rig.frames(3);
     CHECK(rig.shell->showcase_open());
-    CHECK(rig.board_region().size[0] == doctest::Approx(k_window[0] * 0.5f));
-    CHECK(rig.board_region().size[0] < with_panel);
+    CHECK(rig.panel_open("view/gui-showcase"));
+    CHECK(rig.board_region().size[0] == doctest::Approx(with_panel));
 
     rig.click_text("Help");
     rig.frames(2);
     rig.click_text("GUI Showcase");
     rig.frames(3);
     CHECK_FALSE(rig.shell->showcase_open());
+}
+
+TEST_CASE("OasisShell: Reset layout restores the default and Undo layout takes back the last change")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    rig.frames(3);
+    const gui::DockLayout initial = rig.shell->layout();
+
+    rig.click_text("Help");
+    rig.frames(2);
+    rig.click_text("GUI Showcase");
+    rig.frames(4);
+    REQUIRE(rig.shell->showcase_open());
+
+    rig.click_text("View");
+    rig.frames(2);
+    rig.click_text("Undo layout");
+    rig.frames(4);
+    CHECK_FALSE(rig.shell->showcase_open());
+    CHECK(gui::equal(rig.shell->layout(), initial));
+
+    rig.click_text("View");
+    rig.frames(2);
+    rig.click_text("Redo layout");
+    rig.frames(4);
+    CHECK(rig.shell->showcase_open());
+
+    rig.click_text("View");
+    rig.frames(2);
+    rig.click_text("Reset layout");
+    rig.frames(4);
+    CHECK_FALSE(rig.shell->showcase_open());
+    CHECK(gui::equal(rig.shell->layout(), initial));
+}
+
+TEST_CASE("OasisShell: the Panels menu lists the dock panels and reopens a closed one")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    rig.frames(3);
+    rig.click_text("View");
+    rig.frames(2);
+    rig.click_text("Panels  >");
+    rig.frames(2);
+    REQUIRE(rig.has_text("GUI Showcase"));
+    rig.click_text("GUI Showcase");
+    rig.frames(3);
+    CHECK(rig.panel_open("view/gui-showcase"));
+}
+
+TEST_CASE("OasisShell: autosave writes the layout after a change and a flag override alone writes nothing")
+{
+    {
+        ShellRig rig(oasis::DashboardFlag::Off, "hexapawn", selection::k_human_opponent);
+        rig.frames(60);
+        CHECK_FALSE(std::filesystem::exists(rig.layout_file.file()));
+        CHECK_FALSE(rig.shell->dashboard_open());
+
+        rig.click_text("Help");
+        rig.frames(2);
+        rig.click_text("GUI Showcase");
+        rig.frames(60);
+        CHECK(std::filesystem::exists(rig.layout_file.file()));
+        CHECK(rig.layout_file.text().find("gui-showcase") != std::string::npos);
+    }
+}
+
+TEST_CASE("OasisShell: a layout file from a newer build is never overwritten")
+{
+    const std::string newer = "version: 99\nsurfaces: []\n";
+    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent, newer);
+    rig.frames(3);
+    rig.click_text("Help");
+    rig.frames(2);
+    rig.click_text("GUI Showcase");
+    rig.frames(60);
+    CHECK(rig.shell->showcase_open());
+    CHECK(rig.layout_file.text() == newer);
+}
+
+TEST_CASE("OasisShell: a corrupt layout file is set aside and the default layout is used")
+{
+    ShellRig rig(oasis::DashboardFlag::Default, "hexapawn", selection::k_human_opponent, "version: 1\nsurfaces: nope\n");
+    rig.frames(3);
+    CHECK(std::filesystem::exists(std::filesystem::path(rig.layout_file.file()) += ".bad"));
+    CHECK(rig.panel_open("viewport/0"));
 }
 
 TEST_CASE("OasisShell: switching asks first once a move was played, and Cancel keeps the match")
@@ -302,8 +425,13 @@ TEST_CASE("OasisShell: confirming a switch starts the new match with a new board
     }
     REQUIRE(rig.layer->match_in_progress());
     rig.frames(20);
+    for (SpaceId space = 0; space < 9 && rig.shell->feed().size() < 2; ++space)
+    {
+        rig.click_at(rig.cell(space));
+        rig.frames(10);
+    }
     const size_t before = rig.shell->feed().size();
-    REQUIRE(before > 0);
+    REQUIRE(before > 1);
     const size_t clients = rig.graphics->client_count();
 
     rig.click_text("Game");
@@ -352,6 +480,7 @@ TEST_CASE("OasisShell: the chrome lists the menus and a warm frame allocates not
 {
     test::FakeFontSource* source = nullptr;
     Font font = test::make_fake_font(source);
+    LayoutFile layout_file;
     PolledInput input;
     InputRouter router;
     oasis::OasisShell shell(router, oasis::DashboardFlag::On);

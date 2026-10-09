@@ -111,3 +111,6 @@ resources/compiled/
 # Compiled shaders are derived per build
 Oasis/resources/compiled/shader/
 Oasis/resources/compiled/shadermap/
+
+# Dock layout written next to the working directory by a run
+gui-layout.yaml

@@ -22,13 +22,11 @@ int32_t at_least_one(const SettingsNode& node, std::string_view key, int32_t fal
 void read_settings(DashboardSettings& settings, const SettingsNode& node)
 {
     settings.enabled = node.boolean("enabled", settings.enabled);
-    settings.panel_width = at_least_one(node, "panel_width", settings.panel_width);
     settings.history = at_least_one(node, "history", settings.history);
     if (node.has("views"))
     {
         settings.views = node.strings("views");
     }
-    settings.layout_file = node.path("layout_file", settings.layout_file);
 }
 
 } // namespace oryx

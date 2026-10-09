@@ -9,6 +9,8 @@ namespace oryx::gui
 namespace
 {
 
+constexpr float k_landing_flash_seconds = 0.6f;
+
 constexpr float k_close_size = 14.0f;
 
 PanelHostState& host_of(GuiContext& ctx) { return ctx.panel_host(); }
@@ -152,14 +154,17 @@ bool place_body(GuiContext& ctx, PanelHostState& h, PanelId id, const Rect& body
     if (desc->kind == PanelKind::Viewport || is_empty(body))
         return false;
     const GuiTheme& theme = ctx.gui_theme();
-    open_fill(ctx, h, body, theme.panel, theme.panel.background, false, channel);
-    if (h.focused == id)
+    if (!desc->foreign_body)
     {
-        BoxPaint& paint = ctx.layout().current().paint;
-        paint.border_width = 1.0f;
-        paint.border = theme.panel.accent;
+        open_fill(ctx, h, body, theme.panel, theme.panel.background, false, channel);
+        if (h.focused == id)
+        {
+            BoxPaint& paint = ctx.layout().current().paint;
+            paint.border_width = 1.0f;
+            paint.border = theme.panel.accent;
+        }
+        ctx.end_box();
     }
-    ctx.end_box();
     IdScope scope(ctx, ctx.index_id(id.hash));
     return ctx.item(ctx.id("body"), body).pressed;
 }
@@ -402,6 +407,9 @@ void draw_grips(GuiContext& ctx, PanelHostState& h, uint32_t f)
 void draw_float(GuiContext& ctx, PanelHostState& h, uint32_t f, PanelId& pending_close, PanelId& pending_raise)
 {
     const PanelId id = h.layout->floats[f].panel;
+    h.float_rects[f] = h.solved.floats[f];
+    h.float_panels[f] = id;
+    h.float_count = f + 1;
     const PanelDesc* desc = find_panel(h.panels, id);
     if (desc == nullptr)
     {
@@ -508,6 +516,83 @@ Rect target_rect(const PanelHostState& h, const DropPlan& plan)
     return {};
 }
 
+void reason_label(GuiContext& ctx, const PanelHostState& h, const Vec2f& at, DockReason reason)
+{
+    const ImStyle& note_style = ctx.gui_theme().overlay;
+    LayoutStyle label = placed(h, Rect{ at, Vec2f(0.0f, 0.0f) }, k_channel_drag);
+    label.width = fit();
+    label.height = fit();
+    label.padding = note_style.padding;
+    const uint32_t label_index = ctx.begin_box(ImId{}, label);
+    BoxPaint& label_paint = ctx.layout().node(label_index).paint;
+    im::paint_surface(label_paint, note_style, note_style.background);
+    label_paint.text = ctx.arena().store(to_string(reason));
+    label_paint.text_height = note_style.text_height;
+    label_paint.text_colour = note_style.text;
+    ctx.end_box();
+}
+
+Colour faded(Colour colour, float factor)
+{
+    colour.a *= factor;
+    return colour;
+}
+
+void draw_guides(GuiContext& ctx, const PanelHostState& h, const DropGuides& guides)
+{
+    const GuiTheme& theme = ctx.gui_theme();
+    const Colour accent = theme.panel.accent;
+    for (uint32_t i = 0; i < guides.count; ++i)
+    {
+        const DropGuide& guide = guides.guides[i];
+        const bool hovered = static_cast<int32_t>(i) == h.drag.plan.guide;
+        const float alpha = guide.allowed ? 1.0f : k_disabled_alpha;
+        overlay(ctx, h, guide.rect, faded(hovered ? theme.dock_guide_hover : theme.dock_guide, alpha), faded(accent, alpha), 1.0f);
+        const Colour glyph = hovered ? theme.overlay.background : accent;
+        overlay(ctx, h, guide_glyph(guide.rect, guide.zone), faded(glyph, alpha), Colour{ 0.0f, 0.0f, 0.0f, 0.0f }, 0.0f);
+    }
+    const int32_t hovered = h.drag.plan.guide;
+    if (hovered >= 0 && static_cast<uint32_t>(hovered) < guides.count && !guides.guides[hovered].allowed)
+    {
+        const Rect& rect = guides.guides[hovered].rect;
+        reason_label(ctx, h, Vec2f(rect.min[0], rect.min[1] + rect.size[1] + 2.0f), guides.guides[hovered].reason);
+    }
+}
+
+const Rect* landed_rect(const PanelHostState& h)
+{
+    for (uint32_t n = 0; n < h.solved.node_count; ++n)
+    {
+        const DockNode& node = h.layout->nodes[n];
+        for (uint32_t t = 0; node.kind == DockNodeKind::Tabs && t < node.count; ++t)
+            if (node.tabs[t] == h.landed)
+                return &h.solved.nodes[n].rect;
+    }
+    for (uint32_t f = 0; f < h.solved.float_count; ++f)
+        if (h.layout->floats[f].panel == h.landed)
+            return &h.solved.floats[f];
+    return nullptr;
+}
+
+// A fading accent frame on the panel that just docked, its tab stack or float.
+void draw_landing_flash(GuiContext& ctx, PanelHostState& h)
+{
+    // The drop that set it also reshaped the layout after this frame's solve, so the flash starts next frame.
+    if (!is_valid(h.landed) || h.result.landed == h.landed)
+        return;
+    h.landed_age += ctx.delta_time();
+    const float t = h.landed_age / k_landing_flash_seconds;
+    const Rect* rect = landed_rect(h);
+    if (t >= 1.0f || rect == nullptr || !h.options.style.drop_flash)
+    {
+        h.landed = PanelId{};
+        return;
+    }
+    const Colour accent = ctx.gui_theme().panel.accent;
+    const float fade = 1.0f - t;
+    overlay(ctx, h, *rect, faded(accent, 0.22f * fade), faded(accent, fade), 2.0f);
+}
+
 void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
 {
     const DragState& d = h.drag;
@@ -518,6 +603,8 @@ void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
     preview.a *= h.options.style.preview_opacity;
     overlay(ctx, h, plan.preview, preview, accent, 1.0f);
     overlay(ctx, h, plan.marker, accent, accent, 0.0f);
+    if (plan.action != DropAction::Float && !ctx.input().keys.shift)
+        draw_guides(ctx, h, drop_guides(*h.layout, h.panels, h.solved, d.panel, ctx.input().pointer.position));
 
     const bool refused = plan.action == DropAction::Cancel && plan.reason != DockReason::TargetInvalid && plan.reason != DockReason::NotFound;
     if (refused)
@@ -545,26 +632,15 @@ void draw_drag_feedback(GuiContext& ctx, PanelHostState& h)
     paint.text_colour = style.text;
     paint.ellipsis = true;
     ctx.end_box();
-    if (!refused)
-        return;
-    const ImStyle& note_style = theme.overlay;
-    LayoutStyle label = placed(h, Rect{ Vec2f(at[0], at[1] + ghost.size[1] + 2.0f), Vec2f(0.0f, 0.0f) }, k_channel_drag);
-    label.width = fit();
-    label.height = fit();
-    label.padding = note_style.padding;
-    const uint32_t label_index = ctx.begin_box(ImId{}, label);
-    BoxPaint& label_paint = ctx.layout().node(label_index).paint;
-    im::paint_surface(label_paint, note_style, note_style.background);
-    label_paint.text = ctx.arena().store(to_string(plan.reason));
-    label_paint.text_height = note_style.text_height;
-    label_paint.text_colour = note_style.text;
-    ctx.end_box();
+    if (refused && plan.guide < 0)
+        reason_label(ctx, h, Vec2f(at[0], at[1] + ghost.size[1] + 2.0f), plan.reason);
 }
 
 void apply_drop(PanelHostState& h, const DragState& d)
 {
     DockLayout& layout = *h.layout;
     const DropPlan& plan = d.plan;
+    const DockLayout before = layout;
     if (plan.action == DropAction::Reorder)
     {
         note(h, reorder_tab(layout, h.panels, d.panel, plan.slot));
@@ -579,6 +655,12 @@ void apply_drop(PanelHostState& h, const DragState& d)
     else if (plan.action == DropAction::Float)
     {
         note(h, float_panel(layout, h.panels, d.panel, plan.preview));
+    }
+    if (!equal(before, layout))
+    {
+        h.landed = d.panel;
+        h.landed_age = 0.0f;
+        h.result.landed = d.panel;
     }
 }
 
@@ -747,6 +829,7 @@ void draw_host(GuiContext& ctx, PanelHostState& h)
     ctx.pop_id();
     ctx.pop_id();
     update_drag(ctx, h);
+    draw_landing_flash(ctx, h);
     if (is_valid(pending_raise))
         raise_float(h, pending_raise);
     if (is_valid(pending_close))
@@ -764,6 +847,14 @@ bool register_panel(std::string_view name, const PanelOptions& options)
     desc->flags = PanelFlags{ flags_of(options) };
     desc->toolbar = options.toolbar;
     desc->toolbar_placement = options.toolbar_placement;
+    desc->foreign_body = options.foreign_body;
+    desc->dock_near = options.dock_near.empty() ? PanelId{} : make_panel_id(options.dock_near);
+    desc->dock_tabbed_with = options.dock_tabbed_with.empty() ? PanelId{} : make_panel_id(options.dock_tabbed_with);
+    desc->group = options.group.empty() ? PanelId{} : make_panel_id(options.group);
+    desc->dock_side = options.dock_side;
+    desc->dock_size = options.dock_size;
+    desc->order = options.order;
+    desc->initial_open = options.initial_open;
     return true;
 }
 
@@ -798,6 +889,7 @@ void begin_panel_host(DockLayout& layout, const PanelHostOptions& options)
     h.body_count = 0;
     h.current_body = -1;
     h.toolbar_open = false;
+    h.float_count = 0;
     h.solved.node_count = 0;
     keep_valid(h, layout);
     if (!h.history_seeded)
@@ -915,6 +1007,26 @@ Rect viewport_rect(std::string_view name)
 {
     const PanelBody* body = find_body(host_of(context()), make_panel_id(name));
     return body != nullptr && body->viewport ? body->rect : Rect{};
+}
+
+Rect panel_rect(std::string_view name)
+{
+    const PanelBody* body = find_body(host_of(context()), make_panel_id(name));
+    return body != nullptr ? body->rect : Rect{};
+}
+
+bool panel_occluded(std::string_view name, const Vec2f& point)
+{
+    const PanelHostState& h = host_of(context());
+    const PanelId id = make_panel_id(name);
+    uint32_t above = 0;
+    for (uint32_t f = 0; f < h.float_count; ++f)
+        if (h.float_panels[f] == id)
+            above = f + 1;
+    for (uint32_t f = above; f < h.float_count; ++f)
+        if (contains(h.float_rects[f], point))
+            return true;
+    return false;
 }
 
 PanelHostResult panel_host_result()

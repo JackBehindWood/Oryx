@@ -88,6 +88,10 @@ GuiTheme build(const Seed& seed)
     theme.min_hit_size = 18.0f;
     theme.dock_preview = theme.panel.accent;
     theme.dock_preview.a = 0.28f;
+    theme.dock_guide = theme.overlay.background;
+    theme.dock_guide.a = 0.88f;
+    theme.dock_guide_hover = theme.panel.accent;
+    theme.dock_guide_hover.a = 0.95f;
     return theme;
 }
 

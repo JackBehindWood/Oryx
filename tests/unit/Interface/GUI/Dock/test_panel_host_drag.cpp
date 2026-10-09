@@ -295,3 +295,103 @@ TEST_CASE("panel host drag: a panel toolbar is offered only when reserved and th
     CHECK_FALSE(a_toolbar);
     CHECK(is_empty(panel_toolbar_rect("a")));
 }
+
+namespace
+{
+
+const DropGuide* find_guide(const DropGuides& guides, int32_t node, DropZone zone)
+{
+    for (uint32_t i = 0; i < guides.count; ++i)
+        if (guides.guides[i].node == node && guides.guides[i].zone == zone)
+            return &guides.guides[i];
+    return nullptr;
+}
+
+}
+
+TEST_CASE("panel host drag: dropping on a compass guide docks exactly like dock_panel and the hovered guide is reported")
+{
+    DragScene scene;
+    const Rect vp_body = scene.solved().nodes[2].body;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(vp_body));
+    const DropGuides guides = drop_guides(scene.layout, scene.table(), scene.solved(), pid("b"), centre(vp_body));
+    const DropGuide* top = find_guide(guides, 2, DropZone::Top);
+    REQUIRE(top != nullptr);
+    scene.move_to(centre(top->rect));
+    CHECK(scene.panel_host().drag.plan.guide >= 0);
+    CHECK(scene.panel_host().drag.plan.zone == DropZone::Top);
+
+    DockLayout expected = scene.original;
+    REQUIRE(dock_panel(expected, scene.table(), pid("b"), 2, DropZone::Top).applied);
+    scene.release_drag();
+    CHECK(equal(scene.layout, expected));
+}
+
+TEST_CASE("panel host drag: guides can be turned off and the bands still decide")
+{
+    DragScene scene;
+    scene.options.style.guides = false;
+    scene.frames(2);
+    const Rect vp_body = scene.solved().nodes[2].body;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(vp_body));
+    CHECK(scene.panel_host().drag.plan.guide == -1);
+    CHECK(scene.panel_host().drag.plan.action == DropAction::Dock);
+    scene.release_drag();
+}
+
+TEST_CASE("panel host drag: the panel that landed flashes, then the flash ends")
+{
+    DragScene scene;
+    scene.f.driver.input().delta_time = 0.1f;
+    const Rect vp_body = scene.solved().nodes[2].body;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(vp_body));
+    scene.f.driver.release();
+    scene.frames(1);
+    CHECK(panel_host_result().landed == pid("b"));
+    CHECK(scene.panel_host().landed == pid("b"));
+    scene.frames(2);
+    CHECK(is_valid(scene.panel_host().landed));
+    scene.frames(8);
+    CHECK_FALSE(is_valid(scene.panel_host().landed));
+}
+
+TEST_CASE("panel host drag: no flash when the style turns it off or the drop changed nothing")
+{
+    {
+        DragScene scene;
+        scene.options.style.drop_flash = false;
+        scene.frames(2);
+        const Rect vp_body = scene.solved().nodes[2].body;
+        scene.drag(centre(scene.solved().nodes[1].tab_rects[1]), centre(vp_body));
+        scene.frames(2);
+        CHECK_FALSE(is_valid(scene.panel_host().landed));
+    }
+    {
+        DragScene scene;
+        const Vec2f from = centre(scene.solved().nodes[1].tab_rects[1]);
+        scene.drag(from, from + Vec2f(6.0f, 0.0f));
+        CHECK_FALSE(is_valid(scene.panel_host().landed));
+    }
+}
+
+TEST_CASE("panel host drag: warm frames hovering a compass guide allocate nothing")
+{
+    DragScene scene;
+    const Rect vp_body = scene.solved().nodes[2].body;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(vp_body));
+    const DropGuides guides = drop_guides(scene.layout, scene.table(), scene.solved(), pid("b"), centre(vp_body));
+    const DropGuide* left = find_guide(guides, 2, DropZone::Left);
+    REQUIRE(left != nullptr);
+    const Vec2f target = centre(left->rect);
+    scene.move_to(target);
+    scene.move_to(target + Vec2f(2.0f, 1.0f));
+    const MemoryStats before = test::all_allocations();
+    scene.move_to(target + Vec2f(-3.0f, 2.0f));
+    scene.frames(2);
+    CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
+    scene.release_drag();
+}

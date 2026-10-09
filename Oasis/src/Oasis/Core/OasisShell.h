@@ -10,8 +10,8 @@
 namespace oasis
 {
 
-// The windowed Oasis chrome: menu bar, the dashboard (or the GUI showcase) in a side panel, and the region left for the board, which it hands to the input router.
-// An interface client; owns the dashboard feed, which the board layer feeds with every decision.
+// The windowed Oasis chrome: Game, Opponent and Help menus over a dock host holding the board (viewport/0), the dashboard views and the GUI showcase as panels. The board's rect goes to the input router.
+// An interface client; owns the dashboard feed, which the board layer feeds with every decision. Placement, the layout file and the View menu are the GUI's (gui::DockSession).
 class OasisShell : public oryx::IFrameClient, public oryx::RenderSource
 {
 public:
@@ -30,8 +30,10 @@ public:
 
     [[nodiscard]] oryx::DashboardFeed& feed() { return m_feed; }
     [[nodiscard]] const oryx::GuiContext& context() const { return m_context; }
-    [[nodiscard]] bool dashboard_open() const { return m_dashboard_open; }
-    [[nodiscard]] bool showcase_open() const { return m_showcase_open; }
+    [[nodiscard]] const oryx::gui::DockLayout& layout() const { return m_dock->layout(); }
+    // Any dashboard view panel is open.
+    [[nodiscard]] bool dashboard_open() const;
+    [[nodiscard]] bool showcase_open() const;
     [[nodiscard]] bool switch_pending() const { return m_switch_pending; }
 
 private:
@@ -42,8 +44,10 @@ private:
     void request_switch(const std::string& game, const std::string& opponent);
     void answer_switch();
     void dispatch_switch();
+    void view_menu();
     void apply_settings();
     void claim_input();
+    void draw_showcase(const oryx::FrameInfo& info);
 
     oryx::InputRouter& m_router;
     const oryx::BoardLayer* m_board = nullptr;
@@ -55,8 +59,8 @@ private:
     oryx::SettingsSubscription m_settings_subscription;
     oryx::DashboardSettings m_settings;
     bool m_settings_dirty = false;
-    bool m_dashboard_open;
-    bool m_showcase_open = false;
+    oryx::UniquePtr<oryx::gui::DockSession> m_dock;
+    oryx::gui::ForeignPanel m_showcase_panel;
     bool m_switch_pending = false;
     bool m_confirm_requested = false;
     std::string m_pending_game;

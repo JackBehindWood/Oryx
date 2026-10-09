@@ -90,6 +90,15 @@ struct PanelFlags
     return kind == PanelKind::Viewport ? PanelFlags{ panel_flag::reorder_in_host | panel_flag::dock_elsewhere | panel_flag::resize } : PanelFlags{ panel_flag::all };
 }
 
+enum class DropZone : uint8_t
+{
+    Centre,
+    Left,
+    Right,
+    Top,
+    Bottom
+};
+
 // Registered by code every run, never saved; names live here so a PanelId stays four bytes.
 struct PanelDesc
 {
@@ -108,6 +117,18 @@ struct PanelDesc
     // Reserves a toolbar strip of DockMetrics::toolbar_height for the panel.
     bool toolbar = false;
     ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
+    // The body is drawn by another context beneath the host, so the host paints no backdrop there.
+    bool foreign_body = false;
+    // Placement hints from the registering consumer (ids are hashes of names): the GUI decides and skips what it cannot honour. Chain: recorded home, tabbed_with, near on dock_side, the surface edge, the first tab stack.
+    PanelId dock_near;
+    PanelId dock_tabbed_with;
+    PanelId group;
+    DropZone dock_side = DropZone::Right;
+    // Points of the new split's fixed side; zero keeps the ratio.
+    float dock_size = 0.0f;
+    int32_t order = 0;
+    // False leaves the panel out of the default layout.
+    bool initial_open = true;
 };
 
 struct PanelTable
@@ -190,15 +211,6 @@ inline bool add_dock_rule(PanelId (&list)[k_max_dock_rules], uint8_t& count, Pan
     PanelDesc* desc = find_panel(table, panel);
     return desc != nullptr && detail::add_dock_rule(desc->dock_never, desc->dock_never_count, target);
 }
-
-enum class DropZone : uint8_t
-{
-    Centre,
-    Left,
-    Right,
-    Top,
-    Bottom
-};
 
 enum class DockNodeKind : uint8_t
 {

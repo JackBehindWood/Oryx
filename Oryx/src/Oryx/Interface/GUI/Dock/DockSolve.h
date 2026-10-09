@@ -31,6 +31,10 @@ struct DockStyle
     bool compact = false;
     // Alpha factor of the drop preview fill.
     float preview_opacity = 1.0f;
+    // The compass of drop guides shown while a panel is dragged; the edge bands still work without it.
+    bool guides = true;
+    // A short accent flash on the panel that just docked, so the landing spot is unmistakable.
+    bool drop_flash = true;
 };
 
 // Points; the host scales them by the theme scale.
@@ -47,6 +51,10 @@ struct DockMetrics
     // Width reserved at the right end of a strip for the collapse chevron when every tab may collapse; zero reserves nothing.
     float strip_button = 22.0f;
     float toolbar_height = 24.0f;
+    // Side of one drop guide, the gap between guides of a compass and the gap between the outer guides and the surface edge.
+    float guide_size = 28.0f;
+    float guide_gap = 4.0f;
+    float guide_inset = 6.0f;
     DockStyle style;
 };
 
@@ -104,6 +112,33 @@ struct DropTarget
 
 [[nodiscard]] DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);
 
+inline constexpr uint32_t k_max_drop_guides = 9;
+
+// One target of the compass: a zone of a Tabs node (or, with node k_dock_root, beside the whole tree). Refused guides stay present, flagged.
+struct DropGuide
+{
+    DropZone zone = DropZone::Centre;
+    int32_t node = k_no_node;
+    Rect rect;
+    bool allowed = false;
+    DockReason reason = DockReason::None;
+};
+
+struct DropGuides
+{
+    DropGuide guides[k_max_drop_guides];
+    uint32_t count = 0;
+};
+
+// The compass for dragging `panel` with the pointer at `pointer`: centre plus four edge guides around the hovered node's body, and four outer guides at the surface edges. A node whose body is too small for
+// the cluster keeps the centre guide only, then nothing; the outer guides need room for themselves. Empty when the style turns guides off, the pointer is outside the surface or the panel may not dock at all.
+// Permission is can_dock_into, the same set dock_panel uses; a floating panel gets no centre-body guide, matching the float rule of resolve_drop.
+[[nodiscard]] DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer);
+// Index of the guide under the pointer, or -1.
+[[nodiscard]] int32_t guide_at(const DropGuides& guides, const Vec2f& pointer);
+// The inner mark of a guide's icon: the half of the box the zone would take, the middle for Centre.
+[[nodiscard]] Rect guide_glyph(const Rect& guide, DropZone zone);
+
 enum class DropAction : uint8_t
 {
     // Nothing to apply and nothing to preview (the pointer is where the drag began, or a float is only being moved).
@@ -114,7 +149,7 @@ enum class DropAction : uint8_t
     Cancel
 };
 
-// What releasing a dragged panel at the pointer would do. `slot` is the tab position for Reorder and for a Centre dock; reason says why a Cancel was refused.
+// What releasing a dragged panel at the pointer would do; a pointer over a guide wins over the bands. `slot` is the tab position for Reorder and for a Centre dock; reason says why a Cancel was refused.
 struct DropPlan
 {
     DropAction action = DropAction::None;
@@ -125,6 +160,8 @@ struct DropPlan
     // The insertion bar in the target strip for Reorder and a Centre dock; empty otherwise.
     Rect marker;
     DockReason reason = DockReason::None;
+    // The guide under the pointer that decided the plan, or -1 when a band did.
+    int32_t guide = -1;
 };
 
 inline constexpr float k_dock_float_width = 320.0f;

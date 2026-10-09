@@ -23,6 +23,10 @@ void end_panel_host();
 
 // The body rect of a viewport panel in the latest frame; empty when it is absent, closed, collapsed or unselected. Valid outside a frame.
 [[nodiscard]] Rect viewport_rect(std::string_view name);
+// The body rect of any visible panel in the latest frame (floats included); empty when absent, closed, collapsed or unselected. For a PanelOptions::foreign_body panel another context draws into it.
+[[nodiscard]] Rect panel_rect(std::string_view name);
+// True when a float drawn above panel `name` (all of them for a docked panel) covered `point` last frame, so a second context beneath the host should not take the pointer there. Popups are not counted: popup_open() says that.
+[[nodiscard]] bool panel_occluded(std::string_view name, const Vec2f& point);
 [[nodiscard]] PanelHostResult panel_host_result();
 
 // The toolbar strip reserved for the panel being drawn (PanelOptions::toolbar); false, with nothing to close, when the panel has none, is hidden or this is not a docked panel. Call between begin_panel and end_panel.

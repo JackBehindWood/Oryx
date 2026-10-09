@@ -1,0 +1,31 @@
+version: 1
+surfaces:
+  - surface: 0
+    root:
+      split:
+        axis: horizontal
+        mode: ratio
+        ratio: 0.7
+        points: 0
+        first:
+          tabs:
+            panels: [viewport/0]
+            selected: 0
+            collapsed: false
+        second:
+          tabs:
+            panels: [view/gui-showcase]
+            selected: 0
+            collapsed: false
+floats:
+  []
+homes:
+  - panel: view/values
+    sibling: view/probabilities
+    zone: centre
+  - panel: view/probabilities
+    sibling: viewport/0
+    zone: right
+closed:
+  - view/values
+  - view/probabilities
