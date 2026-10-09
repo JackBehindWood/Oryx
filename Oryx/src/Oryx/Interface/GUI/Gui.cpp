@@ -50,6 +50,42 @@ const GuiTheme& theme()
     return active().gui_theme();
 }
 
+void set_theme(const GuiTheme& theme)
+{
+    active().set_theme(theme);
+}
+
+void set_theme_accent(const Colour& accent)
+{
+    GuiTheme edited = active().gui_theme();
+    oryx::set_accent(edited, accent);
+    active().set_theme(edited);
+}
+
+void set_theme_text_height(float height)
+{
+    GuiTheme edited = active().gui_theme();
+    oryx::set_text_height(edited, height);
+    active().set_theme(edited);
+}
+
+void set_theme_corner_radius(float radius)
+{
+    GuiTheme edited = active().gui_theme();
+    oryx::set_corner_radius(edited, radius);
+    active().set_theme(edited);
+}
+
+const GuiDockTheme& dock_theme()
+{
+    return active().dock_theme();
+}
+
+void set_dock_theme(const GuiDockTheme& theme)
+{
+    active().set_dock_theme(theme);
+}
+
 void request_cursor(CursorShape cursor)
 {
     active().request_cursor(cursor);

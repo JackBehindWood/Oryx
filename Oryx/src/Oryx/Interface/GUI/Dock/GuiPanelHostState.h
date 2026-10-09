@@ -92,6 +92,10 @@ struct DragState
     // Pointer minus the dragged tab's or float's top-left corner when the drag began.
     Vec2f grab{ 0.0f, 0.0f };
     DropPlan plan;
+    // Built once per frame and shared by hit-testing, drawing and the release.
+    DropGuides guides;
+    // A float drag: where the float was at the press, for Esc.
+    Rect origin_rect;
     // A tab drag reorders its strip live; where the tab started, so Esc or a refused drop can put it back.
     uint32_t origin_slot = 0;
     bool reordered = false;

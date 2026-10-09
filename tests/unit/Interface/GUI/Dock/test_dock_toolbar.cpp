@@ -114,13 +114,15 @@ TEST_CASE("dock resolve_drop: reorder, dock, refusals and float")
     CHECK(plan.action == DropAction::None);
 
     const Rect vp = s.nodes[2].body;
-    plan = resolve_drop(fx.layout, fx.panels, s, pid("b"), Vec2f(vp.min[0] + vp.size[0] * 0.5f, vp.min[1] + vp.size[1] * 0.5f), false);
+    const Rect vp_node = s.nodes[2].rect;
+    const Vec2f vp_middle(vp_node.min[0] + vp_node.size[0] * 0.5f, vp_node.min[1] + vp_node.size[1] * 0.5f);
+    plan = resolve_drop(fx.layout, fx.panels, s, pid("b"), vp_middle, false);
     CHECK(plan.action == DropAction::Dock);
     CHECK(plan.node == 2);
     CHECK(plan.zone == DropZone::Centre);
 
     REQUIRE(add_dock_only(fx.panels, pid("b"), pid("a")));
-    plan = resolve_drop(fx.layout, fx.panels, s, pid("b"), Vec2f(vp.min[0] + vp.size[0] * 0.5f, vp.min[1] + vp.size[1] * 0.5f), false);
+    plan = resolve_drop(fx.layout, fx.panels, s, pid("b"), vp_middle, false);
     CHECK(plan.action == DropAction::Cancel);
     CHECK(plan.reason == DockReason::NotPermittedTarget);
     CHECK(is_empty(plan.preview));

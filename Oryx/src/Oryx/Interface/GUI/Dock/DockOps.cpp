@@ -645,6 +645,25 @@ const char* to_string(DockReason reason)
     return "?";
 }
 
+const char* describe(DockReason reason)
+{
+    switch (reason)
+    {
+    case DockReason::None: return "";
+    case DockReason::NotPermittedReorder: return "This panel can't be reordered";
+    case DockReason::NotPermittedDock: return "This panel can't be docked";
+    case DockReason::NotPermittedFloat: return "This panel can't be floated";
+    case DockReason::NotPermittedTarget: return "This panel can't dock here";
+    case DockReason::TabsFull: return "This tab group is full";
+    case DockReason::NodesFull: return "No room for another split";
+    case DockReason::FloatsFull: return "Too many floating windows";
+    case DockReason::Collapsed: return "Keep one panel expanded";
+    case DockReason::TargetInvalid: return "Nothing to dock to here";
+    default: break;
+    }
+    return "Can't drop here";
+}
+
 bool is_open(const DockLayout& layout, PanelId panel)
 {
     const Location at = locate(layout, panel);
@@ -749,6 +768,8 @@ DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
         return refuse(DockReason::TargetInvalid);
     if (const DockReason reason = insert_panel(work, panel, node, zone, surface); reason != DockReason::None)
         return refuse(reason);
+    if (target == k_dock_root && zone != DropZone::Centre)
+        fix_new_split(work, panel, zone, find_panel(panels, panel)->dock_size);
     normalize(work, panels);
     layout = work;
     return accept();

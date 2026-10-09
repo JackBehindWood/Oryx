@@ -15,6 +15,8 @@ constexpr float k_landing_flash_seconds = 0.6f;
 
 constexpr float k_close_size = 14.0f;
 
+constexpr float k_splitter_pad = 3.0f;
+
 DockView& host_of(GuiContext& ctx) { return ctx.dock_view(); }
 
 bool host_active(const DockView& h, const GuiContext& ctx) { return h.in_host && h.frame == ctx.frame(); }
@@ -91,7 +93,7 @@ DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
     metrics.splitter = 4.0f * scale;
     metrics.tab_min_width = 48.0f * scale;
     metrics.tab_max_width = 160.0f * scale;
-    metrics.root_edge = 12.0f * scale;
+    metrics.guide_unit = tab.text_height;
     metrics.strip_button = metrics.strip_height;
     return metrics;
 }
@@ -180,12 +182,24 @@ void draw_body(GuiContext& ctx, DockView& h, const DockNode& node, const SolvedN
         h.model->focused = id;
 }
 
-void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& grab)
+void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& grab, const Rect& origin = {})
 {
     if (h.model->drag.source != DragSource::None)
         return;
-    h.model->drag = DragState{ source, panel, grab, {} };
+    h.model->drag = DragState{};
+    h.model->drag.source = source;
+    h.model->drag.panel = panel;
+    h.model->drag.grab = grab;
+    h.model->drag.origin_rect = origin;
 }
+
+// A panel pinned against reordering, docking and floating alike has nothing to drag.
+bool draggable(const PanelTable& panels, PanelId panel)
+{
+    return can_reorder(panels, panel) == DockReason::None || can_dock(panels, panel) == DockReason::None || can_float(panels, panel) == DockReason::None;
+}
+
+Rect padded(const Rect& rect, float pad) { return Rect{ Vec2f(rect.min[0] - pad, rect.min[1] - pad), Vec2f(rect.size[0] + 2.0f * pad, rect.size[1] + 2.0f * pad) }; }
 
 void close_mark(GuiContext& ctx, const ImStyle& style, const ItemState& close, float pad)
 {
@@ -219,7 +233,7 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     const bool closable = can_close(h.model->panels, id) == DockReason::None && close_buttons != CloseButtons::Never;
     const bool dragged = h.model->drag.source == DragSource::Tab && h.model->drag.panel == id;
     const float pad = style.padding.right * 0.5f;
-    const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - k_close_size, rect.min[1] + (rect.size[1] - k_close_size) * 0.5f), Vec2f(k_close_size, k_close_size) };
+    const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - k_close_size, rect.min[1]), Vec2f(k_close_size + pad, rect.size[1]) };
 
     IdScope scope(ctx, ctx.index_id(id.hash));
     const ImId tab_id = ctx.id("tab");
@@ -231,7 +245,7 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         close = ctx.item(ctx.id("close"), close_rect);
     if (tab.hovered)
         ctx.request_cursor(CursorShape::Hand);
-    if (drag.started && !close.held)
+    if (drag.started && !close.held && draggable(h.model->panels, id))
         begin_drag(h, DragSource::Tab, id, drag.start - rect.min);
     if (drag.started && !close.held && h.model->drag.panel == id)
         h.model->drag.origin_slot = index;
@@ -253,6 +267,8 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         {
             paint.fill.a *= k_disabled_alpha;
             paint.text_colour.a *= k_disabled_alpha;
+            paint.border_width = 1.0f;
+            paint.border = ctx.dock_theme().here_state;
         }
     }
     if (show_close)
@@ -349,7 +365,7 @@ void draw_splitter(GuiContext& ctx, DockView& h, int32_t node_index)
     {
         IdScope scope(ctx, ctx.index_id(static_cast<uint64_t>(node_index)));
         const ImId id = ctx.id("splitter");
-        state = ctx.item(id, solved.splitter);
+        state = ctx.item(id, padded(solved.splitter, k_splitter_pad * ctx.gui_theme().tab.text_height / 16.0f));
         const ItemDrag drag = ctx.item_drag(id);
         const bool horizontal = node.axis == DockAxis::Horizontal;
         const uint32_t axis = horizontal ? 0 : 1;
@@ -441,7 +457,7 @@ void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close
     const bool focused = h.model->focused == id;
     const bool closable = can_close(h.model->panels, id) == DockReason::None;
     const float pad = style.padding.right * 0.5f;
-    const Rect close_rect{ Vec2f(parts.title.min[0] + parts.title.size[0] - pad - k_close_size, parts.title.min[1] + (parts.title.size[1] - k_close_size) * 0.5f), Vec2f(k_close_size, k_close_size) };
+    const Rect close_rect{ Vec2f(parts.title.min[0] + parts.title.size[0] - pad - k_close_size, parts.title.min[1]), Vec2f(k_close_size + pad, parts.title.size[1]) };
 
     IdScope scope(ctx, ctx.index_id(id.hash));
     ctx.add_shield(rect);
@@ -467,7 +483,7 @@ void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close
     if (title.hovered)
         ctx.request_cursor(CursorShape::Hand);
     if (drag.started && !close.held)
-        begin_drag(h, DragSource::Float, id, drag.start - rect.min);
+        begin_drag(h, DragSource::Float, id, drag.start - rect.min, rect);
 
     LayoutStyle bar = placed(h, parts.title, k_channel_popup);
     bar.padding = style.padding;
@@ -534,21 +550,28 @@ Rect target_rect(const DockView& h, const DropPlan& plan)
     return {};
 }
 
-void reason_label(GuiContext& ctx, const DockView& h, const Vec2f& at, DockReason reason)
+void note_label(GuiContext& ctx, const DockView& h, const Vec2f& at, const char* text)
 {
     const ImStyle& note_style = ctx.gui_theme().overlay;
-    LayoutStyle label = placed(h, Rect{ at, Vec2f(0.0f, 0.0f) }, k_channel_drag);
+    // The label is laid out after this call, so its width is estimated to keep it inside the host.
+    const float width = static_cast<float>(std::strlen(text)) * note_style.text_height * 0.55f + note_style.padding.left + note_style.padding.right;
+    const float height = note_style.text_height + note_style.padding.top + note_style.padding.bottom;
+    const Rect& host = h.host_rect;
+    const Vec2f clamped(math::max(math::min(at[0], host.min[0] + host.size[0] - width), host.min[0]), math::max(math::min(at[1], host.min[1] + host.size[1] - height), host.min[1]));
+    LayoutStyle label = placed(h, Rect{ clamped, Vec2f(0.0f, 0.0f) }, k_channel_drag);
     label.width = fit();
     label.height = fit();
     label.padding = note_style.padding;
     const uint32_t label_index = ctx.begin_box(ImId{}, label);
     BoxPaint& label_paint = ctx.layout().node(label_index).paint;
     im::paint_surface(label_paint, note_style, note_style.background);
-    label_paint.text = ctx.arena().store(to_string(reason));
+    label_paint.text = ctx.arena().store(text);
     label_paint.text_height = note_style.text_height;
     label_paint.text_colour = note_style.text;
     ctx.end_box();
 }
+
+void reason_label(GuiContext& ctx, const DockView& h, const Vec2f& at, DockReason reason) { note_label(ctx, h, at, describe(reason)); }
 
 Colour faded(Colour colour, float factor)
 {
@@ -556,23 +579,73 @@ Colour faded(Colour colour, float factor)
     return colour;
 }
 
+Icon outward_chevron(DropZone zone)
+{
+    switch (zone)
+    {
+    case DropZone::Left: return Icon::ChevronLeft;
+    case DropZone::Right: return Icon::ChevronRight;
+    case DropZone::Top: return Icon::ChevronUp;
+    case DropZone::Bottom: return Icon::ChevronDown;
+    case DropZone::Centre: break;
+    }
+    return Icon::None;
+}
+
+void overlay_icon(GuiContext& ctx, const DockView& h, const Rect& rect, Icon icon, const Colour& colour)
+{
+    const uint32_t index = ctx.begin_box(ImId{}, placed(h, rect, k_channel_drag));
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    paint.icon = icon;
+    paint.icon_colour = colour;
+    paint.icon_size = 10.0f;
+    ctx.end_box();
+}
+
+// What the hovered guide does, in words: an inner guide works on one panel, an outer one on the whole window.
+const char* guide_hint(const DropGuide& guide)
+{
+    if (guide.outer)
+        return "Dock to the window edge";
+    return guide.zone == DropZone::Centre ? "Add as a tab" : "Split this panel";
+}
+
 void draw_guides(GuiContext& ctx, const DockView& h, const DropGuides& guides)
 {
     const GuiDockTheme& dock = ctx.dock_theme();
+    const Colour clear{ 0.0f, 0.0f, 0.0f, 0.0f };
+    const int32_t hovered = h.model->drag.plan.guide;
+    if (guides.inner_node >= 0 && static_cast<uint32_t>(guides.inner_node) < h.solved.node_count)
+        overlay(ctx, h, h.solved.nodes[guides.inner_node].rect, clear, faded(dock.preview_border, 0.35f), 1.0f);
     for (uint32_t i = 0; i < guides.count; ++i)
     {
         const DropGuide& guide = guides.guides[i];
-        const bool hovered = static_cast<int32_t>(i) == h.model->drag.plan.guide;
+        const bool over = static_cast<int32_t>(i) == hovered;
+        const Rect box = over ? padded(guide.rect, 2.0f) : guide.rect;
+        const Rect inset = padded(box, -2.0f);
+        if (guide.here)
+        {
+            overlay(ctx, h, box, faded(dock.here_state, over ? 0.45f : 0.25f), clear, 0.0f);
+            overlay(ctx, h, inset, clear, dock.here_state, 1.0f);
+            continue;
+        }
         const float alpha = guide.allowed ? 1.0f : k_disabled_alpha;
-        overlay(ctx, h, guide.rect, faded(hovered ? dock.guide_hover : dock.guide, alpha), faded(dock.guide_border, alpha), 1.0f);
-        const Colour glyph = hovered ? dock.guide_glyph_hover : dock.guide_glyph;
-        overlay(ctx, h, guide_glyph(guide.rect, guide.zone), faded(glyph, alpha), Colour{ 0.0f, 0.0f, 0.0f, 0.0f }, 0.0f);
+        const Colour& fill = guide.outer ? (over ? dock.outer_guide_hover : dock.outer_guide) : (over ? dock.guide_hover : dock.guide);
+        const Colour glyph = faded(over ? dock.guide_glyph_hover : dock.guide_glyph, alpha);
+        overlay(ctx, h, box, faded(fill, alpha), faded(guide.outer ? dock.outer_guide_hover : dock.guide_border, alpha), guide.outer ? 2.0f : 1.0f);
+        if (guide.outer)
+            overlay_icon(ctx, h, box, outward_chevron(guide.zone), glyph);
+        else
+            overlay(ctx, h, guide_glyph(box, guide.zone), glyph, clear, 0.0f);
     }
-    const int32_t hovered = h.model->drag.plan.guide;
-    if (hovered >= 0 && static_cast<uint32_t>(hovered) < guides.count && !guides.guides[hovered].allowed)
+    if (hovered >= 0 && static_cast<uint32_t>(hovered) < guides.count)
     {
-        const Rect& rect = guides.guides[hovered].rect;
-        reason_label(ctx, h, Vec2f(rect.min[0], rect.min[1] + rect.size[1] + 2.0f), guides.guides[hovered].reason);
+        const DropGuide& guide = guides.guides[hovered];
+        const Vec2f below(guide.rect.min[0], guide.rect.min[1] + guide.rect.size[1] + 4.0f);
+        if (!guide.allowed && !guide.here)
+            reason_label(ctx, h, below, guide.reason);
+        else if (guide.allowed)
+            note_label(ctx, h, below, guide_hint(guide));
     }
 }
 
@@ -610,18 +683,41 @@ void draw_landing_flash(GuiContext& ctx, DockView& h)
     overlay(ctx, h, *rect, faded(flash, 0.22f * fade), faded(flash, fade), 2.0f);
 }
 
+void tab_chip(GuiContext& ctx, const DockView& h, const Rect& rect, std::string_view title, const Colour& border, float alpha)
+{
+    const ImStyle& style = ctx.gui_theme().tab;
+    LayoutStyle chip = placed(h, rect, k_channel_drag);
+    chip.padding = style.padding;
+    chip.align_y = Align::Centre;
+    const uint32_t index = ctx.begin_box(ImId{}, chip);
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    im::paint_surface(paint, style, faded(style.selected, alpha));
+    paint.border_width = 1.0f;
+    paint.border = border;
+    paint.text = ctx.arena().store(title);
+    paint.text_height = style.text_height;
+    paint.text_colour = faded(style.text, alpha);
+    paint.ellipsis = true;
+    ctx.end_box();
+}
+
 void draw_drag_feedback(GuiContext& ctx, DockView& h)
 {
     const DragState& d = h.model->drag;
     const DropPlan& plan = d.plan;
-    const GuiTheme& theme = ctx.gui_theme();
     const GuiDockTheme& dock = ctx.dock_theme();
-    Colour preview = dock.preview;
+    const bool beside_tree = plan.action == DropAction::Dock && plan.node == k_dock_root;
+    Colour preview = beside_tree ? faded(dock.outer_guide_hover, 0.28f) : dock.preview;
     preview.a *= h.style.preview_opacity;
-    overlay(ctx, h, plan.preview, preview, dock.preview_border, 1.0f);
+    overlay(ctx, h, plan.preview, preview, beside_tree ? dock.outer_guide_hover : dock.preview_border, 1.0f);
     overlay(ctx, h, plan.marker, dock.preview_border, dock.preview_border, 0.0f);
-    if (plan.action != DropAction::Float && !ctx.input().keys.shift)
-        draw_guides(ctx, h, drop_guides(*h.layout, h.model->panels, h.solved, d.panel, ctx.input().pointer.position));
+    if (plan.action == DropAction::Float)
+    {
+        const Rect title{ plan.preview.min, Vec2f(plan.preview.size[0], h.solved.metrics.strip_height) };
+        overlay(ctx, h, title, faded(dock.preview_border, 0.45f), dock.preview_border, 1.0f);
+    }
+    else if (!ctx.input().keys.shift)
+        draw_guides(ctx, h, d.guides);
 
     const bool refused = plan.action == DropAction::Cancel && plan.reason != DockReason::TargetInvalid && plan.reason != DockReason::NotFound;
     if (refused)
@@ -629,30 +725,22 @@ void draw_drag_feedback(GuiContext& ctx, DockView& h)
         const Colour danger = dock.refusal;
         overlay(ctx, h, target_rect(h, plan), Colour{ danger.r, danger.g, danger.b, 0.12f }, danger, 1.0f);
     }
-    if (d.source != DragSource::Tab)
+    if (d.source != DragSource::Tab || plan.action == DropAction::Float)
         return;
 
-    const ImStyle& style = theme.tab;
+    const PanelDesc* desc = find_panel(h.model->panels, d.panel);
+    const std::string_view title = desc != nullptr ? std::string_view(desc->title) : std::string_view();
+    const float chip_w = h.solved.metrics.tab_max_width;
+    const float chip_h = h.solved.metrics.strip_height;
+    if (plan.action == DropAction::Dock && plan.zone == DropZone::Centre && plan.node >= 0 && !is_empty(plan.marker))
+        tab_chip(ctx, h, Rect{ Vec2f(plan.marker.min[0], h.solved.nodes[plan.node].strip.min[1]), Vec2f(chip_w, chip_h) }, title, dock.preview_border, 0.6f);
     Vec2f at = ctx.input().pointer.position - d.grab;
     if (plan.action == DropAction::None && plan.node != k_no_node && static_cast<uint32_t>(plan.node) < h.solved.node_count)
         at[1] = h.solved.nodes[plan.node].strip.min[1];
-    const Rect ghost{ at, Vec2f(h.solved.metrics.tab_max_width, h.solved.metrics.strip_height) };
-    const PanelDesc* desc = find_panel(h.model->panels, d.panel);
-    LayoutStyle chip = placed(h, ghost, k_channel_drag);
-    chip.padding = style.padding;
-    chip.align_y = Align::Centre;
-    const uint32_t index = ctx.begin_box(ImId{}, chip);
-    BoxPaint& paint = ctx.layout().node(index).paint;
-    im::paint_surface(paint, style, style.selected);
-    paint.border_width = 1.0f;
-    paint.border = refused ? dock.refusal : dock.chip_border;
-    paint.text = ctx.arena().store(desc != nullptr ? std::string_view(desc->title) : std::string_view());
-    paint.text_height = style.text_height;
-    paint.text_colour = style.text;
-    paint.ellipsis = true;
-    ctx.end_box();
+    const Rect ghost{ at, Vec2f(chip_w, chip_h) };
+    tab_chip(ctx, h, ghost, title, refused ? dock.refusal : dock.chip_border, 1.0f);
     if (refused && plan.guide < 0)
-        reason_label(ctx, h, Vec2f(at[0], at[1] + ghost.size[1] + 2.0f), plan.reason);
+        reason_label(ctx, h, Vec2f(at[0], at[1] + chip_h + 2.0f), plan.reason);
 }
 
 void apply_drop(DockView& h, const DragState& d)
@@ -733,6 +821,17 @@ void restore_reorder(DockView& h, DragState& d)
         h.result.layout_changed = true;
 }
 
+void restore_float(DockView& h, const DragState& d)
+{
+    DockLayout& layout = *h.layout;
+    for (uint32_t f = 0; f < layout.float_count; ++f)
+        if (layout.floats[f].panel == d.panel && !(layout.floats[f].rect == d.origin_rect) && d.origin_rect.size[0] > 0.0f)
+        {
+            layout.floats[f].rect = d.origin_rect;
+            h.result.layout_changed = true;
+        }
+}
+
 // Runs after the frame's drawing so no op reshapes the tree while its tabs are still being drawn.
 void update_drag(GuiContext& ctx, DockView& h)
 {
@@ -743,14 +842,19 @@ void update_drag(GuiContext& ctx, DockView& h)
     if (key_pressed(input.keys, ImKey::Escape) || !is_open(*h.layout, d.panel))
     {
         if (key_pressed(input.keys, ImKey::Escape))
+        {
             restore_reorder(h, d);
+            if (d.source == DragSource::Float)
+                restore_float(h, d);
+        }
         d = DragState{};
         return;
     }
     const Vec2f pointer = input.pointer.position;
     if (d.source == DragSource::Float)
         move_dragged_float(h, pointer);
-    d.plan = resolve_drop(*h.layout, h.model->panels, h.solved, d.panel, pointer, input.keys.shift);
+    d.guides = input.keys.shift ? DropGuides{} : drop_guides(*h.layout, h.model->panels, h.solved, d.panel, pointer);
+    d.plan = resolve_drop(*h.layout, h.model->panels, h.solved, d.guides, d.panel, pointer, input.keys.shift);
     if (d.source == DragSource::Tab && d.plan.action == DropAction::Reorder)
     {
         reorder_live(h, d, pointer);

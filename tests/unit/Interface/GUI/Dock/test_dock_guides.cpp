@@ -70,13 +70,18 @@ TEST_CASE("drop_guides: a compass on the hovered node and four outer guides, all
     check_well_formed(guides, solved);
     for (DropZone zone : { DropZone::Left, DropZone::Right, DropZone::Top, DropZone::Bottom })
         CHECK(count_zone(guides, zone, true) == 1);
-    for (uint32_t i = 0; i < guides.count; ++i)
-        if (guides.guides[i].node != k_dock_root)
-            CHECK(guides.guides[i].node == 2);
+    for (uint32_t i = 0; i < 4; ++i)
+        CHECK(guides.guides[i].outer);
+    for (uint32_t i = 4; i < guides.count; ++i)
+    {
+        CHECK_FALSE(guides.guides[i].outer);
+        CHECK(guides.guides[i].node == 2);
+    }
+    CHECK(guides.inner_node == 2);
     CHECK(count_zone(guides, DropZone::Centre, false) == 1);
 }
 
-TEST_CASE("drop_guides: small nodes keep the centre guide, then nothing, and nothing ever overlaps")
+TEST_CASE("drop_guides: the compass shrinks with the node and never disappears")
 {
     const PanelTable panels = make_panels();
     DockLayout layout;
@@ -88,21 +93,11 @@ TEST_CASE("drop_guides: small nodes keep the centre guide, then nothing, and not
             const Rect surface{ Vec2f(10.0f, 20.0f), Vec2f(width, height) };
             const SolvedLayout solved = solve(layout, panels, k_metrics, surface);
             const DropGuides guides = drop_guides(layout, panels, solved, pid("b"), centre(surface));
-            check_well_formed(guides, solved);
-            CHECK((guides.count == 0 || guides.count == 5 || guides.count == 9));
+            CHECK(guides.count == 9);
+            const float expected = math::clamp(math::min(width, height) / 8.0f, 0.5f * k_metrics.guide_unit, 0.875f * k_metrics.guide_unit);
+            CHECK(guides.half == doctest::Approx(std::trunc(expected)));
         }
     }
-
-    const SolvedLayout wide = solve(layout, panels, k_metrics, Rect{ Vec2f(0.0f, 0.0f), Vec2f(800.0f, 600.0f) });
-    CHECK(drop_guides(layout, panels, wide, pid("b"), centre(wide.surface_rect)).count == 9);
-    const float cluster = 3.0f * k_metrics.guide_size + 2.0f * k_metrics.guide_gap;
-    const float band = k_metrics.guide_inset + k_metrics.guide_size;
-    const Rect tight{ Vec2f(0.0f, 0.0f), Vec2f(2.0f * band + cluster - 4.0f, 2.0f * band + cluster - 4.0f) };
-    const SolvedLayout small = solve(layout, panels, k_metrics, tight);
-    const DropGuides centre_only = drop_guides(layout, panels, small, pid("b"), centre(tight));
-    CHECK(centre_only.count == 5);
-    CHECK(count_zone(centre_only, DropZone::Centre, false) == 1);
-    CHECK(count_zone(centre_only, DropZone::Left, false) == 0);
 }
 
 TEST_CASE("drop_guides: none outside the surface, with guides off, or for a panel that may not dock")
@@ -151,15 +146,40 @@ TEST_CASE("drop_guides: allowed and reason equal can_dock_into for every flag se
     }
 }
 
-TEST_CASE("drop_guides: a floating panel gets no centre guide")
+TEST_CASE("drop_guides: golden compass of the sample layout")
+{
+    const PanelTable panels = make_panels();
+    const DockLayout layout = make_sample(panels);
+    const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
+    const DropGuides guides = drop_guides(layout, panels, solved, pid("a"), centre(solved.nodes[2].body));
+    std::string text;
+    for (uint32_t i = 0; i < guides.count; ++i)
+    {
+        const DropGuide& guide = guides.guides[i];
+        char line[160];
+        std::snprintf(line, sizeof(line), "%d z%d %.1f,%.1f %.1fx%.1f %s\n", guide.node, static_cast<int>(guide.zone), guide.rect.min[0], guide.rect.min[1], guide.rect.size[0], guide.rect.size[1], guide.allowed ? "ok" : to_string(guide.reason));
+        text += line;
+    }
+    CHECK_MESSAGE(text == "-1 z1 6.0,286.0 28.0x28.0 ok\n"
+                    "-1 z2 766.0,286.0 28.0x28.0 ok\n"
+                    "-1 z3 386.0,6.0 28.0x28.0 ok\n"
+                    "-1 z4 386.0,566.0 28.0x28.0 ok\n"
+                    "2 z1 634.0,286.0 28.0x28.0 ok\n"
+                    "2 z2 698.0,286.0 28.0x28.0 ok\n"
+                    "2 z3 666.0,254.0 28.0x28.0 ok\n"
+                    "2 z4 666.0,318.0 28.0x28.0 ok\n"
+                    "2 z0 666.0,286.0 28.0x28.0 ok\n", text);
+}
+
+TEST_CASE("drop_guides: a floating panel gets the centre guide too")
 {
     const PanelTable panels = make_panels();
     DockLayout layout = make_sample(panels);
     require_applied(float_panel(layout, panels, pid("b"), Rect{ Vec2f(100.0f, 100.0f), Vec2f(200.0f, 150.0f) }));
     const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
     const DropGuides guides = drop_guides(layout, panels, solved, pid("b"), centre(solved.nodes[2].body));
-    CHECK(guides.count == 8);
-    CHECK(count_zone(guides, DropZone::Centre, false) == 0);
+    CHECK(guides.count == 9);
+    CHECK(count_zone(guides, DropZone::Centre, false) == 1);
 }
 
 TEST_CASE("resolve_drop: a pointer over a guide plans exactly that zone, and applying it equals dock_panel")
@@ -167,8 +187,7 @@ TEST_CASE("resolve_drop: a pointer over a guide plans exactly that zone, and app
     const PanelTable panels = make_panels();
     const DockLayout layout = make_sample(panels);
     const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
-    const Vec2f hover = centre(solved.nodes[2].body);
-    const DropGuides guides = drop_guides(layout, panels, solved, pid("b"), hover);
+    const DropGuides guides = drop_guides(layout, panels, solved, pid("b"), centre(solved.nodes[2].body));
     REQUIRE(guides.count == 9);
     for (uint32_t i = 0; i < guides.count; ++i)
     {
@@ -188,43 +207,30 @@ TEST_CASE("resolve_drop: a pointer over a guide plans exactly that zone, and app
     }
 }
 
-TEST_CASE("resolve_drop: a guide beats the edge band it sits in")
+TEST_CASE("guide_at: circling the centre selects each side in turn and the centre inside, with no gaps")
 {
-    PanelTable panels = make_panels();
-    DockLayout layout;
-    require_applied(dock_panel(layout, panels, pid("a"), k_dock_root, DropZone::Centre));
-    require_applied(dock_panel(layout, panels, pid("c"), k_dock_root, DropZone::Right));
-    require_applied(dock_panel(layout, panels, pid("d"), k_dock_root, DropZone::Right));
-    const int32_t inner = layout.nodes[layout.roots[0]].first;
-    require_applied(set_split(layout, panels, layout.roots[0], DockSizeMode::Ratio, 0.5f, 0.0f));
-    require_applied(set_split(layout, panels, inner, DockSizeMode::Ratio, 0.88f, 0.0f));
+    const PanelTable panels = make_panels();
+    const DockLayout layout = make_sample(panels);
     const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
-    const int32_t narrow = node_of(layout, pid("c"));
-    const Rect& body = solved.nodes[narrow].body;
-    REQUIRE(body.size[0] < 2.0f * k_metrics.guide_size + 2.0f);
-
-    const Vec2f mid = centre(body);
-    const DropGuides guides = drop_guides(layout, panels, solved, pid("d"), mid);
-    REQUIRE(count_zone(guides, DropZone::Centre, false) == 1);
-    uint32_t centre_index = 0;
-    for (uint32_t i = 0; i < guides.count; ++i)
-        if (guides.guides[i].node == narrow && guides.guides[i].zone == DropZone::Centre)
-            centre_index = i;
-    const Rect& g = guides.guides[centre_index].rect;
-    const Vec2f in_band(g.min[0] + 1.0f, mid[1]);
-    const float u = (in_band[0] - body.min[0]) / body.size[0];
-    REQUIRE(u < k_metrics.edge_band);
-
-    const DropTarget band = drop_target(layout, solved, in_band);
-    CHECK(band.zone == DropZone::Left);
-    const DropPlan plan = resolve_drop(layout, panels, solved, pid("d"), in_band, false);
-    REQUIRE(plan.action == DropAction::Dock);
-    CHECK(plan.zone == DropZone::Centre);
-    CHECK(plan.node == narrow);
-    CHECK(plan.guide == static_cast<int32_t>(centre_index));
+    const DropGuides guides = drop_guides(layout, panels, solved, pid("b"), centre(solved.nodes[2].body));
+    REQUIRE(guides.half > 0.0f);
+    const float r = guides.half * 2.0f;
+    const struct { Vec2f delta; DropZone zone; } probes[] = {
+        { Vec2f(-r, 0.0f), DropZone::Left }, { Vec2f(r, 0.0f), DropZone::Right }, { Vec2f(0.0f, -r), DropZone::Top }, { Vec2f(0.0f, r), DropZone::Bottom },
+        { Vec2f(-r, -r * 0.8f), DropZone::Left }, { Vec2f(r * 0.8f, -r), DropZone::Top }, { Vec2f(r, r * 0.6f), DropZone::Right }, { Vec2f(-r * 0.7f, r), DropZone::Bottom },
+        { Vec2f(guides.half * 0.5f, guides.half * 0.5f), DropZone::Centre },
+    };
+    for (const auto& probe : probes)
+    {
+        const int32_t index = guide_at(guides, guides.centre + probe.delta);
+        REQUIRE(index >= 0);
+        CHECK(guides.guides[index].zone == probe.zone);
+        CHECK(guides.guides[index].node == guides.inner_node);
+    }
+    CHECK(guide_at(guides, guides.centre + Vec2f(0.0f, guides.half * 5.0f)) == -1);
 }
 
-TEST_CASE("resolve_drop: a refused guide stays, carries the reason, and the bands remain the fallback")
+TEST_CASE("resolve_drop: a refused guide stays and carries the reason, and the rest of the body plans nothing")
 {
     PanelTable panels = make_panels();
     const DockLayout layout = make_sample(panels);
@@ -250,60 +256,49 @@ TEST_CASE("resolve_drop: a refused guide stays, carries the reason, and the band
     }
     CHECK(refused_nodes == 5);
 
-    const DropPlan fallback = resolve_drop(layout, panels, solved, pid("b"), Vec2f(40.0f, 300.0f), false);
-    CHECK(fallback.guide == -1);
+    const DropPlan elsewhere = resolve_drop(layout, panels, solved, pid("b"), Vec2f(120.0f, 300.0f), false);
+    CHECK(elsewhere.guide == -1);
+    CHECK(elsewhere.action == DropAction::None);
 }
 
-TEST_CASE("drop_guides: golden compass of the sample layout")
-{
-    const PanelTable panels = make_panels();
-    const DockLayout layout = make_sample(panels);
-    const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
-    const DropGuides guides = drop_guides(layout, panels, solved, pid("a"), centre(solved.nodes[2].body));
-    std::string text;
-    for (uint32_t i = 0; i < guides.count; ++i)
-    {
-        const DropGuide& guide = guides.guides[i];
-        char line[160];
-        std::snprintf(line, sizeof(line), "%d z%d %.1f,%.1f %.1fx%.1f %s\n", guide.node, static_cast<int>(guide.zone), guide.rect.min[0], guide.rect.min[1], guide.rect.size[0], guide.rect.size[1], guide.allowed ? "ok" : to_string(guide.reason));
-        text += line;
-    }
-    CHECK_MESSAGE(text == "-1 z1 6.0,286.0 28.0x28.0 ok\n"
-                    "-1 z2 766.0,286.0 28.0x28.0 ok\n"
-                    "-1 z3 386.0,6.0 28.0x28.0 ok\n"
-                    "-1 z4 386.0,566.0 28.0x28.0 ok\n"
-                    "2 z1 617.6,286.0 28.0x28.0 ok\n"
-                    "2 z2 681.6,286.0 28.0x28.0 ok\n"
-                    "2 z3 649.6,254.0 28.0x28.0 ok\n"
-                    "2 z4 649.6,318.0 28.0x28.0 ok\n"
-                    "2 z0 649.6,286.0 28.0x28.0 ok\n", text);
-}
-
-TEST_CASE("drop_guides: no guide that would leave the arrangement as it is, for guides and bands alike")
+TEST_CASE("drop_guides: a drop that leaves the arrangement as it is is drawn as a here guide,")
 {
     const PanelTable panels = make_panels();
     const DockLayout layout = make_sample(panels);
     const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
 
-    // vp already sits alone at the far right: nothing of its own node and no outer Right guide is offered.
+    // vp already sits alone at the far right: its own node and the outer Right guide are "here".
     const DropGuides own = drop_guides(layout, panels, solved, pid("vp"), centre(solved.nodes[2].body));
-    CHECK(own.count == 3);
-    CHECK(count_zone(own, DropZone::Right, true) == 0);
+    REQUIRE(own.count == 9);
     for (uint32_t i = 0; i < own.count; ++i)
-        CHECK(own.guides[i].node == k_dock_root);
+    {
+        const DropGuide& guide = own.guides[i];
+        CHECK(guide.here == (!guide.outer || guide.zone == DropZone::Right));
+        CHECK(guide.outer == (guide.node == k_dock_root));
+    }
 
     const DropPlan band = resolve_drop(layout, panels, solved, pid("vp"), Vec2f(795.0f, 300.0f), false);
     CHECK(band.action == DropAction::None);
-    const DropPlan own_centre = resolve_drop(layout, panels, solved, pid("vp"), centre(solved.nodes[2].body), false);
-    CHECK(own_centre.action == DropAction::None);
+    for (uint32_t i = 0; i < own.count; ++i)
+    {
+        if (!own.guides[i].here)
+            continue;
+        const DropPlan over = resolve_drop(layout, panels, solved, pid("vp"), centre(own.guides[i].rect), false);
+        CHECK(over.action == DropAction::None);
+        CHECK(over.reason == DockReason::None);
+        CHECK(over.guide == static_cast<int32_t>(i));
+        CHECK(is_empty(over.preview));
+    }
 
-    // A tab of a two-tab node may still split off from its own node.
+    // A tab of a two-tab node may still split off from its own node; dropping it back into the centre is "here".
     const DropGuides tabbed = drop_guides(layout, panels, solved, pid("b"), centre(solved.nodes[1].body));
-    CHECK(count_zone(tabbed, DropZone::Left, false) == 1);
-    CHECK(count_zone(tabbed, DropZone::Centre, false) == 0);
+    REQUIRE(count_zone(tabbed, DropZone::Left, false) == 1);
+    REQUIRE(count_zone(tabbed, DropZone::Centre, false) == 1);
+    CHECK_FALSE(tabbed.guides[guide_index(tabbed, 1, DropZone::Left)].here);
+    CHECK(tabbed.guides[guide_index(tabbed, 1, DropZone::Centre)].here);
 }
 
-TEST_CASE("drop_guides: the board beside a lone panel offers no Right drop for that panel")
+TEST_CASE("drop_guides: the board beside a lone panel marks the Right drop for that panel as here")
 {
     PanelTable panels = make_panels();
     DockLayout layout;
@@ -312,8 +307,183 @@ TEST_CASE("drop_guides: the board beside a lone panel offers no Right drop for t
     const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
     const int32_t board = node_of(layout, pid("vp"));
     const DropGuides guides = drop_guides(layout, panels, solved, pid("a"), centre(solved.nodes[board].body));
+    const int32_t right = guide_index(guides, board, DropZone::Right);
+    const int32_t outer_right = guide_index(guides, k_dock_root, DropZone::Right);
+    const int32_t left = guide_index(guides, board, DropZone::Left);
+    REQUIRE(right >= 0);
+    REQUIRE(outer_right >= 0);
+    REQUIRE(left >= 0);
+    CHECK(guides.guides[right].here);
+    CHECK(guides.guides[outer_right].here);
+    CHECK_FALSE(guides.guides[left].here);
+}
+
+TEST_CASE("drop_guides: a single stack still offers all four outer guides")
+{
+    const PanelTable panels = make_panels();
+    DockLayout one;
+    require_applied(dock_panel(one, panels, pid("a"), k_dock_root, DropZone::Centre));
+    const SolvedLayout single = solve(one, panels, k_metrics, k_surface);
+    const DropGuides guides = drop_guides(one, panels, single, pid("b"), centre(k_surface));
+    CHECK(guides.count == 9);
+    uint32_t bars = 0;
     for (uint32_t i = 0; i < guides.count; ++i)
-        CHECK_FALSE((guides.guides[i].node == board && guides.guides[i].zone == DropZone::Right));
-    CHECK(count_zone(guides, DropZone::Left, false) == 1);
-    CHECK(count_zone(guides, DropZone::Right, true) == 0);
+        bars += guides.guides[i].outer ? 1u : 0u;
+    CHECK(bars == 4);
+    check_well_formed(guides, single);
+}
+
+TEST_CASE("resolve_drop: an outer drop previews a sidebar of dock_size points and applying it fixes that size")
+{
+    PanelTable panels = make_panels();
+    find_panel(panels, pid("a"))->dock_size = 120.0f;
+    const DockLayout layout = make_sample(panels);
+    const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
+    const DropGuides guides = drop_guides(layout, panels, solved, pid("a"), centre(solved.nodes[2].body));
+    for (const DropZone zone : { DropZone::Left, DropZone::Right, DropZone::Top, DropZone::Bottom })
+    {
+        const int32_t index = guide_index(guides, k_dock_root, zone);
+        REQUIRE(index >= 0);
+        const DropPlan plan = resolve_drop(layout, panels, solved, pid("a"), centre(guides.guides[index].rect), false);
+        REQUIRE(plan.action == DropAction::Dock);
+        const bool sideways = zone == DropZone::Left || zone == DropZone::Right;
+        CHECK(plan.preview.size[sideways ? 0 : 1] == doctest::Approx(120.0f));
+        CHECK(plan.preview.size[sideways ? 1 : 0] == doctest::Approx(k_surface.size[sideways ? 1 : 0]));
+
+        DockLayout applied = layout;
+        require_applied(dock_panel(applied, panels, pid("a"), plan.node, plan.zone));
+        const int32_t root = applied.roots[0];
+        CHECK(applied.nodes[root].mode == (zone == DropZone::Left || zone == DropZone::Top ? DockSizeMode::FixedFirst : DockSizeMode::FixedSecond));
+        CHECK(applied.nodes[root].points == doctest::Approx(120.0f));
+    }
+
+    const DropPlan beside = resolve_drop(layout, panels, solved, pid("a"), Vec2f(795.0f, 300.0f), false);
+    CHECK(beside.action == DropAction::None);
+}
+
+TEST_CASE("resolve_drop: a float under the pointer is neutral, not the node hidden beneath it")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    require_applied(float_panel(layout, panels, pid("b"), Rect{ Vec2f(100.0f, 100.0f), Vec2f(200.0f, 150.0f) }));
+    const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
+    const Vec2f over_float = centre(solved.floats[0]);
+    const DropPlan plan = resolve_drop(layout, panels, solved, pid("a"), over_float, false);
+    CHECK(plan.action == DropAction::None);
+    CHECK(is_empty(plan.preview));
+    const DropGuides guides = drop_guides(layout, panels, solved, pid("a"), over_float);
+    for (uint32_t i = 0; i < guides.count; ++i)
+        CHECK(guides.guides[i].outer);
+}
+
+TEST_CASE("describe: every reason has a human sentence and the full-pool reasons differ from the developer wording")
+{
+    for (uint32_t r = 0; r <= static_cast<uint32_t>(DockReason::Collapsed); ++r)
+    {
+        const DockReason reason = static_cast<DockReason>(r);
+        if (reason != DockReason::None)
+            CHECK(std::strlen(describe(reason)) > 0);
+    }
+    for (const DockReason reason : { DockReason::TabsFull, DockReason::NodesFull, DockReason::FloatsFull })
+        CHECK(std::string_view(describe(reason)) != std::string_view(to_string(reason)));
+    CHECK(std::strlen(describe(DockReason::TargetInvalid)) > 0);
+}
+
+namespace
+{
+
+struct GridLayout
+{
+    const char* name;
+    DockLayout layout;
+};
+
+std::vector<GridLayout> grid_layouts(const PanelTable& panels)
+{
+    std::vector<GridLayout> out;
+    out.push_back({ "sample", make_sample(panels) });
+
+    DockLayout single;
+    require_applied(dock_panel(single, panels, pid("a"), k_dock_root, DropZone::Centre));
+    require_applied(dock_panel(single, panels, pid("b"), k_dock_root, DropZone::Centre));
+    out.push_back({ "single stack", single });
+
+    DockLayout narrow = make_sample(panels);
+    require_applied(dock_panel(narrow, panels, pid("c"), k_dock_root, DropZone::Left));
+    for (uint32_t n = 0; n < narrow.node_count; ++n)
+        if (narrow.nodes[n].kind == DockNodeKind::Split)
+            require_applied(set_split(narrow, panels, static_cast<int32_t>(n), DockSizeMode::Ratio, 0.05f, 0.0f));
+    out.push_back({ "narrow column", narrow });
+
+    DockLayout collapsed = make_sample(panels);
+    require_applied(dock_panel(collapsed, panels, pid("d"), k_dock_root, DropZone::Bottom));
+    for (uint32_t n = 0; n < collapsed.node_count; ++n)
+        if (collapsed.nodes[n].kind == DockNodeKind::Tabs && collapsed.nodes[n].tabs[0] == pid("d"))
+            require_applied(set_collapsed(collapsed, panels, static_cast<int32_t>(n), true));
+    out.push_back({ "collapsed row", collapsed });
+
+    DockLayout floated = make_sample(panels);
+    require_applied(float_panel(floated, panels, pid("a"), Rect{ Vec2f(150.0f, 150.0f), Vec2f(220.0f, 160.0f) }));
+    out.push_back({ "with float", floated });
+    return out;
+}
+
+bool over_strip(const SolvedLayout& solved, const DockLayout& layout, const Vec2f& pointer)
+{
+    for (uint32_t n = 0; n < layout.node_count; ++n)
+        if (layout.nodes[n].kind == DockNodeKind::Tabs && contains(solved.nodes[n].strip, pointer))
+            return true;
+    return false;
+}
+
+} // namespace
+
+TEST_CASE("resolve_drop: nothing docks or reorders unless a guide or a tab strip is under the pointer")
+{
+    const PanelTable panels = make_panels();
+    for (const GridLayout& entry : grid_layouts(panels))
+    {
+        const SolvedLayout solved = solve(entry.layout, panels, k_metrics, k_surface);
+        for (const char* dragged : { "b", "vp" })
+        {
+            if (!is_open(entry.layout, pid(dragged)))
+                continue;
+            for (float y = 1.0f; y < k_surface.size[1]; y += 9.0f)
+                for (float x = 1.0f; x < k_surface.size[0]; x += 9.0f)
+                {
+                    const Vec2f p(x, y);
+                    const DropGuides guides = drop_guides(entry.layout, panels, solved, pid(dragged), p);
+                    const DropPlan plan = resolve_drop(entry.layout, panels, solved, pid(dragged), p, false);
+                    if (plan.action == DropAction::Dock || plan.action == DropAction::Reorder)
+                        CHECK_MESSAGE((guide_at(guides, p) >= 0 || over_strip(solved, entry.layout, p)), entry.name << " " << dragged << " at " << x << "," << y);
+                }
+        }
+    }
+}
+
+TEST_CASE("drop_guides: every leaf gets 5 inner and every pointer inside the surface gets 4 outer guides")
+{
+    const PanelTable panels = make_panels();
+    for (const GridLayout& entry : grid_layouts(panels))
+    {
+        const SolvedLayout solved = solve(entry.layout, panels, k_metrics, k_surface);
+        for (float y = 1.0f; y < k_surface.size[1]; y += 13.0f)
+            for (float x = 1.0f; x < k_surface.size[0]; x += 13.0f)
+            {
+                const Vec2f p(x, y);
+                const DropGuides guides = drop_guides(entry.layout, panels, solved, pid("e"), p);
+                bool over_float = false;
+                for (uint32_t f = 0; f < entry.layout.float_count; ++f)
+                    over_float = over_float || contains(solved.floats[f], p);
+                bool in_leaf = false;
+                for (uint32_t n = 0; n < entry.layout.node_count; ++n)
+                    in_leaf = in_leaf || (entry.layout.nodes[n].kind == DockNodeKind::Tabs && contains(solved.nodes[n].rect, p));
+                uint32_t outer = 0;
+                uint32_t inner = 0;
+                for (uint32_t i = 0; i < guides.count; ++i)
+                    (guides.guides[i].outer ? outer : inner) += 1u;
+                CHECK_MESSAGE(outer == 4u, entry.name << " outer at " << x << "," << y);
+                CHECK_MESSAGE(inner == (in_leaf && !over_float ? 5u : 0u), entry.name << " inner at " << x << "," << y);
+            }
+    }
 }

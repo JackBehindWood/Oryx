@@ -163,15 +163,19 @@ TEST_CASE("panel host drag: a float moves over a body, and re-docks on an edge z
     REQUIRE(scene.layout.float_count == 1);
 
     const Rect title = scene.solved().float_parts[0].title;
-    const Vec2f target = centre(scene.solved().nodes[1].body);
+    const Rect over = scene.solved().nodes[1].body;
+    const Vec2f target(over.min[0] + over.size[0] * 0.25f, over.min[1] + over.size[1] * 0.25f);
     scene.drag(centre(title), target);
     REQUIRE(scene.layout.float_count == 1);
     CHECK(scene.layout.floats[0].rect.min[0] < title.min[0]);
 
     const Rect moved = scene.solved().float_parts[0].title;
     const Rect body = scene.solved().nodes[1].body;
+    const DropGuides compass = drop_guides(scene.layout, scene.table(), scene.solved(), pid("b"), centre(body));
+    const int32_t right = guide_index(compass, 1, DropZone::Right);
+    REQUIRE(right >= 0);
     scene.press_at(centre(moved));
-    scene.move_to(Vec2f(body.min[0] + body.size[0] - 10.0f, body.min[1] + body.size[1] * 0.5f));
+    scene.move_to(centre(compass.guides[right].rect));
     CHECK(scene.model().drag.source == DragSource::Float);
     scene.release_drag();
     CHECK(scene.layout.float_count == 0);
@@ -185,8 +189,11 @@ TEST_CASE("panel host drag: a forbidden target shows no preview, refuses the dro
     DragScene scene;
     REQUIRE(dock_only_in("b", "vp"));
     const Rect body = scene.solved().nodes[1].body;
+    const DropGuides compass = drop_guides(scene.layout, scene.table(), scene.solved(), pid("b"), centre(body));
+    const int32_t right = guide_index(compass, 1, DropZone::Right);
+    REQUIRE(right >= 0);
     scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
-    scene.move_to(Vec2f(body.min[0] + body.size[0] - 10.0f, body.min[1] + body.size[1] * 0.5f));
+    scene.move_to(centre(compass.guides[right].rect));
 
     const DropPlan& plan = scene.model().drag.plan;
     CHECK(plan.action == DropAction::Cancel);
@@ -330,7 +337,7 @@ TEST_CASE("panel host drag: dropping on a compass guide docks exactly like dock_
     CHECK(equal(scene.layout, expected));
 }
 
-TEST_CASE("panel host drag: guides can be turned off and the bands still decide")
+TEST_CASE("panel host drag: with guides off only a tab strip docks and a body plans nothing")
 {
     DragScene scene;
     set_dock_style([](DockStyle& style) { style.guides = false; });
@@ -339,8 +346,13 @@ TEST_CASE("panel host drag: guides can be turned off and the bands still decide"
     scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
     scene.move_to(centre(vp_body));
     CHECK(scene.model().drag.plan.guide == -1);
+    CHECK(scene.model().drag.plan.action == DropAction::None);
+    scene.move_to(centre(scene.solved().nodes[2].strip));
     CHECK(scene.model().drag.plan.action == DropAction::Dock);
+    CHECK(scene.model().drag.plan.zone == DropZone::Centre);
     scene.release_drag();
+    CHECK_FALSE(diff(scene.layout, scene.original).empty());
+    CHECK(is_open(scene.layout, pid("b")));
 }
 
 TEST_CASE("panel host drag: the panel that landed flashes, then the flash ends")
@@ -443,4 +455,105 @@ TEST_CASE("panel host drag: a live reorder is one undo step and a refused drop r
     scene.move_to(Vec2f(900.0f, 300.0f));
     scene.release_drag();
     CHECK(tab_at(scene.layout, 1, 0) == pid("a"));
+}
+
+TEST_CASE("panel host drag: escape during a float drag puts the float back where it was pressed")
+{
+    DragScene scene;
+    scene.drag(centre(scene.solved().nodes[1].tab_rects[1]), Vec2f(900.0f, 300.0f));
+    REQUIRE(scene.layout.float_count == 1);
+    const Rect start = scene.layout.floats[0].rect;
+
+    scene.press_at(centre(scene.solved().float_parts[0].title));
+    scene.move_to(Vec2f(200.0f, 200.0f));
+    REQUIRE(scene.model().drag.source == DragSource::Float);
+    CHECK_FALSE(scene.layout.floats[0].rect == start);
+    scene.f.driver.key_press(ImKey::Escape);
+    scene.frames(1);
+    scene.release_drag();
+    REQUIRE(scene.layout.float_count == 1);
+    CHECK(scene.layout.floats[0].rect == start);
+}
+
+TEST_CASE("panel host drag: a fully pinned panel starts no tab drag")
+{
+    DragScene scene;
+    set_flags(scene.table(), "b", 0);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(Vec2f(900.0f, 300.0f));
+    CHECK(scene.model().drag.source == DragSource::None);
+    scene.release_drag();
+    CHECK(diff(scene.layout, scene.original).empty());
+}
+
+TEST_CASE("panel host drag: hovering a here guide plans nothing, shows no refusal and keeps the layout")
+{
+    DragScene scene;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(scene.solved().nodes[1].body));
+    const DragState& drag = scene.model().drag;
+    const int32_t own = guide_index(drag.guides, 1, DropZone::Centre);
+    REQUIRE(own >= 0);
+    scene.move_to(centre(drag.guides.guides[own].rect));
+    REQUIRE(drag.plan.guide >= 0);
+    CHECK(drag.guides.guides[drag.plan.guide].here);
+    CHECK(drag.plan.action == DropAction::None);
+    CHECK(drag.plan.reason == DockReason::None);
+    scene.release_drag();
+    CHECK(diff(scene.layout, scene.original).empty());
+}
+
+namespace
+{
+
+bool drawn_at(DragScene& scene, const Rect& want)
+{
+    const LayoutTree& tree = scene.f.context.layout();
+    for (uint32_t i = 0; i < tree.node_count(); ++i)
+    {
+        const LayoutNode& node = tree.node(i);
+        if (node.style.channel == k_channel_drag && math::abs(node.rect.min[0] - want.min[0]) < 0.5f && math::abs(node.rect.min[1] - want.min[1]) < 0.5f && math::abs(node.rect.size[0] - want.size[0]) < 0.5f && math::abs(node.rect.size[1] - want.size[1]) < 0.5f)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+TEST_CASE("panel host drag: every guide that can be hit is drawn where it can be hit")
+{
+    DragScene scene;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    for (const Vec2f at : { centre(scene.solved().nodes[2].body), Vec2f(120.0f, 300.0f), centre(scene.solved().nodes[1].body) })
+    {
+        scene.move_to(at);
+        const DropGuides& guides = scene.model().drag.guides;
+        REQUIRE(guides.count == 9);
+        for (uint32_t i = 0; i < guides.count; ++i)
+        {
+            const bool hovered = static_cast<int32_t>(i) == scene.model().drag.plan.guide;
+            const Rect want = hovered ? Rect{ guides.guides[i].rect.min - Vec2f(2.0f, 2.0f), guides.guides[i].rect.size + Vec2f(4.0f, 4.0f) } : guides.guides[i].rect;
+            CHECK_MESSAGE(drawn_at(scene, want), "guide " << i << " at " << at[0] << "," << at[1]);
+        }
+    }
+    scene.release_drag();
+}
+
+TEST_CASE("panel host drag: hovering an outer guide previews the whole window edge and nothing inner")
+{
+    DragScene scene;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(scene.solved().nodes[2].body));
+    const DropGuides guides = scene.model().drag.guides;
+    const int32_t outer = guide_index(guides, k_dock_root, DropZone::Right);
+    REQUIRE(outer >= 0);
+    scene.move_to(centre(guides.guides[outer].rect));
+    const DropPlan& plan = scene.model().drag.plan;
+    CHECK(plan.action == DropAction::Dock);
+    CHECK(plan.node == k_dock_root);
+    CHECK(plan.zone == DropZone::Right);
+    const Rect surface = scene.solved().surface_rect;
+    CHECK(plan.preview.size[1] == doctest::Approx(surface.size[1]));
+    CHECK(plan.preview.min[0] + plan.preview.size[0] == doctest::Approx(surface.min[0] + surface.size[0]));
+    scene.release_drag();
 }

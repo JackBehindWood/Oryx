@@ -7,124 +7,162 @@ namespace oryx
 namespace
 {
 
-Colour rgb(uint32_t hex)
-{
-    return { static_cast<float>((hex >> 16) & 0xFFu) / 255.0f, static_cast<float>((hex >> 8) & 0xFFu) / 255.0f, static_cast<float>(hex & 0xFFu) / 255.0f, 1.0f };
-}
-
-Colour shift(const Colour& colour, float amount)
-{
-    const float target = amount >= 0.0f ? 1.0f : 0.0f;
-    const float t = math::abs(amount);
-    return { math::lerp(colour.r, target, t), math::lerp(colour.g, target, t), math::lerp(colour.b, target, t), colour.a };
-}
-
-float linear(float channel)
-{
-    return channel <= 0.04045f ? channel / 12.92f : std::pow((channel + 0.055f) / 1.055f, 2.4f);
-}
-
-float luminance(const Colour& colour)
-{
-    return 0.2126f * linear(colour.r) + 0.7152f * linear(colour.g) + 0.0722f * linear(colour.b);
-}
-
-// What differs between the three looks; every role is derived from these.
-struct Seed
-{
-    uint32_t panel;
-    uint32_t header;
-    uint32_t field;
-    uint32_t button;
-    uint32_t tab;
-    uint32_t overlay;
-    uint32_t text;
-    uint32_t border;
-    uint32_t field_border;
-    uint32_t thumb;
-    uint32_t accent;
-    uint32_t on_accent;
-    uint32_t selected;
-    // Positive lightens a surface to show hover, negative darkens it.
-    float hover_step;
-    float radius;
-    float border_width;
-    bool panel_border;
-};
-
-ImStyle role(const Seed& seed, uint32_t background, uint32_t border, float border_width)
+ImStyle role(const GuiPalette& palette, const Colour& background, const Colour& border, float border_width)
 {
     ImStyle style;
-    const Colour fill = rgb(background);
-    style.text = rgb(seed.text);
-    style.background = fill;
-    style.hover = shift(fill, seed.hover_step);
-    style.pressed = shift(fill, -seed.hover_step * 0.9f);
-    style.border = rgb(border);
-    style.accent = rgb(seed.accent);
-    style.on_accent = rgb(seed.on_accent);
-    style.selected = rgb(seed.selected);
-    style.radius = seed.radius;
+    set_style_surface(style, background, palette.hover_step);
+    style.text = palette.text;
+    style.border = border;
+    style.accent = palette.accent;
+    style.on_accent = palette.on_accent;
+    style.selected = palette.selected;
+    style.radius = palette.radius;
     style.border_width = border_width;
     style.text_height = 16.0f;
     style.padding = { 8.0f, 2.0f, 8.0f, 2.0f };
     return style;
 }
 
-GuiTheme build(const Seed& seed)
+// The role styles in one place, so setters and the palette applier cannot miss one.
+constexpr ImStyle GuiTheme::* k_roles[] = { &GuiTheme::panel, &GuiTheme::header, &GuiTheme::field, &GuiTheme::button, &GuiTheme::tab, &GuiTheme::scroll, &GuiTheme::overlay };
+
+template<typename Fn>
+void each_style(GuiTheme& theme, Fn&& fn)
 {
-    GuiTheme theme;
-    theme.version = 2;
-    theme.base = role(seed, seed.panel, seed.border, 0.0f);
-    theme.panel = role(seed, seed.panel, seed.border, seed.panel_border ? seed.border_width : 0.0f);
-    theme.header = role(seed, seed.header, seed.border, seed.panel_border ? seed.border_width : 0.0f);
-    theme.field = role(seed, seed.field, seed.field_border, seed.border_width);
-    theme.button = role(seed, seed.button, seed.field_border, seed.border_width);
-    theme.tab = role(seed, seed.tab, seed.border, 0.0f);
-    theme.tab.selected = rgb(seed.panel);
-    theme.scroll = role(seed, seed.panel, seed.thumb, 0.0f);
-    theme.scroll.hover = shift(rgb(seed.thumb), math::abs(seed.hover_step) * 2.0f * (seed.hover_step >= 0.0f ? 1.0f : -1.0f));
-    theme.overlay = role(seed, seed.overlay, seed.field_border, math::max(1.0f, seed.border_width));
-    theme.min_hit_size = 18.0f;
-    return theme;
+    fn(theme.base);
+    for (ImStyle GuiTheme::* member : k_roles)
+    {
+        fn(theme.*member);
+    }
 }
 
-void scale_style(ImStyle& style, float factor)
+Colour scroll_hover(const GuiPalette& palette)
 {
-    style.radius *= factor;
-    style.border_width = style.border_width > 0.0f ? math::max(1.0f, style.border_width * factor) : 0.0f;
-    style.text_height *= factor;
-    style.padding = { style.padding.left * factor, style.padding.top * factor, style.padding.right * factor, style.padding.bottom * factor };
+    return shift_colour(palette.thumb, math::abs(palette.hover_step) * 2.0f * (palette.hover_step >= 0.0f ? 1.0f : -1.0f));
 }
 
 } // namespace
 
-GuiTheme dark_gui_theme()
+GuiTheme make_gui_theme(const GuiPalette& palette)
 {
-    return build({ 0x242424, 0x1B1B1B, 0x121212, 0x353535, 0x1B1B1B, 0x2B2B2B, 0xE4E4E4, 0x333333, 0x454545, 0x555555, 0x3FB7A6, 0x0C1210, 0x1F5F57, 0.07f, 3.0f, 1.0f, false });
+    GuiTheme theme;
+    theme.version = 2;
+    const float framed = palette.panel_border ? palette.border_width : 0.0f;
+    theme.base = role(palette, palette.panel, palette.border, 0.0f);
+    theme.panel = role(palette, palette.panel, palette.border, framed);
+    theme.header = role(palette, palette.header, palette.border, framed);
+    theme.field = role(palette, palette.field, palette.field_border, palette.border_width);
+    theme.button = role(palette, palette.button, palette.field_border, palette.border_width);
+    theme.tab = role(palette, palette.tab, palette.border, 0.0f);
+    theme.tab.selected = palette.panel;
+    theme.scroll = role(palette, palette.panel, palette.thumb, 0.0f);
+    theme.scroll.hover = scroll_hover(palette);
+    theme.overlay = role(palette, palette.overlay, palette.field_border, math::max(1.0f, palette.border_width));
+    theme.min_hit_size = 18.0f;
+    return theme;
 }
 
-GuiTheme light_gui_theme()
+void apply_gui_palette(GuiTheme& theme, const GuiPalette& palette)
 {
-    return build({ 0xF0F0F1, 0xE2E2E4, 0xFFFFFF, 0xE6E6E8, 0xE2E2E4, 0xFFFFFF, 0x1B1B1D, 0xC8C8CC, 0x9A9AA0, 0xB0B0B6, 0x0B7A6C, 0xFFFFFF, 0xBFE5DF, -0.06f, 3.0f, 1.0f, false });
+    const GuiTheme fresh = make_gui_theme(palette);
+    const auto recolour = [](ImStyle& style, const ImStyle& from) {
+        style.text = from.text;
+        style.background = from.background;
+        style.hover = from.hover;
+        style.pressed = from.pressed;
+        style.border = from.border;
+        style.accent = from.accent;
+        style.on_accent = from.on_accent;
+        style.selected = from.selected;
+        style.radius = from.radius;
+        style.border_width = from.border_width;
+    };
+    recolour(theme.base, fresh.base);
+    for (ImStyle GuiTheme::* member : k_roles)
+    {
+        recolour(theme.*member, fresh.*member);
+    }
 }
 
-GuiTheme high_contrast_gui_theme()
+GuiPalette dark_gui_palette()
 {
-    return build({ 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0xFFFFFF, 0xFFFFFF, 0xFFFFFF, 0xFFFFFF, 0xFFD400, 0x000000, 0x1A4C9E, 0.25f, 2.0f, 2.0f, true });
+    GuiPalette p;
+    p.panel = colour_from_hex(0x242424);
+    p.header = colour_from_hex(0x1B1B1B);
+    p.field = colour_from_hex(0x121212);
+    p.button = colour_from_hex(0x353535);
+    p.tab = colour_from_hex(0x1B1B1B);
+    p.overlay = colour_from_hex(0x2B2B2B);
+    p.text = colour_from_hex(0xE4E4E4);
+    p.border = colour_from_hex(0x333333);
+    p.field_border = colour_from_hex(0x454545);
+    p.thumb = colour_from_hex(0x555555);
+    p.accent = colour_from_hex(0x3FB7A6);
+    p.on_accent = colour_from_hex(0x0C1210);
+    p.selected = colour_from_hex(0x1F5F57);
+    p.hover_step = 0.07f;
+    p.radius = 3.0f;
+    p.border_width = 1.0f;
+    p.panel_border = false;
+    return p;
 }
+
+GuiPalette light_gui_palette()
+{
+    GuiPalette p;
+    p.panel = colour_from_hex(0xF0F0F1);
+    p.header = colour_from_hex(0xE2E2E4);
+    p.field = colour_from_hex(0xFFFFFF);
+    p.button = colour_from_hex(0xE6E6E8);
+    p.tab = colour_from_hex(0xE2E2E4);
+    p.overlay = colour_from_hex(0xFFFFFF);
+    p.text = colour_from_hex(0x1B1B1D);
+    p.border = colour_from_hex(0xC8C8CC);
+    p.field_border = colour_from_hex(0x9A9AA0);
+    p.thumb = colour_from_hex(0xB0B0B6);
+    p.accent = colour_from_hex(0x0B7A6C);
+    p.on_accent = colour_from_hex(0xFFFFFF);
+    p.selected = colour_from_hex(0xBFE5DF);
+    p.hover_step = -0.06f;
+    p.radius = 3.0f;
+    p.border_width = 1.0f;
+    p.panel_border = false;
+    return p;
+}
+
+GuiPalette high_contrast_gui_palette()
+{
+    GuiPalette p;
+    const Colour black = colour_from_hex(0x000000);
+    const Colour white = colour_from_hex(0xFFFFFF);
+    p.panel = black;
+    p.header = black;
+    p.field = black;
+    p.button = black;
+    p.tab = black;
+    p.overlay = black;
+    p.text = white;
+    p.border = white;
+    p.field_border = white;
+    p.thumb = white;
+    p.accent = colour_from_hex(0xFFD400);
+    p.on_accent = black;
+    p.selected = colour_from_hex(0x1A4C9E);
+    p.hover_step = 0.25f;
+    p.radius = 2.0f;
+    p.border_width = 2.0f;
+    p.panel_border = true;
+    return p;
+}
+
+GuiTheme dark_gui_theme() { return make_gui_theme(dark_gui_palette()); }
+GuiTheme light_gui_theme() { return make_gui_theme(light_gui_palette()); }
+GuiTheme high_contrast_gui_theme() { return make_gui_theme(high_contrast_gui_palette()); }
 
 GuiTheme scale_gui_theme(const GuiTheme& theme, float factor)
 {
     GuiTheme scaled = theme;
-    scale_style(scaled.base, factor);
-    scale_style(scaled.panel, factor);
-    scale_style(scaled.header, factor);
-    scale_style(scaled.field, factor);
-    scale_style(scaled.button, factor);
-    scale_style(scaled.tab, factor);
-    scale_style(scaled.scroll, factor);
-    scale_style(scaled.overlay, factor);
+    each_style(scaled, [factor](ImStyle& style) { scale_style(style, factor); });
     for (uint32_t index = 0; index < scaled.variant_count; ++index)
     {
         scale_style(scaled.variants[index], factor);
@@ -138,11 +176,25 @@ GuiTheme scale_gui_theme(const GuiTheme& theme, float factor)
     return scaled;
 }
 
-float contrast_ratio(const Colour& a, const Colour& b)
+void set_accent(GuiTheme& theme, const Colour& accent)
 {
-    const float la = luminance(a);
-    const float lb = luminance(b);
-    return (math::max(la, lb) + 0.05f) / (math::min(la, lb) + 0.05f);
+    each_style(theme, [&accent](ImStyle& style) { set_style_accent(style, accent); });
+    theme.tab.selected = theme.panel.background;
+}
+
+void set_text_height(GuiTheme& theme, float height)
+{
+    each_style(theme, [height](ImStyle& style) { style.text_height = height; });
+}
+
+void set_corner_radius(GuiTheme& theme, float radius)
+{
+    each_style(theme, [radius](ImStyle& style) { style.radius = radius; });
+}
+
+void set_text_colour(GuiTheme& theme, const Colour& text)
+{
+    each_style(theme, [&text](ImStyle& style) { style.text = text; });
 }
 
 } // namespace oryx

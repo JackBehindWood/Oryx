@@ -26,6 +26,9 @@ GuiDockTheme derive_dock_theme(const GuiTheme& theme)
     dock.guide_hover = with_alpha(accent, 0.95f);
     dock.guide_glyph = accent;
     dock.guide_glyph_hover = theme.overlay.background;
+    dock.here_state = with_alpha(theme.panel.border, 0.9f);
+    dock.outer_guide = with_alpha(theme.palette[1], 0.85f);
+    dock.outer_guide_hover = with_alpha(theme.palette[1], 1.0f);
     dock.refusal = theme.palette[5];
     dock.chip_border = accent;
     dock.focus_ring = accent;

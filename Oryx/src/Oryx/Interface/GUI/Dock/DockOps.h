@@ -31,6 +31,8 @@ enum class DockReason : uint8_t
 };
 
 [[nodiscard]] const char* to_string(DockReason reason);
+// The refusal as a short sentence for the person dragging; to_string stays the developer wording for logs and tests.
+[[nodiscard]] const char* describe(DockReason reason);
 
 // applied is true exactly when reason is None.
 struct DockResult

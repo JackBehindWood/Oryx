@@ -214,59 +214,19 @@ TEST_CASE("solve: an empty surface and a second surface")
     CHECK(is_empty(solved.nodes[0].rect));
 }
 
-TEST_CASE("drop_target: window edges, strips, bodies and gaps")
+TEST_CASE("strip_at: only the strip of a Tabs node answers")
 {
     const PanelTable panels = make_panels();
     const DockLayout layout = make_sample(panels);
     const SolvedLayout solved = solved_sample(panels, layout);
-
-    CHECK_FALSE(drop_target(layout, solved, Vec2f(-5.0f, 10.0f)).valid);
-    CHECK_FALSE(drop_target(layout, solved, Vec2f(500.0f, 10.0f)).valid);
-    CHECK_FALSE(drop_target(layout, solved, Vec2f(279.0f, 150.0f)).valid);
-
-    DropTarget target = drop_target(layout, solved, Vec2f(2.0f, 150.0f));
-    CHECK(target.valid);
-    CHECK(target.node == k_dock_root);
-    CHECK(target.zone == DropZone::Left);
-    check_rect(target.preview, 0.0f, 0.0f, 118.8f, 300.0f);
-
-    target = drop_target(layout, solved, Vec2f(100.0f, 10.0f));
-    CHECK(target.valid);
-    CHECK(target.node == 1);
-    CHECK(target.zone == DropZone::Centre);
-    check_rect(target.preview, 0.0f, 0.0f, 277.2f, 300.0f);
-
-    target = drop_target(layout, solved, Vec2f(140.0f, 160.0f));
-    CHECK(target.node == 1);
-    CHECK(target.zone == DropZone::Centre);
-
-    target = drop_target(layout, solved, Vec2f(20.0f, 160.0f));
-    CHECK(target.node == 1);
-    CHECK(target.zone == DropZone::Left);
-    check_rect(target.preview, 0.0f, 0.0f, (277.2f - 4.0f) * k_dock_new_ratio, 300.0f);
-
-    target = drop_target(layout, solved, Vec2f(140.0f, 270.0f));
-    CHECK(target.node == 1);
-    CHECK(target.zone == DropZone::Bottom);
-
-    target = drop_target(layout, solved, Vec2f(340.0f, 150.0f));
-    CHECK(target.node == 2);
-    CHECK(target.zone == DropZone::Centre);
+    CHECK(strip_at(layout, solved, Vec2f(-5.0f, 10.0f)) == k_no_node);
+    CHECK(strip_at(layout, solved, Vec2f(100.0f, 150.0f)) == k_no_node);
+    CHECK(strip_at(layout, solved, Vec2f(279.0f, 10.0f)) == k_no_node);
+    CHECK(strip_at(layout, solved, Vec2f(100.0f, 10.0f)) == 1);
+    CHECK(strip_at(layout, solved, Vec2f(340.0f, 10.0f)) == 2);
 }
 
-TEST_CASE("drop_target: an empty surface takes a centre drop")
-{
-    const PanelTable panels = make_panels();
-    const DockLayout layout;
-    const SolvedLayout solved = solved_sample(panels, layout);
-    const DropTarget target = drop_target(layout, solved, Vec2f(200.0f, 150.0f));
-    CHECK(target.valid);
-    CHECK(target.node == k_dock_root);
-    CHECK(target.zone == DropZone::Centre);
-    check_rect(target.preview, 0.0f, 0.0f, 400.0f, 300.0f);
-}
-
-TEST_CASE("drop_target: with room to spare the preview is the rect the dock then takes")
+TEST_CASE("resolve_drop: with room to spare an inner preview is the rect the dock then takes")
 {
     const PanelTable panels = make_panels();
     const Rect big{ Vec2f(0.0f, 0.0f), Vec2f(1000.0f, 600.0f) };
@@ -276,31 +236,24 @@ TEST_CASE("drop_target: with room to spare the preview is the rect the dock then
         DockLayout layout = make_sample(panels);
         const SolvedLayout before = solve(layout, panels, k_metrics, big);
         const Rect& node = before.nodes[2].rect;
-        const float mid_x = node.min[0] + node.size[0] * 0.5f;
-        Vec2f pointer(mid_x, 300.0f);
-        if (zone == DropZone::Left)
-            pointer = Vec2f(node.min[0] + 2.0f, 300.0f);
-        else if (zone == DropZone::Right)
-            pointer = Vec2f(node.min[0] + node.size[0] - 20.0f, 300.0f);
-        else if (zone == DropZone::Top)
-            pointer = Vec2f(mid_x, 40.0f);
-        else
-            pointer = Vec2f(mid_x, 570.0f);
+        const DropGuides guides = drop_guides(layout, panels, before, pid("a"), Vec2f(node.min[0] + node.size[0] * 0.5f, 300.0f));
+        const int32_t index = guide_index(guides, 2, zone);
+        REQUIRE(index >= 0);
+        const Rect& box = guides.guides[index].rect;
+        const DropPlan plan = resolve_drop(layout, panels, before, guides, pid("a"), Vec2f(box.min[0] + box.size[0] * 0.5f, box.min[1] + box.size[1] * 0.5f), false);
+        REQUIRE(plan.action == DropAction::Dock);
+        REQUIRE(plan.node == 2);
+        REQUIRE(plan.zone == zone);
 
-        const DropTarget target = drop_target(layout, before, pointer);
-        REQUIRE(target.valid);
-        REQUIRE(target.node == 2);
-        REQUIRE(target.zone == zone);
-
-        require_applied(dock_panel(layout, panels, pid("c"), 2, zone));
+        require_applied(dock_panel(layout, panels, pid("a"), 2, zone));
         const SolvedLayout after = solve(layout, panels, k_metrics, big);
         int32_t placed = k_no_node;
         for (uint32_t n = 0; n < layout.node_count; ++n)
-            if (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].tabs[0] == pid("c"))
+            if (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].tabs[0] == pid("a"))
                 placed = static_cast<int32_t>(n);
         REQUIRE(placed != k_no_node);
         const Rect& rect = after.nodes[placed].rect;
-        check_rect(target.preview, rect.min[0], rect.min[1], rect.size[0], rect.size[1]);
+        check_rect(plan.preview, rect.min[0], rect.min[1], rect.size[0], rect.size[1]);
     }
 }
 

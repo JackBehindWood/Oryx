@@ -378,3 +378,69 @@ TEST_CASE("selection: a list box row press picks, shortcut toggles and shift ext
     CHECK(selection_contains(words, k_count, 3));
     CHECK(selection_contains(words, k_count, 4));
 }
+
+TEST_CASE("theme: the presets are their palettes, and a palette round-trips through make_gui_theme")
+{
+    const GuiTheme dark = dark_gui_theme();
+    const GuiPalette palette = dark_gui_palette();
+    CHECK(dark.panel.background == palette.panel);
+    CHECK(dark.field.border == palette.field_border);
+    CHECK(dark.button.hover == shift_colour(palette.button, palette.hover_step));
+    CHECK(dark.button.pressed == shift_colour(palette.button, -palette.hover_step * 0.9f));
+    CHECK(dark.tab.selected == palette.panel);
+    CHECK(dark.base.border_width == 0.0f);
+    CHECK(high_contrast_gui_theme().panel.border_width == 2.0f);
+    CHECK(light_gui_theme().field.background == colour_from_hex(0xFFFFFF));
+}
+
+TEST_CASE("theme: set_accent reaches every role, keeps the chosen tab joined to its panel and picks a readable mark")
+{
+    GuiTheme theme = dark_gui_theme();
+    const Colour red = colour_from_hex(0xD03020);
+    set_accent(theme, red);
+    for (const ImStyle* style : { &theme.base, &theme.panel, &theme.header, &theme.field, &theme.button, &theme.tab, &theme.scroll, &theme.overlay })
+    {
+        CHECK(style->accent == red);
+        CHECK(contrast_ratio(style->accent, style->on_accent) >= 3.0f);
+    }
+    CHECK(theme.tab.selected == theme.panel.background);
+    CHECK(theme.field.background == dark_gui_theme().field.background);
+    CHECK(on_colour(colour_from_hex(0xFFD400)) == colour_from_hex(0x000000));
+    CHECK(on_colour(colour_from_hex(0x101010)) == colour_from_hex(0xFFFFFF));
+}
+
+TEST_CASE("theme: size setters and apply_gui_palette keep what they are not about")
+{
+    GuiTheme theme = scale_gui_theme(dark_gui_theme(), 1.5f);
+    theme.spacing = 11.0f;
+    add_style_variant(theme, "danger", theme.button);
+    set_text_height(theme, 20.0f);
+    set_corner_radius(theme, 6.0f);
+    CHECK(theme.field.text_height == 20.0f);
+    CHECK(theme.overlay.radius == 6.0f);
+    CHECK(theme.button.padding.left == doctest::Approx(12.0f));
+
+    apply_gui_palette(theme, light_gui_palette());
+    CHECK(theme.panel.background == light_gui_palette().panel);
+    CHECK(theme.field.text_height == 20.0f);
+    CHECK(theme.spacing == 11.0f);
+    CHECK(theme.variant_count == 1);
+}
+
+TEST_CASE("theme: the gui:: setters edit the active theme and re-derive the dock theme")
+{
+    GuiFixture f;
+    ContextScope<GuiContext> scope(f.context);
+    const Colour green = colour_from_hex(0x30A040);
+    gui::set_theme_accent(green);
+    CHECK(gui::theme().panel.accent == green);
+    CHECK(gui::dock_theme().preview_border == green);
+    gui::set_theme_text_height(18.0f);
+    CHECK(gui::theme().button.text_height == 18.0f);
+    gui::GuiDockTheme dock = gui::dock_theme();
+    dock.refusal = colour_from_hex(0xFF0000);
+    gui::set_dock_theme(dock);
+    CHECK(gui::dock_theme().refusal == colour_from_hex(0xFF0000));
+    gui::set_theme(dark_gui_theme());
+    CHECK(gui::dock_theme().refusal == gui::derive_dock_theme(dark_gui_theme()).refusal);
+}

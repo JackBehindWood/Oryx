@@ -19,7 +19,6 @@ DockMetrics scaled_metrics(float scale)
     metrics.tab_min_width *= scale;
     metrics.tab_max_width *= scale;
     metrics.strip_button *= scale;
-    metrics.root_edge *= scale;
     return metrics;
 }
 

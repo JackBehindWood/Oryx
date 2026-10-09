@@ -44,17 +44,11 @@ struct DockMetrics
     float splitter = 4.0f;
     float tab_min_width = 48.0f;
     float tab_max_width = 160.0f;
-    // Fraction of a Tabs body, from each edge, that drops as a split instead of a tab.
-    float edge_band = 0.25f;
-    // Distance in points from the surface edge that docks beside the whole tree.
-    float root_edge = 12.0f;
     // Width reserved at the right end of a strip for the collapse chevron when every tab may collapse; zero reserves nothing.
     float strip_button = 22.0f;
     float toolbar_height = 24.0f;
-    // Side of one drop guide, the gap between guides of a compass and the gap between the outer guides and the surface edge.
-    float guide_size = 28.0f;
-    float guide_gap = 4.0f;
-    float guide_inset = 6.0f;
+    // The unit the drop guides scale from (the tab text height): a guide's half size is a node's smaller side over 8, clamped to half and one and a half units, as in ImGui.
+    float guide_unit = 16.0f;
     DockStyle style;
 };
 
@@ -114,17 +108,8 @@ struct SolvedLayout
 // Tabs that do not fit keep tab_min_width and scroll so the selected one is visible; a surface smaller than the panels' minimums shrinks both sides proportionally and bodies clip.
 [[nodiscard]] SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface = 0);
 
-// Where a dragged panel would land. Combine with can_dock; floats are ignored. The preview is the ratio rect of the new split; panel minimums can make the solved rect larger.
-struct DropTarget
-{
-    bool valid = false;
-    int32_t node = k_no_node;
-    DropZone zone = DropZone::Centre;
-    Rect preview;
-    uint8_t surface = 0;
-};
-
-[[nodiscard]] DropTarget drop_target(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);
+// The Tabs node whose strip is under the pointer, or k_no_node.
+[[nodiscard]] int32_t strip_at(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);
 
 inline constexpr uint32_t k_max_drop_guides = 9;
 
@@ -136,22 +121,33 @@ struct DropGuide
     Rect rect;
     bool allowed = false;
     DockReason reason = DockReason::None;
+    // The drop would leave the arrangement as it is: drawn, hoverable, never refused.
+    bool here = false;
+    // Beside the whole tree (an edge-anchored bar) instead of splitting the hovered node.
+    bool outer = false;
 };
 
 struct DropGuides
 {
+    // Outer guides first, then the inner five of the hovered node.
     DropGuide guides[k_max_drop_guides];
     uint32_t count = 0;
+    // The inner cluster: the hovered Tabs node, its centre and half size (zero when there is none), for the pie hit-test.
+    int32_t inner_node = k_no_node;
+    Vec2f centre{ 0.0f, 0.0f };
+    float half = 0.0f;
     // The surface the guides belong to; every guide targets it.
     uint8_t surface = 0;
 };
 
-// The compass for dragging `panel` with the pointer at `pointer`: centre plus four edge guides around the hovered node's body, and four outer guides at the surface edges. A node whose body is too small for
-// the cluster keeps the centre guide only, then nothing; the outer guides need room for themselves. Empty when the style turns guides off, the pointer is outside the surface or the panel may not dock at all.
-// Permission is can_dock_into, the same set dock_panel uses; a floating panel gets no centre-body guide, matching the float rule of resolve_drop.
+// ImGui's compass for dragging `panel`: four outer guides, bars hugging the middle of each surface edge that dock beside the whole tree, and five inner squares (a plus shape) centred on the Tabs node under the pointer.
+// The outer four are always there; the inner five are absent over a splitter gap or a float. An empty surface gets one centre guide. Empty when the style turns guides off, the pointer is outside the surface or the panel may not dock at all.
+// Permission is can_dock_into, the same set dock_panel uses; a refused guide stays, flagged, and one whose drop would change nothing is flagged `here`.
 [[nodiscard]] DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer);
-// Index of the guide under the pointer, or -1.
+// Index of the guide under the pointer, or -1. An outer guide wins; the inner five are hit-tested as a pie (centre inside 1.4 half sizes, then the pointer's quadrant out to 2.6, then the squares grown by 0.3).
 [[nodiscard]] int32_t guide_at(const DropGuides& guides, const Vec2f& pointer);
+// Index of the guide with this node and zone, or -1.
+[[nodiscard]] int32_t guide_index(const DropGuides& guides, int32_t node, DropZone zone);
 // The inner mark of a guide's icon: the half of the box the zone would take, the middle for Centre.
 [[nodiscard]] Rect guide_glyph(const Rect& guide, DropZone zone);
 
@@ -165,7 +161,7 @@ enum class DropAction : uint8_t
     Cancel
 };
 
-// What releasing a dragged panel at the pointer would do; a pointer over a guide wins over the bands. `slot` is the tab position for Reorder and for a Centre dock; reason says why a Cancel was refused.
+// What releasing a dragged panel at the pointer would do; a guide under the pointer or a tab strip are the only things that dock; anywhere else inside the surface plans nothing. `slot` is the tab position for Reorder and for a Centre dock; reason says why a Cancel was refused.
 struct DropPlan
 {
     DropAction action = DropAction::None;
@@ -186,5 +182,7 @@ inline constexpr float k_dock_float_height = 240.0f;
 
 // The one place that decides a drag, shared by the host's preview and its release. `float_only` (Shift) skips every dock target; a pointer outside the surface also floats when the panel may.
 [[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only);
+// The same decision over guides the caller built once for this pointer.
+[[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, PanelId panel, const Vec2f& pointer, bool float_only);
 
 }

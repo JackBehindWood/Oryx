@@ -218,7 +218,7 @@ TEST_CASE("fuzz: mutated layouts either validate or throw oryx::Error, and survi
             CHECK(solved.nodes[n].rect.size[0] >= 0.0f);
             CHECK(solved.nodes[n].rect.size[1] >= 0.0f);
         }
-        (void)drop_target(layout, solved, Vec2f(rng.unit() * 400.0f, rng.unit() * 300.0f));
+        (void)strip_at(layout, solved, Vec2f(rng.unit() * 400.0f, rng.unit() * 300.0f));
 
         DockLayout copy = layout;
         normalize(copy);

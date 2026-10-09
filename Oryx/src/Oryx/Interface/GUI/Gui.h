@@ -41,6 +41,14 @@ static_assert(std::is_trivially_copyable_v<GuiIo> && std::is_standard_layout_v<G
 
 [[nodiscard]] GuiIo io();
 [[nodiscard]] const GuiTheme& theme();
+// Applies a whole theme; the dock theme is re-derived from it, so assign set_dock_theme after this for a custom dock look.
+void set_theme(const GuiTheme& theme);
+// Edit-and-apply over the active theme, each through the free function of the same name in GuiTheme.h, so the roles stay consistent.
+void set_theme_accent(const Colour& accent);
+void set_theme_text_height(float height);
+void set_theme_corner_radius(float radius);
+[[nodiscard]] const GuiDockTheme& dock_theme();
+void set_dock_theme(const GuiDockTheme& theme);
 void request_cursor(CursorShape cursor);
 [[nodiscard]] ItemDrag item_drag(GuiId id);
 // Widget state under an id of the current scope; see ImContext::state for the lifetime and limits.

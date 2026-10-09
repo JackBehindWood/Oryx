@@ -49,6 +49,24 @@ struct ImTheme
     uint32_t version = 1;
 };
 
+// Colour from 0xRRGGBB, opaque.
+[[nodiscard]] Colour colour_from_hex(uint32_t rgb);
+// `colour` moved toward white (amount > 0) or black (amount < 0) by |amount| of the way, alpha kept. The one rule behind every hover and pressed fill.
+[[nodiscard]] Colour shift_colour(const Colour& colour, float amount);
+// WCAG contrast ratio of two opaque colours, 1 to 21.
+[[nodiscard]] float contrast_ratio(const Colour& a, const Colour& b);
+// Black or white, whichever has the higher contrast on `fill`.
+[[nodiscard]] Colour on_colour(const Colour& fill);
+
+// Sets `background` and derives the states from it: hover = shift_colour(background, hover_step), pressed = shift_colour(background, -0.9 * hover_step).
+void set_style_surface(ImStyle& style, const Colour& background, float hover_step);
+// Sets `accent` and derives the marks on it: on_accent = on_colour(accent), selected = background blended 35% toward the accent.
+void set_style_accent(ImStyle& style, const Colour& accent);
+// Multiplies the sizes (radius, border width, text height, padding) and leaves the colours.
+void scale_style(ImStyle& style, float factor);
+// Applies set_style_accent to the base style; the named variants keep their own accents.
+void set_accent(ImTheme& theme, const Colour& accent);
+
 // Adds the variant or replaces one of the same name. Throws Error when all slots are taken.
 void add_style_variant(ImTheme& theme, std::string_view name, const ImStyle& style);
 // The base style when no variant has this name or id.
