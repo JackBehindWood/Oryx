@@ -287,3 +287,37 @@ TEST_CASE("solve: a split reports the gap between its children as the splitter")
     CHECK(gap.size[0] == doctest::Approx(k_metrics.splitter));
     CHECK(gap.size[1] == doctest::Approx(k_surface.size[1]));
 }
+
+TEST_CASE("solve: a tab scroll keeps its window until the selection changes, and clamps to the tab count")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout;
+    for (const char* name : { "a", "b", "c", "d", "e", "f" })
+        require_applied(dock_panel(layout, panels, pid(name), k_dock_root, DropZone::Centre));
+    const Rect surface{ Vec2f(0.0f, 0.0f), Vec2f(100.0f, 200.0f) };
+
+    TabScroll scroll;
+    SolvedLayout solved = solve(layout, panels, k_metrics, surface, 0, &scroll);
+    CHECK(solved.nodes[0].first_visible == 4);
+
+    scroll.first[0] = 1;
+    solved = solve(layout, panels, k_metrics, surface, 0, &scroll);
+    CHECK(solved.nodes[0].first_visible == 1);
+    CHECK(solved.nodes[0].visible_count == 2);
+
+    scroll.first[0] = 200;
+    solved = solve(layout, panels, k_metrics, surface, 0, &scroll);
+    CHECK(solved.nodes[0].first_visible == 4);
+
+    scroll.first[0] = 0;
+    solved = solve(layout, panels, k_metrics, surface, 0, &scroll);
+    CHECK(solved.nodes[0].first_visible == 0);
+
+    require_applied(select_tab(layout, 0, 2));
+    solved = solve(layout, panels, k_metrics, surface, 0, &scroll);
+    CHECK(solved.nodes[0].first_visible == 1);
+
+    const SolvedLayout wide = solve(layout, panels, k_metrics, Rect{ Vec2f(0.0f, 0.0f), Vec2f(400.0f, 200.0f) }, 0, &scroll);
+    CHECK(wide.nodes[0].visible_count == 6);
+    CHECK(scroll.first[0] == 0);
+}

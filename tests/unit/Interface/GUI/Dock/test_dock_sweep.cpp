@@ -107,6 +107,8 @@ std::string first_violation(const DockLayout& layout, const PanelTable& panels, 
             return "collapsed node with a body: " + where;
         if (is_empty(s.strip) || s.visible_count < 1)
             return "unreachable tabs: " + where;
+        if (s.first_visible + s.visible_count > node.count)
+            return "tab window past the last tab: " + where;
         for (uint32_t t = s.first_visible; t < s.first_visible + s.visible_count; ++t)
             if (is_empty(s.tab_rects[t]))
                 return "empty visible tab: " + where;

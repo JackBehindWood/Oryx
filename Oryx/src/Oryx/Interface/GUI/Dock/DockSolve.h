@@ -57,6 +57,31 @@ struct DockMetrics
 // The expander's side; a zero strip_button still gets one when a node is collapsed.
 [[nodiscard]] inline float expander_size(const DockMetrics& metrics) { return metrics.strip_button > 0.0f ? metrics.strip_button : metrics.strip_height; }
 
+// Per-node tab strip window kept by the host between frames (view state, never saved): `first` is the first visible tab, `seen_selected` the selection the window last accounted for (255 = none).
+struct TabScroll
+{
+    uint8_t first[k_max_dock_nodes] = {};
+    uint8_t seen_selected[k_max_dock_nodes] = {};
+
+    TabScroll() { for (uint8_t& seen : seen_selected) seen = 255; }
+    // Clamps the stored window to `count - visible` and, when the selection changed since last seen, moves it just far enough to show the selection.
+    uint32_t place(int32_t node, uint32_t selected, uint32_t count, uint32_t visible)
+    {
+        const uint32_t last_first = count - visible;
+        uint32_t f = first[node] < last_first ? first[node] : last_first;
+        if (seen_selected[node] != selected)
+        {
+            if (selected < f)
+                f = selected;
+            else if (selected >= f + visible)
+                f = selected - visible + 1u;
+            seen_selected[node] = static_cast<uint8_t>(selected);
+        }
+        first[node] = static_cast<uint8_t>(f);
+        return f;
+    }
+};
+
 struct SolvedNode
 {
     Rect rect;
@@ -105,8 +130,8 @@ struct SolvedLayout
 // The placement a node's selected panel gets after style, panel and context are weighed.
 [[nodiscard]] ToolbarPlacement resolve_toolbar_placement(const DockStyle& style, const PanelDesc& panel, uint32_t tab_count);
 
-// Tabs that do not fit keep tab_min_width and scroll so the selected one is visible; a surface smaller than the panels' minimums shrinks both sides proportionally and bodies clip.
-[[nodiscard]] SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface = 0);
+// Tabs that do not fit keep tab_min_width and scroll so the selected one is visible; with a TabScroll the window is the stored offset (revealing the selection only when it changed); a surface smaller than the panels' minimums shrinks both sides proportionally and bodies clip.
+[[nodiscard]] SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface = 0, TabScroll* scroll = nullptr);
 
 // The Tabs node whose strip is under the pointer, or k_no_node.
 [[nodiscard]] int32_t strip_at(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer);

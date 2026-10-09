@@ -99,6 +99,9 @@ struct DragState
     // A tab drag reorders its strip live; where the tab started, so Esc or a refused drop can put it back.
     uint32_t origin_slot = 0;
     bool reordered = false;
+    // Seconds the pointer has rested in a strip's edge zone, and since the last auto-scroll step.
+    float edge_dwell = 0.0f;
+    float scroll_clock = 0.0f;
 };
 
 enum class HistoryRequest : uint8_t
@@ -169,6 +172,9 @@ struct DockView
     ImId host_id;
     Rect host_rect;
     SolvedLayout solved;
+    TabScroll tab_scroll;
+    float wheel_accum = 0.0f;
+    int32_t wheel_node = k_no_node;
     PanelBody bodies[k_max_panels];
     uint32_t body_count = 0;
     PanelHostResult result;

@@ -25,6 +25,7 @@ struct Solver
     MinSize mins[k_max_dock_nodes];
     // An all-collapsed root has nothing to give the space to, so it is laid out expanded.
     bool ignore_collapse = false;
+    TabScroll* scroll = nullptr;
 
     bool valid(int32_t node) const { return node >= 0 && static_cast<uint32_t>(node) < layout.node_count; }
     const PanelDesc* selected_desc(const DockNode& n) const { return n.selected < n.count ? find_panel(panels, n.tabs[n.selected]) : nullptr; }
@@ -129,9 +130,13 @@ struct Solver
         {
             tab_w = math::min(metrics.tab_min_width, avail);
             visible = math::clamp<uint32_t>(static_cast<uint32_t>(avail / tab_w), 1u, count);
-            if (n.selected >= visible)
+            if (scroll != nullptr)
+                first = scroll->place(node, n.selected, count, visible);
+            else if (n.selected >= visible)
                 first = n.selected - visible + 1u;
         }
+        if (scroll != nullptr && visible >= count)
+            scroll->first[node] = 0;
         s.first_visible = static_cast<uint8_t>(first);
         s.visible_count = static_cast<uint8_t>(visible);
         for (uint32_t i = 0; i < visible; ++i)
@@ -260,7 +265,7 @@ Rect clamp_float(const Rect& rect, const Vec2f& min_size, const Rect& surface)
     return Rect{ Vec2f(x, y), Vec2f(w, h) };
 }
 
-SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface)
+SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface, TabScroll* scroll)
 {
     SolvedLayout out;
     out.surface = surface;
@@ -270,6 +275,7 @@ SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const Doc
     out.float_count = math::min(layout.float_count, k_max_dock_floats);
 
     Solver solver{ layout, panels, metrics, out, {} };
+    solver.scroll = scroll;
     const int32_t root = surface < k_max_dock_surfaces ? layout.roots[surface] : k_no_node;
     if (root != k_no_node)
     {

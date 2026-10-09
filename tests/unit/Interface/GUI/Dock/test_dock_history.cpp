@@ -127,3 +127,64 @@ TEST_CASE("LayoutHistory: drives a real edit sequence")
     REQUIRE(undo(*history, out));
     CHECK(equal(out, make_sample(panels)));
 }
+
+TEST_CASE("LayoutHistory: selection and float z-order changes rewrite the head instead of adding entries")
+{
+    const PanelTable panels = make_panels();
+    auto history = std::make_unique<LayoutHistory>();
+    DockLayout layout = make_sample(panels);
+    reset(*history, layout);
+
+    require_applied(set_split(layout, panels, 0, DockSizeMode::Ratio, 0.4f, 0.0f));
+    push(*history, layout);
+    REQUIRE(history->count == 2);
+
+    for (uint32_t i = 0; i < 100; ++i)
+    {
+        require_applied(select_tab(layout, 1, i % 2));
+        push(*history, layout);
+    }
+    CHECK(history->count == 2);
+    CHECK(history->cursor == 1);
+
+    DockLayout out;
+    REQUIRE(undo(*history, out));
+    CHECK(out.nodes[0].ratio == doctest::Approx(0.7f));
+    REQUIRE(redo(*history, out));
+    CHECK(equal(out, layout));
+}
+
+TEST_CASE("LayoutHistory: a float raise coalesces but a moved float is a new entry")
+{
+    const PanelTable panels = make_panels();
+    auto history = std::make_unique<LayoutHistory>();
+    DockLayout layout = make_sample(panels);
+    require_applied(float_panel(layout, panels, pid("c"), Rect{ Vec2f(10.0f, 10.0f), Vec2f(100.0f, 100.0f) }));
+    require_applied(float_panel(layout, panels, pid("d"), Rect{ Vec2f(50.0f, 50.0f), Vec2f(100.0f, 100.0f) }));
+    reset(*history, layout);
+
+    std::swap(layout.floats[0], layout.floats[1]);
+    push(*history, layout);
+    CHECK(history->count == 1);
+    CHECK(equal(history->snapshots[history->oldest], layout));
+
+    layout.floats[1].rect.min[0] += 20.0f;
+    push(*history, layout);
+    CHECK(history->count == 2);
+}
+
+TEST_CASE("LayoutHistory: a view-only push after undo keeps the redo branch")
+{
+    const PanelTable panels = make_panels();
+    auto history = std::make_unique<LayoutHistory>();
+    DockLayout layout = make_sample(panels);
+    reset(*history, layout);
+    require_applied(set_split(layout, panels, 0, DockSizeMode::Ratio, 0.4f, 0.0f));
+    push(*history, layout);
+
+    DockLayout out;
+    REQUIRE(undo(*history, out));
+    require_applied(select_tab(out, 1, 0));
+    push(*history, out);
+    CHECK(can_redo(*history));
+}

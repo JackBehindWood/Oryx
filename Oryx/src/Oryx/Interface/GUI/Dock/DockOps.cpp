@@ -1251,6 +1251,23 @@ void reset(LayoutHistory& history, const DockLayout& layout)
     history.cursor = 0;
 }
 
+bool differs_only_in_view(const DockLayout& a, const DockLayout& b)
+{
+    if (a.float_count != b.float_count || a.node_count != b.node_count)
+        return false;
+    DockLayout x = a;
+    DockLayout y = b;
+    for (DockLayout* l : { &x, &y })
+    {
+        for (uint32_t n = 0; n < l->node_count && n < k_max_dock_nodes; ++n)
+            l->nodes[n].selected = 0;
+        for (uint32_t i = 1; i < l->float_count && i < k_max_dock_floats; ++i)
+            for (uint32_t j = i; j > 0 && l->floats[j].panel.hash < l->floats[j - 1].panel.hash; --j)
+                std::swap(l->floats[j], l->floats[j - 1]);
+    }
+    return equal(x, y);
+}
+
 void push(LayoutHistory& history, const DockLayout& layout)
 {
     if (history.count == 0)
@@ -1261,6 +1278,11 @@ void push(LayoutHistory& history, const DockLayout& layout)
     const uint32_t current = (history.oldest + history.cursor) % k_dock_history_size;
     if (equal(history.snapshots[current], layout))
         return;
+    if (differs_only_in_view(history.snapshots[current], layout))
+    {
+        history.snapshots[current] = layout;
+        return;
+    }
 
     history.count = history.cursor + 1;
     if (history.count == k_dock_history_size)

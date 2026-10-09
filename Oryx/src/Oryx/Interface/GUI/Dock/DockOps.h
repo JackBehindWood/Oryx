@@ -118,7 +118,9 @@ struct LayoutHistory
 };
 
 void reset(LayoutHistory& history, const DockLayout& layout);
-// No-op when equal to the current entry; drops redo entries and, when full, the oldest.
+// Equal apart from each stack's selected tab and the float z-order, the two fields a click or raise changes.
+[[nodiscard]] bool differs_only_in_view(const DockLayout& a, const DockLayout& b);
+// No-op when equal to the current entry; a view-only difference (selection, float z-order) rewrites the current entry instead of adding one; otherwise drops redo entries and, when full, the oldest.
 void push(LayoutHistory& history, const DockLayout& layout);
 [[nodiscard]] bool can_undo(const LayoutHistory& history);
 [[nodiscard]] bool can_redo(const LayoutHistory& history);

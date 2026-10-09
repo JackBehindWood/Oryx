@@ -260,19 +260,153 @@ TEST_CASE("panel host: a splitter next to a non-resizable side does not move")
     CHECK(equal(scene.layout, before));
 }
 
-TEST_CASE("panel host: the wheel over an overflowing strip steps the selected tab")
+namespace
 {
-    HostScene scene(300.0f, 400.0f);
+
+void overflow_node_one(HostScene& scene)
+{
     for (const char* name : { "c", "d", "e", "f", "g", "h" })
         require_applied(dock_panel(scene.layout, scene.model().panels, pid(name), 1, DropZone::Centre));
     scene.frames();
+}
+
+void run_held(HostScene& scene, uint32_t frames)
+{
+    scene.act([&](auto& build) { scene.f.driver.run_frames(frames, build); });
+}
+
+}
+
+TEST_CASE("panel host: the wheel over an overflowing strip scrolls it and keeps the selection")
+{
+    HostScene scene(300.0f, 400.0f);
+    overflow_node_one(scene);
     const SolvedNode& node = scene.solved().nodes[1];
     REQUIRE(node.visible_count < scene.layout.nodes[1].count);
     const uint8_t selected = scene.layout.nodes[1].selected;
+    const uint32_t first = node.first_visible;
+    REQUIRE(first > 0);
     scene.f.driver.move_to(centre(node.strip));
     scene.f.driver.wheel({ 0.0f, 1.0f });
     scene.frames(1);
-    CHECK(scene.layout.nodes[1].selected == selected - 1);
+    CHECK(scene.layout.nodes[1].selected == selected);
+    scene.frames(1);
+    CHECK(scene.solved().nodes[1].first_visible == first - 1);
+}
+
+TEST_CASE("panel host: a fractional wheel accumulates before the strip moves a tab")
+{
+    HostScene scene(300.0f, 400.0f);
+    overflow_node_one(scene);
+    const uint32_t first = scene.solved().nodes[1].first_visible;
+    scene.f.driver.move_to(centre(scene.solved().nodes[1].strip));
+    scene.f.driver.wheel({ 0.0f, 0.4f });
+    scene.frames(2);
+    CHECK(scene.solved().nodes[1].first_visible == first);
+    scene.f.driver.wheel({ 0.0f, 0.4f });
+    scene.f.driver.wheel({ 0.0f, 0.4f });
+    scene.frames(2);
+    CHECK(scene.solved().nodes[1].first_visible == first - 1);
+}
+
+TEST_CASE("panel host: clicking a visible tab in an overflowing strip selects it without moving the window")
+{
+    HostScene scene(300.0f, 400.0f);
+    overflow_node_one(scene);
+    const SolvedNode& node = scene.solved().nodes[1];
+    const uint32_t first = node.first_visible;
+    const Rect tab = node.tab_rects[first];
+    scene.click(centre(tab));
+    scene.frames(2);
+    CHECK(scene.layout.nodes[1].selected == first);
+    CHECK(scene.solved().nodes[1].first_visible == first);
+    check_near(scene.solved().nodes[1].tab_rects[first], tab);
+}
+
+TEST_CASE("panel host: a selection made by code reveals the tab")
+{
+    HostScene scene(300.0f, 400.0f);
+    overflow_node_one(scene);
+    REQUIRE(scene.solved().nodes[1].first_visible > 0);
+    REQUIRE(select_panel("a").applied);
+    scene.frames(2);
+    CHECK(scene.solved().nodes[1].first_visible == 0);
+    REQUIRE(select_panel("h").applied);
+    scene.frames(2);
+    const SolvedNode& node = scene.solved().nodes[1];
+    CHECK(node.first_visible + node.visible_count == scene.layout.nodes[1].count);
+}
+
+TEST_CASE("panel host: dwelling at a strip edge during a tab drag scrolls it and the held tab reaches hidden slots")
+{
+    HostScene scene(300.0f, 400.0f);
+    overflow_node_one(scene);
+    REQUIRE(select_panel("a").applied);
+    scene.frames(3);
+    const SolvedNode& node = scene.solved().nodes[1];
+    REQUIRE(node.first_visible == 0);
+    const Rect strip = node.strip;
+    const Vec2f grab = centre(node.tab_rects[0]);
+    scene.f.driver.move_to(grab);
+    scene.f.driver.press();
+    scene.frames(1);
+    scene.f.driver.move_to(grab + Vec2f(10.0f, 0.0f));
+    scene.frames(1);
+    const float right = is_empty(node.collapse_button) ? strip.min[0] + strip.size[0] : node.collapse_button.min[0];
+    scene.f.driver.move_to(Vec2f(right - 2.0f, grab[1]));
+    run_held(scene, 90);
+    CHECK(scene.panel_host().tab_scroll.first[1] > 0);
+
+    scene.f.driver.release();
+    scene.frames(2);
+    CHECK(scene.layout.nodes[1].tabs[0] != pid("a"));
+}
+
+TEST_CASE("panel host: the wheel scrolls a strip while a tab is held")
+{
+    HostScene scene(300.0f, 400.0f);
+    overflow_node_one(scene);
+    const SolvedNode& node = scene.solved().nodes[1];
+    const uint32_t first = node.first_visible;
+    REQUIRE(first > 0);
+    const Vec2f grab = centre(node.tab_rects[first]);
+    scene.f.driver.move_to(grab);
+    scene.f.driver.press();
+    scene.frames(1);
+    scene.f.driver.move_to(grab + Vec2f(6.0f, 0.0f));
+    scene.frames(2);
+    scene.f.driver.wheel({ 0.0f, 1.0f });
+    scene.frames(3);
+    CHECK(scene.panel_host().tab_scroll.first[1] < first);
+    scene.f.driver.release();
+    scene.frames(2);
+}
+
+TEST_CASE("panel host: a middle click closes a closable tab and respects the close permission")
+{
+    HostScene scene;
+    set_flags(scene.model().panels, "b", panel_flag::reorder_in_host | panel_flag::dock_elsewhere);
+    scene.frames();
+    scene.act([&](auto& build) { scene.f.driver.click(centre(scene.solved().nodes[1].tab_rects[1]), build, MouseCode::Middle); });
+    scene.frames(2);
+    CHECK(is_panel_open("b"));
+
+    scene.act([&](auto& build) { scene.f.driver.click(centre(scene.solved().nodes[1].tab_rects[0]), build, MouseCode::Middle); });
+    scene.frames(2);
+    CHECK_FALSE(is_panel_open("a"));
+}
+
+TEST_CASE("panel host: a press on a tab of a collapsed stack switches tabs and leaves it collapsed")
+{
+    HostScene scene;
+    scene.frames();
+    REQUIRE(set_panel_collapsed("a", true).applied);
+    scene.frames(3);
+    REQUIRE(scene.layout.nodes[1].collapsed == 1);
+    scene.click(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.frames(2);
+    CHECK(scene.layout.nodes[1].selected == 0);
+    CHECK(scene.layout.nodes[1].collapsed == 1);
 }
 
 TEST_CASE("panel host: a press in a body or tab moves the focus seam")

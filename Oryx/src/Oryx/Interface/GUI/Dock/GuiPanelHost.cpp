@@ -17,6 +17,12 @@ constexpr float k_close_size = 14.0f;
 
 constexpr float k_splitter_pad = 3.0f;
 
+constexpr float k_edge_dwell_seconds = 0.25f;
+
+constexpr float k_edge_step_seconds = 0.12f;
+
+constexpr uint32_t k_scroll_step_tabs = 1;
+
 DockView& host_of(GuiContext& ctx) { return ctx.dock_view(); }
 
 bool host_active(const DockView& h, const GuiContext& ctx) { return h.in_host && h.frame == ctx.frame(); }
@@ -294,11 +300,30 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     if (tab.pressed && !close.hovered)
     {
         h.model->focused = id;
+        h.tab_scroll.seen_selected[node_index] = static_cast<uint8_t>(index);
         if (!chosen)
             note(h, select_tab(*h.layout, node_index, index));
     }
-    if (close.clicked)
+    if (close.clicked || (tab.hovered && button_of(ctx.input(), MouseCode::Middle).released && can_close(h.model->panels, id) == DockReason::None))
         pending_close = id;
+}
+
+// Whole tabs per step: consumes whole units of `amount` (positive scrolls toward the first tab), keeps the remainder for trackpad fractions.
+void scroll_strip(DockView& h, int32_t node_index, float& amount)
+{
+    const uint32_t count = h.layout->nodes[node_index].count;
+    const uint32_t visible = h.solved.nodes[node_index].visible_count;
+    if (visible >= count)
+    {
+        amount = 0.0f;
+        return;
+    }
+    const float steps = std::trunc(amount);
+    if (steps == 0.0f)
+        return;
+    amount -= steps;
+    const int32_t first = static_cast<int32_t>(h.solved.nodes[node_index].first_visible) - static_cast<int32_t>(steps) * static_cast<int32_t>(k_scroll_step_tabs);
+    h.tab_scroll.first[node_index] = static_cast<uint8_t>(math::clamp<int32_t>(first, 0, static_cast<int32_t>(count - visible)));
 }
 
 void draw_strip(GuiContext& ctx, DockView& h, int32_t node_index, PanelId& pending_close)
@@ -322,14 +347,17 @@ void draw_strip(GuiContext& ctx, DockView& h, int32_t node_index, PanelId& pendi
         IdScope scope(ctx, ctx.index_id(static_cast<uint64_t>(node_index)));
         const ItemState strip = ctx.item(ctx.id("strip"), solved.strip);
         const bool overflowing = solved.visible_count < node.count;
-        if (strip.hovered && overflowing && !ctx.wheel_consumed())
+        const bool dragging_tab = h.model->drag.source == DragSource::Tab;
+        const bool over = strip.hovered || (dragging_tab && contains(solved.strip, ctx.input().pointer.position));
+        if (over && overflowing && !ctx.wheel_consumed())
         {
             const float wheel = ctx.input().wheel[1] != 0.0f ? ctx.input().wheel[1] : ctx.input().wheel[0];
             if (wheel != 0.0f)
             {
                 std::ignore = ctx.consume_wheel();
-                const uint32_t next = wheel > 0.0f ? (node.selected > 0 ? node.selected - 1u : 0u) : math::min<uint32_t>(node.selected + 1u, node.count - 1u);
-                note(h, select_tab(*h.layout, node_index, next));
+                h.wheel_accum = h.wheel_node == node_index ? h.wheel_accum + wheel : wheel;
+                h.wheel_node = node_index;
+                scroll_strip(h, node_index, h.wheel_accum);
             }
         }
     }
@@ -798,12 +826,16 @@ void reorder_live(DockView& h, DragState& d, const Vec2f& pointer)
     uint32_t current = 0;
     while (current < node.count && node.tabs[current] != d.panel)
         ++current;
+    if (solved.visible_count == 0 || current >= node.count)
+        return;
     const uint32_t first = solved.first_visible;
     const uint32_t last = math::min<uint32_t>(first + solved.visible_count, node.count) - 1u;
-    if (solved.visible_count == 0 || current < first || current > last)
-        return;
     const auto centre = [&solved](uint32_t i) { return solved.tab_rects[i].min[0] + solved.tab_rects[i].size[0] * 0.5f; };
     uint32_t target = current;
+    if (current < first)
+        target = first - 1u;
+    else if (current > last)
+        target = last + 1u;
     while (target > first && pointer[0] < centre(target - 1u))
         --target;
     while (target < last && pointer[0] > centre(target + 1u))
@@ -833,6 +865,35 @@ void restore_float(DockView& h, const DragState& d)
 }
 
 // Runs after the frame's drawing so no op reshapes the tree while its tabs are still being drawn.
+// Resting the pointer in an overflowing strip's edge zone scrolls it a tab at a time, so hidden slots can be reached mid-drag.
+void auto_scroll_strip(DockView& h, DragState& d, const Vec2f& pointer, float delta_time)
+{
+    const int32_t node_index = strip_at(*h.layout, h.solved, pointer);
+    int32_t direction = 0;
+    if (node_index != k_no_node && h.solved.nodes[node_index].visible_count < h.layout->nodes[node_index].count)
+    {
+        const SolvedNode& solved = h.solved.nodes[node_index];
+        const float zone = h.solved.metrics.tab_min_width * 0.5f;
+        const float right = is_empty(solved.collapse_button) ? solved.strip.min[0] + solved.strip.size[0] : solved.collapse_button.min[0];
+        direction = pointer[0] < solved.strip.min[0] + zone ? -1 : (pointer[0] > right - zone ? 1 : 0);
+    }
+    if (direction == 0)
+    {
+        d.edge_dwell = 0.0f;
+        d.scroll_clock = 0.0f;
+        return;
+    }
+    d.edge_dwell += delta_time;
+    if (d.edge_dwell < k_edge_dwell_seconds)
+        return;
+    d.scroll_clock += delta_time;
+    if (d.scroll_clock < k_edge_step_seconds)
+        return;
+    d.scroll_clock = 0.0f;
+    float step = static_cast<float>(-direction);
+    scroll_strip(h, node_index, step);
+}
+
 void update_drag(GuiContext& ctx, DockView& h)
 {
     DragState& d = h.model->drag;
@@ -853,6 +914,8 @@ void update_drag(GuiContext& ctx, DockView& h)
     const Vec2f pointer = input.pointer.position;
     if (d.source == DragSource::Float)
         move_dragged_float(h, pointer);
+    if (d.source == DragSource::Tab)
+        auto_scroll_strip(h, d, pointer, input.delta_time);
     d.guides = input.keys.shift ? DropGuides{} : drop_guides(*h.layout, h.model->panels, h.solved, d.panel, pointer);
     d.plan = resolve_drop(*h.layout, h.model->panels, h.solved, d.guides, d.panel, pointer, input.keys.shift);
     if (d.source == DragSource::Tab && d.plan.action == DropAction::Reorder)
@@ -946,9 +1009,25 @@ void draw_empty(GuiContext& ctx, DockView& h)
     ctx.end_box();
 }
 
+// Live reorder moves the held tab's index; accounting for it here keeps the strip from snapping back to reveal it while the drag scrolls.
+void sync_drag_scroll(DockView& h)
+{
+    const DragState& d = h.model->drag;
+    if (d.source != DragSource::Tab)
+        return;
+    for (uint32_t n = 0; n < h.layout->node_count; ++n)
+    {
+        const DockNode& node = h.layout->nodes[n];
+        for (uint32_t t = 0; node.kind == DockNodeKind::Tabs && t < node.count; ++t)
+            if (node.tabs[t] == d.panel)
+                h.tab_scroll.seen_selected[n] = node.selected;
+    }
+}
+
 void draw_host(GuiContext& ctx, DockView& h)
 {
-    h.solved = solve(*h.layout, h.model->panels, metrics_of(ctx.gui_theme(), h.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface));
+    sync_drag_scroll(h);
+    h.solved = solve(*h.layout, h.model->panels, metrics_of(ctx.gui_theme(), h.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface), &h.tab_scroll);
     const int32_t root = h.layout->roots[ctx.input().surface];
     if (root == k_no_node && h.layout->float_count == 0)
     {
