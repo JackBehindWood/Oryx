@@ -119,7 +119,9 @@ struct Solver
         if (count == 0 || !(avail > 0.0f))
             return;
 
-        float tab_w = avail / static_cast<float>(count);
+        // Neighbours overlap, so n tabs of width w take n * w - (n - 1) * overlap.
+        const float overlap = count > 1 ? math::max(metrics.tab_overlap, 0.0f) : 0.0f;
+        float tab_w = (avail + overlap * static_cast<float>(count - 1)) / static_cast<float>(count);
         uint32_t visible = count;
         uint32_t first = 0;
         if (tab_w >= metrics.tab_min_width)
@@ -129,7 +131,7 @@ struct Solver
         else
         {
             tab_w = math::min(metrics.tab_min_width, avail);
-            visible = math::clamp<uint32_t>(static_cast<uint32_t>(avail / tab_w), 1u, count);
+            visible = math::clamp<uint32_t>(static_cast<uint32_t>((avail + overlap) / math::max(tab_w - overlap, 1.0f)), 1u, count);
             if (scroll != nullptr)
                 first = scroll->place(node, n.selected, count, visible);
             else if (n.selected >= visible)
@@ -140,7 +142,7 @@ struct Solver
         s.first_visible = static_cast<uint8_t>(first);
         s.visible_count = static_cast<uint8_t>(visible);
         for (uint32_t i = 0; i < visible; ++i)
-            s.tab_rects[first + i] = Rect{ Vec2f(rect.min[0] + tab_w * static_cast<float>(i), strip_y), Vec2f(tab_w, strip_h) };
+            s.tab_rects[first + i] = Rect{ Vec2f(rect.min[0] + (tab_w - overlap) * static_cast<float>(i), strip_y), Vec2f(tab_w, strip_h) };
     }
 
     void place(int32_t node, Rect rect, uint32_t depth, bool rail)
@@ -401,14 +403,14 @@ DockReason subject_can_dock(const DockLayout& layout, const PanelTable& panels, 
     return subject.is_stack() ? can_dock_tabs(layout, panels, subject.set, subject.count) : can_dock(panels, subject.panel);
 }
 
-DockReason subject_can_dock_into(const DockLayout& layout, const PanelTable& panels, const DropSubject& subject, int32_t target)
+DockReason subject_can_dock_into(const DockLayout& layout, const PanelTable& panels, const DropSubject& subject, int32_t target, DropZone zone)
 {
     if (!subject.is_stack())
-        return can_dock_into(layout, panels, subject.panel, target);
+        return can_dock_into(layout, panels, subject.panel, target, zone);
     if (const DockReason reason = can_dock_tabs(layout, panels, subject.set, subject.count); reason != DockReason::None)
         return reason;
     for (uint32_t t = 0; t < subject.count; ++t)
-        if (const DockReason reason = can_dock_into(layout, panels, subject.set[t], target); reason != DockReason::None)
+        if (const DockReason reason = can_dock_into(layout, panels, subject.set[t], target, zone); reason != DockReason::None)
             return reason;
     return DockReason::None;
 }
@@ -429,7 +431,7 @@ DropProbe probe_drop(const DockLayout& layout, const PanelTable& panels, const D
 
 void add_guide(DropGuides& out, const DockLayout& layout, const PanelTable& panels, const DropSubject& subject, DropZone zone, int32_t node, const Rect& rect)
 {
-    DockReason reason = subject_can_dock_into(layout, panels, subject, node);
+    DockReason reason = subject_can_dock_into(layout, panels, subject, node, zone);
     bool here = false;
     if (reason == DockReason::None)
     {
@@ -642,7 +644,7 @@ uint32_t insertion_slot(const DockNode& node, const SolvedNode& solved, float x)
     return slot;
 }
 
-Rect insertion_marker(const DockNode& node, const SolvedNode& solved, uint32_t slot)
+Rect insertion_marker(const DockNode& node, const SolvedNode& solved, uint32_t slot, float overlap)
 {
     if (solved.visible_count == 0)
         return {};
@@ -652,7 +654,7 @@ Rect insertion_marker(const DockNode& node, const SolvedNode& solved, uint32_t s
     if (slot > first)
     {
         const Rect& tab = solved.tab_rects[math::min(slot, end) - 1u];
-        x = tab.min[0] + tab.size[0];
+        x = tab.min[0] + tab.size[0] - (slot < end ? overlap * 0.5f : 0.0f);
     }
     return Rect{ Vec2f(x - 1.0f, solved.strip.min[1]), Vec2f(2.0f, solved.strip.size[1]) };
 }
@@ -836,11 +838,11 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
             plan.node = source;
             plan.slot = slot;
             if (plan.action == DropAction::Reorder)
-                plan.marker = insertion_marker(node, solved.nodes[source], insertion);
+                plan.marker = insertion_marker(node, solved.nodes[source], insertion, solved.metrics.tab_overlap);
             return plan;
         }
 
-        if (const DockReason reason = subject_can_dock_into(layout, panels, subject, strip); reason != DockReason::None)
+        if (const DockReason reason = subject_can_dock_into(layout, panels, subject, strip, DropZone::Centre); reason != DockReason::None)
             return refused(reason, strip, DropZone::Centre);
         const DropProbe probe = probe_drop(layout, panels, subject, DockTarget{ strip, solved.surface }, DropZone::Centre);
         if (probe.reason != DockReason::None)
@@ -853,7 +855,7 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
         plan.zone = DropZone::Centre;
         plan.preview = centre_preview(solved.nodes[strip]);
         plan.slot = subject.is_stack() ? layout.nodes[strip].count : insertion_slot(layout.nodes[strip], solved.nodes[strip], pointer[0]);
-        plan.marker = insertion_marker(layout.nodes[strip], solved.nodes[strip], plan.slot);
+        plan.marker = insertion_marker(layout.nodes[strip], solved.nodes[strip], plan.slot, solved.metrics.tab_overlap);
         return plan;
     }
 

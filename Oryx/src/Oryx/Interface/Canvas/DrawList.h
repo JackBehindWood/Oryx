@@ -44,6 +44,19 @@ struct LineCmd
     uint32_t clip = k_no_clip;
 };
 
+inline constexpr uint32_t k_max_polygon_points = 32;
+
+// A convex polygon filled with one colour, points in order around it; convexity is the recorder's contract.
+struct PolygonCmd
+{
+    Vec2f points[k_max_polygon_points];
+    uint32_t count = 0;
+    Colour colour;
+    uint32_t clip = k_no_clip;
+};
+
+static_assert(std::is_trivially_copyable_v<PolygonCmd>);
+
 // Which picture of the owner's image table an ImageCmd draws; ReplayTarget carries the table, so the list never names a texture.
 struct ImageHandle
 {
@@ -88,10 +101,11 @@ enum class DrawKind : uint32_t
     Border,
     Line,
     Text,
-    Image
+    Image,
+    Polygon
 };
 
-inline constexpr uint32_t DRAW_KIND_COUNT = 6;
+inline constexpr uint32_t DRAW_KIND_COUNT = 7;
 
 // Consecutive commands of one kind, so the draw order across kinds survives the typed arrays.
 struct DrawRun
@@ -110,6 +124,7 @@ struct DrawChannel
     std::vector<LineCmd> lines;
     std::vector<TextCmd> texts;
     std::vector<ImageCmd> images;
+    std::vector<PolygonCmd> polygons;
     std::vector<DrawRun> runs;
 };
 
@@ -127,6 +142,7 @@ void for_each_command(const DrawChannel& channel, const DrawRun& run, Visitor&& 
             case DrawKind::Line: visitor(channel.lines[at]); break;
             case DrawKind::Text: visitor(channel.texts[at]); break;
             case DrawKind::Image: visitor(channel.images[at]); break;
+            case DrawKind::Polygon: visitor(channel.polygons[at]); break;
         }
     }
 }
@@ -171,6 +187,8 @@ public:
     void add_border(const Rect& rect, const CornerRadius& radius, float thickness, const Colour& colour);
     void add_line(const Vec2f& from, const Vec2f& to, float thickness, const Colour& colour);
     void add_image(const Rect& rect, ImageHandle image, const Vec2f& uv_min, const Vec2f& uv_max, const CornerRadius& radius, const Colour& tint);
+    // Throws Error unless 3 to k_max_polygon_points points.
+    void add_polygon(const Vec2f* points, uint32_t count, const Colour& colour);
     void add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour);
 
     [[nodiscard]] std::string_view text(const TextCmd& command) const { return std::string_view(m_text).substr(command.first, command.length); }

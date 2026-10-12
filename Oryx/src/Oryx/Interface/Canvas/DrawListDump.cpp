@@ -93,6 +93,17 @@ struct Dumper
         end(command.clip);
     }
 
+    void operator()(const PolygonCmd& command)
+    {
+        put(out, "  polygon %u", command.count);
+        for (uint32_t index = 0; index < command.count; ++index)
+        {
+            put(out, " (%.2f %.2f)", command.points[index][0], command.points[index][1]);
+        }
+        put_colour(out, command.colour);
+        end(command.clip);
+    }
+
     void operator()(const TextCmd& command)
     {
         put(out, "  text (%.2f %.2f) h=%.2f align=%u \"", command.origin[0], command.origin[1], command.pixel_height, static_cast<uint32_t>(command.align));

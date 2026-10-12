@@ -15,6 +15,33 @@ enum class LabelSide : uint8_t
 
 inline constexpr uint32_t k_palette_size = 8;
 
+enum class TabShape : uint8_t
+{
+    // A plain rectangle, the look before tab styles.
+    Flat,
+    // A trapezoid whose sides lean in, with curved shoulders; neighbours overlap and the chosen tab stands taller.
+    Sloped
+};
+
+// The look of a tab, shared by the dock's strips and the tab_bar widget; named by what it draws. Lengths are points at a 16 point tab text and scale with the tab text height.
+struct TabStyle
+{
+    TabShape shape = TabShape::Sloped;
+    // How far each top corner leans in from the base.
+    float slope = 8.0f;
+    // The radius of the curve where a side meets the top edge.
+    float shoulder = 5.0f;
+    // How far neighbouring tabs overlap in a dock strip.
+    float overlap = 6.0f;
+    // How much taller the chosen tab stands than the others.
+    float selected_raise = 3.0f;
+
+    [[nodiscard]] static constexpr TabStyle sloped() { return TabStyle{}; }
+    [[nodiscard]] static constexpr TabStyle flat() { return TabStyle{ TabShape::Flat, 0.0f, 0.0f, 0.0f, 0.0f }; }
+};
+
+static_assert(std::is_trivially_copyable_v<TabStyle> && std::is_standard_layout_v<TabStyle>);
+
 // The shared theme plus the roles only developer tooling needs. The role styles split what one `base` style used to cover, so a panel, a header, a field, a button, a tab, a scroll bar and a popup each get their own surface;
 // a widget takes its role unless the call names a variant or a style. `base` stays the fallback for text and for code that predates the roles.
 struct GuiTheme : ImTheme
@@ -28,6 +55,7 @@ struct GuiTheme : ImTheme
     ImStyle scroll;
     // Tooltips, menus and popups.
     ImStyle overlay;
+    TabStyle tab_style = TabStyle::sloped();
     // Space between neighbouring widgets in a row or column.
     float spacing = 4.0f;
     // Label first, as in Unity and Godot forms; After gives ImGui's order.

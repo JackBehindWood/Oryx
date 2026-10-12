@@ -101,3 +101,57 @@ TEST_CASE("PainterClip pops on scope exit and on a throw")
     }
     CHECK(f.list.clip_depth() == 0);
 }
+
+TEST_CASE("Painter: convex polygons snap their points to device pixels")
+{
+    PainterFixture f;
+    Painter painter(f.list, f.font, 2.0f);
+    const Vec2f points[4] = { { 0.3f, 0.3f }, { 10.2f, 0.3f }, { 8.8f, 6.1f }, { 1.6f, 6.1f } };
+    painter.fill_convex(points, 4, RED);
+    const PolygonCmd& command = f.list.channel(0).polygons[0];
+    REQUIRE(command.count == 4);
+    CHECK(command.points[0] == Vec2f(0.5f, 0.5f));
+    CHECK(command.points[1] == Vec2f(10.0f, 0.5f));
+    CHECK(command.points[2] == Vec2f(9.0f, 6.0f));
+}
+
+TEST_CASE("Painter: polygons and polylines reject point counts out of range")
+{
+    PainterFixture f;
+    Painter painter(f.list, f.font);
+    const Vec2f points[k_max_polygon_points + 1] = {};
+    CHECK_THROWS_AS(painter.fill_convex(points, 2, RED), Error);
+    CHECK_THROWS_AS(painter.fill_convex(points, k_max_polygon_points + 1, RED), Error);
+    CHECK_THROWS_AS(painter.stroke_polyline(points, 1, false, 1.0f, RED), Error);
+}
+
+TEST_CASE("Painter: stroke_polyline draws one line per segment and closes on request")
+{
+    PainterFixture f;
+    Painter painter(f.list, f.font);
+    const Vec2f points[3] = { { 0.0f, 0.0f }, { 10.0f, 0.0f }, { 10.0f, 10.0f } };
+    painter.stroke_polyline(points, 3, false, 1.0f, RED);
+    CHECK(f.list.channel(0).lines.size() == 2);
+    painter.stroke_polyline(points, 3, true, 1.0f, RED);
+    CHECK(f.list.channel(0).lines.size() == 5);
+}
+
+TEST_CASE("Painter: circles are fully rounded squares")
+{
+    PainterFixture f;
+    Painter painter(f.list, f.font);
+    painter.fill_circle({ 10.0f, 10.0f }, 4.0f, RED);
+    painter.stroke_circle({ 10.0f, 10.0f }, 4.0f, 1.0f, RED);
+    REQUIRE(f.list.channel(0).rounded_rects.size() == 1);
+    CHECK(f.list.channel(0).rounded_rects[0].rect == Rect{ { 6.0f, 6.0f }, { 8.0f, 8.0f } });
+    CHECK(f.list.channel(0).rounded_rects[0].radius.top_left == 4.0f);
+    CHECK(f.list.channel(0).borders.size() == 1);
+}
+
+TEST_CASE("Painter: triangles record a three point polygon")
+{
+    PainterFixture f;
+    Painter painter(f.list, f.font);
+    painter.fill_triangle({ 0.0f, 0.0f }, { 8.0f, 0.0f }, { 4.0f, 6.0f }, RED);
+    CHECK(f.list.channel(0).polygons[0].count == 3);
+}

@@ -4,6 +4,7 @@
 #include "Oryx/Core/Error.h"
 #include "Oryx/Interface/Canvas/FrameArena.h"
 #include "Oryx/Interface/Canvas/Painter.h"
+#include "Oryx/Interface/Canvas/TabShape.h"
 
 namespace oryx
 {
@@ -273,7 +274,21 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
     const uint32_t channel = node.style.channel != 0 ? node.style.channel : inherited_channel;
     pass.list.set_channel(channel);
     const BoxPaint& paint = node.paint;
-    if (paint.has_fill)
+    Vec2f tab[k_max_polygon_points];
+    uint32_t tab_count = 0;
+    if (paint.slope > 0.0f && (paint.has_fill || paint.border_width > 0.0f))
+    {
+        tab_count = tab_outline(node.rect, paint.slope, paint.shoulder, paint.slope_flip, tab);
+        for (uint32_t point = 0; point < tab_count; ++point)
+        {
+            tab[point] = Vec2f(std::round(tab[point][0] * pass.scale) / pass.scale, std::round(tab[point][1] * pass.scale) / pass.scale);
+        }
+    }
+    if (paint.has_fill && tab_count > 0)
+    {
+        pass.list.add_polygon(tab, tab_count, faded(paint.fill, alpha));
+    }
+    else if (paint.has_fill)
     {
         const Rect snapped = snap_to_pixels(node.rect, pass.scale);
         if (is_square(paint.radius))
@@ -289,7 +304,14 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
     {
         pass.list.add_image(snap_to_pixels(inset(node.rect, node.style.padding), pass.scale), paint.image, paint.image_uv_min, paint.image_uv_max, paint.radius, faded(paint.image_tint, alpha));
     }
-    if (paint.border_width > 0.0f)
+    if (paint.border_width > 0.0f && tab_count > 0)
+    {
+        for (uint32_t point = 0; point + 1 < tab_count; ++point)
+        {
+            pass.list.add_line(tab[point], tab[point + 1], paint.border_width, faded(paint.border, alpha));
+        }
+    }
+    else if (paint.border_width > 0.0f)
     {
         pass.list.add_border(snap_to_pixels(node.rect, pass.scale), paint.radius, paint.border_width, faded(paint.border, alpha));
     }

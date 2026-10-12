@@ -125,7 +125,71 @@ void bar(std::string_view label, float value, float max, const BarOptions& optio
     progress(label, fraction, text, field);
 }
 
-PlotScope::PlotScope(std::string_view name, const PlotOptions& options)
+namespace
+{
+
+class PlotFrame
+{
+public:
+    PlotFrame(std::string_view name, const PlotOptions& options = {});
+    ~PlotFrame();
+
+    PlotFrame(const PlotFrame&) = delete;
+    PlotFrame& operator=(const PlotFrame&) = delete;
+
+    void line(std::string_view label, const Values& values, PlotStyle style = PlotStyle::Line, const Colour& colour = k_theme_colour);
+    // One bar per sample from zero; the y range includes zero.
+    void bars(std::string_view label, const Values& values, const Colour& colour = k_theme_colour);
+    // A vertical marker through sample `index` and a horizontal one at `value`: thresholds, the selected ply.
+    void vline(float index, const Colour& colour, float thickness = 1.0f);
+    void hline(float value, const Colour& colour, float thickness = 1.0f);
+
+    // For drawing of your own: the data rectangle (see to_screen) and a painter clipped to the plot.
+    [[nodiscard]] PlotArea area() const;
+    [[nodiscard]] Painter& painter() { return m_canvas.painter; }
+    [[nodiscard]] const ItemState& item() const { return m_canvas.item; }
+    [[nodiscard]] PlotResult result() const;
+
+private:
+    // What the plot remembers from the frame before.
+    struct Memory
+    {
+        float y_min = 0.0f;
+        float y_max = 1.0f;
+        uint32_t x_count = 0;
+        uint32_t series = 0;
+        bool bars = false;
+        bool valid = false;
+    };
+
+    struct Entry
+    {
+        std::string_view name;
+        Colour colour;
+    };
+
+    void draw(const Values& values, PlotStyle style, bool bars, const Colour& colour);
+    [[nodiscard]] Colour series_colour(const Colour& requested) const;
+
+    GuiContext& m_context;
+    const ImStyle* m_style;
+    PlotOptions m_options;
+    ImId m_id;
+    Memory m_previous;
+    im::CanvasArea m_canvas;
+    // The frame inside the canvas minus the legend row above and the label gutter on the left.
+    Rect m_inner;
+    Rect m_data;
+    bool m_clipped = false;
+    float m_seen_min = std::numeric_limits<float>::max();
+    float m_seen_max = std::numeric_limits<float>::lowest();
+    uint32_t m_seen_count = 0;
+    bool m_seen_bars = false;
+    uint32_t m_series = 0;
+    Entry m_entries[k_palette_size];
+};
+
+PlotFrame::PlotFrame(std::string_view name, const PlotOptions& options)
     : m_context(context())
     , m_style(&m_context.role_style(options, &GuiTheme::panel))
     , m_options(options)
@@ -167,7 +231,7 @@ PlotScope::PlotScope(std::string_view name, const PlotOptions& options)
     }
 }
 
-PlotScope::~PlotScope()
+PlotFrame::~PlotFrame()
 {
     Painter& painter = m_canvas.painter;
     if (m_clipped)
@@ -245,7 +309,7 @@ PlotScope::~PlotScope()
     m_context.state<Memory>(m_id) = next;
 }
 
-PlotArea PlotScope::area() const
+PlotArea PlotFrame::area() const
 {
     const bool known = m_previous.valid;
     const float seen_min = known ? m_previous.y_min : m_seen_min;
@@ -260,7 +324,7 @@ PlotArea PlotScope::area() const
     return area;
 }
 
-PlotResult PlotScope::result() const
+PlotResult PlotFrame::result() const
 {
     PlotResult result;
     result.item = m_canvas.item;
@@ -274,12 +338,12 @@ PlotResult PlotScope::result() const
     return result;
 }
 
-Colour PlotScope::series_colour(const Colour& requested) const
+Colour PlotFrame::series_colour(const Colour& requested) const
 {
     return requested.a > 0.0f ? requested : palette_colour(m_context.gui_theme(), m_series);
 }
 
-void PlotScope::line(std::string_view label, const Values& values, PlotStyle style, const Colour& colour)
+void PlotFrame::line(std::string_view label, const Values& values, PlotStyle style, const Colour& colour)
 {
     if (m_series >= k_palette_size)
     {
@@ -291,7 +355,7 @@ void PlotScope::line(std::string_view label, const Values& values, PlotStyle sty
     ++m_series;
 }
 
-void PlotScope::bars(std::string_view label, const Values& values, const Colour& colour)
+void PlotFrame::bars(std::string_view label, const Values& values, const Colour& colour)
 {
     if (m_series >= k_palette_size)
     {
@@ -303,19 +367,19 @@ void PlotScope::bars(std::string_view label, const Values& values, const Colour&
     ++m_series;
 }
 
-void PlotScope::vline(float index, const Colour& colour, float thickness)
+void PlotFrame::vline(float index, const Colour& colour, float thickness)
 {
     const PlotArea plot = area();
     m_canvas.painter.line(to_screen(plot, index + 0.5f, plot.y_max), to_screen(plot, index + 0.5f, plot.y_min), colour, thickness);
 }
 
-void PlotScope::hline(float value, const Colour& colour, float thickness)
+void PlotFrame::hline(float value, const Colour& colour, float thickness)
 {
     const PlotArea plot = area();
     m_canvas.painter.line(to_screen(plot, plot.x_min, value), to_screen(plot, plot.x_max, value), colour, thickness);
 }
 
-void PlotScope::draw(const Values& values, PlotStyle style, bool bars, const Colour& colour)
+void PlotFrame::draw(const Values& values, PlotStyle style, bool bars, const Colour& colour)
 {
     const PlotArea plot = area();
     Painter& painter = m_canvas.painter;
@@ -433,6 +497,59 @@ void PlotScope::draw(const Values& values, PlotStyle style, bool bars, const Col
     m_seen_max = math::max(m_seen_max, seen_max);
     m_seen_count = math::max(m_seen_count, values.count);
     m_seen_bars = m_seen_bars || bars;
+}
+
+} // namespace
+
+bool begin_plot(std::string_view name, const PlotOptions& options)
+{
+    context().push_scope<PlotFrame>("plot", name, options);
+    return true;
+}
+
+void end_plot()
+{
+    context().pop_scope<PlotFrame>("end_plot");
+}
+
+void plot_line(std::string_view label, const Values& values, PlotStyle style, const Colour& colour)
+{
+    context().scope<PlotFrame>("plot_line").line(label, values, style, colour);
+}
+
+void plot_bars(std::string_view label, const Values& values, const Colour& colour)
+{
+    context().scope<PlotFrame>("plot_bars").bars(label, values, colour);
+}
+
+void plot_vline(float index, const Colour& colour, float thickness)
+{
+    context().scope<PlotFrame>("plot_vline").vline(index, colour, thickness);
+}
+
+void plot_hline(float value, const Colour& colour, float thickness)
+{
+    context().scope<PlotFrame>("plot_hline").hline(value, colour, thickness);
+}
+
+PlotArea plot_area()
+{
+    return context().scope<PlotFrame>("plot_area").area();
+}
+
+Painter& plot_painter()
+{
+    return context().scope<PlotFrame>("plot_painter").painter();
+}
+
+const ItemState& plot_item()
+{
+    return context().scope<PlotFrame>("plot_item").item();
+}
+
+PlotResult plot_result()
+{
+    return context().scope<PlotFrame>("plot_result").result();
 }
 
 PlotResult plot_lines(std::string_view name, const Values& values, const PlotOptions& options, PlotStyle style, const Colour& colour)

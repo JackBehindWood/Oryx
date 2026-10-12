@@ -45,6 +45,13 @@ public:
     void fill_rounded_rect(const Rect& rect, const CornerRadius& radius, const Colour& colour);
     void border(const Rect& rect, const CornerRadius& radius, float thickness, const Colour& colour);
     // A picture of the replay's image table; the rect snaps like the fills. A radius rounds its corners.
+    // A convex polygon (3 to k_max_polygon_points points in order around it); points snap to device pixels. Convexity is the caller's contract.
+    void fill_convex(const Vec2f* points, uint32_t count, const Colour& colour);
+    void fill_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour);
+    // One line per segment (and a closing one when `closed`), at most k_max_polygon_points points; joints are butt ends, which is exact for outlines about a pixel thick.
+    void stroke_polyline(const Vec2f* points, uint32_t count, bool closed, float thickness, const Colour& colour);
+    void fill_circle(const Vec2f& centre, float radius, const Colour& colour);
+    void stroke_circle(const Vec2f& centre, float radius, float thickness, const Colour& colour);
     void image(const Rect& rect, ImageHandle image, const ImageSpec& spec = {});
     void line(const Vec2f& from, const Vec2f& to, const Colour& colour, float thickness = 1.0f);
     // A chevron, cross, plus, minus or check centred in `box`; see draw_icon.

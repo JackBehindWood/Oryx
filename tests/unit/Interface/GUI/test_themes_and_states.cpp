@@ -213,10 +213,13 @@ TEST_CASE("states: a toggle button on versus off")
     CHECK(distance(text_node(f, "on")->paint.fill, text_node(f, "off")->paint.fill) > 0.05f);
 }
 
-TEST_CASE("states: the selected tab has an accent underline and the others none")
+TEST_CASE("states: the selected tab of a flat tab style has an accent underline and the others none")
 {
     GuiFixture f;
     use_dark(f);
+    GuiTheme flat = f.context.gui_theme();
+    flat.tab_style = TabStyle::flat();
+    f.context.set_theme(flat);
     uint32_t selected = 1;
     const auto body = [&]
     {
@@ -232,6 +235,32 @@ TEST_CASE("states: the selected tab has an accent underline and the others none"
         underlines += node.paint.has_fill && node.style.height.kind == SizingKind::Fixed && node.style.height.value == 2.0f && distance(node.paint.fill, f.context.gui_theme().tab.accent) < 0.001f ? 1u : 0u;
     }
     CHECK(underlines == 1);
+}
+
+TEST_CASE("states: the sloped tab style draws tabs as trapezoids with no underline")
+{
+    GuiFixture f;
+    use_dark(f);
+    REQUIRE(f.context.gui_theme().tab_style.shape == TabShape::Sloped);
+    uint32_t selected = 1;
+    const auto body = [&]
+    {
+        gui::TabBarScope bar("tabs", selected);
+        std::ignore = bar.tab("A");
+        std::ignore = bar.tab("B");
+    };
+    f.driver.settle(f.column_of(body));
+    uint32_t sloped = 0;
+    for (uint32_t index = 0; index < f.context.layout().node_count(); ++index)
+    {
+        const LayoutNode& node = f.context.layout().node(index);
+        sloped += node.paint.slope > 0.0f ? 1u : 0u;
+        const bool underline = node.paint.has_fill && node.style.height.kind == SizingKind::Fixed && node.style.height.value == 2.0f;
+        CHECK_FALSE(underline);
+    }
+    CHECK(sloped == 2);
+    f.driver.frame(f.column_of(body));
+    CHECK(f.context.draw_list().command_count(DrawKind::Polygon) == 2);
 }
 
 TEST_CASE("disabled: widgets ignore the pointer, report nothing and paint dimmed")

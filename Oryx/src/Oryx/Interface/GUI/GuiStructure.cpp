@@ -178,6 +178,7 @@ TreeNodeResult begin_tree_node(std::string_view label, const TreeNodeOptions& op
         children.padding.left = ctx.gui_theme().indent;
         ctx.begin_box(ImId{}, children);
         ctx.push_id(label);
+        open_marker<TreeEnd>("tree node");
     }
     return { open, state };
 }
@@ -185,6 +186,7 @@ TreeNodeResult begin_tree_node(std::string_view label, const TreeNodeOptions& op
 void end_tree_node()
 {
     GuiContext& ctx = context();
+    close_marker<TreeEnd>("end_tree_node");
     ctx.pop_id();
     ctx.end_box();
 }
@@ -283,7 +285,33 @@ void end_scroll()
     ctx.end_box();
 }
 
-TabBarScope::TabBarScope(std::string_view name, uint32_t& selected, const TabBarOptions& options)
+namespace
+{
+
+class TabBarFrame
+{
+public:
+    TabBarFrame(std::string_view name, uint32_t& selected, const TabBarOptions& options);
+    ~TabBarFrame();
+
+    TabBarFrame(const TabBarFrame&) = delete;
+    TabBarFrame& operator=(const TabBarFrame&) = delete;
+
+    bool tab(std::string_view label);
+    bool tab(std::string_view label, bool* open);
+    [[nodiscard]] const TabBarResult& result() const { return m_result; }
+
+private:
+    bool draw_tab(std::string_view label, bool closable, bool* open);
+
+    uint32_t& m_selected;
+    const ImStyle* m_style;
+    bool m_closable;
+    uint32_t m_count = 0;
+    TabBarResult m_result;
+};
+
+TabBarFrame::TabBarFrame(std::string_view name, uint32_t& selected, const TabBarOptions& options)
     : m_selected(selected)
     , m_style(&context().role_style(options, &GuiTheme::tab))
     , m_closable(options.closable)
@@ -296,19 +324,19 @@ TabBarScope::TabBarScope(std::string_view name, uint32_t& selected, const TabBar
     ctx.push_id(name);
 }
 
-TabBarScope::~TabBarScope()
+TabBarFrame::~TabBarFrame()
 {
     GuiContext& ctx = context();
     ctx.pop_id();
     ctx.end_box();
 }
 
-bool TabBarScope::tab(std::string_view label)
+bool TabBarFrame::tab(std::string_view label)
 {
     return draw_tab(label, m_closable, nullptr);
 }
 
-bool TabBarScope::tab(std::string_view label, bool* open)
+bool TabBarFrame::tab(std::string_view label, bool* open)
 {
     if (open != nullptr && !*open)
     {
@@ -318,7 +346,7 @@ bool TabBarScope::tab(std::string_view label, bool* open)
     return draw_tab(label, open != nullptr || m_closable, open);
 }
 
-bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
+bool TabBarFrame::draw_tab(std::string_view label, bool closable, bool* open)
 {
     GuiContext& ctx = context();
     const ImStyle& style = *m_style;
@@ -329,10 +357,23 @@ bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
     const ItemDrag drag = ctx.item_drag(tab_id);
     LayoutStyle box = im::default_box(style);
     box.gap = style.padding.left * 0.5f;
+    const TabStyle& look = ctx.gui_theme().tab_style;
+    const bool sloped = look.shape == TabShape::Sloped;
+    const float scale = style.text_height / 16.0f;
+    if (sloped)
+    {
+        box.padding.left += look.slope * scale * 0.5f;
+        box.padding.right += look.slope * scale * 0.5f;
+    }
     const uint32_t node_index = ctx.begin_box(tab_id, box);
     const bool chosen = index == m_selected;
     im::paint_surface(ctx.layout().node(node_index).paint, style, im::interaction_fill(style, tab, chosen ? style.selected : style.background));
     ctx.layout().node(node_index).paint.border_width = 0.0f;
+    if (sloped)
+    {
+        ctx.layout().node(node_index).paint.slope = look.slope * scale;
+        ctx.layout().node(node_index).paint.shoulder = look.shoulder * scale;
+    }
     if (tab.hovered)
     {
         ctx.request_cursor(CursorShape::Hand);
@@ -356,7 +397,7 @@ bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
         ctx.layout().node(node_index).paint.text_height = style.text_height;
         ctx.layout().node(node_index).paint.text_colour = style.text;
     }
-    if (chosen)
+    if (chosen && !sloped)
     {
         LayoutStyle underline;
         underline.width = grow();
@@ -388,6 +429,34 @@ bool TabBarScope::draw_tab(std::string_view label, bool closable, bool* open)
         }
     }
     return index == m_selected && (open == nullptr || *open);
+}
+
+} // namespace
+
+bool begin_tab_bar(std::string_view name, uint32_t& selected, const TabBarOptions& options)
+{
+    context().push_scope<TabBarFrame>("tab bar", name, selected, options);
+    return true;
+}
+
+void end_tab_bar()
+{
+    context().pop_scope<TabBarFrame>("end_tab_bar");
+}
+
+bool tab_item(std::string_view label)
+{
+    return context().scope<TabBarFrame>("tab_item").tab(label);
+}
+
+bool tab_item(std::string_view label, bool* open)
+{
+    return context().scope<TabBarFrame>("tab_item").tab(label, open);
+}
+
+const TabBarResult& tab_bar_result()
+{
+    return context().scope<TabBarFrame>("tab_bar_result").result();
 }
 
 bool splitter(std::string_view name, float& first_size, const SplitterOptions& options)
@@ -440,9 +509,40 @@ ScrollOptions scroll_options_of(const ListBoxOptions& options)
     return scroll;
 }
 
-} // namespace
+class ListBoxFrame
+{
+public:
+    explicit ListBoxFrame(std::string_view name, const ListBoxOptions& options);
+    ~ListBoxFrame();
 
-ListBoxScope::Range ListBoxScope::visible_range(std::string_view name, const ListBoxOptions& options)
+    ListBoxFrame(const ListBoxFrame&) = delete;
+    ListBoxFrame& operator=(const ListBoxFrame&) = delete;
+
+    [[nodiscard]] ItemState item(std::string_view label, bool selected);
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected);
+    [[nodiscard]] uint32_t first_item() const { return m_first; }
+    [[nodiscard]] uint32_t last_item() const { return m_last; }
+
+private:
+    struct Range
+    {
+        uint32_t first = 0;
+        uint32_t last = 0;
+    };
+
+    ListBoxFrame(std::string_view name, const ListBoxOptions& options, const Range& range);
+    [[nodiscard]] static Range visible_range(std::string_view name, const ListBoxOptions& options);
+    void spacer(uint32_t rows);
+
+    uint32_t m_first = 0;
+    uint32_t m_last = 0;
+    ScrollScope m_scroll;
+    ListBoxOptions m_options;
+    LayoutStyle m_row;
+    uint32_t m_count = 0;
+};
+
+ListBoxFrame::Range ListBoxFrame::visible_range(std::string_view name, const ListBoxOptions& options)
 {
     if (options.item_count == 0)
     {
@@ -459,12 +559,12 @@ ListBoxScope::Range ListBoxScope::visible_range(std::string_view name, const Lis
     return { math::min(first > 1 ? first - 1 : 0u, options.item_count), math::min(last + 1, options.item_count) };
 }
 
-ListBoxScope::ListBoxScope(std::string_view name, const ListBoxOptions& options)
-    : ListBoxScope(name, options, visible_range(name, options))
+ListBoxFrame::ListBoxFrame(std::string_view name, const ListBoxOptions& options)
+    : ListBoxFrame(name, options, visible_range(name, options))
 {
 }
 
-ListBoxScope::ListBoxScope(std::string_view name, const ListBoxOptions& options, const Range& range)
+ListBoxFrame::ListBoxFrame(std::string_view name, const ListBoxOptions& options, const Range& range)
     : m_first(range.first)
     , m_last(range.last)
     , m_scroll(name, scroll_options_of(options))
@@ -481,7 +581,7 @@ ListBoxScope::ListBoxScope(std::string_view name, const ListBoxOptions& options,
     }
 }
 
-ListBoxScope::~ListBoxScope()
+ListBoxFrame::~ListBoxFrame()
 {
     if (m_options.item_count > 0)
     {
@@ -489,7 +589,7 @@ ListBoxScope::~ListBoxScope()
     }
 }
 
-void ListBoxScope::spacer(uint32_t rows)
+void ListBoxFrame::spacer(uint32_t rows)
 {
     if (rows == 0)
     {
@@ -502,7 +602,7 @@ void ListBoxScope::spacer(uint32_t rows)
     context().end_box();
 }
 
-ItemState ListBoxScope::item(std::string_view label, bool selected)
+ItemState ListBoxFrame::item(std::string_view label, bool selected)
 {
     if (m_options.item_count > 0)
     {
@@ -514,12 +614,45 @@ ItemState ListBoxScope::item(std::string_view label, bool selected)
     return selectable(label, selected, row_options);
 }
 
-ItemState ListBoxScope::item(uint32_t index, std::string_view label, bool selected)
+ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool selected)
 {
     IdScope row(context(), context().index_id(index));
     SelectableOptions row_options;
     static_cast<WidgetOptions&>(row_options) = m_options;
     return selectable(label, selected, row_options);
+}
+
+} // namespace
+
+bool begin_list_box(std::string_view name, const ListBoxOptions& options)
+{
+    context().push_scope<ListBoxFrame>("list box", name, options);
+    return true;
+}
+
+void end_list_box()
+{
+    context().pop_scope<ListBoxFrame>("end_list_box");
+}
+
+ItemState list_item(std::string_view label, bool selected)
+{
+    return context().scope<ListBoxFrame>("list_item").item(label, selected);
+}
+
+ItemState list_item(uint32_t index, std::string_view label, bool selected)
+{
+    return context().scope<ListBoxFrame>("list_item").item(index, label, selected);
+}
+
+uint32_t list_first_item()
+{
+    return context().scope<ListBoxFrame>("list_first_item").first_item();
+}
+
+uint32_t list_last_item()
+{
+    return context().scope<ListBoxFrame>("list_last_item").last_item();
 }
 
 bool filter_matches(std::string_view needle, std::string_view text)

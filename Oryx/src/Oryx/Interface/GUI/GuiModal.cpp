@@ -66,6 +66,7 @@ bool begin_modal_impl(std::string_view name, const WidgetOptions& options, bool&
         escaped = true;
         return false;
     }
+    open_marker<ModalEnd>("modal");
     return true;
 }
 
@@ -101,6 +102,7 @@ bool begin_modal(std::string_view name, const WidgetOptions& options)
 void end_modal()
 {
     GuiContext& ctx = context();
+    close_marker<ModalEnd>("end_modal");
     ctx.end_box();
     ctx.end_popup_layer();
     ctx.end_box();

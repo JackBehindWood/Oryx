@@ -41,6 +41,7 @@ void ImContext::begin_frame(const ImInput& input)
     m_shield_count = 0;
     m_shield_depth = 0;
     m_disabled = 0;
+    m_scope_depth = 0;
     m_layout.set_alpha(1.0f);
 }
 
@@ -62,6 +63,10 @@ void ImContext::end_frame()
     if (!m_id_stack.empty())
     {
         throw Error("ImContext frame ended with an id scope open", "every push_id needs a pop_id");
+    }
+    if (m_scope_depth != 0)
+    {
+        throw Error(std::string("ImContext frame ended with ") + m_scopes[m_scope_depth - 1].name + " open", "every begin_* of a scoped widget needs its end_*");
     }
     if (m_draw.has_clip())
     {
@@ -116,8 +121,28 @@ void ImContext::abort_frame()
     m_shield_depth = 0;
     m_shield_count = 0;
     m_disabled = 0;
+    m_scope_depth = 0;
     m_layout.set_alpha(1.0f);
     m_open = false;
+}
+
+void ImContext::scope_overflow(const char* name) const
+{
+    throw Error(std::string("Too many nested scopes opening ") + name, "at most 24 scoped widgets may be open at once");
+}
+
+void ImContext::scope_missing(const char* user) const
+{
+    throw Error(std::string(user) + " called outside its widget", "open it with its begin_* first");
+}
+
+void ImContext::scope_mismatch(const char* end) const
+{
+    if (m_scope_depth == 0)
+    {
+        throw Error(std::string(end) + " called with no scoped widget open", "every end_* needs its begin_*, and only when begin_* returned true");
+    }
+    throw Error(std::string(end) + " called while " + m_scopes[m_scope_depth - 1].name + " is the innermost open scope", "close inner scoped widgets first");
 }
 
 void ImContext::solve_layout()

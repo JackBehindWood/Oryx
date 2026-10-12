@@ -300,3 +300,38 @@ TEST_CASE("replay: a rounded shape carries its radii and thickness as fractions 
     CHECK(std::abs(vertices[0].uv[0]) == doctest::Approx(20.0f + UI_SHAPE_MARGIN));
     CHECK(std::abs(vertices[0].uv[1]) == doctest::Approx(10.0f + UI_SHAPE_MARGIN));
 }
+
+TEST_CASE("replay: a convex polygon becomes a fan of triangles in the same UI stream as rects")
+{
+    ReplayFixture f;
+    DrawList list;
+    list.add_rect({ { 0.0f, 0.0f }, { 4.0f, 4.0f } }, BLUE);
+    const Vec2f trapezoid[4] = { { 10.0f, 20.0f }, { 14.0f, 10.0f }, { 26.0f, 10.0f }, { 30.0f, 20.0f } };
+    list.add_polygon(trapezoid, 4, RED);
+    f.run(list);
+    REQUIRE(f.sink.size() == 1);
+    const std::vector<Vertex2DUi> vertices = f.quads(f.sink[0]);
+    REQUIRE(vertices.size() == 12);
+    CHECK(vertices[4].position[0] == doctest::Approx(10.0f));
+    CHECK(vertices[4].position[1] == doctest::Approx(30.0f));
+    CHECK(vertices[5].position[0] == doctest::Approx(14.0f));
+    CHECK(vertices[6].position[0] == doctest::Approx(26.0f));
+    CHECK(vertices[7].position[0] == doctest::Approx(26.0f));
+    CHECK(vertices[8].position[0] == doctest::Approx(10.0f));
+    CHECK(vertices[10].position[0] == doctest::Approx(30.0f));
+}
+
+TEST_CASE("replay: a polygon obeys the clip it was recorded under")
+{
+    ReplayFixture f;
+    DrawList list;
+    list.push_clip({ { 0.0f, 0.0f }, { 20.0f, 20.0f } });
+    const Vec2f triangle[3] = { { 2.0f, 2.0f }, { 18.0f, 2.0f }, { 10.0f, 18.0f } };
+    list.add_polygon(triangle, 3, RED);
+    list.pop_clip();
+    f.run(list);
+    REQUIRE(f.sink.size() == 1);
+    REQUIRE(f.sink[0].has_scissor);
+    CHECK(f.sink[0].scissor.width == 20);
+    CHECK(f.sink[0].scissor.height == 20);
+}

@@ -74,11 +74,13 @@ void begin_menu_bar(std::string_view name, const WidgetOptions& options)
     paint.has_fill = true;
     paint.fill = style.background;
     ctx.push_id(name);
+    open_marker<MenuBarEnd>("menu bar");
 }
 
 void end_menu_bar()
 {
     GuiContext& ctx = context();
+    close_marker<MenuBarEnd>("end_menu_bar");
     ctx.pop_id();
     ctx.end_box();
 }
@@ -144,12 +146,14 @@ bool begin_menu(std::string_view label, const WidgetOptions& options)
         menus.open = 0;
         return false;
     }
+    open_marker<MenuEnd>("menu");
     return true;
 }
 
 void end_menu()
 {
     GuiContext& ctx = context();
+    close_marker<MenuEnd>("end_menu");
     ctx.end_box();
     ctx.end_popup_layer();
     ctx.pop_id();
@@ -212,12 +216,14 @@ bool begin_popup(std::string_view name, const WidgetOptions& options)
         return false;
     }
     ctx.push_id(name);
+    open_marker<PopupEnd>("popup");
     return true;
 }
 
 void end_popup()
 {
     GuiContext& ctx = context();
+    close_marker<PopupEnd>("end_popup");
     ctx.pop_id();
     ctx.end_box();
     ctx.end_popup_layer();
@@ -232,13 +238,15 @@ bool context_menu(const ItemState& item, std::string_view name, const WidgetOpti
     return begin_popup(name, options);
 }
 
-void tooltip(const ItemState& item, std::string_view text, float delay)
+namespace
 {
-    GuiContext& ctx = context();
+
+bool open_tooltip(GuiContext& ctx, const ItemState& item, float delay, std::string_view text)
+{
     const GuiTheme& theme = ctx.gui_theme();
     if (!item.hovered || item.hovered_seconds < (delay >= 0.0f ? delay : theme.tooltip_delay))
     {
-        return;
+        return false;
     }
     const ImStyle& style = theme.base;
     const ImId id = ctx.id("tooltip");
@@ -249,9 +257,43 @@ void tooltip(const ItemState& item, std::string_view text, float delay)
     const uint32_t index = ctx.begin_box(id, box);
     BoxPaint& paint = ctx.layout().node(index).paint;
     im::paint_surface(paint, style, style.background);
-    paint.text = ctx.arena().store(text);
-    paint.text_height = style.text_height;
-    paint.text_colour = style.text;
+    if (!text.empty())
+    {
+        paint.text = ctx.arena().store(text);
+        paint.text_height = style.text_height;
+        paint.text_colour = style.text;
+    }
+    return true;
+}
+
+} // namespace
+
+void tooltip(const ItemState& item, std::string_view text, float delay)
+{
+    GuiContext& ctx = context();
+    if (open_tooltip(ctx, item, delay, text))
+    {
+        ctx.end_box();
+    }
+}
+
+bool begin_tooltip(const ItemState& item, float delay)
+{
+    GuiContext& ctx = context();
+    if (!open_tooltip(ctx, item, delay, {}))
+    {
+        return false;
+    }
+    ctx.push_id("tooltip");
+    open_marker<TooltipEnd>("tooltip");
+    return true;
+}
+
+void end_tooltip()
+{
+    GuiContext& ctx = context();
+    close_marker<TooltipEnd>("end_tooltip");
+    ctx.pop_id();
     ctx.end_box();
 }
 

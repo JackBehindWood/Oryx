@@ -17,38 +17,29 @@ void end_menu();
 // A row of an open menu; a click closes every open menu in the next frame.
 [[nodiscard]] ItemState menu_item(std::string_view label, bool selected = false, const WidgetOptions& options = {});
 
-class MenuBarScope
+struct MenuBarEnd
+{
+    static void end() { end_menu_bar(); }
+};
+
+class MenuBarScope : public AlwaysScope<MenuBarEnd>
 {
 public:
     explicit MenuBarScope(std::string_view name, const WidgetOptions& options = {}) { begin_menu_bar(name, options); }
-    ~MenuBarScope() { end_menu_bar(); }
-
-    MenuBarScope(const MenuBarScope&) = delete;
-    MenuBarScope& operator=(const MenuBarScope&) = delete;
 };
 
-class MenuScope
+struct MenuEnd
+{
+    static void end() { end_menu(); }
+};
+
+class MenuScope : public Scope<MenuEnd>
 {
 public:
     explicit MenuScope(std::string_view label, const WidgetOptions& options = {})
-        : m_open(begin_menu(label, options))
+        : Scope(begin_menu(label, options))
     {
     }
-    ~MenuScope()
-    {
-        if (m_open)
-        {
-            end_menu();
-        }
-    }
-
-    MenuScope(const MenuScope&) = delete;
-    MenuScope& operator=(const MenuScope&) = delete;
-
-    [[nodiscard]] bool open() const { return m_open; }
-
-private:
-    bool m_open;
 };
 
 // A popup that opens where the pointer was when open_popup ran and stays until close_popup, a press outside or Escape. begin_popup returns whether it is open; call end_popup only then.
@@ -59,11 +50,42 @@ void close_current_popup();
 [[nodiscard]] bool begin_popup(std::string_view name, const WidgetOptions& options = {});
 void end_popup();
 
+struct PopupEnd
+{
+    static void end() { end_popup(); }
+};
+
+class PopupScope : public Scope<PopupEnd>
+{
+public:
+    explicit PopupScope(std::string_view name, const WidgetOptions& options = {})
+        : Scope(begin_popup(name, options))
+    {
+    }
+};
+
 // Opens the popup `name` on a right click of the item and returns whether it is open, like begin_popup.
 [[nodiscard]] bool context_menu(const ItemState& item, std::string_view name, const WidgetOptions& options = {});
 
 // Shows `text` at the pointer once the item has been hovered for the delay (negative: the theme's tooltip_delay). It never takes input.
 void tooltip(const ItemState& item, std::string_view text, float delay = -1.0f);
+// The same for content of your own: returns whether the tooltip is shown (the item hovered for the delay); fill it and call end_tooltip only then.
+[[nodiscard]] bool begin_tooltip(const ItemState& item, float delay = -1.0f);
+void end_tooltip();
+
+struct TooltipEnd
+{
+    static void end() { end_tooltip(); }
+};
+
+class TooltipScope : public Scope<TooltipEnd>
+{
+public:
+    explicit TooltipScope(const ItemState& item, float delay = -1.0f)
+        : Scope(begin_tooltip(item, delay))
+    {
+    }
+};
 
 // Queues a message for show_toasts.
 void toast(std::string_view text, float seconds = 3.0f);

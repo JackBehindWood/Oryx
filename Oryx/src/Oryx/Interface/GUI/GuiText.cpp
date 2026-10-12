@@ -13,11 +13,16 @@ namespace
 constexpr float k_pad = 6.0f;
 constexpr float k_caret_width = 1.5f;
 
-float text_width(GuiContext& ctx, std::string_view text, float height)
+} // namespace
+
+float measure_text(GuiContext& ctx, std::string_view text, float height)
 {
     Font* font = ctx.theme().font;
     return font != nullptr && !text.empty() ? font->measure(text, height).width : 0.0f;
 }
+
+namespace
+{
 
 uint32_t next_boundary(std::string_view text, uint32_t at)
 {
@@ -29,15 +34,16 @@ uint32_t next_boundary(std::string_view text, uint32_t at)
     return at;
 }
 
-// The byte offset of the boundary nearest to `x` points into the text.
-uint32_t index_at(GuiContext& ctx, std::string_view text, float height, float x)
+} // namespace
+
+uint32_t text_offset_at(GuiContext& ctx, std::string_view text, float height, float x)
 {
     uint32_t at = 0;
     float previous = 0.0f;
     while (at < text.size())
     {
         const uint32_t next = next_boundary(text, at);
-        const float width = text_width(ctx, text.substr(0, next), height);
+        const float width = measure_text(ctx, text.substr(0, next), height);
         if (x < (previous + width) * 0.5f)
         {
             return at;
@@ -47,6 +53,9 @@ uint32_t index_at(GuiContext& ctx, std::string_view text, float height, float x)
     }
     return static_cast<uint32_t>(text.size());
 }
+
+namespace
+{
 
 Colour with_alpha(const Colour& colour, float alpha)
 {
@@ -80,7 +89,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
         else
         {
             const std::string_view text(buffer);
-            edit.click = index_at(ctx, text, style.text_height, input.pointer.position[0] - rect.min[0] - k_pad + state.scroll);
+            edit.click = text_offset_at(ctx, text, style.text_height, input.pointer.position[0] - rect.min[0] - k_pad + state.scroll);
         }
     }
     else if (outcome.item.double_clicked)
@@ -117,7 +126,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
     outcome.focused = focused;
 
     const std::string_view text(buffer);
-    const float caret_x = text_width(ctx, text.substr(0, state.caret), style.text_height);
+    const float caret_x = measure_text(ctx, text.substr(0, state.caret), style.text_height);
     const float inner = known ? math::max(1.0f, rect.size[0] - 2.0f * k_pad) : 1.0f;
     if (focused && known)
     {
@@ -145,8 +154,8 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
     {
         const uint32_t low = math::min(state.caret, state.anchor);
         const uint32_t high = math::max(state.caret, state.anchor);
-        const float x0 = text_width(ctx, text.substr(0, low), style.text_height);
-        const float x1 = text_width(ctx, text.substr(0, high), style.text_height);
+        const float x0 = measure_text(ctx, text.substr(0, low), style.text_height);
+        const float x1 = measure_text(ctx, text.substr(0, high), style.text_height);
         LayoutStyle selection;
         selection.width = fixed(x1 - x0);
         selection.height = fixed(height - 4.0f);
@@ -157,7 +166,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
         ctx.end_box();
     }
     LayoutStyle label;
-    label.width = fixed(text_width(ctx, text, style.text_height) + 2.0f);
+    label.width = fixed(measure_text(ctx, text, style.text_height) + 2.0f);
     label.height = fixed(height);
     label.align_y = Align::Centre;
     label.floating = floating(k_pad - state.scroll, 0.0f);

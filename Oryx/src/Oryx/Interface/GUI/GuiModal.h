@@ -25,28 +25,18 @@ void end_modal();
 // The common dialog in one call, drawn every frame once opened with open_modal: Confirmed or Cancelled (a click or Escape) on the frame it is answered, None otherwise.
 [[nodiscard]] ModalChoice confirm(std::string_view name, std::string_view message, std::string_view confirm_label, std::string_view cancel_label);
 
-class ModalScope
+struct ModalEnd
+{
+    static void end() { end_modal(); }
+};
+
+class ModalScope : public Scope<ModalEnd>
 {
 public:
     explicit ModalScope(std::string_view name, const WidgetOptions& options = {})
-        : m_open(begin_modal(name, options))
+        : Scope(begin_modal(name, options))
     {
     }
-    ~ModalScope()
-    {
-        if (m_open)
-        {
-            end_modal();
-        }
-    }
-
-    ModalScope(const ModalScope&) = delete;
-    ModalScope& operator=(const ModalScope&) = delete;
-
-    [[nodiscard]] bool open() const { return m_open; }
-
-private:
-    bool m_open;
 };
 
 } // namespace oryx::gui

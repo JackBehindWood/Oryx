@@ -16,7 +16,28 @@ bool register_panel(std::string_view name, const PanelOptions& options = {});
 bool dock_only_in(std::string_view panel, std::string_view target);
 bool never_dock_in(std::string_view panel, std::string_view target);
 
-// Takes the leftover space like central_area() and draws the context's dock over it. The context owns the layout: the first call (or the first layout query) loads `gui.layout_file` or builds the default from the registered hints,
+// A group of panels (PanelOptions::group names it), as a typed handle; made from the name, so any code can name the same group.
+struct GroupHandle
+{
+    PanelId id;
+};
+
+[[nodiscard]] GroupHandle group(std::string_view name);
+
+// Group-level docking limits (see DockRules): which panels the members of `group` may share a tab stack with, checked from both sides and on every Centre drop (refused with a human reason),
+// and applied to a layout loaded after the call by closing the panels that break them. Replaces the group's earlier rules; call before the first host frame. False when the handle is invalid, a rule is malformed or eight groups already have rules.
+bool set_group_rules(GroupHandle group, const DockRules& rules);
+
+// Presets for set_group_rules.
+[[nodiscard]] DockRules rules_free();
+// Members tab only with their own group.
+[[nodiscard]] DockRules rules_own_group(GroupHandle self);
+// Members tab only with their own group and with viewport panels.
+[[nodiscard]] DockRules rules_own_group_and_viewports(GroupHandle self);
+// Members tab only with the listed groups (at most k_max_dock_rules; more are ignored).
+[[nodiscard]] DockRules rules_only_with(const GroupHandle* groups, uint32_t count);
+
+// Takes the leftover space of the box it sits in (the Fill area of GuiArea.h, or any grow box) and draws the context's dock over it. The context owns the layout: the first call (or the first layout query) loads `gui.layout_file` or builds the default from the registered hints,
 // autosaves reactively and writes a pending change when the context is destroyed; an empty layout_file keeps everything in memory. With `gui.docking` off the Viewport panel fills the host and nothing else is drawn.
 // Every begin_panel_host needs its end_panel_host. A layout that fails validate is replaced by the last good one and logged, never thrown. Register panels before the first call.
 void begin_panel_host();

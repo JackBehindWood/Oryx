@@ -640,6 +640,7 @@ const char* to_string(DockReason reason)
     case DockReason::AlreadyOpen: return "panel already open";
     case DockReason::AlreadyClosed: return "panel already closed";
     case DockReason::NotPermittedTarget: return "panel may not dock there";
+    case DockReason::NotPermittedGroup: return "group rules forbid sharing tabs there";
     case DockReason::Collapsed: return "node is collapsed";
     }
     return "?";
@@ -654,6 +655,7 @@ const char* describe(DockReason reason)
     case DockReason::NotPermittedDock: return "This panel can't be docked";
     case DockReason::NotPermittedFloat: return "This panel can't be floated";
     case DockReason::NotPermittedTarget: return "This panel can't dock here";
+    case DockReason::NotPermittedGroup: return "These panels can't share tabs";
     case DockReason::TabsFull: return "This tab group is full";
     case DockReason::NodesFull: return "No room for another split";
     case DockReason::FloatsFull: return "Too many floating windows";
@@ -685,7 +687,54 @@ bool can_resize_split(const DockLayout& layout, const PanelTable& panels, int32_
     return side_resizable(layout, panels, n.first, 0) && side_resizable(layout, panels, n.second, 0);
 }
 
-DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target)
+namespace
+{
+
+bool rule_lists(const DockRule& rule, const PanelDesc& other)
+{
+    bool listed = rule.viewports && other.kind == PanelKind::Viewport;
+    for (uint32_t g = 0; g < rule.count && g < k_max_dock_rules && !listed; ++g)
+        listed = is_valid(other.group) && other.group == rule.groups[g];
+    return listed;
+}
+
+// One side's rules against the other panel.
+bool rules_allow(const PanelTable& panels, const PanelDesc& owner, const PanelDesc& other)
+{
+    const DockRules* rules = find_group_rules(panels, owner.group);
+    if (rules == nullptr)
+        return true;
+    for (uint32_t r = 0; r < rules->count && r < k_max_dock_rules; ++r)
+    {
+        const DockRule& rule = rules->rules[r];
+        const bool listed = rule_lists(rule, other);
+        switch (rule.kind)
+        {
+        case DockRuleKind::OnlyWithGroups:
+            if (!listed)
+                return false;
+            break;
+        case DockRuleKind::NeverWithGroups:
+            if (listed)
+                return false;
+            break;
+        }
+    }
+    return true;
+}
+
+}
+
+bool can_share_tabs(const PanelTable& panels, PanelId a, PanelId b)
+{
+    const PanelDesc* first = find_panel(panels, a);
+    const PanelDesc* second = find_panel(panels, b);
+    if (first == nullptr || second == nullptr)
+        return true;
+    return rules_allow(panels, *first, *second) && rules_allow(panels, *second, *first);
+}
+
+DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target, DropZone zone)
 {
     if (const DockReason reason = can_dock(panels, panel); reason != DockReason::None)
         return reason;
@@ -705,7 +754,41 @@ DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, Pan
         for (uint32_t r = 0; r < desc->dock_only_count; ++r)
             allowed = allowed || node.tabs[t] == desc->dock_only[r];
     }
-    return allowed ? DockReason::None : DockReason::NotPermittedTarget;
+    if (!allowed)
+        return DockReason::NotPermittedTarget;
+    if (zone == DropZone::Centre)
+        for (uint32_t t = 0; t < node.count && t < k_max_dock_tabs; ++t)
+            if (node.tabs[t] != panel && !can_share_tabs(panels, panel, node.tabs[t]))
+                return DockReason::NotPermittedGroup;
+    return DockReason::None;
+}
+
+uint32_t repair_group_rules(DockLayout& layout, const PanelTable& panels)
+{
+    if (panels.group_rule_count == 0)
+        return 0;
+    uint32_t closed = 0;
+    for (bool again = true; again;)
+    {
+        again = false;
+        for (uint32_t n = 0; n < layout.node_count && !again; ++n)
+        {
+            const DockNode& node = layout.nodes[n];
+            if (node.kind != DockNodeKind::Tabs)
+                continue;
+            for (uint32_t later = 1; later < node.count && !again; ++later)
+                for (uint32_t earlier = 0; earlier < later && !again; ++earlier)
+                    if (!can_share_tabs(panels, node.tabs[earlier], node.tabs[later]))
+                    {
+                        const PanelId offender = node.tabs[later];
+                        again = close_panel(layout, panels, offender).applied;
+                        closed += again ? 1u : 0u;
+                        if (!again)
+                            return closed;
+                    }
+        }
+    }
+    return closed;
 }
 
 DockReason can_reorder(const PanelTable& panels, PanelId panel) { return require_flag(panels, panel, panel_flag::reorder_in_host, DockReason::NotPermittedReorder); }
@@ -750,7 +833,7 @@ DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
     if (same_host && layout.nodes[resolved].count == 1)
         return refuse(DockReason::NoChange);
 
-    if (const DockReason reason = can_dock_into(layout, panels, panel, target == k_dock_root && zone == DropZone::Centre && is_tabs(layout, resolved) ? resolved : target); reason != DockReason::None)
+    if (const DockReason reason = can_dock_into(layout, panels, panel, target == k_dock_root && zone == DropZone::Centre && is_tabs(layout, resolved) ? resolved : target, zone); reason != DockReason::None)
         return refuse(reason);
 
     // Node indices shift once the emptied source host is pruned, so the target is re-found through a panel that stays put.
@@ -872,7 +955,7 @@ DockResult dock_tabs(DockLayout& layout, const PanelTable& panels, const PanelId
 
     const bool into_tabs = is_tabs(layout, resolved);
     for (uint32_t m = 0; m < count; ++m)
-        if (const DockReason reason = can_dock_into(layout, panels, moved[m], zone == DropZone::Centre && into_tabs ? resolved : target); reason != DockReason::None)
+        if (const DockReason reason = can_dock_into(layout, panels, moved[m], zone == DropZone::Centre && into_tabs ? resolved : target, zone); reason != DockReason::None)
             return refuse(reason);
     if (zone == DropZone::Centre && into_tabs && layout.nodes[resolved].count + count > k_max_dock_tabs)
         return refuse(DockReason::TabsFull);

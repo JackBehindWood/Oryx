@@ -28,9 +28,56 @@ LayoutStyle cell_box(const Sizing& width, TextAlign align)
     return box;
 }
 
-} // namespace
+class TableFrame
+{
+public:
+    TableFrame(std::string_view name, const TableOptions& options);
+    ~TableFrame();
 
-TableScope::TableScope(std::string_view name, const TableOptions& options)
+    TableFrame(const TableFrame&) = delete;
+    TableFrame& operator=(const TableFrame&) = delete;
+
+    void column(std::string_view label, Sizing width, bool sortable, TextAlign align);
+    TableResult headers();
+    [[nodiscard]] uint32_t first_row() const { return m_first; }
+    [[nodiscard]] uint32_t last_row() const { return m_last; }
+    ItemState row(uint32_t index, bool selected);
+    void cell(std::string_view text);
+    void begin_cell();
+    void end_cell();
+
+private:
+    struct Column
+    {
+        std::string_view label;
+        Sizing width;
+        TextAlign align = TextAlign::Left;
+        bool sortable = false;
+    };
+
+    void close_row();
+    void spacer_rows(uint32_t count);
+
+    GuiContext& m_context;
+    const ImStyle* m_style;
+    TableOptions m_options;
+    ImId m_id;
+    Column m_columns[k_max_table_columns];
+    uint32_t m_column_count = 0;
+    uint32_t m_first = 0;
+    uint32_t m_last = 0;
+    uint32_t m_cell = 0;
+    bool m_headers = false;
+    bool m_row_open = false;
+    bool m_cell_open = false;
+};
+
+TableFrame& table_frame(const char* user)
+{
+    return context().scope<TableFrame>(user);
+}
+
+TableFrame::TableFrame(std::string_view name, const TableOptions& options)
     : m_context(context())
     , m_style(&m_context.role_style(options, &GuiTheme::panel))
     , m_options(options)
@@ -44,7 +91,7 @@ TableScope::TableScope(std::string_view name, const TableOptions& options)
     m_context.push_id(name);
 }
 
-TableScope::~TableScope()
+TableFrame::~TableFrame()
 {
     GuiContext& ctx = m_context;
     if (m_headers)
@@ -57,7 +104,7 @@ TableScope::~TableScope()
     ctx.end_box();
 }
 
-void TableScope::column(std::string_view label, Sizing width, bool sortable, TextAlign align)
+void TableFrame::column(std::string_view label, Sizing width, bool sortable, TextAlign align)
 {
     if (m_headers)
     {
@@ -70,7 +117,7 @@ void TableScope::column(std::string_view label, Sizing width, bool sortable, Tex
     m_columns[m_column_count++] = { m_context.arena().store(label), width, align, sortable };
 }
 
-void TableScope::spacer_rows(uint32_t count)
+void TableFrame::spacer_rows(uint32_t count)
 {
     if (count == 0)
     {
@@ -83,7 +130,7 @@ void TableScope::spacer_rows(uint32_t count)
     m_context.end_box();
 }
 
-TableResult TableScope::headers()
+TableResult TableFrame::headers()
 {
     if (m_headers)
     {
@@ -161,7 +208,7 @@ TableResult TableScope::headers()
     return result;
 }
 
-void TableScope::close_row()
+void TableFrame::close_row()
 {
     if (m_row_open)
     {
@@ -171,7 +218,7 @@ void TableScope::close_row()
     }
 }
 
-ItemState TableScope::row(uint32_t index, bool selected)
+ItemState TableFrame::row(uint32_t index, bool selected)
 {
     if (!m_headers)
     {
@@ -196,7 +243,7 @@ ItemState TableScope::row(uint32_t index, bool selected)
     return state;
 }
 
-void TableScope::begin_cell()
+void TableFrame::begin_cell()
 {
     if (!m_row_open)
     {
@@ -211,13 +258,13 @@ void TableScope::begin_cell()
     m_cell_open = true;
 }
 
-void TableScope::end_cell()
+void TableFrame::end_cell()
 {
     m_context.end_box();
     m_cell_open = false;
 }
 
-void TableScope::cell(std::string_view text)
+void TableFrame::cell(std::string_view text)
 {
     begin_cell();
     BoxPaint& paint = m_context.layout().node(m_context.layout().node_count() - 1).paint;
@@ -228,6 +275,59 @@ void TableScope::cell(std::string_view text)
     paint.text_align = column.align;
     paint.ellipsis = true;
     end_cell();
+}
+
+} // namespace
+
+bool begin_table(std::string_view name, const TableOptions& options)
+{
+    context().push_scope<TableFrame>("table", name, options);
+    return true;
+}
+
+void end_table()
+{
+    context().pop_scope<TableFrame>("end_table");
+}
+
+void table_column(std::string_view label, Sizing width, bool sortable, TextAlign align)
+{
+    table_frame("table_column").column(label, width, sortable, align);
+}
+
+TableResult table_headers()
+{
+    return table_frame("table_headers").headers();
+}
+
+uint32_t table_first_row()
+{
+    return table_frame("table_first_row").first_row();
+}
+
+uint32_t table_last_row()
+{
+    return table_frame("table_last_row").last_row();
+}
+
+ItemState table_row(uint32_t index, bool selected)
+{
+    return table_frame("table_row").row(index, selected);
+}
+
+void table_cell(std::string_view text)
+{
+    table_frame("table_cell").cell(text);
+}
+
+void table_begin_cell()
+{
+    table_frame("table_begin_cell").begin_cell();
+}
+
+void table_end_cell()
+{
+    table_frame("table_end_cell").end_cell();
 }
 
 } // namespace oryx::gui

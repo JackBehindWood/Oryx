@@ -143,10 +143,46 @@ struct PanelDesc
     bool initial_open = true;
 };
 
+enum class DockRuleKind : uint8_t
+{
+    // The panels it may tab with are those of the listed groups (and viewports when asked); anything else is refused.
+    OnlyWithGroups,
+    // The panels of the listed groups (and viewports when asked) are refused as tab mates.
+    NeverWithGroups
+};
+
+// One rule of a group: which panels its members may share a tab stack with. Plain data, so presets are values and tests build them directly.
+struct DockRule
+{
+    DockRuleKind kind = DockRuleKind::OnlyWithGroups;
+    PanelId groups[k_max_dock_rules] = {};
+    uint8_t count = 0;
+    // Panels of PanelKind::Viewport count as listed.
+    bool viewports = false;
+};
+
+// All of a group's rules, every one of which must allow a tab mate.
+struct DockRules
+{
+    DockRule rules[k_max_dock_rules] = {};
+    uint8_t count = 0;
+};
+
+inline constexpr uint32_t k_max_rule_groups = 8;
+
+struct GroupRules
+{
+    PanelId group;
+    DockRules rules;
+};
+
 struct PanelTable
 {
     PanelDesc descs[k_max_panels] = {};
     uint32_t count = 0;
+    // Registered by code every run like the panels, never saved.
+    GroupRules group_rules[k_max_rule_groups] = {};
+    uint32_t group_rule_count = 0;
 };
 
 namespace detail
@@ -222,6 +258,36 @@ inline bool add_dock_rule(PanelId (&list)[k_max_dock_rules], uint8_t& count, Pan
 {
     PanelDesc* desc = find_panel(table, panel);
     return desc != nullptr && detail::add_dock_rule(desc->dock_never, desc->dock_never_count, target);
+}
+
+// Sets the rules of `group`, replacing earlier ones; false when `group` is invalid, a rule is malformed (count over capacity) or k_max_rule_groups groups already have rules.
+[[nodiscard]] inline bool set_group_rules(PanelTable& table, PanelId group, const DockRules& rules)
+{
+    if (!is_valid(group) || rules.count > k_max_dock_rules)
+        return false;
+    for (uint32_t r = 0; r < rules.count; ++r)
+        if (rules.rules[r].count > k_max_dock_rules)
+            return false;
+    for (uint32_t i = 0; i < table.group_rule_count; ++i)
+        if (table.group_rules[i].group == group)
+        {
+            table.group_rules[i].rules = rules;
+            return true;
+        }
+    if (table.group_rule_count >= k_max_rule_groups)
+        return false;
+    table.group_rules[table.group_rule_count++] = GroupRules{ group, rules };
+    return true;
+}
+
+[[nodiscard]] inline const DockRules* find_group_rules(const PanelTable& table, PanelId group)
+{
+    if (!is_valid(group))
+        return nullptr;
+    for (uint32_t i = 0; i < table.group_rule_count && i < k_max_rule_groups; ++i)
+        if (table.group_rules[i].group == group)
+            return &table.group_rules[i].rules;
+    return nullptr;
 }
 
 enum class DockNodeKind : uint8_t

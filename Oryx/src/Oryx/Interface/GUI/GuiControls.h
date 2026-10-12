@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Interface/GUI/Gui.h"
+#include "Oryx/Interface/GUI/GuiScope.h"
 #include "Oryx/Interface/GUI/GuiSelection.h"
 
 // The developer-tooling widget set. Like everything in oryx::gui they answer from last frame's rects, take a std::string_view label that is also the identity under the current id scope,
@@ -22,22 +23,19 @@ struct FieldOptions : WidgetOptions
 static_assert(std::is_trivially_copyable_v<FieldOptions>);
 
 // A row holding a label and one control (a name starting with "##" hides its label but still names the row), built in the order the options and the theme choose; the row is the box named `name` and scopes the ids of its control.
-// Open it, add the control's boxes, close it by leaving the scope.
-class FieldScope
+// Open it, add the control's boxes, close it with end_field (FieldScope does both). It always opens.
+void begin_field(std::string_view name, const FieldOptions& options);
+void end_field();
+
+struct FieldEnd
+{
+    static void end() { end_field(); }
+};
+
+class FieldScope : public AlwaysScope<FieldEnd>
 {
 public:
-    FieldScope(std::string_view name, const FieldOptions& options);
-    ~FieldScope();
-
-    FieldScope(const FieldScope&) = delete;
-    FieldScope& operator=(const FieldScope&) = delete;
-
-private:
-    std::string_view m_name;
-    const ImStyle* m_style;
-    float m_label_width;
-    bool m_label_after;
-    bool m_hidden;
+    FieldScope(std::string_view name, const FieldOptions& options) { begin_field(name, options); }
 };
 
 // A leaf box with one line of text; the text is copied into the frame arena. Returns the node index.
@@ -100,33 +98,33 @@ struct TreeNodeResult
 
 static_assert(std::is_trivially_copyable_v<TreeNodeResult> && std::is_standard_layout_v<TreeNodeResult>);
 
-// A row that toggles on a click; while open its children go in an indented column and end_tree_node closes it (call it only when `open`). The label scopes the children's ids.
+// A row that toggles on a click; while open its children go in an indented column and end_tree_node closes it (call it only when `open`, else it throws). The label scopes the children's ids.
 [[nodiscard]] TreeNodeResult begin_tree_node(std::string_view label, const TreeNodeOptions& options = {});
 void end_tree_node();
 
-class TreeScope
+struct TreeEnd
+{
+    static void end() { end_tree_node(); }
+};
+
+class TreeScope : public Scope<TreeEnd>
 {
 public:
     explicit TreeScope(std::string_view label, const TreeNodeOptions& options = {})
-        : m_result(begin_tree_node(label, options))
+        : TreeScope(begin_tree_node(label, options))
     {
     }
-    ~TreeScope()
-    {
-        if (m_result.open)
-        {
-            end_tree_node();
-        }
-    }
 
-    TreeScope(const TreeScope&) = delete;
-    TreeScope& operator=(const TreeScope&) = delete;
-
-    [[nodiscard]] bool open() const { return m_result.open; }
-    [[nodiscard]] const ItemState& item() const { return m_result.item; }
+    [[nodiscard]] const ItemState& item() const { return m_item; }
 
 private:
-    TreeNodeResult m_result;
+    explicit TreeScope(const TreeNodeResult& result)
+        : Scope(result.open)
+        , m_item(result.item)
+    {
+    }
+
+    ItemState m_item;
 };
 
 struct ScrollOptions : WidgetOptions
@@ -147,14 +145,15 @@ void end_scroll();
 // Moves region `name` ahead of its begin_scroll, clamped to the range of the last solve (so past the end means the bottom, and the first frame keeps the offset), and scroll_offset reports the result at once.
 void set_scroll_offset(std::string_view name, float offset);
 
-class ScrollScope
+struct ScrollEnd
+{
+    static void end() { end_scroll(); }
+};
+
+class ScrollScope : public AlwaysScope<ScrollEnd>
 {
 public:
     explicit ScrollScope(std::string_view name, const ScrollOptions& options = {}) { begin_scroll(name, options); }
-    ~ScrollScope() { end_scroll(); }
-
-    ScrollScope(const ScrollScope&) = delete;
-    ScrollScope& operator=(const ScrollScope&) = delete;
 };
 
 struct TabBarOptions : WidgetOptions
@@ -176,32 +175,33 @@ struct TabBarResult
 
 static_assert(std::is_trivially_copyable_v<TabBarResult> && std::is_standard_layout_v<TabBarResult>);
 
-// A strip of tabs, one tab() call each in order; a press selects. `selected` is the caller's, so tab content is a plain `if` on it once the scope ends.
-class TabBarScope
+// A strip of tabs, one tab_item() call each in order; a press selects. `selected` is the caller's (kept by reference until end_tab_bar), so tab content is a plain `if` on it once the bar ends. It always opens.
+bool begin_tab_bar(std::string_view name, uint32_t& selected, const TabBarOptions& options = {});
+void end_tab_bar();
+// True while this tab is the selected one (after this frame's press).
+bool tab_item(std::string_view label);
+// A tab with its own close button, like ImGui's TabItem `p_open`: the click clears *open, and while it is false nothing is drawn and the result is false (skip the content too).
+// The index still counts, so the other tabs keep theirs.
+bool tab_item(std::string_view label, bool* open);
+// What the tabs added so far reported.
+[[nodiscard]] const TabBarResult& tab_bar_result();
+
+struct TabBarEnd
+{
+    static void end() { end_tab_bar(); }
+};
+
+class TabBarScope : public Scope<TabBarEnd>
 {
 public:
-    TabBarScope(std::string_view name, uint32_t& selected, const TabBarOptions& options = {});
-    ~TabBarScope();
+    TabBarScope(std::string_view name, uint32_t& selected, const TabBarOptions& options = {})
+        : Scope(begin_tab_bar(name, selected, options))
+    {
+    }
 
-    TabBarScope(const TabBarScope&) = delete;
-    TabBarScope& operator=(const TabBarScope&) = delete;
-
-    // True while this tab is the selected one (after this frame's press).
-    bool tab(std::string_view label);
-    // A tab with its own close button, like ImGui's TabItem `p_open`: the click clears *open, and while it is false nothing is drawn and the result is false (skip the content too).
-    // The index still counts, so the other tabs keep theirs.
-    bool tab(std::string_view label, bool* open);
-    // What the tabs added so far reported.
-    [[nodiscard]] const TabBarResult& result() const { return m_result; }
-
-private:
-    bool draw_tab(std::string_view label, bool closable, bool* open);
-
-    uint32_t& m_selected;
-    const ImStyle* m_style;
-    bool m_closable;
-    uint32_t m_count = 0;
-    TabBarResult m_result;
+    bool tab(std::string_view label) { return tab_item(label); }
+    bool tab(std::string_view label, bool* open) { return tab_item(label, open); }
+    [[nodiscard]] const TabBarResult& result() const { return tab_bar_result(); }
 };
 
 struct SplitterOptions
@@ -228,41 +228,34 @@ struct ListBoxOptions : WidgetOptions
 
 static_assert(std::is_trivially_copyable_v<ListBoxOptions>);
 
-// Selectable rows in a scroll region; the caller owns the selection. Without item_count, one item(label, selected) call per row. With it, a long list costs only its visible rows:
-//   ListBoxScope list("games", { .item_count = n }); for (i = list.first_item(); i < list.last_item(); ++i) { if (list.item(i, names[i], i == selected).clicked) ... }
-// The range comes from last frame's scroll offset and view height with a row of margin each side, so it is one frame late like every hit area.
-class ListBoxScope
+// Selectable rows in a scroll region; the caller owns the selection. Without item_count, one list_item(label, selected) call per row. With it, a long list costs only its visible rows:
+//   if (ListBoxScope list("games", { .item_count = n })) { for (i = list.first_item(); i < list.last_item(); ++i) { if (list.item(i, names[i], i == selected).clicked) ... } }
+// The range comes from last frame's scroll offset and view height with a row of margin each side, so it is one frame late like every hit area. It always opens.
+bool begin_list_box(std::string_view name, const ListBoxOptions& options = {});
+void end_list_box();
+// A row; the state's `clicked` says it was picked. Throws Error on a virtualised list, which needs the index.
+[[nodiscard]] ItemState list_item(std::string_view label, bool selected);
+[[nodiscard]] ItemState list_item(uint32_t index, std::string_view label, bool selected);
+[[nodiscard]] uint32_t list_first_item();
+[[nodiscard]] uint32_t list_last_item();
+
+struct ListBoxEnd
+{
+    static void end() { end_list_box(); }
+};
+
+class ListBoxScope : public Scope<ListBoxEnd>
 {
 public:
-    explicit ListBoxScope(std::string_view name, const ListBoxOptions& options = {});
-    ~ListBoxScope();
-
-    ListBoxScope(const ListBoxScope&) = delete;
-    ListBoxScope& operator=(const ListBoxScope&) = delete;
-
-    // A row; the state's `clicked` says it was picked. Throws Error on a virtualised list, which needs the index.
-    [[nodiscard]] ItemState item(std::string_view label, bool selected);
-    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected);
-    [[nodiscard]] uint32_t first_item() const { return m_first; }
-    [[nodiscard]] uint32_t last_item() const { return m_last; }
-
-private:
-    struct Range
+    explicit ListBoxScope(std::string_view name, const ListBoxOptions& options = {})
+        : Scope(begin_list_box(name, options))
     {
-        uint32_t first = 0;
-        uint32_t last = 0;
-    };
+    }
 
-    ListBoxScope(std::string_view name, const ListBoxOptions& options, const Range& range);
-    [[nodiscard]] static Range visible_range(std::string_view name, const ListBoxOptions& options);
-    void spacer(uint32_t rows);
-
-    uint32_t m_first = 0;
-    uint32_t m_last = 0;
-    ScrollScope m_scroll;
-    ListBoxOptions m_options;
-    LayoutStyle m_row;
-    uint32_t m_count = 0;
+    [[nodiscard]] ItemState item(std::string_view label, bool selected) { return list_item(label, selected); }
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected) { return list_item(index, label, selected); }
+    [[nodiscard]] uint32_t first_item() const { return list_first_item(); }
+    [[nodiscard]] uint32_t last_item() const { return list_last_item(); }
 };
 
 // True when every character of `needle` matches `text` as a case-insensitive (ASCII) substring; an empty needle matches everything. The needle is fed by the caller.
@@ -324,29 +317,27 @@ static_assert(std::is_trivially_copyable_v<DragOptions>);
 bool drag_float(std::string_view label, float& value, float min = 0.0f, float max = 0.0f, const DragOptions& options = {});
 bool drag_int(std::string_view label, int32_t& value, int32_t min = 0, int32_t max = 0, const DragOptions& options = {});
 
-// A button showing `preview` that opens a list while the scope lives; one item() call per entry, the caller owns the selection and the preview text. Closes on a pick, a press outside or Escape.
-class ComboScope
+// A button showing `preview` that opens a list; returns whether the list is open. Call combo_item once per entry and end_combo only when true (a closed combo has already finished itself).
+// The caller owns the selection and the preview text. Closes on a pick, a press outside or Escape.
+[[nodiscard]] bool begin_combo(std::string_view label, std::string_view preview, const FieldOptions& options = {});
+void end_combo();
+// An entry of the open list; true on the frame it is picked.
+bool combo_item(std::string_view text, bool selected);
+
+struct ComboEnd
+{
+    static void end() { end_combo(); }
+};
+
+class ComboScope : public Scope<ComboEnd>
 {
 public:
-    ComboScope(std::string_view label, std::string_view preview, const FieldOptions& options = {});
-    ~ComboScope();
+    ComboScope(std::string_view label, std::string_view preview, const FieldOptions& options = {})
+        : Scope(begin_combo(label, preview, options))
+    {
+    }
 
-    ComboScope(const ComboScope&) = delete;
-    ComboScope& operator=(const ComboScope&) = delete;
-
-    [[nodiscard]] bool open() const { return m_popup; }
-    // An entry of the open list; true on the frame it is picked. Does nothing while the list is closed.
-    bool item(std::string_view text, bool selected);
-
-private:
-    GuiContext& m_context;
-    FieldScope m_field;
-    ImId m_control;
-    ItemState m_state;
-    bool m_open;
-    bool m_popup = false;
-    PopupResult m_result;
-    uint32_t m_count = 0;
+    bool item(std::string_view text, bool selected) { return open() && combo_item(text, selected); }
 };
 
 } // namespace oryx::gui

@@ -34,6 +34,10 @@ struct BoxPaint
     Colour icon_colour = { 1.0f, 1.0f, 1.0f, 1.0f };
     float icon_size = 0.0f;
     float icon_thickness = 1.5f;
+    // A positive slope draws the fill as a tab (see tab_outline: the sides lean in by `slope`, `shoulder` rounds the top corners, `slope_flip` puts the base on top) and the border as an open outline without the base edge; `radius` is then ignored.
+    float slope = 0.0f;
+    float shoulder = 0.0f;
+    bool slope_flip = false;
 };
 
 struct LayoutNode

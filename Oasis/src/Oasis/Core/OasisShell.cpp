@@ -275,9 +275,13 @@ void OasisShell::render_stage(RenderStage stage, StageContext& context)
 
 void OasisShell::build()
 {
-    gui::begin_workspace("shell");
-    menus();
-    gui::begin_body();
+    gui::AreaOptions top;
+    top.anchor = gui::AreaAnchor::Top;
+    if (gui::AreaScope bar("menu_area", top); bar)
+    {
+        menus();
+    }
+    if (gui::AreaScope body("body"); body)
     {
         gui::PanelHostScope host;
         for (size_t index = 0; index < m_panel.views.size(); ++index)
@@ -287,8 +291,6 @@ void OasisShell::build()
         static_cast<void>(gui::begin_panel(k_showcase_panel));
         gui::end_panel();
     }
-    gui::end_body();
-    gui::end_workspace();
     answer_switch();
 }
 

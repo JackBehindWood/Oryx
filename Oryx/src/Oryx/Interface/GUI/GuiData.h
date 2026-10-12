@@ -2,6 +2,7 @@
 
 #include "Oryx/Interface/GUI/GuiPolicies.h"
 #include "Oryx/Interface/GUI/GuiControls.h"
+#include "Oryx/Interface/GUI/GuiScope.h"
 
 // Widgets that turn numbers into pixels. Data comes in as `Values` (a view of the caller's floats), the look from the theme; everything custom is the caller's own code between the calls of a scope.
 namespace oryx::gui
@@ -61,65 +62,42 @@ static_assert(std::is_trivially_copyable_v<PlotResult> && std::is_standard_layou
 // A plot in the manner of ImPlot: open the scope, add series and markers with calls, leave it. Sample i occupies [i, i + 1) on x and is drawn at its centre, so lines, bars and markers line up.
 // The y range and x extent are the previous frame's (a plot is one frame late, like every hit area), so it is blank on the first frame. A pixel column draws at most the min and max of its samples, so a series of any length costs at most two points per column.
 // NaN and infinite samples are gaps. Holds at most k_palette_size series (each line()/bars()); a further one throws Error. The scope's painter is clipped to the data rectangle: the legend sits in a row above it and the y range labels in a gutter left of it, so neither covers a series or a marker.
-class PlotScope
+// The rule of ImGui's BeginPlot: begin_plot returns whether the plot is open (always, here) and end_plot follows only then. Series and markers go through the plot_* calls of the innermost open plot.
+bool begin_plot(std::string_view name, const PlotOptions& options = {});
+void end_plot();
+void plot_line(std::string_view label, const Values& values, PlotStyle style = PlotStyle::Line, const Colour& colour = k_theme_colour);
+// One bar per sample from zero; the y range includes zero.
+void plot_bars(std::string_view label, const Values& values, const Colour& colour = k_theme_colour);
+// A vertical marker through sample `index` and a horizontal one at `value`: thresholds, the selected ply.
+void plot_vline(float index, const Colour& colour, float thickness = 1.0f);
+void plot_hline(float value, const Colour& colour, float thickness = 1.0f);
+// For drawing of your own: the data rectangle (see to_screen) and a painter clipped to the plot.
+[[nodiscard]] PlotArea plot_area();
+[[nodiscard]] Painter& plot_painter();
+[[nodiscard]] const ItemState& plot_item();
+[[nodiscard]] PlotResult plot_result();
+
+struct PlotEnd
+{
+    static void end() { end_plot(); }
+};
+
+class PlotScope : public Scope<PlotEnd>
 {
 public:
-    PlotScope(std::string_view name, const PlotOptions& options = {});
-    ~PlotScope();
-
-    PlotScope(const PlotScope&) = delete;
-    PlotScope& operator=(const PlotScope&) = delete;
-
-    void line(std::string_view label, const Values& values, PlotStyle style = PlotStyle::Line, const Colour& colour = k_theme_colour);
-    // One bar per sample from zero; the y range includes zero.
-    void bars(std::string_view label, const Values& values, const Colour& colour = k_theme_colour);
-    // A vertical marker through sample `index` and a horizontal one at `value`: thresholds, the selected ply.
-    void vline(float index, const Colour& colour, float thickness = 1.0f);
-    void hline(float value, const Colour& colour, float thickness = 1.0f);
-
-    // For drawing of your own: the data rectangle (see to_screen) and a painter clipped to the plot.
-    [[nodiscard]] PlotArea area() const;
-    [[nodiscard]] Painter& painter() { return m_canvas.painter; }
-    [[nodiscard]] const ItemState& item() const { return m_canvas.item; }
-    [[nodiscard]] PlotResult result() const;
-
-private:
-    // What the plot remembers from the frame before.
-    struct Memory
+    PlotScope(std::string_view name, const PlotOptions& options = {})
+        : Scope(begin_plot(name, options))
     {
-        float y_min = 0.0f;
-        float y_max = 1.0f;
-        uint32_t x_count = 0;
-        uint32_t series = 0;
-        bool bars = false;
-        bool valid = false;
-    };
+    }
 
-    struct Entry
-    {
-        std::string_view name;
-        Colour colour;
-    };
-
-    void draw(const Values& values, PlotStyle style, bool bars, const Colour& colour);
-    [[nodiscard]] Colour series_colour(const Colour& requested) const;
-
-    GuiContext& m_context;
-    const ImStyle* m_style;
-    PlotOptions m_options;
-    ImId m_id;
-    Memory m_previous;
-    im::CanvasArea m_canvas;
-    // The frame inside the canvas minus the legend row above and the label gutter on the left.
-    Rect m_inner;
-    Rect m_data;
-    bool m_clipped = false;
-    float m_seen_min = std::numeric_limits<float>::max();
-    float m_seen_max = std::numeric_limits<float>::lowest();
-    uint32_t m_seen_count = 0;
-    bool m_seen_bars = false;
-    uint32_t m_series = 0;
-    Entry m_entries[k_palette_size];
+    void line(std::string_view label, const Values& values, PlotStyle style = PlotStyle::Line, const Colour& colour = k_theme_colour) { plot_line(label, values, style, colour); }
+    void bars(std::string_view label, const Values& values, const Colour& colour = k_theme_colour) { plot_bars(label, values, colour); }
+    void vline(float index, const Colour& colour, float thickness = 1.0f) { plot_vline(index, colour, thickness); }
+    void hline(float value, const Colour& colour, float thickness = 1.0f) { plot_hline(value, colour, thickness); }
+    [[nodiscard]] PlotArea area() const { return plot_area(); }
+    [[nodiscard]] Painter& painter() { return plot_painter(); }
+    [[nodiscard]] const ItemState& item() const { return plot_item(); }
+    [[nodiscard]] PlotResult result() const { return plot_result(); }
 };
 
 // One-call forms of a single-series plot.

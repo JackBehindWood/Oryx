@@ -77,6 +77,20 @@ private:
         m_batcher.draw_ui_quad(corners, command.colour);
     }
 
+    void draw(const PolygonCmd& command)
+    {
+        set_clip(command.clip);
+        const Vec2f first = world(command.points[0]);
+        Vec2f previous = world(command.points[1]);
+        for (uint32_t index = 2; index < command.count; ++index)
+        {
+            const Vec2f next = world(command.points[index]);
+            const Vec2f triangle[4] = { first, previous, next, next };
+            m_batcher.draw_ui_quad(triangle, command.colour);
+            previous = next;
+        }
+    }
+
     void draw(const TextCmd& command)
     {
         set_clip(command.clip);

@@ -27,6 +27,7 @@ enum class DockReason : uint8_t
     AlreadyOpen,
     AlreadyClosed,
     NotPermittedTarget,
+    NotPermittedGroup,
     Collapsed
 };
 
@@ -50,7 +51,12 @@ struct DockResult
 [[nodiscard]] DockReason can_close(const PanelTable& panels, PanelId panel);
 
 // can_dock plus the panel's dock_only / dock_never rules against the Tabs node `target` (k_dock_root: only allowed without dock_only). Same set as dock_panel, for drop feedback.
-[[nodiscard]] DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target);
+// A Centre drop also needs the group rules of both sides to allow every panel already in the node (NotPermittedGroup); an edge drop starts a stack of its own, so they do not apply.
+[[nodiscard]] DockReason can_dock_into(const DockLayout& layout, const PanelTable& panels, PanelId panel, int32_t target, DropZone zone = DropZone::Centre);
+// True when the group rules of `a` and `b` (each side's, both ways) allow them to share a tab stack. Panels without a group, or whose group has no rules, allow everything.
+[[nodiscard]] bool can_share_tabs(const PanelTable& panels, PanelId a, PanelId b);
+// Closes every panel that breaks the group rules of the stack it sits in (the later tab of each offending pair), so a layout saved before the rules changed loads without a forbidden mix. Returns how many it closed.
+uint32_t repair_group_rules(DockLayout& layout, const PanelTable& panels);
 
 // True when the panel sits in a Tabs node or a float.
 [[nodiscard]] bool is_open(const DockLayout& layout, PanelId panel);

@@ -102,6 +102,13 @@ DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
     metrics.grip_band = 6.0f * scale;
     metrics.splitter_pad = 3.0f * scale;
     metrics.underline = 2.0f * scale;
+    if (theme.tab_style.shape == TabShape::Sloped)
+    {
+        metrics.tab_overlap = theme.tab_style.overlap * scale;
+        metrics.tab_slope = theme.tab_style.slope * scale;
+        metrics.tab_shoulder = theme.tab_style.shoulder * scale;
+        metrics.tab_raise = theme.tab_style.selected_raise * scale;
+    }
     metrics.float_width = 320.0f * scale;
     metrics.float_height = 240.0f * scale;
     return metrics;
@@ -325,12 +332,17 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     const bool closable = can_close(h.model->panels, id) == DockReason::None && close_buttons != CloseButtons::Never;
     const bool dragged = h.model->drag.source == DragSource::Tab && h.model->drag.panel == id;
     const DockMetrics& metrics = h.solved.metrics;
+    const bool sloped = metrics.tab_slope > 0.0f;
     const float pad = style.padding.right * 0.5f;
-    const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - metrics.close_size, rect.min[1]), Vec2f(metrics.close_size + pad, rect.size[1]) };
+    const float lean = sloped ? metrics.tab_slope * 0.5f : 0.0f;
+    const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - lean - metrics.close_size, rect.min[1]), Vec2f(metrics.close_size + pad, rect.size[1]) };
+    // Neighbours overlap, so each tab answers only for its own half of the overlap.
+    const float shared = sloped ? metrics.tab_overlap * 0.5f : 0.0f;
+    const Rect hit{ Vec2f(rect.min[0] + shared, rect.min[1]), Vec2f(math::max(rect.size[0] - 2.0f * shared, 0.0f), rect.size[1]) };
 
     IdScope scope(ctx, ctx.index_id(id.hash));
     const ImId tab_id = ctx.id("tab");
-    const ItemState tab = ctx.item(tab_id, rect);
+    const ItemState tab = ctx.item(tab_id, hit);
     const ItemDrag drag = ctx.item_drag(tab_id);
     const bool show_close = closable && (close_buttons == CloseButtons::Always || chosen || tab.hovered);
     ItemState close;
@@ -349,9 +361,17 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     if (drag.started && !close.held && h.model->drag.panel == id)
         h.model->drag.origin_slot = index;
 
-    LayoutStyle box = placed(h, rect);
+    const bool bottom_tabs = h.style.tab_position == TabPosition::Bottom;
+    Rect shown = rect;
+    if (sloped && !chosen)
+    {
+        shown.size[1] = math::max(rect.size[1] - metrics.tab_raise, 0.0f);
+        shown.min[1] = bottom_tabs ? rect.min[1] : rect.min[1] + metrics.tab_raise;
+    }
+    LayoutStyle box = placed(h, shown);
     box.padding = style.padding;
-    box.padding.right += show_close ? metrics.close_size + pad : 0.0f;
+    box.padding.left += lean;
+    box.padding.right += lean + (show_close ? metrics.close_size + pad : 0.0f);
     box.align_y = Align::Centre;
     const uint32_t box_index = ctx.begin_box(ImId{}, box);
     {
@@ -363,6 +383,14 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         paint.text_height = style.text_height;
         paint.text_colour = style.text;
         paint.ellipsis = true;
+        if (sloped)
+        {
+            paint.slope = metrics.tab_slope;
+            paint.shoulder = metrics.tab_shoulder;
+            paint.slope_flip = bottom_tabs;
+            paint.border_width = picked || chosen ? 1.0f : 0.0f;
+            paint.border = picked ? ctx.dock_theme().chip_border : style.border;
+        }
         if (dragged)
         {
             paint.fill.a *= k_disabled_alpha;
@@ -372,8 +400,8 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         }
     }
     if (show_close)
-        close_mark(ctx, metrics, style, close, pad);
-    if (chosen)
+        close_mark(ctx, metrics, style, close, pad + lean);
+    if (chosen && !sloped)
     {
         LayoutStyle underline;
         underline.width = grow();
@@ -489,8 +517,15 @@ void draw_strip(GuiContext& ctx, DockView& h, int32_t node_index, PanelId& pendi
     }
 
     const uint32_t first = solved.first_visible;
-    for (uint32_t i = first; i < first + solved.visible_count && i < node.count; ++i)
-        draw_tab(ctx, h, node_index, node, i, solved.tab_rects[i], pending_close);
+    const uint32_t end = math::min(first + static_cast<uint32_t>(solved.visible_count), static_cast<uint32_t>(node.count));
+    // The chosen tab is drawn last so it overlaps its neighbours; a press while drawing moves the selection, so it is read once.
+    const bool raised = h.solved.metrics.tab_slope > 0.0f;
+    const uint32_t chosen = node.selected;
+    for (uint32_t i = first; i < end; ++i)
+        if (!raised || i != chosen)
+            draw_tab(ctx, h, node_index, node, i, solved.tab_rects[i], pending_close);
+    if (raised && chosen >= first && chosen < end)
+        draw_tab(ctx, h, node_index, node, chosen, solved.tab_rects[chosen], pending_close);
     if (collapsed && node.selected < node.count && node.tabs[node.selected] == h.model->focused)
         focus_ring(ctx, h, solved.strip);
 
@@ -1408,6 +1443,8 @@ void ensure_loaded(DockModel& m)
     migrate_surfaces(loaded.layout, m.panels, m.surface_count);
     const bool usable = !has_viewport(m.panels) || viewport_open(loaded.layout, m.panels);
     m.layout = usable ? loaded.layout : m.default_layout;
+    if (const uint32_t repaired = repair_group_rules(m.layout, m.panels); repaired > 0)
+        OX_WARN("Dock layout: closed {} panel(s) that break the group rules", repaired);
     m.from_file = loaded.from_file && usable;
     m.has_good = false;
     m.file = use_file ? settings.layout_file : std::filesystem::path();
@@ -1499,6 +1536,43 @@ bool dock_only_in(std::string_view panel, std::string_view target)
 bool never_dock_in(std::string_view panel, std::string_view target)
 {
     return add_dock_never(context().dock_model().panels, make_panel_id(panel), make_panel_id(target));
+}
+
+GroupHandle group(std::string_view name)
+{
+    return GroupHandle{ make_panel_id(name) };
+}
+
+bool set_group_rules(GroupHandle group, const DockRules& rules)
+{
+    return set_group_rules(context().dock_model().panels, group.id, rules);
+}
+
+DockRules rules_free()
+{
+    return DockRules{};
+}
+
+DockRules rules_own_group(GroupHandle self)
+{
+    return rules_only_with(&self, 1);
+}
+
+DockRules rules_own_group_and_viewports(GroupHandle self)
+{
+    DockRules rules = rules_only_with(&self, 1);
+    rules.rules[0].viewports = true;
+    return rules;
+}
+
+DockRules rules_only_with(const GroupHandle* groups, uint32_t count)
+{
+    DockRules rules;
+    rules.count = 1;
+    rules.rules[0].kind = DockRuleKind::OnlyWithGroups;
+    for (uint32_t index = 0; index < count && index < k_max_dock_rules; ++index)
+        rules.rules[0].groups[rules.rules[0].count++] = groups[index].id;
+    return rules;
 }
 
 void begin_panel_host()

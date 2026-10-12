@@ -30,6 +30,54 @@ void Painter::border(const Rect& rect, const CornerRadius& radius, float thickne
     m_list.add_border(snap_to_pixels(rect, m_scale), radius, thickness, colour);
 }
 
+void Painter::fill_convex(const Vec2f* points, uint32_t count, const Colour& colour)
+{
+    if (points == nullptr || count < 3 || count > k_max_polygon_points)
+    {
+        throw Error("Painter polygon needs 3 to 32 points", "split longer outlines before painting");
+    }
+    Vec2f snapped[k_max_polygon_points];
+    for (uint32_t index = 0; index < count; ++index)
+    {
+        snapped[index] = Vec2f(std::round(points[index][0] * m_scale) / m_scale, std::round(points[index][1] * m_scale) / m_scale);
+    }
+    m_list.add_polygon(snapped, count, colour);
+}
+
+void Painter::fill_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c, const Colour& colour)
+{
+    const Vec2f points[3] = { a, b, c };
+    fill_convex(points, 3, colour);
+}
+
+void Painter::stroke_polyline(const Vec2f* points, uint32_t count, bool closed, float thickness, const Colour& colour)
+{
+    if (points == nullptr || count < 2 || count > k_max_polygon_points)
+    {
+        throw Error("Painter polyline needs 2 to 32 points", "split longer outlines before painting");
+    }
+    for (uint32_t index = 0; index + 1 < count; ++index)
+    {
+        m_list.add_line(points[index], points[index + 1], thickness, colour);
+    }
+    if (closed && count > 2)
+    {
+        m_list.add_line(points[count - 1], points[0], thickness, colour);
+    }
+}
+
+void Painter::fill_circle(const Vec2f& centre, float radius, const Colour& colour)
+{
+    const Rect box{ Vec2f(centre[0] - radius, centre[1] - radius), Vec2f(radius * 2.0f, radius * 2.0f) };
+    m_list.add_rounded_rect(box, uniform_radius(radius), colour);
+}
+
+void Painter::stroke_circle(const Vec2f& centre, float radius, float thickness, const Colour& colour)
+{
+    const Rect box{ Vec2f(centre[0] - radius, centre[1] - radius), Vec2f(radius * 2.0f, radius * 2.0f) };
+    m_list.add_border(box, uniform_radius(radius), thickness, colour);
+}
+
 void Painter::image(const Rect& rect, ImageHandle image, const ImageSpec& spec)
 {
     m_list.add_image(snap_to_pixels(rect, m_scale), image, spec.uv_min, spec.uv_max, spec.radius, spec.tint);

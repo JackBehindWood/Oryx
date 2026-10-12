@@ -75,6 +75,11 @@ struct DockMetrics
     float grip_band = 6.0f;
     float splitter_pad = 3.0f;
     float underline = 2.0f;
+    // Tab shape, in points: neighbouring tabs overlap by tab_overlap, the sides lean in by tab_slope with curved shoulders, and the chosen tab stands tab_raise above the others. Zero draws the plain rectangles.
+    float tab_overlap = 0.0f;
+    float tab_slope = 0.0f;
+    float tab_shoulder = 0.0f;
+    float tab_raise = 0.0f;
     float float_width = 320.0f;
     float float_height = 240.0f;
     DockStyle style;

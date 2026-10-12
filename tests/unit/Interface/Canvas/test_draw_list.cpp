@@ -178,3 +178,52 @@ TEST_CASE("DrawList: merge keeps images in channel order")
     CHECK(channel.runs[1].kind == DrawKind::Image);
     CHECK(channel.runs[1].first == 1);
 }
+
+TEST_CASE("DrawList: polygons record points, clip and draw order")
+{
+    DrawList list;
+    const Vec2f triangle[3] = { { 0.0f, 0.0f }, { 10.0f, 0.0f }, { 5.0f, 8.0f } };
+    list.add_rect({ { 0.0f, 0.0f }, { 4.0f, 4.0f } }, RED);
+    list.push_clip({ { 0.0f, 0.0f }, { 6.0f, 6.0f } });
+    list.add_polygon(triangle, 3, BLUE);
+    list.pop_clip();
+    list.add_rect({ { 0.0f, 0.0f }, { 4.0f, 4.0f } }, RED);
+    const DrawChannel& channel = list.channel(0);
+    REQUIRE(channel.runs.size() == 3);
+    CHECK(channel.runs[1].kind == DrawKind::Polygon);
+    REQUIRE(channel.polygons.size() == 1);
+    CHECK(channel.polygons[0].count == 3);
+    CHECK(channel.polygons[0].points[2] == Vec2f(5.0f, 8.0f));
+    CHECK(channel.polygons[0].clip != k_no_clip);
+    CHECK(list.command_count(DrawKind::Polygon) == 1);
+}
+
+TEST_CASE("DrawList: polygons outside the clip are skipped and bad counts throw")
+{
+    DrawList list;
+    const Vec2f triangle[3] = { { 20.0f, 20.0f }, { 30.0f, 20.0f }, { 25.0f, 28.0f } };
+    list.push_clip({ { 0.0f, 0.0f }, { 6.0f, 6.0f } });
+    list.add_polygon(triangle, 3, RED);
+    list.pop_clip();
+    CHECK(list.channel(0).polygons.empty());
+    CHECK_THROWS_AS(list.add_polygon(triangle, 2, RED), Error);
+    const Vec2f many[k_max_polygon_points + 1] = {};
+    CHECK_THROWS_AS(list.add_polygon(many, k_max_polygon_points + 1, RED), Error);
+}
+
+TEST_CASE("DrawList: merge keeps polygons in channel order and dump lists them")
+{
+    DrawList list;
+    list.split_channels(2);
+    const Vec2f first[3] = { { 0.0f, 0.0f }, { 4.0f, 0.0f }, { 0.0f, 4.0f } };
+    const Vec2f second[3] = { { 1.0f, 1.0f }, { 5.0f, 1.0f }, { 1.0f, 5.0f } };
+    list.set_channel(1);
+    list.add_polygon(second, 3, BLUE);
+    list.set_channel(0);
+    list.add_polygon(first, 3, RED);
+    list.merge();
+    const DrawChannel& channel = list.channel(0);
+    REQUIRE(channel.polygons.size() == 2);
+    CHECK(channel.polygons[1].points[0] == Vec2f(1.0f, 1.0f));
+    CHECK(dump(list).find("polygon 3 (0.00 0.00) (4.00 0.00) (0.00 4.00) rgba(1.00 0.00 0.00 1.00)") != std::string::npos);
+}

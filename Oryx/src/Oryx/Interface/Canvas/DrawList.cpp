@@ -37,6 +37,7 @@ void DrawList::clear()
         channel.lines.clear();
         channel.texts.clear();
         channel.images.clear();
+        channel.polygons.clear();
         channel.runs.clear();
     }
     m_clips.clear();
@@ -87,6 +88,7 @@ void DrawList::merge()
             static_cast<uint32_t>(target.lines.size()),
             static_cast<uint32_t>(target.texts.size()),
             static_cast<uint32_t>(target.images.size()),
+            static_cast<uint32_t>(target.polygons.size()),
         };
         for (DrawRun run : source.runs)
         {
@@ -99,6 +101,7 @@ void DrawList::merge()
         append(target.lines, source.lines);
         append(target.texts, source.texts);
         append(target.images, source.images);
+        append(target.polygons, source.polygons);
         source.runs.clear();
     }
     m_channel_count = 1;
@@ -218,6 +221,32 @@ void DrawList::add_image(const Rect& rect, ImageHandle image, const Vec2f& uv_mi
     record(DrawKind::Image, array.size());
 }
 
+void DrawList::add_polygon(const Vec2f* points, uint32_t count, const Colour& colour)
+{
+    if (points == nullptr || count < 3 || count > k_max_polygon_points)
+    {
+        throw Error("DrawList polygon needs 3 to 32 points", "split longer outlines before recording");
+    }
+    Vec2f low = points[0];
+    Vec2f high = points[0];
+    for (uint32_t index = 1; index < count; ++index)
+    {
+        low = Vec2f(math::min(low[0], points[index][0]), math::min(low[1], points[index][1]));
+        high = Vec2f(math::max(high[0], points[index][0]), math::max(high[1], points[index][1]));
+    }
+    if (!visible({ low, high - low }))
+    {
+        return;
+    }
+    std::vector<PolygonCmd>& array = m_channels[m_current].polygons;
+    PolygonCmd& command = array.emplace_back();
+    std::memcpy(command.points, points, count * sizeof(Vec2f));
+    command.count = count;
+    command.colour = colour;
+    command.clip = clip_index();
+    record(DrawKind::Polygon, array.size());
+}
+
 void DrawList::add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour)
 {
     if (text.empty() || (!m_clip_stack.empty() && is_empty(m_clips[m_clip_stack.back()])))
@@ -236,7 +265,7 @@ uint32_t DrawList::command_count() const
     for (uint32_t index = 0; index < m_channel_count; ++index)
     {
         const DrawChannel& channel = m_channels[index];
-        total += static_cast<uint32_t>(channel.rects.size() + channel.rounded_rects.size() + channel.borders.size() + channel.lines.size() + channel.texts.size() + channel.images.size());
+        total += static_cast<uint32_t>(channel.rects.size() + channel.rounded_rects.size() + channel.borders.size() + channel.lines.size() + channel.texts.size() + channel.images.size() + channel.polygons.size());
     }
     return total;
 }
@@ -255,6 +284,7 @@ uint32_t DrawList::command_count(DrawKind kind) const
             case DrawKind::Line: total += channel.lines.size(); break;
             case DrawKind::Text: total += channel.texts.size(); break;
             case DrawKind::Image: total += channel.images.size(); break;
+            case DrawKind::Polygon: total += channel.polygons.size(); break;
         }
     }
     return static_cast<uint32_t>(total);

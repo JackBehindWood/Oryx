@@ -206,9 +206,33 @@ bool drag_int(std::string_view label, int32_t& value, int32_t min, int32_t max, 
     return changed;
 }
 
-ComboScope::ComboScope(std::string_view label, std::string_view preview, const FieldOptions& options)
+namespace
+{
+
+class ComboFrame
+{
+public:
+    ComboFrame(std::string_view preview, const FieldOptions& options);
+    ~ComboFrame();
+
+    ComboFrame(const ComboFrame&) = delete;
+    ComboFrame& operator=(const ComboFrame&) = delete;
+
+    [[nodiscard]] bool popup() const { return m_popup; }
+    bool item(std::string_view text, bool selected);
+
+private:
+    GuiContext& m_context;
+    ImId m_control;
+    ItemState m_state;
+    bool m_open;
+    bool m_popup = false;
+    PopupResult m_result;
+    uint32_t m_count = 0;
+};
+
+ComboFrame::ComboFrame(std::string_view preview, const FieldOptions& options)
     : m_context(context())
-    , m_field(label, options)
     , m_control(m_context.id("control"))
     , m_state(m_context.item(m_control))
     , m_open(m_context.state<OpenFlag>(m_control).open)
@@ -252,7 +276,7 @@ ComboScope::ComboScope(std::string_view label, std::string_view preview, const F
     }
 }
 
-ComboScope::~ComboScope()
+ComboFrame::~ComboFrame()
 {
     GuiContext& ctx = m_context;
     if (m_popup)
@@ -266,7 +290,7 @@ ComboScope::~ComboScope()
     ctx.state<OpenFlag>(m_control).open = m_open;
 }
 
-bool ComboScope::item(std::string_view text, bool selected)
+bool ComboFrame::item(std::string_view text, bool selected)
 {
     if (!m_popup)
     {
@@ -279,6 +303,34 @@ bool ComboScope::item(std::string_view text, bool selected)
         return true;
     }
     return false;
+}
+
+} // namespace
+
+bool begin_combo(std::string_view label, std::string_view preview, const FieldOptions& options)
+{
+    GuiContext& ctx = context();
+    begin_field(label, options);
+    ComboFrame& combo = ctx.push_scope<ComboFrame>("combo", preview, options);
+    if (combo.popup())
+    {
+        return true;
+    }
+    ctx.pop_scope<ComboFrame>("end_combo");
+    end_field();
+    return false;
+}
+
+void end_combo()
+{
+    GuiContext& ctx = context();
+    ctx.pop_scope<ComboFrame>("end_combo");
+    end_field();
+}
+
+bool combo_item(std::string_view text, bool selected)
+{
+    return context().scope<ComboFrame>("combo_item").item(text, selected);
 }
 
 } // namespace oryx::gui

@@ -27,6 +27,11 @@ struct EditOutcome
     bool focused = false;
 };
 
+// The width of `text` in points at `height`; zero without a font.
+[[nodiscard]] float measure_text(GuiContext& ctx, std::string_view text, float height);
+// The byte offset of the code point boundary nearest to `x` points into `text`.
+[[nodiscard]] uint32_t text_offset_at(GuiContext& ctx, std::string_view text, float height, float x);
+
 // Draws the field named by `id` over `buffer` and runs the editor on this frame's input while it has focus. A press focuses it and places the caret; a double click selects everything; a press elsewhere, Enter and Escape release focus.
 EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buffer, uint32_t capacity, TextEditState& state, Sizing width);
 

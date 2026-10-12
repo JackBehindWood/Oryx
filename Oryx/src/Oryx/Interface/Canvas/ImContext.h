@@ -73,6 +73,16 @@ static_assert(std::is_trivially_copyable_v<ImOutput> && std::is_standard_layout_
 
 inline constexpr size_t k_max_widget_state_size = 64;
 
+// Widgets with a begin and an end keep their working state in a frame of the scope stack: nesting is bounded and the state lives inline, so a warm frame allocates nothing.
+inline constexpr uint32_t k_max_scopes = 24;
+inline constexpr size_t k_max_scope_data = 1536;
+
+template<typename T>
+struct ScopeTag
+{
+    static constexpr char value = 0;
+};
+
 // Reserved draw channels, above the default canvas channel (1): floating windows, then popups, then tooltips, then a dragged ghost.
 inline constexpr uint32_t k_channel_float = 2;
 inline constexpr uint32_t k_channel_popup = 3;
@@ -246,9 +256,67 @@ public:
     void end_disabled();
     [[nodiscard]] bool disabled() const { return m_disabled != 0; }
 
+    // Opens a scope of kind T named `name` (for error messages) and constructs its state in place from `args`; throws Error past k_max_scopes. The frame sits at a fixed address until pop_scope runs T's destructor,
+    // which is where a widget does its closing work. A frame left open by an error is dropped without it (abort_frame, begin_frame).
+    template<typename T, typename... Args>
+    T& push_scope(const char* name, Args&&... args)
+    {
+        static_assert(sizeof(T) <= k_max_scope_data && alignof(T) <= alignof(std::max_align_t), "scope state does not fit a scope frame");
+        if (m_scope_depth >= k_max_scopes)
+        {
+            scope_overflow(name);
+        }
+        ScopeFrame& frame = m_scopes[m_scope_depth];
+        frame.name = name;
+        frame.tag = &ScopeTag<T>::value;
+        T& state = *new (frame.data) T(std::forward<Args>(args)...);
+        ++m_scope_depth;
+        return state;
+    }
+    // The innermost open scope of kind T; throws Error naming `user` (the calling function) when there is none.
+    template<typename T>
+    [[nodiscard]] T& scope(const char* user)
+    {
+        for (uint32_t index = m_scope_depth; index > 0; --index)
+        {
+            if (m_scopes[index - 1].tag == &ScopeTag<T>::value)
+            {
+                return *std::launder(reinterpret_cast<T*>(m_scopes[index - 1].data));
+            }
+        }
+        scope_missing(user);
+    }
+    // Closes the innermost scope, which must be of kind T, by destroying its state; `end` names the calling end_* function. Throws Error when nothing is open or another kind is.
+    template<typename T>
+    void pop_scope(const char* end)
+    {
+        if (m_scope_depth == 0 || m_scopes[m_scope_depth - 1].tag != &ScopeTag<T>::value)
+        {
+            scope_mismatch(end);
+        }
+        T* state = std::launder(reinterpret_cast<T*>(m_scopes[m_scope_depth - 1].data));
+        --m_scope_depth;
+        std::destroy_at(state);
+    }
+    [[nodiscard]] uint32_t scope_depth() const { return m_scope_depth; }
+
     [[nodiscard]] ImStats stats() const;
 
 protected:
+    struct ScopeFrame
+    {
+        const char* name = nullptr;
+        const char* tag = nullptr;
+        alignas(std::max_align_t) unsigned char data[k_max_scope_data];
+    };
+
+    [[noreturn]] void scope_overflow(const char* name) const;
+    [[noreturn]] void scope_missing(const char* user) const;
+    [[noreturn]] void scope_mismatch(const char* end) const;
+
+    std::array<ScopeFrame, k_max_scopes> m_scopes;
+    uint32_t m_scope_depth = 0;
+
     // The seed salts every id made here, so two context kinds never share an id for the same label.
     explicit ImContext(uint64_t id_seed = 0)
         : m_id_seed(id_seed)

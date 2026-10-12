@@ -3,7 +3,10 @@
 #include "Oryx/Interface/Canvas/ImWidgets.h"
 #include "Oryx/Interface/GUI/GuiContext.h"
 #include "Oryx/Interface/GUI/GuiId.h"
+#include "Oryx/Interface/GUI/GuiScope.h"
 
+// Begin/end rule (ImGui's): a begin_* that returns bool opens its widget only on true, and its end_* is called only then; calling it otherwise, or an end_* out of order, throws Error, as does a scope left open at end_frame.
+// Widgets that always open say so and always end. The *Scope classes (see GuiScope.h) do the pairing and are optional.
 // The developer-tooling GUI as free functions over the active GuiContext (see ContextScope<GuiContext>). Each throws Error when none is active; the widgets themselves are the shared ones in oryx::im, so they match oryx::ui.
 namespace oryx::gui
 {
@@ -86,31 +89,29 @@ void status_line(std::string_view text, const StatusOptions& options = {});
 void begin_disabled();
 void end_disabled();
 
+struct DisabledEnd
+{
+    static void end() { end_disabled(); }
+};
+
 // Disables what is built in its scope when `disabled` is true; a false one does nothing, so it wraps a conditional widget without a branch.
-class DisabledScope
+class DisabledScope : public Scope<DisabledEnd>
 {
 public:
     explicit DisabledScope(bool disabled = true)
-        : m_active(disabled)
+        : Scope(begin_if(disabled))
     {
-        if (m_active)
+    }
+
+private:
+    static bool begin_if(bool disabled)
+    {
+        if (disabled)
         {
             begin_disabled();
         }
+        return disabled;
     }
-    ~DisabledScope()
-    {
-        if (m_active)
-        {
-            end_disabled();
-        }
-    }
-
-    DisabledScope(const DisabledScope&) = delete;
-    DisabledScope& operator=(const DisabledScope&) = delete;
-
-private:
-    bool m_active;
 };
 
 uint32_t begin_box(std::string_view label, const LayoutStyle& style);
@@ -118,50 +119,54 @@ void end_box();
 // A box floated against the whole surface by one point of itself and the same point of the surface.
 [[nodiscard]] LayoutStyle anchored(AttachPoint at, Sizing width = fit(), Sizing height = fit(), const Vec2f& offset = { 0.0f, 0.0f });
 
+struct BoxEnd
+{
+    static void end() { end_box(); }
+};
+
 // Ends the box when it goes out of scope.
-class BoxScope
+class BoxScope : public AlwaysScope<BoxEnd>
 {
 public:
     BoxScope(std::string_view label, const LayoutStyle& style) { begin_box(label, style); }
-    ~BoxScope() { end_box(); }
-
-    BoxScope(const BoxScope&) = delete;
-    BoxScope& operator=(const BoxScope&) = delete;
 };
 
-class RowScope
+struct RowEnd
+{
+    static void end() { end_row(); }
+};
+
+class RowScope : public AlwaysScope<RowEnd>
 {
 public:
     explicit RowScope(std::string_view name, const RowOptions& options = {}) { begin_row(name, options); }
-    ~RowScope() { end_row(); }
-
-    RowScope(const RowScope&) = delete;
-    RowScope& operator=(const RowScope&) = delete;
 };
 
-class ColumnScope
+struct ColumnEnd
+{
+    static void end() { end_column(); }
+};
+
+class ColumnScope : public AlwaysScope<ColumnEnd>
 {
 public:
     explicit ColumnScope(std::string_view name, const RowOptions& options = {}) { begin_column(name, options); }
-    ~ColumnScope() { end_column(); }
-
-    ColumnScope(const ColumnScope&) = delete;
-    ColumnScope& operator=(const ColumnScope&) = delete;
 };
 
-class PanelScope
+struct PanelEnd
+{
+    static void end() { end_panel(); }
+};
+
+class PanelScope : public AlwaysScope<PanelEnd>
 {
 public:
     explicit PanelScope(std::string_view name, const PanelOptions& options = {})
         : m_visible(begin_panel(name, options))
     {
     }
-    ~PanelScope() { end_panel(); }
 
     [[nodiscard]] bool visible() const { return m_visible; }
-
-    PanelScope(const PanelScope&) = delete;
-    PanelScope& operator=(const PanelScope&) = delete;
 
 private:
     bool m_visible;

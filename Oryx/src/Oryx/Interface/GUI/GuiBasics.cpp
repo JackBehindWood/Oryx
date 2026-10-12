@@ -64,36 +64,65 @@ void overlay_text(std::string_view text, const ImStyle& style)
     ctx.end_box();
 }
 
-FieldScope::FieldScope(std::string_view name, const FieldOptions& options)
-    : m_name(name)
-    , m_style(&context().role_style(options, &GuiTheme::panel))
+namespace
 {
-    GuiContext& ctx = context();
-    const GuiTheme& theme = ctx.gui_theme();
-    m_label_width = options.label_width >= 0.0f ? options.label_width : theme.label_width;
-    m_label_after = side_of(theme, options) == LabelSide::After;
-    m_hidden = m_name.starts_with("##");
-    LayoutStyle row;
-    row.width = options.width;
-    row.align_y = Align::Centre;
-    row.gap = theme.spacing;
-    ctx.begin_box(name, row);
-    ctx.push_id(name);
-    if (!m_label_after && !m_hidden)
+
+class FieldFrame
+{
+public:
+    FieldFrame(std::string_view name, const FieldOptions& options)
+        : m_name(name)
+        , m_style(&context().role_style(options, &GuiTheme::panel))
     {
-        text_box(m_name, *m_style, m_label_width > 0.0f ? fixed(m_label_width) : fit());
+        GuiContext& ctx = context();
+        const GuiTheme& theme = ctx.gui_theme();
+        m_label_width = options.label_width >= 0.0f ? options.label_width : theme.label_width;
+        m_label_after = side_of(theme, options) == LabelSide::After;
+        m_hidden = m_name.starts_with("##");
+        LayoutStyle row;
+        row.width = options.width;
+        row.align_y = Align::Centre;
+        row.gap = theme.spacing;
+        ctx.begin_box(name, row);
+        ctx.push_id(name);
+        if (!m_label_after && !m_hidden)
+        {
+            text_box(m_name, *m_style, m_label_width > 0.0f ? fixed(m_label_width) : fit());
+        }
     }
+
+    ~FieldFrame()
+    {
+        GuiContext& ctx = context();
+        if (m_label_after && !m_hidden)
+        {
+            text_box(m_name, *m_style, m_label_width > 0.0f ? fixed(m_label_width) : fit());
+        }
+        ctx.pop_id();
+        ctx.end_box();
+    }
+
+    FieldFrame(const FieldFrame&) = delete;
+    FieldFrame& operator=(const FieldFrame&) = delete;
+
+private:
+    std::string_view m_name;
+    const ImStyle* m_style;
+    float m_label_width;
+    bool m_label_after;
+    bool m_hidden;
+};
+
+} // namespace
+
+void begin_field(std::string_view name, const FieldOptions& options)
+{
+    context().push_scope<FieldFrame>("field", name, options);
 }
 
-FieldScope::~FieldScope()
+void end_field()
 {
-    GuiContext& ctx = context();
-    if (m_label_after && !m_hidden)
-    {
-        text_box(m_name, *m_style, m_label_width > 0.0f ? fixed(m_label_width) : fit());
-    }
-    ctx.pop_id();
-    ctx.end_box();
+    context().pop_scope<FieldFrame>("end_field");
 }
 
 void text_coloured(std::string_view text, const Colour& colour, const WidgetOptions& options)
