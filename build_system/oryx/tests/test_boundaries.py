@@ -1,12 +1,13 @@
-import tomllib
 from pathlib import Path
 
 from pyforge.boundaries import Boundaries
-from pyforge.config import parse_config
+
+from build_system.oryx.boundaries import oryx_boundaries
 
 REPO = Path(__file__).resolve().parents[3]
-CONFIG = parse_config(tomllib.loads((REPO / "forge.toml").read_text()))
-BOUNDARIES = Boundaries(CONFIG.boundaries)
+SUITE = oryx_boundaries(REPO)
+BOUNDARIES = Boundaries(SUITE.specs["oryx"])
+OASIS = Boundaries(SUITE.specs["oasis"])
 
 
 def check_includes(root: Path) -> list:
@@ -97,3 +98,48 @@ def test_renderer_and_text_may_not_include_assets(tmp_path):
 def test_text_is_headless(tmp_path):
     src = _tree(tmp_path, {"Text/T.h": '#include "Oryx/Renderer/Font.h"\n'})
     assert len(check_includes(src)) == 1
+
+
+def test_every_declared_module_exists_in_the_tree():
+    assert BOUNDARIES.dead_parts(REPO) == []
+
+
+def test_graphics_exports_are_derived_from_the_source_not_listed_by_hand():
+    from pyforge.boundaries import compile_selector
+
+    part = BOUNDARIES.spec._find("graphics")
+    assert part is not None
+    graphics = compile_selector(list(part.words), {})
+    derived = BOUNDARIES.scan(REPO).exclusive_to(graphics)
+    assert {"DrawList", "Painter", "PresentedGraphicsBoard2D", "ImContext", "UiContext", "GuiContext", "LayoutTree", "Renderer"} <= derived
+    assert not {"oryx", "std", "detail"} & derived
+
+
+def test_library_checks_are_tied_to_the_graphics_and_python_options():
+    (library,) = BOUNDARIES.spec.libraries
+    by_option = {}
+    for rule in library.rules:
+        by_option.setdefault(rule.requires, set()).add(rule.kind)
+    assert by_option == {("!graphics",): {"export", "import"}, ("!python",): {"symbols", "import"}}
+    assert {optional.option for optional in BOUNDARIES.spec.optionals} == {"graphics", "python"}
+
+
+def test_oasis_tree_satisfies_its_own_rules():
+    assert OASIS.check(REPO) == [] and OASIS.dead_parts(REPO) == []
+
+
+def test_oasis_game_rules_cannot_reach_the_app_shell_or_the_renderer(tmp_path):
+    for relative, content in {
+        "Oasis/src/Oasis/Game/G.h": '#include "Oasis/Core/OasisApp.h"\n#include "Oryx/Renderer/Renderer.h"\n',
+        "Oasis/src/Oasis/Core/OasisApp.h": '#include "Oasis/Game/G.h"\n',
+        "Oasis/src/Oasis/Strategy/S.h": "\n",
+    }.items():
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    messages = [v.message for v in OASIS.check(tmp_path)]
+    assert messages == ["Game must not include Core (the app shell sits on top of the rules)", "Game must not include Oryx/Renderer (game rules and strategies stay headless)"]
+
+
+def test_the_suite_names_both_trees():
+    assert list(SUITE.specs) == ["oryx", "oasis"]

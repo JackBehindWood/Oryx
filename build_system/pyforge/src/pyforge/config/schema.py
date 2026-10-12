@@ -115,6 +115,7 @@ class Suite:
 class TestsTable:
     project: str
     suites: dict[str, Suite] = field(default_factory=dict)
+    shards: int = 1
 
 
 @dataclass(frozen=True)
@@ -157,6 +158,8 @@ class DocsTable:
 @dataclass(frozen=True)
 class BoundaryRule:
     rule: str
+    because: str = ""
+    message: str = ""
     why: str = ""
 
 

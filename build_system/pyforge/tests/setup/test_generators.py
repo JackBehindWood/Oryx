@@ -23,8 +23,18 @@ def test_unknown_generator():
 @pytest.mark.parametrize("system, cc, cxx", [("Darwin", "clang", "clang++"), ("Linux", "gcc", "g++")])
 def test_gmake_launcher_prefixes_the_default_compilers(monkeypatch, system, cc, cxx):
     monkeypatch.setattr("platform.system", lambda: system)
+    monkeypatch.delenv("CC", raising=False)
+    monkeypatch.delenv("CXX", raising=False)
     command = build_compile_command("gmake", "debug_x64", Path("build"), launcher="ccache")
     assert command[-2:] == [f"CC=ccache {cc}", f"CXX=ccache {cxx}"]
+
+
+def test_gmake_launcher_prefixes_the_compilers_named_by_cc_and_cxx(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setenv("CC", "clang")
+    monkeypatch.setenv("CXX", "clang++")
+    command = build_compile_command("gmake", "debug_x64", Path("build"), launcher="ccache")
+    assert command[-2:] == ["CC=ccache clang", "CXX=ccache clang++"]
 
 
 def test_gmake_without_launcher_has_no_compiler_overrides():

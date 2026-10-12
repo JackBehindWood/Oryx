@@ -3,8 +3,13 @@ project "Tests"
     kind "ConsoleApp"
     forge.project_defaults()
 
-    pchheader "oxpch.h"
-    pchsource "oxpch.cpp"
+    pchheader "TestPch.h"
+    pchsource "TestPch.cpp"
+
+    -- main.cpp defines DOCTEST_CONFIG_IMPLEMENT, which the precompiled doctest.h would already have skipped.
+    filter "files:main.cpp"
+        flags { "NoPCH" }
+    filter {}
 
     files {
         "**.h",

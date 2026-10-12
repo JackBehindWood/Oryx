@@ -2,7 +2,7 @@
 
 > **Status: Phase 10 built through Step 10. Steps 0-10 are done (scaffold, assets, window and input, RHI and NullRHI, Metal, shaders and pipelines, batching and the draw facade, text, the Oasis vertical slice and presented boards, Slang, hardening and audit). `SceneRenderer` is built thin (2D board and overlay stages). Not built, with seams recorded below: `ShaderAsset`, `BoardLayout3D` and a 3D front end, shadow/3D/post stages, recreate-on-device-loss.**
 
-Presentation is a strictly downstream concern: it reads `IState` and never the reverse. Graphics are on by default and removed with `uv run forge --without graphics <command>`. The rules below are declared in `[boundaries]` in `forge.toml` and checked by `forge boundaries check --artifacts` (include layering plus a symbol scan of a graphics-off `libOryx.a`), which CI runs.
+Presentation is a strictly downstream concern: it reads `IState` and never the reverse. Graphics are on by default and removed with `uv run forge --without graphics <command>`. The rules below are declared in code in `build_system/oryx/boundaries.py` and checked by `forge boundaries check --artifacts` (include layering plus a symbol scan of a graphics-off `libOryx.a`), which CI runs.
 
 ## Module layout and layering
 

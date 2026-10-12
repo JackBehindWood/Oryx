@@ -63,39 +63,6 @@ sha256 = "bd6cfc47b7353b2cffa36a866b1584749f76f4b2dbebf6dda26bc3fb40dc3c0e"
 url = "https://github.com/shader-slang/slang/releases/download/v2026.19/slang-2026.19-linux-aarch64.tar.gz"
 sha256 = "eeefa4e52ca322cf3c037ee0d273b0ee68f4161fa422eda1bb704126073b69b4"
 
-[boundaries]
-root = "Oryx/src"
-base = "Oryx"
-rules = [
-  { rule = "** !-> backends", why = "public headers must not include backends/" },
-  { rule = "backend-header <-only- Core/Window.cpp Graphics/RHI/RHI.cpp", why = "only the backend factories Core/Window.cpp, Graphics/RHI/RHI.cpp may include a backend header" },
-  { rule = "Assets !-> Core/Window.h Core/Input.h Events/WindowEvent.h except Assets/**/Gpu*", why = "CPU assets must stay headless" },
-  { rule = "headless !-> graphics except Board/Graphics", why = "{module} must not include {target}; only Board/Graphics sits above the renderer" },
-  { rule = "Assets !-> graphics except Assets/**/Gpu*", why = "only the Gpu* bridges may include {target}" },
-  { rule = "graphics Text !-> Assets", why = "{module} must not include Assets; fonts reach the renderer through Text/IFontSource" },
-  { rule = "Interface/Canvas !-> Interface/UI Interface/GUI Board Assets", why = "{module} is the shared immediate-mode layer; it must not include {target}" },
-  { rule = "Interface/UI !-> Interface/GUI Board Assets Game Strategy", why = "{module} is the player-facing UI layer; it must not include {target}" },
-  { rule = "Interface/GUI !-> Interface/UI Board Assets Game Strategy Dashboard", why = "{module} is the developer-tooling UI layer, a peer of Interface/UI; it must not include {target}" },
-  { rule = "Dashboard/Feed !-> Board Assets", why = "{module} consumes only Decision data and labels; it must not include {target}" },
-  { rule = "Dashboard/View !-> Board Assets", why = "{module} draws only feed records; it must not include {target}" },
-  { rule = "Dashboard/Panel !-> Board Assets", why = "{module} hosts registered views over the feed; it must not include {target}" },
-  { rule = "Core Game Strategy Simulation !-> Dashboard", why = "{module} is below the dashboard; it must not include {target}" },
-  "Graphics < Shaders < Renderer < Interface/Canvas < Interface/UI < Board/Graphics",
-  "Renderer < Interface/Canvas < Interface/GUI < Dashboard/View < Dashboard/Panel",
-]
-
-[boundaries.sets]
-graphics = ["Graphics", "Shaders", "Renderer", "Interface/Canvas", "Interface/UI", "Interface/GUI", "Dashboard/View", "Dashboard/Panel", "Board/Graphics"]
-headless = ["Game", "Strategy", "Simulation", "Core", "Text", "Board", "Dashboard/Feed"]
-backends = ["**/backends/**"]
-backend-header = ['re:^(?:Null|Metal|MacOS|Glfw)\w*\.(?:h|hpp)$']
-
-[[boundaries.artifacts]]
-path = "build/bin/**/libOryx.a"
-deny = '\boryx::(?:Graphics|Shaders|Renderer|DrawList|Painter|ImContext|ImTheme|LayoutTree|UiContext|UiTheme|GuiContext|GuiTheme|ImId|UiId|GuiId|im|ui|gui|PresentedGraphicsBoard2D)::'
-requires = ["!graphics"]
-why = "graphics-off library must not export graphics symbols"
-
 [docs]
 tool = "mkdocs"
 

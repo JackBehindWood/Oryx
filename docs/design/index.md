@@ -21,5 +21,6 @@ The decisions here are working assumptions until reviewed during the project's d
 | [Observability](observability.md) | Optional strategy observability |
 | [Graphics](graphics.md) | Phase 10 graphics and asset subsystem: layering, RHI, roadmap |
 | [Dashboard](dashboard.md) | Phase 11 dashboard: Canvas, UI and GUI systems, scissor clipping, industry survey, build order |
+| [Boundaries](boundaries.md) | Layering rules as code: modules, helpers, generated messages, library checks, multiple languages |
 | [Platform](platform.md) | Serialization, graphics, build system, documentation |
 | [Decision Log](decision-log.md) | What is settled, what is open, and why |

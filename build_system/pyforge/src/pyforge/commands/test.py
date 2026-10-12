@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 
 from pyforge import registry, runners
+from pyforge.runners import doctest as doctest_runner
 from pyforge.config import RunContext, Suite
 from pyforge.config.schema import suggestion
 from pyforge.deps.resolve import requirements_met
@@ -91,6 +92,13 @@ def run_suites(
         "Arguments after `--` are passed to the runner, when every selected suite shares one.",
     ),
     list_: bool = typer.Option(False, "--list", help="List the selected suites' test cases/items instead of running them."),
+    shards: Optional[int] = typer.Option(
+        None,
+        "--shards",
+        "-j",
+        help="Run the C++ test cases over this many parallel processes, each with its own TMPDIR (0 = one per core, 1 = a single process). "
+        "Default: [tests] shards in forge.toml.",
+    ),
 ):
     """Run (or list) the project's test suites."""
     run: RunContext = ctx.obj
@@ -144,9 +152,13 @@ def run_suites(
 
     console.print(f"[bold blue]🧪 Running tests ({', '.join(selected)})...[/bold blue]")
     failed = False
+    shard_count = run.config.tests.shards if shards is None else shards
     for kind, dirs in dirs_by_kind.items():
-        command_line = _build_command(run, kind, dirs, extra, list_only=False)
-        if stream_command(command_line, cwd=run.project.root, env=env, console=console) != 0:
+        if kind == "doctest" and shard_count != 1:
+            code = doctest_runner.run_sharded(_test_binary(run), dirs, extra, shards=shard_count, cwd=run.project.root, env=env, console=console)
+        else:
+            code = stream_command(_build_command(run, kind, dirs, extra, list_only=False), cwd=run.project.root, env=env, console=console)
+        if code != 0:
             failed = True
 
     if failed:

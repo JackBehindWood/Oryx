@@ -19,7 +19,7 @@ def register(name: str, builder: CompileCommandBuilder) -> None:
     GENERATORS.register(name)
 
 
-# The compilers Premake's gmake toolset defaults to per OS, which a launcher has to be prepended to.
+# The compilers Premake's gmake toolset defaults to per OS (overridden by CC/CXX), which a launcher has to be prepended to.
 DEFAULT_COMPILERS = {"Darwin": ("clang", "clang++"), "Linux": ("gcc", "g++")}
 
 
@@ -29,7 +29,8 @@ def _gmake_compile_command(makefile_dir: Path, config_token: str, jobs: int, lau
         system = platform.system()
         if system not in DEFAULT_COMPILERS:
             raise ValueError(f"[build] launcher is not supported on {system}")
-        cc, cxx = DEFAULT_COMPILERS[system]
+        default_cc, default_cxx = DEFAULT_COMPILERS[system]
+        cc, cxx = os.environ.get("CC") or default_cc, os.environ.get("CXX") or default_cxx
         command += [f"CC={launcher} {cc}", f"CXX={launcher} {cxx}"]
     return command
 

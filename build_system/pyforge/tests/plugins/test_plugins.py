@@ -18,6 +18,7 @@ def test_hookspecs_are_present():
         "forge_post_clean",
         "forge_test_env",
         "forge_editor_contributions",
+        "forge_boundaries",
         "forge_dependency_sources",
     }
 

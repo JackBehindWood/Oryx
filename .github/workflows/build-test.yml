@@ -2,8 +2,12 @@ name: Build & Test
 
 on:
   push:
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,31 +16,32 @@ concurrency:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    name: build (${{ matrix.os }}, python ${{ matrix.python }}, CPython ${{ matrix.py }}, graphics ${{ matrix.graphics }})
+    timeout-minutes: 60
+    name: build (${{ matrix.os }}, ${{ matrix.cc }}, python ${{ matrix.python }}, CPython ${{ matrix.py }}, graphics ${{ matrix.graphics }})
     env:
       # Managed CPython ships a shared libpython, which the embedded scripting backend links.
       UV_PYTHON_PREFERENCE: only-managed
       BUILD_FLAGS: ${{ format('{0} {1}', matrix.python == 'off' && '--without python' || '', matrix.graphics == 'off' && '--without graphics' || '') }}
+      CC: ${{ matrix.cc == 'clang' && 'clang' || '' }}
+      CXX: ${{ matrix.cc == 'clang' && 'clang++' || '' }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 500M
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python: ["on", "off"]
-        py: ["3.11"]
-        graphics: ["on"]
         include:
-          - os: ubuntu-latest
-            python: "on"
-            py: "3.11"
-            graphics: "off"
-          - os: macos-latest
-            python: "on"
-            py: "3.11"
-            graphics: "off"
+          - { os: ubuntu-24.04, cc: gcc, python: "on", py: "3.11", graphics: "on" }
+          - { os: ubuntu-24.04, cc: gcc, python: "off", py: "3.11", graphics: "on" }
+          - { os: ubuntu-24.04, cc: gcc, python: "on", py: "3.11", graphics: "off" }
+          - { os: ubuntu-24.04, cc: clang, python: "on", py: "3.11", graphics: "on" }
           # Newest CPython: annotations are evaluated lazily from 3.14 on.
-          - os: ubuntu-latest
-            python: "on"
-            py: "3.14"
-            graphics: "on"
+          - { os: ubuntu-24.04, cc: gcc, python: "on", py: "3.14", graphics: "on" }
+          - { os: macos-15, cc: clang, python: "on", py: "3.11", graphics: "on" }
+          - { os: macos-15, cc: clang, python: "off", py: "3.11", graphics: "on" }
+          - { os: macos-15, cc: clang, python: "on", py: "3.11", graphics: "off" }
 
     steps:
     - uses: actions/checkout@v4
@@ -68,11 +73,14 @@ jobs:
         brew install make ccache
 
     - name: Restore ccache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
-        path: ${{ runner.os == 'macOS' && '~/Library/Caches/ccache' || '~/.cache/ccache' }}
-        key: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-${{ github.sha }}
-        restore-keys: ccache-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-
+        path: .ccache
+        key: ccache-${{ matrix.os }}-${{ matrix.cc }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-${{ github.sha }}
+        restore-keys: ccache-${{ matrix.os }}-${{ matrix.cc }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-
+
+    - name: Show the toolchain
+      run: ${CXX:-c++} --version
 
     - name: Select CPython
       run: echo "UV_PYTHON=${{ matrix.py }}" >> "$GITHUB_ENV"
@@ -92,11 +100,19 @@ jobs:
     - name: Configure and compile
       run: uv run forge $BUILD_FLAGS compile
 
-    - name: Check boundaries (includes, and graphics-off symbols)
-      run: uv run forge $BUILD_FLAGS boundaries check --artifacts
+    - name: Save ccache
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        path: .ccache
+        key: ccache-${{ matrix.os }}-${{ matrix.cc }}-${{ matrix.python }}-${{ matrix.py }}-${{ matrix.graphics }}-${{ github.sha }}
 
     - name: ccache statistics
+      if: always()
       run: ccache -s
+
+    - name: Check boundaries (includes, and graphics-off symbols)
+      run: uv run forge $BUILD_FLAGS boundaries check --artifacts
 
     - name: Test (unit, integration, python when enabled)
       run: uv run forge $BUILD_FLAGS test
@@ -112,10 +128,11 @@ jobs:
 
   tooling:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-2025]
 
     steps:
     - uses: actions/checkout@v4
@@ -150,7 +167,8 @@ jobs:
         forge --dry-run configure
 
   extraction:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v4
@@ -176,7 +194,15 @@ jobs:
         pytest -q
 
   pip:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 500M
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
 
     steps:
     - uses: actions/checkout@v4
@@ -186,12 +212,19 @@ jobs:
     - name: Set up build environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
+        sudo apt-get install -y build-essential ccache
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
+
+    - name: Restore ccache
+      uses: actions/cache/restore@v4
+      with:
+        path: .ccache
+        key: ccache-pip-${{ github.sha }}
+        restore-keys: ccache-pip-
 
     - name: Restore Premake binary cache
       uses: actions/cache@v4
@@ -210,10 +243,19 @@ jobs:
     - name: Build and test (no uv involved)
       run: |
         source .venv/bin/activate
+        forge config set build.launcher ccache --local
         forge all
 
+    - name: Save ccache
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        path: .ccache
+        key: ccache-pip-${{ github.sha }}
+
   docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v4
@@ -225,3 +267,16 @@ jobs:
 
     - name: Build docs (strict)
       run: uv run forge docs build
+
+  ci-ok:
+    if: always()
+    needs: [build, tooling, extraction, pip, docs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - name: Every job passed or was deliberately skipped
+      run: |
+        if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+          echo "A required job failed or was cancelled"
+          exit 1
+        fi

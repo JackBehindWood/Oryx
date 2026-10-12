@@ -267,11 +267,17 @@ void sanitize_multi(DockView& h)
         clear_multi(m);
 }
 
+void reset_drag(DragState& drag)
+{
+    static const DragState idle{};
+    drag = idle;
+}
+
 void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& press, const Vec2f& grab, const Rect& origin = {})
 {
     if (h.model->drag.source != DragSource::None)
         return;
-    h.model->drag = DragState{};
+    reset_drag(h.model->drag);
     h.model->drag.source = source;
     h.model->drag.panel = panel;
     h.model->drag.press = press;
@@ -1088,7 +1094,7 @@ void update_drag(GuiContext& ctx, DockView& h)
             else if (d.source == DragSource::Float)
                 restore_float(h, d);
         }
-        d = DragState{};
+        reset_drag(d);
         return;
     }
     const Vec2f pointer = input.pointer.position;
@@ -1108,7 +1114,7 @@ void update_drag(GuiContext& ctx, DockView& h)
         auto_scroll_strip(h, d, pointer, input.delta_time);
     if (d.source == DragSource::Stack && h.model->multi_count < 2)
     {
-        d = DragState{};
+        reset_drag(d);
         return;
     }
     if (d.source == DragSource::Stack)
@@ -1125,7 +1131,9 @@ void update_drag(GuiContext& ctx, DockView& h)
     if (d.source == DragSource::Tab && d.plan.action == DropAction::Reorder)
     {
         reorder_live(h, d, pointer);
-        d.plan = DropPlan{ DropAction::None, d.plan.node };
+        DropPlan cleared;
+        cleared.node = d.plan.node;
+        d.plan = cleared;
     }
     if (!button_of(input, MouseCode::Left).down)
     {
@@ -1136,7 +1144,7 @@ void update_drag(GuiContext& ctx, DockView& h)
                 restore_tear(h, d);
         }
         apply_drop(h, d);
-        d = DragState{};
+        reset_drag(d);
         return;
     }
     h.result.interacting = true;
@@ -1522,7 +1530,7 @@ void begin_panel_host()
     }
     else
     {
-        m.drag = DragState{};
+        reset_drag(m.drag);
         m.history_request = HistoryRequest::None;
     }
 

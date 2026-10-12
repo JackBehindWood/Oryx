@@ -10,6 +10,7 @@ from rich.console import Console
 from pyforge.api import hookimpl
 
 from . import commands
+from .boundaries import oryx_boundaries
 from .python_env import PythonEnvError, premake_python_options, python_build_info, write_python_config
 from .python_extension import install_extension_pth, remove_extension_pth
 
@@ -43,6 +44,11 @@ def cook_shaders(ctx):
 @hookimpl
 def forge_commands(app):
     app.add_typer(commands.app, name="python", help=commands.GROUP_HELP)
+
+
+@hookimpl
+def forge_boundaries(ctx):
+    return oryx_boundaries(ctx.project.root)
 
 
 @hookimpl

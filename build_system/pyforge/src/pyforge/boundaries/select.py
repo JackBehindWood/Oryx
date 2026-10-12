@@ -1,7 +1,21 @@
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ..config.schema import SchemaError
+
+
+def _split_alternatives(body: str) -> list[str]:
+    parts, depth, start = [], 0, 0
+    for index, char in enumerate(body):
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(body[start:index])
+            start = index + 1
+    return parts + [body[start:]]
 
 
 def _glob_regex(glob: str) -> str:
@@ -19,15 +33,28 @@ def _glob_regex(glob: str) -> str:
         elif glob[index] == "?":
             parts.append("[^/]")
             index += 1
+        elif glob[index] == "{":
+            close = _closing_brace(glob, index)
+            parts.append("(?:" + "|".join(_glob_regex(option) for option in _split_alternatives(glob[index + 1:close])) + ")")
+            index = close + 1
         else:
             parts.append(re.escape(glob[index]))
             index += 1
     return "".join(parts)
 
 
+def _closing_brace(glob: str, start: int) -> int:
+    depth = 0
+    for index in range(start, len(glob)):
+        depth += {"{": 1, "}": -1}.get(glob[index], 0)
+        if depth == 0:
+            return index
+    raise SchemaError(f"boundaries: unbalanced '{{' in glob {glob!r}")
+
+
 @dataclass(frozen=True)
 class Token:
-    """A bare word names a module or directory, `re:` starts a regex, anything with * or ? is a glob."""
+    """A bare word names a module or directory, `re:` starts a regex, anything with * ? or {a,b} is a glob; a glob without a `/` matches a file name at any depth."""
 
     text: str
     pattern: re.Pattern
@@ -40,8 +67,9 @@ class Token:
 def _token(text: str) -> Token:
     if text.startswith("re:"):
         return Token(text, re.compile(text[3:]), anywhere=True)
-    if "*" in text or "?" in text:
-        return Token(text, re.compile(_glob_regex(text) + r"\Z"))
+    if any(char in text for char in "*?{"):
+        anywhere_prefix = "" if "/" in text else "(?:.*/)?"
+        return Token(text, re.compile(anywhere_prefix + _glob_regex(text) + r"\Z"))
     return Token(text, re.compile(re.escape(text) + r"(?:/.*)?\Z"))
 
 
@@ -64,7 +92,7 @@ def _expand(word: str, sets: dict[str, list[str]], seen: tuple[str, ...] = ()) -
     return [leaf for member in sets[word] for leaf in _expand(member, sets, (*seen, word))]
 
 
-def compile_selector(words: list[str], sets: dict[str, list[str]], exclude: list[str] = ()) -> Selector:
+def compile_selector(words: Sequence[str], sets: dict[str, list[str]], exclude: Sequence[str] = ()) -> Selector:
     """`words` may name entries of `sets`, which expand recursively; a leading `!` negates a word."""
     include = [leaf for word in words if not word.startswith("!") for leaf in _expand(word, sets)]
     negated = [word.removeprefix("!") for word in words if word.startswith("!")] + list(exclude)

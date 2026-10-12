@@ -50,6 +50,7 @@ nav:
       - Platform: design/platform.md
       - Graphics: design/graphics.md
       - Dashboard: design/dashboard.md
+      - Boundaries: design/boundaries.md
       - Memory Allocator: design/memory-allocator.md
       - Decision Log: design/decision-log.md
   - Python:

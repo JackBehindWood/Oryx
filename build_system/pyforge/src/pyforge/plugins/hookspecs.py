@@ -45,6 +45,9 @@ if pluggy is not None:
         def forge_editor_contributions(self, ctx) -> dict | None: ...
 
         @hookspec
+        def forge_boundaries(self, ctx): ...
+
+        @hookspec
         def forge_dependency_sources(self) -> dict[str, object] | None: ...
 else:
     hookspec = None

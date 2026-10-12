@@ -51,7 +51,7 @@ def test_layers_forbid_every_upward_include(tmp_path):
 def test_base_prefix_is_stripped_and_first_rule_wins(tmp_path):
     src = _tree(tmp_path, {"src/App/Game/g.h": '#include "App/Render/r.h"\n'})
     boundaries = _boundaries([{"rule": "Game !-> Render", "why": "first"}, "Game !-> Render"], root="src", base="App")
-    assert [str(v) for v in boundaries.check(src)] == ["App/Game/g.h: includes App/Render/r.h (first)"]
+    assert [str(v) for v in boundaries.check(src)] == ["App/Game/g.h: first"]
 
 
 def test_unmatched_selector_suggests_set(tmp_path):
@@ -80,3 +80,4 @@ def test_artifacts_respect_requires_and_deny(tmp_path):
     boundaries = Boundaries(cfg.boundaries)
     assert boundaries.check_artifacts(tmp_path, {"graphics": True}) == []
     assert len(boundaries.check_artifacts(tmp_path, {"graphics": False})) == 1
+

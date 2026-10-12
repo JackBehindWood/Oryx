@@ -5,6 +5,8 @@
 // otherwise any OX_CORE_*/OX_* logging exercised by a test (e.g. Simulation
 // integration tests) dereferences a null logger, since this binary has its own
 // main() instead of EntryPoint.h's.
+#include "oxpch.h"
+
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
 
