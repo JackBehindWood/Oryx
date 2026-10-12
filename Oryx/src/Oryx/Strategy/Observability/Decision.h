@@ -19,7 +19,7 @@ struct ActionScore
     bool has_value = false;
 };
 
-// Flat list entry so a tree from any search (alpha-beta, MCTS) fits without a fixed schema; parent is an index into the list, -1 for the root.
+// Flat list entry so a tree from any search (alpha-beta, MCTS) fits without a fixed schema; parent is an index into the list, -1 for the root; emit parents before children so a capped copy keeps a connected prefix.
 struct SearchNode
 {
     int32_t parent = -1;

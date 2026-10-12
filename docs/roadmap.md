@@ -564,6 +564,16 @@ Longer-term possibilities include:
 
 The extension model should remain simple enough that contributors can understand it without learning a large framework.
 
+### Possible later: authoring tools (not planned, no decision made)
+
+A way for users to create games without writing C++ is a long-term idea, to be weighed when the extension model above exists. Candidate shapes, smallest first:
+
+* **Data-defined games.** A declarative file (board spaces, pieces, moves, win condition) loaded by a generic `IGame`, with a presenter derived from it. Fits the existing split: a game is data plus rules, and `IBoardPresenter` already draws any `BoardLayout`.
+* **Python-authored games.** Python scripting already registers games and console boards ([Python API](design/python-api.md)); a template and a "new game" scaffold command in `forge` would lower the entry cost.
+* **A small in-app editor.** A dock panel (a registered view, like the dashboard views) that edits a board layout and rule table and saves the data file above, built from the GUI widgets and the dock system, so it needs no new UI framework. A UI/layout editor would be the same idea over `DockLayout` (already a plain, versioned record) and the GUI theme.
+
+Constraints to keep when this is picked up: check `docs/design/decision-log.md` and `docs/architecture.md` §14 first (serialisation and Python ownership are still undecided), keep Game, Strategy and Engine separate, register through self-registering factories, and prefer the smallest data format that expresses Tic-Tac-Toe and Hexapawn before anything general.
+
 ---
 
 # 17. Build & Developer Tooling

@@ -23,6 +23,12 @@ void read_settings(DashboardSettings& settings, const SettingsNode& node)
 {
     settings.enabled = node.boolean("enabled", settings.enabled);
     settings.history = at_least_one(node, "history", settings.history);
+    const int64_t tree_nodes = node.integer("max_tree_nodes", settings.max_tree_nodes);
+    if (tree_nodes < 0 || tree_nodes > 65536)
+    {
+        throw SettingsError("dashboard.max_tree_nodes must be between 0 and 65536, got " + std::to_string(tree_nodes));
+    }
+    settings.max_tree_nodes = static_cast<int32_t>(tree_nodes);
     if (node.has("annotations"))
     {
         settings.annotations = node.strings("annotations");

@@ -174,6 +174,7 @@ size_t DashboardFeed::store_numbers(const Decision& decision)
         std::copy(decision.tree.begin(), decision.tree.begin() + static_cast<std::ptrdiff_t>(kept_nodes), m_tree.begin() + static_cast<std::ptrdiff_t>(slot * tree_limit));
     }
     record.tree_count = static_cast<uint32_t>(kept_nodes);
+    record.dropped_tree_nodes = static_cast<uint32_t>(decision.tree.size() - kept_nodes);
 
     m_drops.scores += record.dropped_scores;
     m_drops.metrics += record.dropped_metrics;

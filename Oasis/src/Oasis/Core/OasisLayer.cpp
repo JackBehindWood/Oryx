@@ -130,7 +130,7 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
             graphics.remove_client(*graphics_board);
         }
     };
-    oryx::BoardLayer& board = app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent, create_board, false, release_board, &m_shell->feed() });
+    oryx::BoardLayer& board = app.push_layer<oryx::BoardLayer>(oryx::BoardLayerDesc{ plan.game, m_options.opponent, create_board, false, release_board, &m_shell->observer() });
     m_shell->bind(board);
     return true;
 #else

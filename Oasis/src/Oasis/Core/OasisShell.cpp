@@ -31,6 +31,7 @@ oryx::FeedOptions feed_options(const DashboardSettings& settings)
 {
     FeedOptions options;
     options.capacity = settings.history;
+    options.max_tree_nodes = settings.max_tree_nodes;
     return options;
 }
 
@@ -39,6 +40,7 @@ oryx::FeedOptions feed_options(const DashboardSettings& settings)
 OasisShell::OasisShell(InputRouter& router, DashboardFlag flag)
     : m_router(router)
     , m_feed(feed_options(settings_of<DashboardSettings>()))
+    , m_observer(m_feed)
     , m_settings(settings_of<DashboardSettings>())
 {
     m_model.feed = &m_feed;
@@ -319,6 +321,10 @@ void OasisShell::view_menu()
         static_cast<void>(gui::set_group_open(k_dashboard_group, !gui::is_group_open(k_dashboard_group)));
     }
     annotation_menu();
+    if (gui::menu_item("Synthetic search tree", m_observer.enabled()).clicked)
+    {
+        m_observer.set_enabled(!m_observer.enabled());
+    }
     gui::dock_menu();
     gui::end_menu();
 }

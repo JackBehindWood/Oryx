@@ -127,7 +127,7 @@ std::string first_label(const DashboardFeed& feed)
 
 TEST_CASE("dashboard view: the built-in views register by id and an unknown id is null")
 {
-    for (const char* id : { "probabilities", "values", "decision", "trace", "stats" })
+    for (const char* id : { "probabilities", "values", "decision", "trace", "stats", "search" })
     {
         UniquePtr<IDashboardView> view = DashboardViewRegistry::create(id);
         REQUIRE(view != nullptr);
@@ -790,4 +790,102 @@ TEST_CASE("dashboard trace: one line names the match and counts its decisions in
     select_record(f.model, f.feed.view(0).record->sequence);
     f.frames();
     CHECK(f.find_text("Match 1 \xC2\xB7 2 decisions \xC2\xB7 viewing 1 of 2") != nullptr);
+}
+
+namespace
+{
+
+void feed_tree(DashboardFeed& feed, uint32_t moves)
+{
+    UniquePtr<IGame> game = GameRegistry::create("tictactoe");
+    REQUIRE(game != nullptr);
+    UniquePtr<IState> state = game->new_initial_state();
+    ActionList actions = state->legal_actions();
+    Decision decision;
+    decision.player = state->current_player();
+    decision.chosen = actions[0];
+    decision.tree.push_back(SearchNode{ -1, INVALID_ACTION, 100, 0.0 });
+    for (uint32_t i = 0; i < moves; ++i)
+    {
+        set_probability(decision, actions[i], 1.0 / static_cast<double>(moves));
+        decision.tree.push_back(SearchNode{ 0, actions[i], 10 + static_cast<int64_t>(i), 0.25 });
+    }
+    feed.on_decision(*state, decision);
+}
+
+FeedOptions tree_options(int32_t nodes)
+{
+    FeedOptions options;
+    options.max_tree_nodes = nodes;
+    return options;
+}
+
+} // namespace
+
+TEST_CASE("search view: with no tree it says why, and whether storage is off")
+{
+    ViewFixture off("search");
+    feed_uniform(off.feed, "tictactoe", 0);
+    off.frames();
+    CHECK(off.find_text("No search tree for this decision") != nullptr);
+    CHECK(off.find_text("Tree storage is off: set dashboard.max_tree_nodes") != nullptr);
+
+    ViewFixture on("search", tree_options(16));
+    feed_uniform(on.feed, "tictactoe", 0);
+    on.frames();
+    CHECK(on.find_text("The strategy did not publish one") != nullptr);
+}
+
+TEST_CASE("search view: the root and its best line are shown with move labels")
+{
+    ViewFixture f("search", tree_options(32));
+    feed_tree(f.feed, 4);
+    f.settle();
+    f.frames();
+    CHECK(f.painted("Root"));
+    CHECK(f.painted(label_view(f.feed.view(0).scores[0].label)));
+    CHECK(f.painted("5 nodes \xC2\xB7 depth 2"));
+}
+
+TEST_CASE("search view: a capped tree says it was truncated")
+{
+    ViewFixture f("search", tree_options(3));
+    feed_tree(f.feed, 5);
+    f.frames();
+    CHECK(f.painted("Truncated: 3 nodes were not kept"));
+}
+
+TEST_CASE("search view: clicking a root move selects it and pins its action for the board")
+{
+    ViewFixture f("search", tree_options(32));
+    feed_tree(f.feed, 4);
+    f.settle();
+    f.frames();
+    const RecordView record = f.feed.view(0);
+    const LayoutNode* row = f.find_text(label_view(record.scores[0].label));
+    REQUIRE(row != nullptr);
+    f.driver.click(rect_centre(row->rect), f.column_of([&f] { f.view->draw(f.model); }));
+    CHECK(f.model.pinned_action == record.scores[0].action);
+}
+
+TEST_CASE("search view: a malformed tree draws without throwing")
+{
+    ViewFixture f("search", tree_options(8));
+    UniquePtr<IGame> game = GameRegistry::create("tictactoe");
+    UniquePtr<IState> state = game->new_initial_state();
+    Decision decision;
+    decision.chosen = state->legal_actions()[0];
+    decision.tree = { SearchNode{ 5, 1, 1, 0.0 }, SearchNode{ 1, 2, 1, 0.0 }, SearchNode{ 2, 3, 1, 0.0 } };
+    f.feed.on_decision(*state, decision);
+    CHECK_NOTHROW(f.frames());
+}
+
+TEST_CASE("search view: steady frames allocate nothing")
+{
+    ViewFixture f("search", tree_options(32));
+    feed_tree(f.feed, 4);
+    f.frames(6);
+    const MemoryStats before = test::all_allocations();
+    f.frames(3);
+    CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }

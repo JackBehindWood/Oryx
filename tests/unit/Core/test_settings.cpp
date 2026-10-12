@@ -418,7 +418,7 @@ TEST_CASE("dashboard settings default to off, read their keys and reject non-pos
     const DashboardSettings& defaults = settings_of<DashboardSettings>();
     CHECK_FALSE(defaults.enabled);
     CHECK(defaults.history == 256);
-    CHECK(defaults.views == std::vector<std::string>{ "trace", "decision", "stats" });
+    CHECK(defaults.views == std::vector<std::string>{ "trace", "decision", "stats", "search" });
     CHECK(defaults.annotations == std::vector<std::string>{ "heat", "chosen" });
 
     TempDir dir;

@@ -60,36 +60,71 @@ oryx::ActionId TicTacToeHeuristicStrategy::decide(const oryx::Context& context)
     Mark my_mark = tic_tac_toe.current_player() == 0 ? Mark::X : Mark::O;
     Mark opponent_mark = (my_mark == Mark::X) ? Mark::O : Mark::X;
 
-    oryx::ActionId winning = find_completing_move(tic_tac_toe, my_mark);
-    if (oryx::is_valid(winning))
-    {
-        return winning;
-    }
-
-    oryx::ActionId blocking = find_completing_move(tic_tac_toe, opponent_mark);
-    if (oryx::is_valid(blocking))
-    {
-        return blocking;
-    }
-
+    const oryx::ActionId winning = find_completing_move(tic_tac_toe, my_mark);
+    const oryx::ActionId blocking = find_completing_move(tic_tac_toe, opponent_mark);
     oryx::ActionList actions = tic_tac_toe.legal_actions();
 
     constexpr oryx::ActionId k_center = 4;
-    if (std::find(actions.begin(), actions.end(), k_center) != actions.end())
-    {
-        return k_center;
-    }
-
     constexpr oryx::ActionId k_corners[] = { 0, 2, 6, 8 };
-    for (oryx::ActionId corner : k_corners)
+    auto legal = [&](oryx::ActionId action) { return std::find(actions.begin(), actions.end(), action) != actions.end(); };
+    auto rule_value = [&](oryx::ActionId action)
     {
-        if (std::find(actions.begin(), actions.end(), corner) != actions.end())
+        if (action == winning)
         {
-            return corner;
+            return 1.0;
+        }
+        if (action == blocking)
+        {
+            return 0.75;
+        }
+        if (action == k_center)
+        {
+            return 0.5;
+        }
+        return std::find(std::begin(k_corners), std::end(k_corners), action) != std::end(k_corners) ? 0.25 : 0.0;
+    };
+
+    oryx::ActionId chosen = oryx::INVALID_ACTION;
+    if (oryx::is_valid(winning))
+    {
+        chosen = winning;
+    }
+    else if (oryx::is_valid(blocking))
+    {
+        chosen = blocking;
+    }
+    else if (legal(k_center))
+    {
+        chosen = k_center;
+    }
+    else
+    {
+        for (oryx::ActionId corner : k_corners)
+        {
+            if (chosen == oryx::INVALID_ACTION && legal(corner))
+            {
+                chosen = corner;
+            }
+        }
+        if (chosen == oryx::INVALID_ACTION)
+        {
+            chosen = actions.front();
         }
     }
 
-    return actions.front();
+    if (oryx::IDecisionObserver* observer = context.get<oryx::IDecisionObserver>())
+    {
+        oryx::Decision decision;
+        decision.player = tic_tac_toe.current_player();
+        decision.chosen = chosen;
+        for (oryx::ActionId action : actions)
+        {
+            oryx::set_value(decision, action, rule_value(action));
+            oryx::set_probability(decision, action, action == chosen ? 1.0 : 0.0);
+        }
+        observer->on_decision(context.state(), decision);
+    }
+    return chosen;
 }
 
 } // namespace oasis

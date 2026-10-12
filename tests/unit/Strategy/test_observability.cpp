@@ -38,7 +38,8 @@ TEST_CASE("MinimaxStrategy publishes deterministic node counts and root values o
     for (const ActionScore& score : decision.scores)
     {
         CHECK(score.has_value);
-        CHECK_FALSE(score.has_probability);
+        CHECK(score.has_probability);
+        CHECK(score.probability == doctest::Approx(1.0 / 9.0));
         CHECK(score.value == doctest::Approx(0.0));
     }
 }
@@ -331,4 +332,33 @@ TEST_CASE("Aggregating repeats keeps a diagnostic peak instead of summing it")
     }
     CHECK(largest > 0.0);
     CHECK(get_metric(aggregate(result, matchup_key(spec.matchups[0])), "minimax/depth_max") == largest);
+}
+
+TEST_CASE("MinimaxStrategy publishes its top plies as a tree and a policy over the optimal moves")
+{
+    oasis::TicTacToeState state;
+    Context context(state);
+    TraceRecorder trace;
+    context.provide<IDecisionObserver>(&trace);
+
+    MinimaxStrategy strategy;
+    strategy.decide(context);
+
+    const Decision& decision = trace.entries()[0].decision;
+    REQUIRE(!decision.tree.empty());
+    CHECK(decision.tree[0].parent == -1);
+    CHECK(decision.tree[0].visits == 549945);
+    CHECK(decision.tree.size() == 1 + 9 + 9 * 8);
+    for (size_t i = 1; i < decision.tree.size(); ++i)
+    {
+        CHECK(decision.tree[i].parent >= 0);
+        CHECK(static_cast<size_t>(decision.tree[i].parent) < i);
+    }
+    double total = 0.0;
+    for (const ActionScore& score : decision.scores)
+    {
+        CHECK(score.has_probability);
+        total += score.probability;
+    }
+    CHECK(total == doctest::Approx(1.0));
 }

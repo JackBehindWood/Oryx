@@ -98,6 +98,7 @@
 #include "Oryx/Dashboard/Feed/ActionDescription.h"
 #include "Oryx/Dashboard/Feed/DashboardFeed.h"
 #include "Oryx/Dashboard/Feed/DashboardModel.h"
+#include "Oryx/Dashboard/Feed/TreeIndex.h"
 #include "Oryx/Dashboard/DashboardSettings.h"
 
 #include "Oryx/Simulation/ActionHistory.h"

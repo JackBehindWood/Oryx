@@ -5,6 +5,7 @@
 #ifdef OX_ENABLE_GRAPHICS
 
 #include "GuiShowcase.h"
+#include "SyntheticTreeObserver.h"
 #include "Oryx/Events/SimulationEvent.h"
 
 namespace oasis
@@ -32,6 +33,8 @@ public:
     void set_font(oryx::Font* font);
 
     [[nodiscard]] oryx::DashboardFeed& feed() { return m_feed; }
+    // What the match reports to: the feed, through the optional synthetic tree.
+    [[nodiscard]] oryx::IDecisionObserver& observer() { return m_observer; }
     [[nodiscard]] const oryx::GuiContext& context() const { return m_context; }
     [[nodiscard]] const oryx::gui::DockLayout& layout();
     // Any dashboard view panel is open.
@@ -62,6 +65,7 @@ private:
     oryx::InputRouter& m_router;
     const oryx::BoardLayer* m_board = nullptr;
     oryx::DashboardFeed m_feed;
+    SyntheticTreeObserver m_observer;
     oryx::DashboardModel m_model;
     oryx::DashboardPanelState m_panel;
     oryx::GuiContext m_context;

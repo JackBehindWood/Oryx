@@ -66,6 +66,7 @@ struct DashboardRecord
     uint32_t tree_count = 0;
     uint32_t dropped_scores = 0;
     uint32_t dropped_metrics = 0;
+    uint32_t dropped_tree_nodes = 0;
     uint8_t chosen_space_count = 0;
     uint32_t chosen_spaces[k_record_spaces] = {};
     FixedLabel chosen_label;
