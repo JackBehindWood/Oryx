@@ -559,3 +559,114 @@ TEST_CASE("panel host drag: hovering an outer guide previews the whole window ed
     CHECK(plan.preview.min[0] + plan.preview.size[0] == doctest::Approx(surface.min[0] + surface.size[0]));
     scene.release_drag();
 }
+
+TEST_CASE("panel host drag: ctrl-click picks tabs, a picked tab drags them together onto a guide and one undo restores")
+{
+    DragScene scene;
+    scene.f.driver.hold_shortcut(true);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.release_drag();
+    scene.f.driver.hold_shortcut(false);
+    REQUIRE(scene.model().multi_count == 2);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(scene.solved().nodes[2].body));
+    CHECK(scene.model().drag.source == DragSource::Stack);
+    const DropGuides guides = drop_guides(scene.layout, scene.table(), scene.solved(), 1, centre(scene.solved().nodes[2].body));
+    const DropGuide* bottom = find_guide(guides, 2, DropZone::Bottom);
+    REQUIRE(bottom != nullptr);
+    scene.move_to(centre(bottom->rect));
+
+    DockLayout expected = scene.original;
+    REQUIRE(dock_node(expected, scene.table(), 1, 2, DropZone::Bottom).applied);
+    scene.release_drag();
+    CHECK(equal(scene.layout, expected));
+    CHECK(scene.model().multi_count == 0);
+    scene.model().history_request = HistoryRequest::Undo;
+    scene.frames(2);
+    CHECK(diff(scene.layout, scene.original).empty());
+}
+
+TEST_CASE("panel host drag: shift-click picks a range, a plain click clears it and a stack released off target changes nothing")
+{
+    DragScene scene;
+    scene.f.driver.input().keys.shift = true;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.release_drag();
+    scene.f.driver.input().keys.shift = false;
+    CHECK(scene.model().multi_count == 2);
+
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.move_to(Vec2f(900.0f, 300.0f));
+    CHECK(scene.model().drag.source == DragSource::Stack);
+    scene.release_drag();
+    CHECK(differs_only_in_view(scene.layout, scene.original));
+    CHECK(scene.layout.float_count == 0);
+
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.release_drag();
+    CHECK(scene.model().multi_count == 0);
+}
+
+TEST_CASE("panel host drag: a plain press on an unpicked tab drops the picks, and the only stack cannot be dragged whole")
+{
+    DragScene scene;
+    scene.f.driver.hold_shortcut(true);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.release_drag();
+    scene.f.driver.hold_shortcut(false);
+    REQUIRE(scene.model().multi_count == 2);
+    scene.press_at(centre(scene.solved().nodes[2].tab_rects[0]));
+    scene.release_drag();
+    CHECK(scene.model().multi_count == 0);
+
+    DragScene lone;
+    lone.layout = DockLayout{};
+    require_applied(dock_panel(lone.layout, lone.table(), pid("a"), k_dock_root, DropZone::Centre));
+    require_applied(dock_panel(lone.layout, lone.table(), pid("b"), 0, DropZone::Centre));
+    require_applied(dock_panel(lone.layout, lone.table(), pid("vp"), 0, DropZone::Centre));
+    settle_dock(lone.model());
+    lone.frames(3);
+    CHECK(can_dock_node(lone.layout, lone.table(), 0) == DockReason::NoChange);
+    lone.f.driver.hold_shortcut(true);
+    lone.press_at(centre(lone.solved().nodes[0].tab_rects[0]));
+    lone.release_drag();
+    lone.f.driver.hold_shortcut(false);
+    lone.press_at(centre(lone.solved().nodes[0].tab_rects[1]));
+    lone.move_to(Vec2f(400.0f, 300.0f));
+    CHECK(lone.model().drag.source != DragSource::Stack);
+    lone.release_drag();
+}
+
+TEST_CASE("panel host drag: a pinned panel among the picks keeps them from dragging together")
+{
+    DragScene scene;
+    set_flags(scene.table(), "b", panel_flag::all & ~panel_flag::dock_elsewhere);
+    scene.frames(2);
+    scene.f.driver.hold_shortcut(true);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.release_drag();
+    scene.f.driver.hold_shortcut(false);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.move_to(centre(scene.solved().nodes[2].body));
+    CHECK(scene.model().drag.source != DragSource::Stack);
+    scene.release_drag();
+}
+
+TEST_CASE("panel host drag: warm multi-tab drag frames allocate nothing")
+{
+    DragScene scene;
+    scene.f.driver.hold_shortcut(true);
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[0]));
+    scene.release_drag();
+    scene.f.driver.hold_shortcut(false);
+    const Rect vp_body = scene.solved().nodes[2].body;
+    scene.press_at(centre(scene.solved().nodes[1].tab_rects[1]));
+    scene.move_to(centre(vp_body));
+    scene.move_to(centre(vp_body) + Vec2f(5.0f, 5.0f));
+    REQUIRE(scene.model().drag.source == DragSource::Stack);
+    const MemoryStats before = test::all_allocations();
+    scene.move_to(centre(vp_body) + Vec2f(12.0f, 9.0f));
+    scene.frames(2);
+    CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
+    scene.release_drag();
+}

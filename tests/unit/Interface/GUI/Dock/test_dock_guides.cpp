@@ -487,3 +487,50 @@ TEST_CASE("drop_guides: every leaf gets 5 inner and every pointer inside the sur
             }
     }
 }
+
+TEST_CASE("stack guides: 4 outer + 5 inner, the own stack is here, and nothing plans a float or reorder")
+{
+    const PanelTable panels = make_panels();
+    const DockLayout layout = make_sample(panels);
+    const SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
+    const DropGuides own = drop_guides(layout, panels, solved, 1, centre(solved.nodes[1].body));
+    REQUIRE(own.count == 9);
+    for (uint32_t i = 4; i < own.count; ++i)
+        CHECK(own.guides[i].here);
+    const DropGuides other = drop_guides(layout, panels, solved, 1, centre(solved.nodes[2].body));
+    REQUIRE(other.count == 9);
+    for (uint32_t i = 4; i < other.count; ++i)
+        CHECK(other.guides[i].allowed);
+
+    for (float y = 0.0f; y < 600.0f; y += 23.0f)
+        for (float x = -20.0f; x < 820.0f; x += 29.0f)
+        {
+            const Vec2f at(x, y);
+            const DropGuides guides = drop_guides(layout, panels, solved, 1, at);
+            const DropPlan plan = resolve_drop(layout, panels, solved, guides, 1, at, false);
+            CHECK(plan.action != DropAction::Float);
+            CHECK(plan.action != DropAction::Reorder);
+            if (plan.action == DropAction::Dock)
+                CHECK((plan.guide >= 0 || strip_at(layout, solved, at) != k_no_node));
+        }
+}
+
+TEST_CASE("stack guides: a pinned panel in the stack refuses the whole stack, a dock_never target is refused with its reason")
+{
+    PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    set_flags(panels, "a", panel_flag::all & ~panel_flag::dock_elsewhere);
+    SolvedLayout solved = solve(layout, panels, k_metrics, k_surface);
+    CHECK(drop_guides(layout, panels, solved, 1, centre(solved.nodes[2].body)).count == 0);
+
+    panels = make_panels();
+    REQUIRE(add_dock_never(panels, pid("b"), pid("vp")));
+    solved = solve(layout, panels, k_metrics, k_surface);
+    const DropGuides guides = drop_guides(layout, panels, solved, 1, centre(solved.nodes[2].body));
+    const int32_t centre_guide = guide_index(guides, 2, DropZone::Centre);
+    REQUIRE(centre_guide >= 0);
+    CHECK_FALSE(guides.guides[centre_guide].allowed);
+    CHECK(guides.guides[centre_guide].reason == DockReason::NotPermittedTarget);
+    const DropPlan plan = resolve_drop(layout, panels, solved, guides, 1, centre(guides.guides[centre_guide].rect), false);
+    CHECK(plan.action == DropAction::Cancel);
+}

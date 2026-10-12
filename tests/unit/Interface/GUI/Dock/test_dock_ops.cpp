@@ -450,3 +450,132 @@ TEST_CASE("dock rules: dock_only limits the targets, dock_never excludes some, r
     CHECK_FALSE(add_dock_never(panels, pid("e"), pid("j")));
     CHECK(std::string_view(to_string(DockReason::NotPermittedTarget)) == "panel may not dock there");
 }
+
+TEST_CASE("dock_node: centre merges the stack and selects its selected tab")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    require_applied(dock_node(layout, panels, 1, 2, DropZone::Centre));
+    CHECK(named(layout, panels) == "dock v1\nsurface 0\n  tabs [vp a b*]\n");
+    CHECK_NOTHROW(validate(layout, panels, ValidateFlags{ true }));
+}
+
+TEST_CASE("dock_node: an edge keeps the stack as one node beside the target")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    require_applied(dock_node(layout, panels, 1, 2, DropZone::Bottom));
+    CHECK(named(layout, panels) == "dock v1\nsurface 0\n  split v ratio 0.700\n    tabs [vp*]\n    tabs [a b*]\n");
+    CHECK_NOTHROW(validate(layout, panels, ValidateFlags{ true }));
+}
+
+TEST_CASE("dock_node: a root edge wraps the whole tree and honours dock_size")
+{
+    PanelTable panels = make_panels();
+    find_panel(panels, pid("b"))->dock_size = 120.0f;
+    DockLayout layout = make_sample(panels);
+    require_applied(dock_node(layout, panels, 2, dock_root(), DropZone::Left));
+    const DockNode& root = layout.nodes[layout.roots[0]];
+    CHECK(root.kind == DockNodeKind::Split);
+    CHECK(root.mode == DockSizeMode::Ratio);
+    layout = make_sample(panels);
+    require_applied(dock_node(layout, panels, 1, dock_root(), DropZone::Right));
+    CHECK(layout.nodes[layout.roots[0]].mode == DockSizeMode::FixedSecond);
+    CHECK(layout.nodes[layout.roots[0]].points == 120.0f);
+}
+
+TEST_CASE("dock_node: refusals leave the layout untouched")
+{
+    PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    const DockLayout before = layout;
+    CHECK(dock_node(layout, panels, 1, 1, DropZone::Centre).reason == DockReason::NoChange);
+    CHECK(dock_node(layout, panels, 0, 2, DropZone::Centre).reason == DockReason::TargetInvalid);
+    set_flags(panels, "b", panel_flag::all & ~panel_flag::dock_elsewhere);
+    CHECK(dock_node(layout, panels, 1, 2, DropZone::Centre).reason == DockReason::NotPermittedDock);
+    CHECK(can_dock_node(layout, panels, 1) == DockReason::NotPermittedDock);
+    CHECK(equal(layout, before));
+
+    panels = make_panels();
+    add_dock_never(panels, pid("a"), pid("vp"));
+    CHECK(dock_node(layout, panels, 1, 2, DropZone::Right).reason == DockReason::NotPermittedTarget);
+    CHECK(equal(layout, before));
+}
+
+TEST_CASE("dock_node: a merge past the tab cap is refused")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout;
+    const auto node_of = [&](const char* name) {
+        for (int32_t n = 0; n < static_cast<int32_t>(layout.node_count); ++n)
+            for (uint32_t t = 0; layout.nodes[n].kind == DockNodeKind::Tabs && t < layout.nodes[n].count; ++t)
+                if (layout.nodes[n].tabs[t] == pid(name))
+                    return n;
+        return -1;
+    };
+    require_applied(dock_panel(layout, panels, pid("a"), k_dock_root, DropZone::Centre));
+    for (const char* name : { "b", "c", "d", "e" })
+        require_applied(dock_panel(layout, panels, pid(name), node_of("a"), DropZone::Centre));
+    require_applied(dock_panel(layout, panels, pid("f"), k_dock_root, DropZone::Right));
+    for (const char* name : { "g", "h", "i", "j" })
+        require_applied(dock_panel(layout, panels, pid(name), node_of("f"), DropZone::Centre));
+    const DockLayout before = layout;
+    const DockResult result = dock_node(layout, panels, node_of("a"), node_of("f"), DropZone::Centre);
+    CHECK(result.reason == DockReason::TabsFull);
+    CHECK(equal(layout, before));
+}
+
+TEST_CASE("dock_node: a moved collapsed stack stays collapsed on an edge and expands on a merge")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout = make_sample(panels);
+    layout.nodes[1].collapsed = 1;
+    require_applied(dock_node(layout, panels, 1, 2, DropZone::Right));
+    bool any_collapsed = false;
+    for (uint32_t n = 0; n < layout.node_count; ++n)
+        any_collapsed = any_collapsed || (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].collapsed != 0);
+    CHECK(any_collapsed);
+    layout = make_sample(panels);
+    layout.nodes[1].collapsed = 1;
+    require_applied(dock_node(layout, panels, 1, 2, DropZone::Centre));
+    CHECK(layout.nodes[layout.roots[0]].collapsed == 0);
+}
+
+TEST_CASE("dock_tabs: a subset moves in source order and leaves the rest, and can split off its own stack")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout;
+    require_applied(dock_panel(layout, panels, pid("a"), k_dock_root, DropZone::Centre));
+    require_applied(dock_panel(layout, panels, pid("b"), 0, DropZone::Centre));
+    require_applied(dock_panel(layout, panels, pid("c"), 0, DropZone::Centre));
+    require_applied(dock_panel(layout, panels, pid("vp"), k_dock_root, DropZone::Right));
+    const auto node_of = [](const DockLayout& l, const char* name) {
+        for (int32_t n = 0; n < static_cast<int32_t>(l.node_count); ++n)
+            for (uint32_t t = 0; l.nodes[n].kind == DockNodeKind::Tabs && t < l.nodes[n].count; ++t)
+                if (l.nodes[n].tabs[t] == pid(name))
+                    return n;
+        return -1;
+    };
+    const PanelId pick[] = { pid("c"), pid("a") };
+    DockLayout moved = layout;
+    require_applied(dock_tabs(moved, panels, pick, 2, node_of(moved, "vp"), DropZone::Centre));
+    CHECK(named(moved, panels).find("tabs [b*]") != std::string::npos);
+    CHECK(named(moved, panels).find("tabs [vp a c*]") != std::string::npos);
+
+    moved = layout;
+    require_applied(dock_tabs(moved, panels, pick, 2, node_of(moved, "b"), DropZone::Bottom));
+    CHECK(named(moved, panels).find("tabs [a c*]") != std::string::npos);
+    CHECK(named(moved, panels).find("tabs [b*]") != std::string::npos);
+    CHECK(dock_tabs(moved, panels, pick, 2, node_of(moved, "a"), DropZone::Centre).reason == DockReason::NoChange);
+    CHECK_NOTHROW(validate(moved, panels, ValidateFlags{ true }));
+}
+
+TEST_CASE("dock_node: the only stack cannot be moved whole")
+{
+    const PanelTable panels = make_panels();
+    DockLayout layout;
+    require_applied(dock_panel(layout, panels, pid("a"), k_dock_root, DropZone::Centre));
+    require_applied(dock_panel(layout, panels, pid("b"), 0, DropZone::Centre));
+    CHECK(can_dock_node(layout, panels, 0) == DockReason::NoChange);
+    CHECK(dock_node(layout, panels, 0, dock_root(), DropZone::Left).reason == DockReason::NoChange);
+}

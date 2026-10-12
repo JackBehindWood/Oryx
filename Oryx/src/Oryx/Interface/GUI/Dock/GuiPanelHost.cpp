@@ -221,6 +221,52 @@ bool tab_location(const DockLayout& layout, PanelId panel, int32_t& node, uint32
     return false;
 }
 
+bool in_multi(const DockModel& m, PanelId panel)
+{
+    for (uint32_t i = 0; i < m.multi_count; ++i)
+        if (m.multi[i] == panel)
+            return true;
+    return false;
+}
+
+void clear_multi(DockModel& m)
+{
+    m.multi_count = 0;
+    m.multi_anchor = PanelId{};
+}
+
+void toggle_multi(DockModel& m, PanelId panel)
+{
+    for (uint32_t i = 0; i < m.multi_count; ++i)
+        if (m.multi[i] == panel)
+        {
+            m.multi[i] = m.multi[--m.multi_count];
+            return;
+        }
+    if (m.multi_count < k_max_dock_tabs)
+        m.multi[m.multi_count++] = panel;
+}
+
+// Keeps only picked tabs that still share one stack, so a layout change under the selection can never leave a stale set.
+void sanitize_multi(DockView& h)
+{
+    DockModel& m = *h.model;
+    int32_t node = k_no_node;
+    uint32_t kept = 0;
+    for (uint32_t i = 0; i < m.multi_count; ++i)
+    {
+        int32_t at = k_no_node;
+        uint32_t index = 0;
+        if (!tab_location(*h.layout, m.multi[i], at, index) || (kept > 0 && at != node))
+            continue;
+        node = at;
+        m.multi[kept++] = m.multi[i];
+    }
+    m.multi_count = kept;
+    if (kept < 2)
+        clear_multi(m);
+}
+
 void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& press, const Vec2f& grab, const Rect& origin = {})
 {
     if (h.model->drag.source != DragSource::None)
@@ -286,8 +332,14 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         close = ctx.item(ctx.id("close"), close_rect);
     if (tab.hovered)
         ctx.request_cursor(CursorShape::Hand);
-    if (drag.started && !close.held && draggable(h.model->panels, id))
+    const bool picked = in_multi(*h.model, id);
+    if (drag.started && !close.held && picked && can_dock_tabs(*h.layout, h.model->panels, h.model->multi, h.model->multi_count) == DockReason::None)
+        begin_drag(h, DragSource::Stack, id, drag.start, drag.start - rect.min);
+    else if (drag.started && !close.held && draggable(h.model->panels, id))
+    {
+        clear_multi(*h.model);
         begin_drag(h, DragSource::Tab, id, drag.start, drag.start - rect.min);
+    }
     if (drag.started && !close.held && h.model->drag.panel == id)
         h.model->drag.origin_slot = index;
 
@@ -298,8 +350,9 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     const uint32_t box_index = ctx.begin_box(ImId{}, box);
     {
         BoxPaint& paint = ctx.layout().node(box_index).paint;
-        im::paint_surface(paint, style, im::interaction_fill(style, tab, chosen ? style.selected : style.background));
-        paint.border_width = 0.0f;
+        im::paint_surface(paint, style, im::interaction_fill(style, tab, chosen || picked ? style.selected : style.background));
+        paint.border_width = picked ? 1.0f : 0.0f;
+        paint.border = ctx.dock_theme().chip_border;
         paint.text = ctx.arena().store(desc->title);
         paint.text_height = style.text_height;
         paint.text_colour = style.text;
@@ -336,9 +389,41 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     {
         h.model->focused = id;
         h.tab_scroll.seen_selected[node_index] = static_cast<uint8_t>(index);
+        const ImKeys& keys = ctx.input().keys;
+        DockModel& m = *h.model;
+        if (keys.shortcut || keys.shift)
+        {
+            int32_t held_node = k_no_node;
+            uint32_t held_index = 0;
+            if (m.multi_count > 0 && (!tab_location(*h.layout, m.multi[0], held_node, held_index) || held_node != node_index))
+                clear_multi(m);
+            uint32_t from = node.selected;
+            for (uint32_t t = 0; t < node.count; ++t)
+                if (m.multi_anchor == node.tabs[t])
+                    from = t;
+            if (keys.shift)
+            {
+                m.multi_count = 0;
+                for (uint32_t t = math::min(from, index); t <= math::max(from, index) && t < node.count; ++t)
+                    m.multi[m.multi_count++] = node.tabs[t];
+            }
+            else
+            {
+                if (m.multi_count == 0 && node.selected < node.count && node.tabs[node.selected] != id)
+                    m.multi[m.multi_count++] = node.tabs[node.selected];
+                toggle_multi(m, id);
+                m.multi_anchor = id;
+            }
+        }
+        else if (!picked)
+        {
+            clear_multi(m);
+        }
         if (!chosen)
             note(h, select_tab(*h.layout, node_index, index));
     }
+    if (tab.clicked && picked && !close.hovered && !ctx.input().keys.shortcut && !ctx.input().keys.shift && h.model->drag.source == DragSource::None)
+        clear_multi(*h.model);
     if (close.clicked || (tab.hovered && button_of(ctx.input(), MouseCode::Middle).released && can_close(h.model->panels, id) == DockReason::None))
         pending_close = id;
 }
@@ -801,7 +886,7 @@ void draw_drag_feedback(GuiContext& ctx, DockView& h)
         const Colour danger = dock.refusal;
         overlay(ctx, h, target_rect(h, plan), Colour{ danger.r, danger.g, danger.b, 0.12f }, danger, 1.0f);
     }
-    if (d.source != DragSource::Tab || plan.action == DropAction::Float)
+    if (d.source == DragSource::Float || plan.action == DropAction::Float)
         return;
 
     const PanelDesc* desc = find_panel(h.model->panels, d.panel);
@@ -814,6 +899,11 @@ void draw_drag_feedback(GuiContext& ctx, DockView& h)
     if (plan.action == DropAction::None && plan.node != k_no_node && static_cast<uint32_t>(plan.node) < h.solved.node_count)
         at[1] = h.solved.nodes[plan.node].strip.min[1];
     const Rect ghost{ at, Vec2f(chip_w, chip_h) };
+    if (d.source == DragSource::Stack)
+    {
+        const float offset = chip_h * 0.25f;
+        tab_chip(ctx, h, Rect{ Vec2f(at[0] + offset, at[1] + offset), ghost.size }, title, dock.chip_border, 0.5f);
+    }
     tab_chip(ctx, h, ghost, title, refused ? dock.refusal : dock.chip_border, 1.0f);
     if (refused && plan.guide < 0)
         reason_label(ctx, h, Vec2f(at[0], at[1] + chip_h + 2.0f), plan.reason);
@@ -827,6 +917,11 @@ void apply_drop(DockView& h, const DragState& d)
     if (plan.action == DropAction::Reorder)
     {
         note(h, reorder_tab(layout, h.model->panels, d.panel, plan.slot));
+    }
+    else if (plan.action == DropAction::Dock && d.source == DragSource::Stack)
+    {
+        note(h, dock_tabs(layout, h.model->panels, h.model->multi, h.model->multi_count, DockTarget{ plan.node, plan.surface }, plan.zone));
+        clear_multi(*h.model);
     }
     else if (plan.action == DropAction::Dock)
     {
@@ -1011,8 +1106,22 @@ void update_drag(GuiContext& ctx, DockView& h)
         move_dragged_float(h, pointer);
     if (d.source == DragSource::Tab)
         auto_scroll_strip(h, d, pointer, input.delta_time);
-    d.guides = input.keys.shift ? DropGuides{} : drop_guides(*h.layout, h.model->panels, h.solved, d.panel, pointer);
-    d.plan = resolve_drop(*h.layout, h.model->panels, h.solved, d.guides, d.panel, pointer, input.keys.shift);
+    if (d.source == DragSource::Stack && h.model->multi_count < 2)
+    {
+        d = DragState{};
+        return;
+    }
+    if (d.source == DragSource::Stack)
+    {
+        const DockModel& m = *h.model;
+        d.guides = input.keys.shift ? DropGuides{} : drop_guides(*h.layout, m.panels, h.solved, m.multi, m.multi_count, pointer);
+        d.plan = resolve_drop(*h.layout, m.panels, h.solved, d.guides, m.multi, m.multi_count, pointer, input.keys.shift);
+    }
+    else
+    {
+        d.guides = input.keys.shift ? DropGuides{} : drop_guides(*h.layout, h.model->panels, h.solved, d.panel, pointer);
+        d.plan = resolve_drop(*h.layout, h.model->panels, h.solved, d.guides, d.panel, pointer, input.keys.shift);
+    }
     if (d.source == DragSource::Tab && d.plan.action == DropAction::Reorder)
     {
         reorder_live(h, d, pointer);
@@ -1178,8 +1287,23 @@ void sync_drag_scroll(DockView& h)
     }
 }
 
+// Cmd/Ctrl+A with the pointer over a strip picks every tab of its stack, so a whole stack moves like any other selection.
+void select_all_tabs(DockView& h, const ImKeys& keys, const Vec2f& pointer)
+{
+    DockModel& m = *h.model;
+    const int32_t node_index = strip_at(*h.layout, h.solved, pointer);
+    if (!keys.shortcut || !key_pressed(keys, ImKey::A) || m.drag.source != DragSource::None || node_index == k_no_node)
+        return;
+    const DockNode& node = h.layout->nodes[node_index];
+    m.multi_count = 0;
+    for (uint32_t t = 0; t < node.count && t < k_max_dock_tabs; ++t)
+        m.multi[m.multi_count++] = node.tabs[t];
+    m.multi_anchor = node.tabs[0];
+}
+
 void draw_host(GuiContext& ctx, DockView& h)
 {
+    sanitize_multi(h);
     sync_drag_scroll(h);
     h.solved = solve(*h.layout, h.model->panels, metrics_of(ctx.gui_theme(), h.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface), &h.tab_scroll);
     for (uint32_t f = 0; f < h.solved.float_count; ++f)
@@ -1199,6 +1323,7 @@ void draw_host(GuiContext& ctx, DockView& h)
     }
     ctx.push_id("panel_host");
     cycle_tabs(h, ctx.input().keys, h.solved.surface);
+    select_all_tabs(h, ctx.input().keys, ctx.input().pointer.position);
     PanelId pending_close;
     PanelId pending_raise;
     const uint32_t count = h.solved.node_count;

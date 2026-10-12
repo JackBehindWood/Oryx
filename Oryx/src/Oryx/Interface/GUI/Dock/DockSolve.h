@@ -214,6 +214,10 @@ struct DropGuides
 // Permission is can_dock_into, the same set dock_panel uses; a refused guide stays, flagged, and one whose drop would change nothing is flagged `here`.
 [[nodiscard]] DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer);
 // Index of the guide under the pointer, or -1. An outer guide wins; the inner five are hit-tested as a pie (centre inside 1.4 half sizes, then the pointer's quadrant out to 2.6, then the squares grown by 0.3).
+// The same compass for dragging the whole Tabs node `stack`: permission is every panel passing can_dock_into, the own stack's guides are `here`.
+[[nodiscard]] DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, int32_t stack, const Vec2f& pointer);
+// The same for `count` tabs of one stack (a multi-selection): they must all sit in one Tabs node.
+[[nodiscard]] DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const PanelId* moved, uint32_t count, const Vec2f& pointer);
 [[nodiscard]] int32_t guide_at(const DropGuides& guides, const Vec2f& pointer);
 // Index of the guide with this node and zone, or -1.
 [[nodiscard]] int32_t guide_index(const DropGuides& guides, int32_t node, DropZone zone);
@@ -250,5 +254,8 @@ struct DropPlan
 [[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only);
 // The same decision over guides the caller built once for this pointer.
 [[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, PanelId panel, const Vec2f& pointer, bool float_only);
+// A whole-stack drag: only a guide or another stack's strip docks, never a Float or Reorder; anywhere else plans nothing, so releasing off target leaves the layout as it was.
+[[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, int32_t stack, const Vec2f& pointer, bool float_only);
+[[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, const PanelId* moved, uint32_t count, const Vec2f& pointer, bool float_only);
 
 }

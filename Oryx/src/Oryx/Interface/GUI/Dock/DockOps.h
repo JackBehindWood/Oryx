@@ -61,6 +61,13 @@ struct DockResult
 
 // Centre tabs into the target Tabs node; an edge splits it with the panel on that side. target is a Tabs node, or dock_root(surface) for that surface's tree (an edge there wraps the whole tree).
 [[nodiscard]] DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, DockTarget target, DropZone zone);
+// None when these panels, all in one Tabs node, may be dragged together: every one may dock (all or nothing), and they are not the only stack there is.
+[[nodiscard]] DockReason can_dock_tabs(const DockLayout& layout, const PanelTable& panels, const PanelId* moved, uint32_t count);
+[[nodiscard]] DockReason can_dock_node(const DockLayout& layout, const PanelTable& panels, int32_t source);
+// Moves a subset of one stack like dock_panel moves one panel, keeping their order: Centre appends them (TabsFull past k_max_dock_tabs) and keeps the selected one selected, an edge puts them in a new stack beside the target (which may be the stack they left); every panel must pass can_dock_into.
+[[nodiscard]] DockResult dock_tabs(DockLayout& layout, const PanelTable& panels, const PanelId* moved, uint32_t count, DockTarget target, DropZone zone);
+// dock_tabs of every tab of the Tabs node `source`; keeps its collapsed flag on an edge.
+[[nodiscard]] DockResult dock_node(DockLayout& layout, const PanelTable& panels, int32_t source, DockTarget target, DropZone zone);
 [[nodiscard]] DockResult float_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, const Rect& rect, uint8_t surface = 0);
 [[nodiscard]] DockResult close_panel(DockLayout& layout, const PanelTable& panels, PanelId panel);
 // Reopens at the recorded home when its sibling is open, else by the panel's placement hints (see PanelDesc), else tabs into the first Tabs node of `surface`.

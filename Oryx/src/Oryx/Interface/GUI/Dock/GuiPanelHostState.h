@@ -81,7 +81,9 @@ enum class DragSource : uint8_t
 {
     None,
     Tab,
-    Float
+    Float,
+    // The multi-selected tabs (DockModel::multi), grabbed by one of them; `panel` is the one held.
+    Stack
 };
 
 // The one drag in flight: plain values, so it needs no allocation and survives a rebuilt tree.
@@ -147,6 +149,10 @@ struct DockModel
     DockLayout last_good;
     bool has_good = false;
     PanelId focused;
+    // Tabs picked together with Ctrl/Cmd or Shift (all in one stack, view state, never saved or in history), and the tab a Shift range grows from.
+    PanelId multi[k_max_dock_tabs] = {};
+    uint32_t multi_count = 0;
+    PanelId multi_anchor;
     // Focus history, most recent first, for Ctrl+Tab in Recent order; `cycling` freezes it while Ctrl is held and `cycle_at` is the entry shown.
     PanelId recent[k_max_panels] = {};
     uint32_t recent_count = 0;

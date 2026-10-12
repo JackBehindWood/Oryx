@@ -775,6 +775,171 @@ DockResult dock_panel(DockLayout& layout, const PanelTable& panels, PanelId pane
     return accept();
 }
 
+namespace
+{
+
+// The Tabs node holding every panel of `moved`, or k_no_node when they are not all in one node.
+int32_t common_node(const DockLayout& layout, const PanelId* moved, uint32_t count)
+{
+    if (count == 0 || count > k_max_dock_tabs)
+        return k_no_node;
+    const Location first = locate(layout, moved[0]);
+    if (first.where != Where::InTabs)
+        return k_no_node;
+    for (uint32_t m = 1; m < count; ++m)
+    {
+        const Location at = locate(layout, moved[m]);
+        if (at.where != Where::InTabs || at.node != first.node)
+            return k_no_node;
+    }
+    return first.node;
+}
+
+uint32_t tabs_node_count(const DockLayout& layout)
+{
+    uint32_t count = 0;
+    for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
+        count += layout.nodes[n].kind == DockNodeKind::Tabs ? 1u : 0u;
+    return count;
+}
+
+}
+
+DockReason can_dock_tabs(const DockLayout& layout, const PanelTable& panels, const PanelId* moved, uint32_t count)
+{
+    const int32_t source = common_node(layout, moved, count);
+    if (source == k_no_node)
+        return DockReason::TargetInvalid;
+    for (uint32_t m = 0; m < count; ++m)
+        if (const DockReason reason = can_dock(panels, moved[m]); reason != DockReason::None)
+            return reason;
+    // Every panel already tabbed together: there is nowhere to take them.
+    return count == layout.nodes[source].count && tabs_node_count(layout) == 1 ? DockReason::NoChange : DockReason::None;
+}
+
+DockReason can_dock_node(const DockLayout& layout, const PanelTable& panels, int32_t source)
+{
+    if (!is_tabs(layout, source))
+        return DockReason::TargetInvalid;
+    const DockNode& node = layout.nodes[source];
+    return can_dock_tabs(layout, panels, node.tabs, node.count);
+}
+
+DockResult dock_node(DockLayout& layout, const PanelTable& panels, int32_t source, DockTarget at_target, DropZone zone)
+{
+    if (!is_tabs(layout, source))
+        return refuse(DockReason::TargetInvalid);
+    const DockNode& node = layout.nodes[source];
+    const PanelId moved[k_max_dock_tabs] = { node.tabs[0], node.tabs[1], node.tabs[2], node.tabs[3], node.tabs[4], node.tabs[5], node.tabs[6], node.tabs[7] };
+    return dock_tabs(layout, panels, moved, node.count, at_target, zone);
+}
+
+DockResult dock_tabs(DockLayout& layout, const PanelTable& panels, const PanelId* moved_in, uint32_t count, DockTarget at_target, DropZone zone)
+{
+    const int32_t target = at_target.node;
+    const uint8_t surface = at_target.surface;
+    if (surface >= k_max_dock_surfaces)
+        return refuse(DockReason::TargetInvalid);
+    if (const DockReason reason = can_dock_tabs(layout, panels, moved_in, count); reason != DockReason::None)
+        return refuse(reason);
+    const int32_t source = common_node(layout, moved_in, count);
+
+    const int32_t resolved = target == k_dock_root ? layout.roots[surface] : target;
+    if (target != k_dock_root && !is_tabs(layout, target))
+        return refuse(DockReason::TargetInvalid);
+    if (target == k_dock_root && resolved != k_no_node && zone == DropZone::Centre && !is_tabs(layout, resolved))
+        return refuse(DockReason::TargetInvalid);
+    const DockNode& from = layout.nodes[source];
+    const bool whole = count == from.count;
+    if (resolved == source && (zone == DropZone::Centre || whole))
+        return refuse(DockReason::NoChange);
+
+    // Source order, not selection order, so the tabs keep their relative order.
+    PanelId moved[k_max_dock_tabs];
+    uint32_t selected_at = count - 1u;
+    uint32_t ordered = 0;
+    for (uint32_t t = 0; t < from.count; ++t)
+        for (uint32_t m = 0; m < count; ++m)
+            if (moved_in[m] == from.tabs[t])
+            {
+                if (t == from.selected)
+                    selected_at = ordered;
+                moved[ordered++] = from.tabs[t];
+                break;
+            }
+    if (ordered != count)
+        return refuse(DockReason::BadArgument);
+
+    const bool into_tabs = is_tabs(layout, resolved);
+    for (uint32_t m = 0; m < count; ++m)
+        if (const DockReason reason = can_dock_into(layout, panels, moved[m], zone == DropZone::Centre && into_tabs ? resolved : target); reason != DockReason::None)
+            return refuse(reason);
+    if (zone == DropZone::Centre && into_tabs && layout.nodes[resolved].count + count > k_max_dock_tabs)
+        return refuse(DockReason::TabsFull);
+
+    // Node indices shift once the emptied source is pruned, so the target is re-found through a panel that stays put.
+    PanelId anchor;
+    if (target != k_dock_root)
+        for (uint32_t t = 0; t < layout.nodes[resolved].count && !is_valid(anchor); ++t)
+        {
+            bool leaving = false;
+            for (uint32_t m = 0; m < count; ++m)
+                leaving = leaving || layout.nodes[resolved].tabs[t] == moved[m];
+            if (!leaving)
+                anchor = layout.nodes[resolved].tabs[t];
+        }
+    float points = 0.0f;
+    for (uint32_t m = 0; m < count && !(points > 0.0f); ++m)
+        points = find_panel(panels, moved[m])->dock_size;
+    const uint8_t collapsed = whole ? from.collapsed : 0;
+
+    DockLayout work = layout;
+    for (uint32_t m = 0; m < count; ++m)
+        remove_tab(work, source, locate(work, moved[m]).index);
+    normalize(work, panels);
+    const int32_t node = target == k_dock_root ? work.roots[surface] : locate(work, anchor).node;
+    if (target != k_dock_root && node == k_no_node)
+        return refuse(DockReason::TargetInvalid);
+
+    if (zone == DropZone::Centre && node != k_no_node)
+    {
+        DockNode& into = work.nodes[node];
+        for (uint32_t m = 0; m < count; ++m)
+            into.tabs[into.count + m] = moved[m];
+        into.selected = static_cast<uint8_t>(into.count + selected_at);
+        into.count = static_cast<uint8_t>(into.count + count);
+        into.collapsed = 0;
+    }
+    else
+    {
+        if (work.node_count + (node == k_no_node ? 1u : 2u) > k_max_dock_nodes)
+            return refuse(DockReason::NodesFull);
+        const int32_t leaf = alloc_node(work);
+        DockNode& l = work.nodes[leaf];
+        l.kind = DockNodeKind::Tabs;
+        l.count = static_cast<uint8_t>(count);
+        l.selected = static_cast<uint8_t>(selected_at);
+        l.collapsed = collapsed;
+        for (uint32_t m = 0; m < count; ++m)
+            l.tabs[m] = moved[m];
+        if (node == k_no_node)
+            work.roots[surface] = leaf;
+        else
+        {
+            const int32_t split = alloc_node(work);
+            replace_child(work, node, split);
+            init_split(work.nodes[split], zone, leaf, node);
+            if (target == k_dock_root)
+                fix_new_split(work, moved[0], zone, points);
+        }
+        if (all_collapsed(work, root_of(work, leaf)))
+            work.nodes[leaf].collapsed = 0;
+    }
+    normalize(work, panels);
+    layout = work;
+    return accept();
+}
+
 DockResult float_panel(DockLayout& layout, const PanelTable& panels, PanelId panel, const Rect& rect, uint8_t surface)
 {
     if (surface >= k_max_dock_surfaces)

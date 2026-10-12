@@ -169,6 +169,37 @@ TEST_CASE("Benchmark: dock drop guides and resolve_drop under a moving pointer")
     MESSAGE("resolve_drop + drop_guides: " << us << " us/call pair");
 }
 
+TEST_CASE("Benchmark: dock drop guides and resolve_drop for a multi-tab drag")
+{
+    using namespace oryx::gui;
+    PanelTable table;
+    for (const char* name : { "a", "b", "c", "d", "e" })
+        REQUIRE(add_panel(table, name, name, PanelKind::View, 40.0f, 30.0f));
+    DockLayout layout;
+    REQUIRE(dock_panel(layout, table, make_panel_id("a"), k_dock_root, DropZone::Centre).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("b"), 0, DropZone::Centre).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("c"), 0, DropZone::Centre).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("d"), k_dock_root, DropZone::Right).applied);
+    REQUIRE(dock_panel(layout, table, make_panel_id("e"), k_dock_root, DropZone::Bottom).applied);
+    const SolvedLayout solved = solve(layout, table, DockMetrics{}, Rect{ Vec2f(0.0f, 0.0f), Vec2f(1280.0f, 720.0f) });
+    const PanelId picks[] = { make_panel_id("a"), make_panel_id("b") };
+
+    uint32_t tick = 0;
+    uint32_t sink = 0;
+    const auto start = Clock::now();
+    constexpr uint32_t k_iterations = 20000;
+    for (uint32_t i = 0; i < k_iterations; ++i)
+    {
+        ++tick;
+        const Vec2f pointer(static_cast<float>(tick * 7 % 1280), static_cast<float>(tick * 13 % 720));
+        const DropGuides guides = drop_guides(layout, table, solved, picks, 2, pointer);
+        sink += guides.count + static_cast<uint32_t>(resolve_drop(layout, table, solved, guides, picks, 2, pointer, false).action);
+    }
+    const double us = std::chrono::duration<double, std::micro>(Clock::now() - start).count() / k_iterations;
+    CHECK(sink > 0);
+    MESSAGE("multi-tab drop_guides + resolve_drop: " << us << " us/call pair");
+}
+
 TEST_CASE("Benchmark: GUI frame of a 1000-row virtualised table")
 {
     Scene scene;

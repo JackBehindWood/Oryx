@@ -367,27 +367,73 @@ bool same_arrangement(const DockLayout& a, const DockLayout& b)
     return true;
 }
 
+// What is being dragged: one panel, or `count` tabs of the Tabs node `stack` (a subset, or all of them).
+struct DropSubject
+{
+    PanelId panel;
+    const PanelId* set = nullptr;
+    uint32_t count = 0;
+    int32_t stack = k_no_node;
+    bool is_stack() const { return count > 0; }
+};
+
+int32_t node_holding(const DockLayout& layout, PanelId panel)
+{
+    for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
+        for (uint32_t t = 0; layout.nodes[n].kind == DockNodeKind::Tabs && t < layout.nodes[n].count && t < k_max_dock_tabs; ++t)
+            if (layout.nodes[n].tabs[t] == panel)
+                return static_cast<int32_t>(n);
+    return k_no_node;
+}
+
+DropSubject stack_subject(const DockLayout& layout, const PanelId* set, uint32_t count)
+{
+    DropSubject subject;
+    subject.set = set;
+    subject.count = count;
+    subject.panel = count > 0 ? set[0] : PanelId{};
+    subject.stack = count > 0 ? node_holding(layout, set[0]) : k_no_node;
+    return subject;
+}
+
+DockReason subject_can_dock(const DockLayout& layout, const PanelTable& panels, const DropSubject& subject)
+{
+    return subject.is_stack() ? can_dock_tabs(layout, panels, subject.set, subject.count) : can_dock(panels, subject.panel);
+}
+
+DockReason subject_can_dock_into(const DockLayout& layout, const PanelTable& panels, const DropSubject& subject, int32_t target)
+{
+    if (!subject.is_stack())
+        return can_dock_into(layout, panels, subject.panel, target);
+    if (const DockReason reason = can_dock_tabs(layout, panels, subject.set, subject.count); reason != DockReason::None)
+        return reason;
+    for (uint32_t t = 0; t < subject.count; ++t)
+        if (const DockReason reason = can_dock_into(layout, panels, subject.set[t], target); reason != DockReason::None)
+            return reason;
+    return DockReason::None;
+}
+
 struct DropProbe
 {
     DockReason reason = DockReason::None;
     bool changes_nothing = false;
 };
 
-DropProbe probe_drop(const DockLayout& layout, const PanelTable& panels, PanelId panel, DockTarget target, DropZone zone)
+DropProbe probe_drop(const DockLayout& layout, const PanelTable& panels, const DropSubject& subject, DockTarget target, DropZone zone)
 {
     DockLayout probe = layout;
-    const DockResult result = dock_panel(probe, panels, panel, target, zone);
+    const DockResult result = subject.is_stack() ? dock_tabs(probe, panels, subject.set, subject.count, target, zone) : dock_panel(probe, panels, subject.panel, target, zone);
     const bool full = result.reason == DockReason::TabsFull || result.reason == DockReason::NodesFull;
     return { full ? result.reason : DockReason::None, result.reason == DockReason::NoChange || (result.applied && same_arrangement(layout, probe)) };
 }
 
-void add_guide(DropGuides& out, const DockLayout& layout, const PanelTable& panels, PanelId panel, DropZone zone, int32_t node, const Rect& rect)
+void add_guide(DropGuides& out, const DockLayout& layout, const PanelTable& panels, const DropSubject& subject, DropZone zone, int32_t node, const Rect& rect)
 {
-    DockReason reason = can_dock_into(layout, panels, panel, node);
+    DockReason reason = subject_can_dock_into(layout, panels, subject, node);
     bool here = false;
     if (reason == DockReason::None)
     {
-        const DropProbe probe = probe_drop(layout, panels, panel, DockTarget{ node, out.surface }, zone);
+        const DropProbe probe = probe_drop(layout, panels, subject, DockTarget{ node, out.surface }, zone);
         here = probe.changes_nothing;
         reason = probe.reason;
     }
@@ -412,13 +458,27 @@ bool over_float(const DockLayout& layout, const SolvedLayout& solved, PanelId dr
 
 }
 
-static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer);
+static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropSubject& subject, const Vec2f& pointer);
 
 DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer)
 {
-    DropGuides out = build_drop_guides(layout, panels, solved, panel, pointer);
+    DropGuides out = build_drop_guides(layout, panels, solved, DropSubject{ panel }, pointer);
     out.surface = solved.surface;
     return out;
+}
+
+DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const PanelId* moved, uint32_t count, const Vec2f& pointer)
+{
+    DropGuides out = build_drop_guides(layout, panels, solved, stack_subject(layout, moved, count), pointer);
+    out.surface = solved.surface;
+    return out;
+}
+
+DropGuides drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, int32_t stack, const Vec2f& pointer)
+{
+    if (stack < 0 || static_cast<uint32_t>(stack) >= layout.node_count || layout.nodes[stack].kind != DockNodeKind::Tabs)
+        return DropGuides{};
+    return drop_guides(layout, panels, solved, layout.nodes[stack].tabs, layout.nodes[stack].count, pointer);
 }
 
 namespace
@@ -437,30 +497,30 @@ Rect square_at(const Vec2f& centre, float half)
 
 }
 
-static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer)
+static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropSubject& subject, const Vec2f& pointer)
 {
     DropGuides out;
     out.surface = solved.surface;
     const DockMetrics& metrics = solved.metrics;
     const Rect& surface = solved.surface_rect;
     const int32_t root = solved.surface < k_max_dock_surfaces ? layout.roots[solved.surface] : k_no_node;
-    if (!metrics.style.guides || !contains(surface, pointer) || can_dock(panels, panel) != DockReason::None)
+    if (!metrics.style.guides || !contains(surface, pointer) || subject_can_dock(layout, panels, subject) != DockReason::None)
         return out;
 
     const Vec2f surface_centre(surface.min[0] + surface.size[0] * 0.5f, surface.min[1] + surface.size[1] * 0.5f);
     const float outer_half = std::trunc(metrics.guide_unit * 0.875f);
     if (root == k_no_node)
     {
-        add_guide(out, layout, panels, panel, DropZone::Centre, k_dock_root, square_at(surface_centre, outer_half));
+        add_guide(out, layout, panels, subject, DropZone::Centre, k_dock_root, square_at(surface_centre, outer_half));
         return out;
     }
 
     // Outer guides sit against the window edge at its midpoint, so they read as "the edge" and never share a place with the inner cross.
     const float reach = std::trunc(metrics.guide_unit * 0.375f) + outer_half;
-    add_guide(out, layout, panels, panel, DropZone::Left, k_dock_root, square_at(Vec2f(surface.min[0] + reach, surface_centre[1]), outer_half));
-    add_guide(out, layout, panels, panel, DropZone::Right, k_dock_root, square_at(Vec2f(surface.min[0] + surface.size[0] - reach, surface_centre[1]), outer_half));
-    add_guide(out, layout, panels, panel, DropZone::Top, k_dock_root, square_at(Vec2f(surface_centre[0], surface.min[1] + reach), outer_half));
-    add_guide(out, layout, panels, panel, DropZone::Bottom, k_dock_root, square_at(Vec2f(surface_centre[0], surface.min[1] + surface.size[1] - reach), outer_half));
+    add_guide(out, layout, panels, subject, DropZone::Left, k_dock_root, square_at(Vec2f(surface.min[0] + reach, surface_centre[1]), outer_half));
+    add_guide(out, layout, panels, subject, DropZone::Right, k_dock_root, square_at(Vec2f(surface.min[0] + surface.size[0] - reach, surface_centre[1]), outer_half));
+    add_guide(out, layout, panels, subject, DropZone::Top, k_dock_root, square_at(Vec2f(surface_centre[0], surface.min[1] + reach), outer_half));
+    add_guide(out, layout, panels, subject, DropZone::Bottom, k_dock_root, square_at(Vec2f(surface_centre[0], surface.min[1] + surface.size[1] - reach), outer_half));
 
     int32_t hit = k_no_node;
     for (uint32_t n = 0; n < solved.node_count; ++n)
@@ -469,7 +529,7 @@ static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& 
             hit = static_cast<int32_t>(n);
             break;
         }
-    if (hit == k_no_node || over_float(layout, solved, panel, pointer))
+    if (hit == k_no_node || over_float(layout, solved, subject.panel, pointer))
         return out;
 
     const Rect& node = solved.nodes[hit].rect;
@@ -479,11 +539,11 @@ static DropGuides build_drop_guides(const DockLayout& layout, const PanelTable& 
     out.centre = centre;
     out.half = half;
     out.inner_node = hit;
-    add_guide(out, layout, panels, panel, DropZone::Left, hit, square_at(Vec2f(centre[0] - step, centre[1]), half));
-    add_guide(out, layout, panels, panel, DropZone::Right, hit, square_at(Vec2f(centre[0] + step, centre[1]), half));
-    add_guide(out, layout, panels, panel, DropZone::Top, hit, square_at(Vec2f(centre[0], centre[1] - step), half));
-    add_guide(out, layout, panels, panel, DropZone::Bottom, hit, square_at(Vec2f(centre[0], centre[1] + step), half));
-    add_guide(out, layout, panels, panel, DropZone::Centre, hit, square_at(centre, half));
+    add_guide(out, layout, panels, subject, DropZone::Left, hit, square_at(Vec2f(centre[0] - step, centre[1]), half));
+    add_guide(out, layout, panels, subject, DropZone::Right, hit, square_at(Vec2f(centre[0] + step, centre[1]), half));
+    add_guide(out, layout, panels, subject, DropZone::Top, hit, square_at(Vec2f(centre[0], centre[1] - step), half));
+    add_guide(out, layout, panels, subject, DropZone::Bottom, hit, square_at(Vec2f(centre[0], centre[1] + step), half));
+    add_guide(out, layout, panels, subject, DropZone::Centre, hit, square_at(centre, half));
     return out;
 }
 
@@ -622,7 +682,7 @@ DropPlan refused(DockReason reason, int32_t node = k_no_node, DropZone zone = Dr
 
 }
 
-static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, PanelId panel, const Vec2f& pointer, bool float_only);
+static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, const DropSubject& subject, const Vec2f& pointer, bool float_only);
 
 DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only)
 {
@@ -632,18 +692,40 @@ DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const 
 
 DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, PanelId panel, const Vec2f& pointer, bool float_only)
 {
-    DropPlan plan = decide_drop(layout, panels, solved, guides, panel, pointer, float_only);
+    DropPlan plan = decide_drop(layout, panels, solved, guides, DropSubject{ panel }, pointer, float_only);
     plan.surface = solved.surface;
     return plan;
+}
+
+DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, const PanelId* moved, uint32_t count, const Vec2f& pointer, bool float_only)
+{
+    DropPlan plan = decide_drop(layout, panels, solved, guides, stack_subject(layout, moved, count), pointer, float_only);
+    plan.surface = solved.surface;
+    return plan;
+}
+
+DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, int32_t stack, const Vec2f& pointer, bool float_only)
+{
+    if (stack < 0 || static_cast<uint32_t>(stack) >= layout.node_count || layout.nodes[stack].kind != DockNodeKind::Tabs)
+        return DropPlan{};
+    return resolve_drop(layout, panels, solved, guides, layout.nodes[stack].tabs, layout.nodes[stack].count, pointer, float_only);
 }
 
 namespace
 {
 
-float dock_size_of(const PanelTable& panels, PanelId panel)
+// A stack takes the first non-zero dock_size among its panels.
+float subject_dock_size(const PanelTable& panels, const DropSubject& subject)
 {
-    const PanelDesc* desc = find_panel(panels, panel);
-    return desc != nullptr ? desc->dock_size : 0.0f;
+    if (!subject.is_stack())
+    {
+        const PanelDesc* desc = find_panel(panels, subject.panel);
+        return desc != nullptr ? desc->dock_size : 0.0f;
+    }
+    for (uint32_t t = 0; t < subject.count; ++t)
+        if (const PanelDesc* desc = find_panel(panels, subject.set[t]); desc != nullptr && desc->dock_size > 0.0f)
+            return desc->dock_size;
+    return 0.0f;
 }
 
 // A centre drop lands under the strip, like ImGui's preview; a collapsed node has no body, so the whole node shows.
@@ -693,10 +775,11 @@ int32_t strip_at(const DockLayout& layout, const SolvedLayout& solved, const Vec
     return k_no_node;
 }
 
-static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, PanelId panel, const Vec2f& pointer, bool float_only)
+static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, const DropGuides& guides, const DropSubject& subject, const Vec2f& pointer, bool float_only)
 {
-    const int32_t source = tab_node_of(layout, panel);
-    const bool floating = is_floating(layout, panel);
+    const PanelId panel = subject.panel;
+    const int32_t source = subject.is_stack() ? subject.stack : tab_node_of(layout, panel);
+    const bool floating = !subject.is_stack() && is_floating(layout, panel);
     if (source == k_no_node && !floating)
         return refused(DockReason::NotFound);
 
@@ -720,7 +803,7 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
             plan.node = guide.node;
             plan.zone = guide.zone;
             if (guide.node == k_dock_root)
-                plan.preview = root_preview(solved.surface_rect, guide.zone, dock_size_of(panels, panel), solved.metrics);
+                plan.preview = root_preview(solved.surface_rect, guide.zone, subject_dock_size(panels, subject), solved.metrics);
             else if (guide.zone == DropZone::Centre)
                 plan.preview = centre_preview(solved.nodes[guide.node]);
             else
@@ -736,6 +819,8 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
         if (strip == k_no_node)
             return DropPlan{};
 
+        if (strip == source && subject.is_stack())
+            return DropPlan{ DropAction::None, source };
         if (strip == source)
         {
             if (can_reorder(panels, panel) != DockReason::None)
@@ -755,9 +840,9 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
             return plan;
         }
 
-        if (const DockReason reason = can_dock_into(layout, panels, panel, strip); reason != DockReason::None)
+        if (const DockReason reason = subject_can_dock_into(layout, panels, subject, strip); reason != DockReason::None)
             return refused(reason, strip, DropZone::Centre);
-        const DropProbe probe = probe_drop(layout, panels, panel, DockTarget{ strip, solved.surface }, DropZone::Centre);
+        const DropProbe probe = probe_drop(layout, panels, subject, DockTarget{ strip, solved.surface }, DropZone::Centre);
         if (probe.reason != DockReason::None)
             return refused(probe.reason, strip, DropZone::Centre);
         if (probe.changes_nothing)
@@ -767,12 +852,12 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
         plan.node = strip;
         plan.zone = DropZone::Centre;
         plan.preview = centre_preview(solved.nodes[strip]);
-        plan.slot = insertion_slot(layout.nodes[strip], solved.nodes[strip], pointer[0]);
+        plan.slot = subject.is_stack() ? layout.nodes[strip].count : insertion_slot(layout.nodes[strip], solved.nodes[strip], pointer[0]);
         plan.marker = insertion_marker(layout.nodes[strip], solved.nodes[strip], plan.slot);
         return plan;
     }
 
-    if (floating || solved.metrics.style.tear_off == TearOff::Never)
+    if (subject.is_stack() || floating || solved.metrics.style.tear_off == TearOff::Never)
         return DropPlan{};
     const DockReason reason = can_float(panels, panel);
     if (reason != DockReason::None)
