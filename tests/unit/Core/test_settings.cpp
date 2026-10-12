@@ -418,14 +418,17 @@ TEST_CASE("dashboard settings default to off, read their keys and reject non-pos
     const DashboardSettings& defaults = settings_of<DashboardSettings>();
     CHECK_FALSE(defaults.enabled);
     CHECK(defaults.history == 256);
-    CHECK(defaults.views == std::vector<std::string>{ "trace", "probabilities", "values", "stats" });
+    CHECK(defaults.views == std::vector<std::string>{ "trace", "decision", "stats" });
+    CHECK(defaults.annotations == std::vector<std::string>{ "heat", "chosen" });
 
     TempDir dir;
-    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  history: 64\n  views: [values]\n"));
+    load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  history: 64\n  views: [values]\n  annotations: [value]\n"));
     const DashboardSettings& dashboard = settings_of<DashboardSettings>();
     CHECK(dashboard.enabled);
     CHECK(dashboard.history == 64);
     CHECK(dashboard.views == std::vector<std::string>{ "values" });
+    CHECK(dashboard.annotations == std::vector<std::string>{ "value" });
+    CHECK_THROWS_AS(load_from(dir.write("a.yaml", "dashboard:\n  annotations: [sparkle]\n")), SettingsError);
 
     CHECK_THROWS_AS(load_from(dir.write("h.yaml", "dashboard:\n  history: -4\n")), SettingsError);
 

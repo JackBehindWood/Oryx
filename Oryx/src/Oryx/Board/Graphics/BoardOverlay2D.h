@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Board/BoardAnnotation.h"
 #include "Oryx/Board/BoardInput.h"
 #include "Oryx/Board/BoardScene.h"
 #include "Oryx/Board/Graphics/BoardProjection2D.h"
@@ -14,6 +15,21 @@ struct OverlayButton
     Rect rect;
 };
 
+// What the overlay shows about annotations: the chip row that switches each kind (top right) and the legend (bottom left). Off draws neither.
+struct BoardAnnotationOverlay
+{
+    bool controls = false;
+    AnnotationFlags flags;
+    // "Ply 7 · Player 2 · minimax"; empty draws no legend line.
+    std::string_view legend;
+    // The decision shown is not the latest one.
+    bool ghost = false;
+    // Draws the heat gradient in the legend, from `heat_low` to `heat_high`.
+    bool heat_scale = false;
+    Colour heat_low = { 0.3f, 0.3f, 0.3f, 1.0f };
+    Colour heat_high = { 0.8f, 0.5f, 0.7f, 1.0f };
+};
+
 // The words of one frame, as views the caller keeps alive for the call. The variants name styles of the board's UiTheme (empty is the plain one).
 struct BoardOverlayText
 {
@@ -24,6 +40,7 @@ struct BoardOverlayText
     std::string_view headline;
     std::string_view headline_variant;
     std::string_view hint;
+    BoardAnnotationOverlay annotations;
 };
 
 // What one frame of the overlay found out; the vectors keep their capacity so a warm frame allocates nothing.
@@ -36,6 +53,8 @@ struct BoardOverlayResult
     // The option whose button was clicked this frame, valid when `chosen`.
     size_t option = 0;
     bool chosen = false;
+    // The annotation chips after this frame's clicks; equals the input flags when none was clicked.
+    AnnotationFlags annotation_flags;
     // The Play again button was clicked this frame.
     bool restart = false;
     // True while the pointer is over a button or holding one, so the board leaves the press to the UI.

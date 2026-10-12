@@ -13,6 +13,16 @@ constexpr float k_banner_padding = 28.0f;
 constexpr float k_banner_gap = 14.0f;
 constexpr float k_again_width = 180.0f;
 constexpr float k_again_height = 40.0f;
+constexpr float k_chip_width = 76.0f;
+constexpr float k_chip_height = 28.0f;
+constexpr float k_chip_gap = 6.0f;
+constexpr float k_corner_margin = 12.0f;
+constexpr float k_legend_gap = 8.0f;
+constexpr float k_badge_height = 20.0f;
+constexpr float k_badge_text = 13.0f;
+constexpr float k_swatch_width = 14.0f;
+constexpr float k_swatch_height = 10.0f;
+constexpr uint32_t k_swatch_count = 6;
 
 void build_banner(const BoardOverlayText& text, BoardOverlayResult& out)
 {
@@ -47,6 +57,81 @@ void build_banner(const BoardOverlayText& text, BoardOverlayResult& out)
     out.restart = ui::button("Play again", again_options).clicked;
 }
 
+void build_chips(const BoardAnnotationOverlay& annotations, BoardOverlayResult& out)
+{
+    LayoutStyle row = ui::anchored(AttachPoint::TopRight, fit(), fixed(k_chip_height), { -k_corner_margin, k_corner_margin });
+    row.gap = k_chip_gap;
+    ui::BoxScope chips("annotation-chips", row);
+
+    LayoutStyle chip_box;
+    chip_box.width = fixed(k_chip_width);
+    chip_box.height = fixed(k_chip_height);
+    ui::WidgetOptions options;
+    options.layout = &chip_box;
+    AnnotationFlags flags = annotations.flags;
+    ui::toggle("Heat", flags.heat, options);
+    ui::toggle("Chosen", flags.chosen, options);
+    ui::toggle("Values", flags.value, options);
+    out.annotation_flags = flags;
+}
+
+void build_badge(UiContext& ui, std::string_view name, std::string_view text, const Colour& fill, const Colour& text_colour)
+{
+    LayoutStyle box;
+    box.width = fit();
+    box.height = fixed(k_badge_height);
+    box.padding = { 8.0f, 0.0f, 8.0f, 0.0f };
+    box.align_y = Align::Centre;
+    const uint32_t index = ui::begin_box(name, box);
+    BoxPaint& paint = ui.layout().node(index).paint;
+    paint.has_fill = true;
+    paint.fill = fill;
+    paint.radius = uniform_radius(k_badge_height * 0.5f);
+    paint.text = text;
+    paint.text_height = k_badge_text;
+    paint.text_colour = text_colour;
+    ui::end_box();
+}
+
+void build_legend(UiContext& ui, const BoardAnnotationOverlay& annotations)
+{
+    LayoutStyle row = ui::anchored(AttachPoint::BottomLeft, fit(), fixed(k_badge_height), { k_corner_margin, -k_corner_margin });
+    row.gap = k_legend_gap;
+    row.align_y = Align::Centre;
+    ui::BoxScope legend("annotation-legend", row);
+
+    if (annotations.ghost)
+    {
+        build_badge(ui, "ghost", "Ghost", { 0.98f, 0.82f, 0.25f, 1.0f }, { 0.07f, 0.08f, 0.11f, 1.0f });
+    }
+    if (!annotations.legend.empty())
+    {
+        LayoutStyle line;
+        ui::WidgetOptions options;
+        options.variant = "hint";
+        options.layout = &line;
+        ui::label(annotations.legend, options);
+    }
+    if (!annotations.heat_scale)
+    {
+        return;
+    }
+    LayoutStyle swatches;
+    swatches.align_y = Align::Centre;
+    ui::BoxScope scale("heat-scale", swatches);
+    for (uint32_t step = 0; step < k_swatch_count; ++step)
+    {
+        LayoutStyle cell;
+        cell.width = fixed(k_swatch_width);
+        cell.height = fixed(k_swatch_height);
+        const uint32_t index = ui.begin_box(ui.index_id(step), cell);
+        BoxPaint& paint = ui.layout().node(index).paint;
+        paint.has_fill = true;
+        paint.fill = lerp(annotations.heat_low, annotations.heat_high, static_cast<float>(step) / static_cast<float>(k_swatch_count - 1));
+        ui.end_box();
+    }
+}
+
 void build_overlay(UiContext& ui, const BoardScene& scene, const BoardOverlayText& text, BoardOverlayResult& out)
 {
     LayoutStyle root;
@@ -73,6 +158,11 @@ void build_overlay(UiContext& ui, const BoardScene& scene, const BoardOverlayTex
     if (!text.headline.empty())
     {
         build_banner(text, out);
+    }
+    if (text.annotations.controls)
+    {
+        build_chips(text.annotations, out);
+        build_legend(ui, text.annotations);
     }
 
     if (scene.options.empty())
@@ -133,6 +223,7 @@ void run_board_overlay(UiContext& ui, const BoardInput& input, double delta_time
     out.option = 0;
     out.chosen = false;
     out.restart = false;
+    out.annotation_flags = text.annotations.flags;
     out.pointer_over_ui = false;
 
     ContextScope<UiContext> scope(ui);

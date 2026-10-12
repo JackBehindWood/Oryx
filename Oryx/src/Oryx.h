@@ -79,6 +79,7 @@
 #include "Oryx/Board/IBoardPresenter.h"
 #include "Oryx/Board/MoveBuilder.h"
 #include "Oryx/Board/BoardScene.h"
+#include "Oryx/Board/BoardAnnotation.h"
 #include "Oryx/Board/BoardPresentation.h"
 #include "Oryx/Board/BoardInteraction.h"
 #include "Oryx/Board/Console/PresentedConsoleBoard.h"
@@ -94,6 +95,7 @@
 #include "Oryx/Strategy/Observability/TraceRecorder.h"
 #include "Oryx/Strategy/Observability/DiagnosticsAggregator.h"
 #include "Oryx/Strategy/Observability/JsonLinesWriter.h"
+#include "Oryx/Dashboard/Feed/ActionDescription.h"
 #include "Oryx/Dashboard/Feed/DashboardFeed.h"
 #include "Oryx/Dashboard/Feed/DashboardModel.h"
 #include "Oryx/Dashboard/DashboardSettings.h"
@@ -195,4 +197,6 @@
 #include "Oryx/Board/Graphics/BoardRenderer2D.h"
 #include "Oryx/Board/Graphics/PresentedGraphicsBoard2D.h"
 #include "Oryx/Board/Graphics/GraphicsBoards.h"
+#include "Oryx/Board/Graphics/PresenterActionDescriber.h"
+#include "Oryx/Board/Graphics/DecisionAnnotations.h"
 #endif

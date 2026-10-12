@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Board/BoardAnnotation.h"
 #include "Oryx/Board/Layout/BoardLayout2D.h"
 #include "Oryx/Interface/UI/UiTheme.h"
 #include "Oryx/Board/Graphics/BoardProjection2D.h"
@@ -27,11 +28,32 @@ struct BoardTheme2D
     float space_gap = 0.06f;
     // A piece's size as a fraction of its space's footprint.
     float piece_size = 0.64f;
+    // Annotations: none of these is red or green, so they read under the common colour-vision deficiencies.
+    Colour heat = { 0.80f, 0.47f, 0.65f, 1.0f };
+    Colour chosen = { 0.98f, 0.82f, 0.25f, 1.0f };
+    Colour value_positive = { 0.34f, 0.71f, 0.91f, 1.0f };
+    Colour value_negative = { 0.90f, 0.62f, 0.0f, 1.0f };
+    Colour link = { 1.0f, 1.0f, 1.0f, 0.90f };
+    // The heat tint's alpha runs from `heat_floor` (a small weight stays visible) to `heat_peak`.
+    float heat_floor = 0.18f;
+    float heat_peak = 0.75f;
+    // Smallest space, in pixels, that still prints a heat percentage.
+    float heat_text_min_size = 44.0f;
     // Null draws with Renderer::default_font().
     Font* font = nullptr;
 };
 
+// What to paint over a board beyond its scene: the list, which kinds are on, the space under the pointer (value chips) and a space another panel points at (outlined).
+struct BoardAnnotationLayer
+{
+    const BoardAnnotations* annotations = nullptr;
+    AnnotationFlags flags;
+    SpaceId hovered = k_no_space;
+    SpaceId linked = k_no_space;
+};
+
 // The board proper (spaces, pieces, targets, axis labels) through `batcher`, whose scene the caller has open under a pixel-unit Camera2D over layout.viewport.
-void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font);
+// Heat goes under the pieces; the chosen ring and arrow, value chips, percentages and the link outline go over them. A space out of range for the layout is skipped.
+void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const BoardAnnotationLayer& annotations = {});
 
 } // namespace oryx

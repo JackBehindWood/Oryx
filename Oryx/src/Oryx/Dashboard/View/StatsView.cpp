@@ -12,6 +12,8 @@ namespace
 {
 
 constexpr float k_row_height = 20.0f;
+constexpr float k_name_min_width = 96.0f;
+constexpr float k_number_width = 76.0f;
 constexpr size_t k_open_by_default_keys = 24;
 constexpr std::string_view k_ungrouped = "other";
 
@@ -68,9 +70,14 @@ private:
     {
         FrameArena& arena = gui::context().arena();
         uint32_t rows = 0;
-        for (const uint32_t of : group_of)
+        bool single = true;
+        for (size_t key = 0; key < group_of.size(); ++key)
         {
-            rows += of == group ? 1u : 0u;
+            if (group_of[key] == group)
+            {
+                ++rows;
+                single = single && feed.key_stats(static_cast<uint16_t>(key)).count <= 1;
+            }
         }
         gui::push_id(arena.format("%u", group));
         if (gui::collapsing_header(space.empty() ? k_ungrouped : space, feed.key_count() <= k_open_by_default_keys))
@@ -80,12 +87,15 @@ private:
             options.row_height = k_row_height;
             options.height = fixed(static_cast<float>(rows + 1) * k_row_height);
             gui::TableScope table("keys", options);
-            table.column("Name", grow());
-            table.column("Ply", fixed(64.0f), false, TextAlign::Right);
-            table.column("Last", fixed(64.0f), false, TextAlign::Right);
-            table.column("Mean", fixed(64.0f), false, TextAlign::Right);
-            table.column("Max", fixed(64.0f), false, TextAlign::Right);
-            table.column("Count", fixed(56.0f), false, TextAlign::Right);
+            table.column("Name", grow(1.0f, k_name_min_width));
+            table.column(single ? "Value" : "Ply", fixed(k_number_width), false, TextAlign::Right);
+            if (!single)
+            {
+                table.column("Last", fixed(k_number_width), false, TextAlign::Right);
+                table.column("Mean", fixed(k_number_width), false, TextAlign::Right);
+                table.column("Max", fixed(k_number_width), false, TextAlign::Right);
+                table.column("Count", fixed(k_number_width), false, TextAlign::Right);
+            }
             std::ignore = table.headers();
             uint32_t row = 0;
             for (size_t key = 0; key < group_of.size(); ++key)
@@ -96,13 +106,18 @@ private:
                 }
                 const std::string_view name = feed.key_name(static_cast<uint16_t>(key));
                 const KeyStats& stats = feed.key_stats(static_cast<uint16_t>(key));
-                std::ignore = table.row(row++);
+                const ItemState state = table.row(row++);
+                gui::tooltip(state, name);
                 table.cell(space.empty() ? name : name.substr(space.size() + 1));
-                table.cell(format_view_number(arena, ply[key]));
+                table.cell(format_view_number(arena, single ? stats.last : ply[key]));
+                if (single)
+                {
+                    continue;
+                }
                 table.cell(format_view_number(arena, stats.last));
                 table.cell(stats.keeps_max || stats.count == 0 ? "-" : format_view_number(arena, stats.sum / static_cast<double>(stats.count)));
                 table.cell(format_view_number(arena, stats.max));
-                table.cell(arena.format("%lld", static_cast<long long>(stats.count)));
+                table.cell(format_view_number(arena, static_cast<double>(stats.count)));
             }
         }
         gui::pop_id();

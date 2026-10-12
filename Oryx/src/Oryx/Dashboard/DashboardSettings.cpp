@@ -23,6 +23,17 @@ void read_settings(DashboardSettings& settings, const SettingsNode& node)
 {
     settings.enabled = node.boolean("enabled", settings.enabled);
     settings.history = at_least_one(node, "history", settings.history);
+    if (node.has("annotations"))
+    {
+        settings.annotations = node.strings("annotations");
+        for (const std::string& name : settings.annotations)
+        {
+            if (name != "heat" && name != "chosen" && name != "value")
+            {
+                throw SettingsError("dashboard.annotations: unknown overlay '" + name + "' (heat, chosen or value)");
+            }
+        }
+    }
     if (node.has("views"))
     {
         settings.views = node.strings("views");

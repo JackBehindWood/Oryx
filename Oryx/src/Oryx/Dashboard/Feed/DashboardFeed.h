@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Dashboard/Feed/ActionDescription.h"
 #include "Oryx/Dashboard/Feed/DashboardRecord.h"
 #include "Oryx/Dashboard/Feed/FeedOptions.h"
 #include "Oryx/Strategy/Observability/IDecisionObserver.h"
@@ -23,6 +24,9 @@ public:
     void begin_match();
     // The next begin_match clears the ring first, so a switch to another game starts empty even if the old match decides once more before it ends.
     void clear_at_next_match() { m_clear_at_next_match = true; }
+
+    // Null falls back to IState::action_to_string and records no spaces.
+    void set_describer(SharedPtr<const IActionDescriber> describer) { m_describer = std::move(describer); }
 
     [[nodiscard]] const FeedOptions& options() const { return m_options; }
     [[nodiscard]] size_t size() const { return m_total < m_records.size() ? static_cast<size_t>(m_total) : m_records.size(); }
@@ -50,7 +54,10 @@ private:
     int32_t intern_key(const std::string& name);
     [[nodiscard]] RecordView view_of_slot(size_t slot) const;
 
+    void describe_into(const IState& state, ActionId action, FixedLabel& label, uint32_t* spaces, uint8_t& space_count) const;
+
     FeedOptions m_options;
+    SharedPtr<const IActionDescriber> m_describer;
     std::vector<DashboardRecord> m_records;
     std::vector<ScoreEntry> m_scores;
     std::vector<MetricEntry> m_metrics;

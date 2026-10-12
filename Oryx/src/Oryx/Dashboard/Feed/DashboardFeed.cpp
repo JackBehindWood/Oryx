@@ -182,17 +182,31 @@ size_t DashboardFeed::store_numbers(const Decision& decision)
     return slot;
 }
 
+void DashboardFeed::describe_into(const IState& state, ActionId action, FixedLabel& label, uint32_t* spaces, uint8_t& space_count) const
+{
+    ActionDescription description;
+    if (m_describer != nullptr && m_describer->describe(state, action, description))
+    {
+        label = description.label;
+        space_count = static_cast<uint8_t>(math::min<size_t>(description.space_count, k_record_spaces));
+        std::copy(description.spaces, description.spaces + space_count, spaces);
+        return;
+    }
+    set_label(label, state.action_to_string(action));
+    space_count = 0;
+}
+
 void DashboardFeed::store_labels(size_t slot, const IState& state, const Decision& decision)
 {
     DashboardRecord& record = m_records[slot];
     if (is_game_action(decision.chosen))
     {
-        set_label(record.chosen_label, state.action_to_string(decision.chosen));
+        describe_into(state, decision.chosen, record.chosen_label, record.chosen_spaces, record.chosen_space_count);
     }
     ScoreEntry* scores = m_scores.data() + slot * static_cast<size_t>(m_options.max_scores);
     for (uint32_t i = 0; i < record.score_count; ++i)
     {
-        set_label(scores[i].label, state.action_to_string(scores[i].action));
+        describe_into(state, scores[i].action, scores[i].label, scores[i].spaces, scores[i].space_count);
     }
 }
 

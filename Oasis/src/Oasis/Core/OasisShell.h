@@ -20,6 +20,9 @@ public:
 
     // The board layer the menus switch; it is created after the shell because it needs the feed.
     void bind(const oryx::BoardLayer& layer) { m_board = &layer; }
+    // A match's board was created or is being released: the shell teaches the feed the game's action names and talks annotations to the board.
+    void board_created(oryx::IGraphicsBoard& board, const std::string& game);
+    void board_released(oryx::IGraphicsBoard& board);
 
     void frame(const oryx::FrameInfo& info) override;
     void render_stage(oryx::RenderStage stage, oryx::StageContext& context) override;
@@ -35,6 +38,9 @@ public:
     [[nodiscard]] bool dashboard_open();
     [[nodiscard]] bool showcase_open();
     [[nodiscard]] bool switch_pending() const { return m_switch_pending; }
+    [[nodiscard]] oryx::DashboardModel& model() { return m_model; }
+    [[nodiscard]] const oryx::AnnotationFlags& annotation_flags() const { return m_flags; }
+    [[nodiscard]] const oryx::BoardAnnotations& annotations() const { return m_annotations; }
 
 private:
     void build();
@@ -46,6 +52,8 @@ private:
     void dispatch_switch();
     void view_menu();
     void apply_settings();
+    void sync_board();
+    void annotation_menu();
     void claim_input();
     // A floating showcase draws over the shell, since its own context renders beneath it.
     bool showcase_floating();
@@ -57,6 +65,12 @@ private:
     oryx::DashboardModel m_model;
     oryx::DashboardPanelState m_panel;
     oryx::GuiContext m_context;
+    oryx::IGraphicsBoard* m_graphics_board = nullptr;
+    oryx::BoardAnnotations m_annotations;
+    oryx::AnnotationFlags m_flags;
+    oryx::AnnotationFlags m_pushed_flags;
+    std::string m_legend;
+    uint32_t m_seen_match = 0;
     GuiShowcase m_showcase;
     oryx::SettingsSubscription m_settings_subscription;
     oryx::DashboardSettings m_settings;

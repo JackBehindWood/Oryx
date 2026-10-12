@@ -11,6 +11,18 @@ constexpr float k_target_dot = 0.16f;
 constexpr float k_ring_thickness = 0.22f;
 constexpr float k_cross_thickness = 0.16f;
 constexpr float k_outline = 1.08f;
+constexpr float k_chosen_ring = 0.86f;
+constexpr float k_chosen_ring_thickness = 0.11f;
+constexpr float k_arrow_thickness = 0.07f;
+constexpr float k_arrow_min_thickness = 3.0f;
+constexpr float k_arrow_head = 0.30f;
+constexpr float k_link_thickness = 2.5f;
+constexpr float k_chip_height = 20.0f;
+constexpr float k_chip_char = 8.5f;
+constexpr float k_chip_padding = 12.0f;
+constexpr float k_chip_text = 15.0f;
+constexpr float k_heat_text = 14.0f;
+constexpr float k_heat_text_inset = 4.0f;
 
 void draw_text_centred(BatchRenderer2D& batcher, Font& font, const Vec2f& centre, const std::string& text, float pixel_height, const Colour& colour)
 {
@@ -103,6 +115,188 @@ void draw_axis_labels(BatchRenderer2D& batcher, const BoardLayout2D& board, cons
     }
 }
 
+Vec2f space_size(const BoardLayout2D& board, SpaceId space, const BoardProjection2D& layout)
+{
+    return { board.size(space)[0] * layout.scale, board.size(space)[1] * layout.scale };
+}
+
+bool in_range(const BoardLayout2D& board, SpaceId space)
+{
+    return space < board.space_count();
+}
+
+Colour with_alpha(const Colour& colour, float alpha)
+{
+    return { colour.r, colour.g, colour.b, alpha };
+}
+
+void draw_heat(BatchRenderer2D& batcher, const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, const BoardAnnotationLayer& annotations)
+{
+    for (const BoardAnnotation& item : annotations.annotations->items)
+    {
+        const SpaceId space = destination(item);
+        if (item.kind != AnnotationKind::Heat || !in_range(board, space))
+        {
+            continue;
+        }
+        const Vec2f centre = board_to_world(layout, board.position(space));
+        const Vec2f size = space_size(board, space, layout) * (1.0f - theme.space_gap);
+        const Colour tint = with_alpha(theme.heat, math::lerp(theme.heat_floor, theme.heat_peak, math::clamp(item.weight, 0.0f, 1.0f)));
+        if (board.shape(space) == SpaceShape::Circle)
+        {
+            batcher.draw_circle(centre, math::min(size[0], size[1]) * 0.5f, tint);
+        }
+        else
+        {
+            batcher.draw_rect(centre, size, tint);
+        }
+    }
+}
+
+void draw_heat_text(BatchRenderer2D& batcher, const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const BoardAnnotationLayer& annotations)
+{
+    if (!font.ready())
+    {
+        return;
+    }
+    TextStyle style;
+    style.pixel_height = k_heat_text;
+    style.colour = { 0.96f, 0.96f, 0.98f, 1.0f };
+    for (const BoardAnnotation& item : annotations.annotations->items)
+    {
+        const SpaceId space = destination(item);
+        if (item.kind != AnnotationKind::Heat || !in_range(board, space) || std::isnan(item.value))
+        {
+            continue;
+        }
+        const Vec2f size = space_size(board, space, layout);
+        if (math::min(size[0], size[1]) < theme.heat_text_min_size)
+        {
+            continue;
+        }
+        const Vec2f centre = board_to_world(layout, board.position(space));
+        char text[16];
+        std::snprintf(text, sizeof(text), "%.0f%%", static_cast<double>(item.value) * 100.0);
+        batcher.draw_text({ centre[0] - size[0] * 0.5f + k_heat_text_inset, centre[1] + size[1] * 0.5f - k_heat_text_inset - font.ascent(k_heat_text) }, text, font, style);
+    }
+}
+
+void draw_segment(BatchRenderer2D& batcher, const Vec2f& from, const Vec2f& to, float thickness, const Colour& colour)
+{
+    const Vec2f delta = to - from;
+    const float length = std::sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+    if (length <= math::EPSILON<float>)
+    {
+        return;
+    }
+    batcher.draw_rect((from + to) * 0.5f, { length, thickness }, colour, std::atan2(delta[1], delta[0]));
+}
+
+void draw_chosen(BatchRenderer2D& batcher, const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, const BoardAnnotation& item)
+{
+    const SpaceId last = destination(item);
+    if (!in_range(board, last))
+    {
+        return;
+    }
+    const Vec2f end = board_to_world(layout, board.position(last));
+    const float cell = math::min(board.size(last)[0], board.size(last)[1]) * layout.scale;
+    const float radius = cell * 0.5f * k_chosen_ring;
+    const float thickness = math::max(k_arrow_min_thickness, cell * k_arrow_thickness);
+    Vec2f previous = end;
+    bool have_previous = false;
+    for (uint8_t step = 0; step < item.path_count; ++step)
+    {
+        if (!in_range(board, item.path[step]))
+        {
+            continue;
+        }
+        const Vec2f point = board_to_world(layout, board.position(item.path[step]));
+        if (have_previous)
+        {
+            draw_segment(batcher, previous, point, thickness, theme.chosen);
+        }
+        previous = point;
+        have_previous = true;
+    }
+    batcher.draw_circle(end, radius, theme.chosen, k_chosen_ring_thickness);
+    if (item.path_count < 2)
+    {
+        return;
+    }
+    Vec2f from = end;
+    for (int32_t step = static_cast<int32_t>(item.path_count) - 2; step >= 0; --step)
+    {
+        if (in_range(board, item.path[step]))
+        {
+            from = board_to_world(layout, board.position(item.path[step]));
+            break;
+        }
+    }
+    const Vec2f delta = end - from;
+    const float length = std::sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+    if (length <= math::EPSILON<float>)
+    {
+        return;
+    }
+    const Vec2f direction = delta * (1.0f / length);
+    const Vec2f side = { -direction[1], direction[0] };
+    const float head = cell * k_arrow_head;
+    const Vec2f tip = end - direction * radius;
+    batcher.draw_triangle(tip, tip - direction * head + side * (head * 0.5f), tip - direction * head - side * (head * 0.5f), theme.chosen);
+}
+
+void draw_value_chip(BatchRenderer2D& batcher, const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const BoardAnnotation& item)
+{
+    const SpaceId space = destination(item);
+    if (!in_range(board, space) || std::isnan(item.value) || !font.ready())
+    {
+        return;
+    }
+    char text[24];
+    std::snprintf(text, sizeof(text), math::abs(item.value) < 100.0f ? "%+.2f" : "%+.0f", static_cast<double>(item.value));
+    const float width = static_cast<float>(std::strlen(text)) * k_chip_char + k_chip_padding;
+    const Vec2f size = space_size(board, space, layout);
+    const Vec2f centre = board_to_world(layout, board.position(space)) + Vec2f(0.0f, size[1] * 0.5f);
+    batcher.draw_rect(centre, { width + 2.0f, k_chip_height + 2.0f }, theme.piece_outline);
+    batcher.draw_rect(centre, { width, k_chip_height }, item.value >= 0.0f ? theme.value_positive : theme.value_negative);
+    TextStyle style;
+    style.pixel_height = k_chip_text;
+    style.colour = theme.piece_outline;
+    style.align = TextAlign::Centre;
+    batcher.draw_text({ centre[0], centre[1] - font.ascent(k_chip_text) * 0.5f }, text, font, style);
+}
+
+void draw_link(BatchRenderer2D& batcher, const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, SpaceId space)
+{
+    const Vec2f centre = board_to_world(layout, board.position(space));
+    const Vec2f size = space_size(board, space, layout);
+    const float t = k_link_thickness;
+    batcher.draw_rect({ centre[0], centre[1] + size[1] * 0.5f - t * 0.5f }, { size[0], t }, theme.link);
+    batcher.draw_rect({ centre[0], centre[1] - size[1] * 0.5f + t * 0.5f }, { size[0], t }, theme.link);
+    batcher.draw_rect({ centre[0] - size[0] * 0.5f + t * 0.5f, centre[1] }, { t, size[1] }, theme.link);
+    batcher.draw_rect({ centre[0] + size[0] * 0.5f - t * 0.5f, centre[1] }, { t, size[1] }, theme.link);
+}
+
+void draw_annotations_over(BatchRenderer2D& batcher, const BoardLayout2D& board, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const BoardAnnotationLayer& annotations)
+{
+    if (annotations.flags.heat)
+    {
+        draw_heat_text(batcher, board, layout, theme, font, annotations);
+    }
+    for (const BoardAnnotation& item : annotations.annotations->items)
+    {
+        if (item.kind == AnnotationKind::Chosen && annotations.flags.chosen)
+        {
+            draw_chosen(batcher, board, layout, theme, item);
+        }
+        else if (item.kind == AnnotationKind::Value && annotations.flags.value && destination(item) == annotations.hovered)
+        {
+            draw_value_chip(batcher, board, layout, theme, font, item);
+        }
+    }
+}
+
 } // namespace
 
 UiTheme board_ui_theme()
@@ -158,7 +352,7 @@ UiTheme board_ui_theme()
     return theme;
 }
 
-void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font)
+void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const BoardProjection2D& layout, const BoardTheme2D& theme, Font& font, const BoardAnnotationLayer& annotations)
 {
     if (layout.scale <= 0.0f || scene.layout == nullptr)
     {
@@ -169,6 +363,11 @@ void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const Boar
     for (SpaceId space = 0; space < board.space_count(); ++space)
     {
         draw_space(batcher, board, space, scene.highlights[space], layout, theme);
+    }
+    const bool annotated = annotations.annotations != nullptr;
+    if (annotated && annotations.flags.heat)
+    {
+        draw_heat(batcher, board, layout, theme, annotations);
     }
 
     for (const ScenePiece& piece : scene.pieces)
@@ -188,6 +387,15 @@ void draw_board_2d(BatchRenderer2D& batcher, const BoardScene& scene, const Boar
         {
             Vec2f centre = board_to_world(layout, board.position(space));
             batcher.draw_circle(centre, std::min(board.size(space)[0], board.size(space)[1]) * layout.scale * k_target_dot, theme.target);
+        }
+    }
+
+    if (annotated)
+    {
+        draw_annotations_over(batcher, board, layout, theme, font, annotations);
+        if (in_range(board, annotations.linked))
+        {
+            draw_link(batcher, board, layout, theme, annotations.linked);
         }
     }
 

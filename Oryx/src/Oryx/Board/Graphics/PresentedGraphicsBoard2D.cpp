@@ -76,9 +76,44 @@ void PresentedGraphicsBoard2D::refresh_text(const BoardScene& scene)
     }
 }
 
+void PresentedGraphicsBoard2D::set_annotations(const BoardAnnotationRequest& request)
+{
+    if (request.annotations != nullptr)
+    {
+        m_annotations = *request.annotations;
+    }
+    else
+    {
+        m_annotations.items.clear();
+    }
+    m_annotation_flags = request.flags;
+    m_controls = request.controls;
+    m_legend.assign(request.legend);
+    m_ghost = request.ghost;
+    m_linked = request.linked;
+}
+
+BoardAnnotationOverlay PresentedGraphicsBoard2D::annotation_overlay() const
+{
+    BoardAnnotationOverlay overlay;
+    overlay.controls = m_controls;
+    overlay.flags = m_annotation_flags;
+    overlay.legend = m_legend;
+    overlay.ghost = m_ghost;
+    const bool heat_on = m_annotation_flags.heat && std::any_of(m_annotations.items.begin(), m_annotations.items.end(), [](const BoardAnnotation& item) { return item.kind == AnnotationKind::Heat; });
+    overlay.heat_scale = heat_on;
+    const Colour& tile = m_theme.tones[1];
+    overlay.heat_low = lerp(tile, m_theme.heat, m_theme.heat_floor);
+    overlay.heat_high = lerp(tile, m_theme.heat, m_theme.heat_peak);
+    return overlay;
+}
+
 void PresentedGraphicsBoard2D::reset(PlayerId seat)
 {
     m_interaction.reset(seat);
+    m_annotations.items.clear();
+    m_linked = k_no_space;
+    m_ghost = false;
     m_overlay = {};
     m_text_source.clear();
     m_text_to_move = -2;
@@ -105,8 +140,12 @@ void PresentedGraphicsBoard2D::update(const BoardInput& input, double delta_time
     }
     refresh_ui_theme();
     refresh_text(scene);
-    const BoardOverlayText text{ m_status, m_status_variant, m_headline, m_headline_variant, k_restart_hint };
+    const BoardOverlayText text{ m_status, m_status_variant, m_headline, m_headline_variant, k_restart_hint, annotation_overlay() };
     run_board_overlay(m_ui, input, delta_time, m_interaction.dragging(), scene, text, m_overlay);
+    if (m_controls)
+    {
+        m_annotation_flags = m_overlay.annotation_flags;
+    }
     if (m_overlay.restart)
     {
         request_restart();
@@ -168,7 +207,7 @@ void PresentedGraphicsBoard2D::render_stage(RenderStage stage, StageContext& con
     Font& font = m_theme.font != nullptr ? *m_theme.font : Renderer::default_font();
     if (stage == RenderStage::Scene2D)
     {
-        draw_board_2d(context.batcher_2d, m_interaction.scene(), m_projection, m_theme, font);
+        draw_board_2d(context.batcher_2d, m_interaction.scene(), m_projection, m_theme, font, { &m_annotations, m_annotation_flags, m_interaction.hovered(), m_linked });
     }
     else if (stage == RenderStage::Overlay && m_overlay.viewport == m_projection.viewport)
     {

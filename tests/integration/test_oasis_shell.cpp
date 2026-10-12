@@ -76,6 +76,11 @@ public:
     Vec2f size{ 0.0f, 0.0f };
 };
 
+bool find_annotation_kind(const BoardAnnotations& annotations, AnnotationKind kind)
+{
+    return std::any_of(annotations.items.begin(), annotations.items.end(), [kind](const BoardAnnotation& item) { return item.kind == kind; });
+}
+
 struct ShellRig
 {
     LayoutFile layout_file;
@@ -98,9 +103,17 @@ struct ShellRig
             SharedPtr<IGraphicsBoard> created = create_graphics_board(name, seat);
             board = dynamic_cast<PresentedGraphicsBoard2D*>(created.get());
             graphics->add_client(*created);
+            shell->board_created(*created, name);
             return created;
         };
-        BoardReleaser release = [this](IBoard& released) { graphics->remove_client(dynamic_cast<IGraphicsBoard&>(released)); };
+        BoardReleaser release = [this](IBoard& released)
+        {
+            if (shell != nullptr)
+            {
+                shell->board_released(dynamic_cast<IGraphicsBoard&>(released));
+            }
+            graphics->remove_client(dynamic_cast<IGraphicsBoard&>(released));
+        };
         layer = &app.push_layer<BoardLayer>(BoardLayerDesc{ game, opponent, factory, false, release, &shell->feed() });
         shell->bind(*layer);
         graphics->add_client(probe);
@@ -145,6 +158,51 @@ struct ShellRig
         }
         FAIL("no box with text " << text);
         return {};
+    }
+
+    [[nodiscard]] bool board_has_text(std::string_view text) const
+    {
+        const LayoutTree& tree = board->ui().layout();
+        for (uint32_t index = 0; index < tree.node_count(); ++index)
+        {
+            if (tree.node(index).paint.text == text)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] Vec2f board_centre_of(std::string_view text) const
+    {
+        const LayoutTree& tree = board->ui().layout();
+        for (uint32_t index = 0; index < tree.node_count(); ++index)
+        {
+            if (tree.node(index).paint.text == text)
+            {
+                return board_region().min + rect_centre(tree.node(index).rect);
+            }
+        }
+        FAIL("no board box with text " << text);
+        return {};
+    }
+
+    void play_until_decisions(size_t count)
+    {
+        for (uint32_t attempt = 0; attempt < 40 && !layer->match_in_progress(); ++attempt)
+        {
+            frames(5);
+            if (!layer->match_in_progress())
+            {
+                click_at(cell(4));
+            }
+        }
+        frames(20);
+        for (SpaceId space = 0; space < 9 && shell->feed().size() < count; ++space)
+        {
+            click_at(cell(space));
+            frames(10);
+        }
     }
 
     [[nodiscard]] bool has_text(std::string_view text) const
@@ -452,6 +510,106 @@ TEST_CASE("OasisShell: confirming a switch starts the new match with a new board
         CHECK(rig.shell->feed().view(index).record->match_index == 0);
     }
     CHECK(rig.shell->feed().size() < before);
+}
+
+TEST_CASE("OasisShell: decisions use the board's own names and the board shows its annotation controls")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    rig.frames(3);
+    rig.play_until_decisions(1);
+    REQUIRE(rig.shell->feed().size() >= 1);
+
+    BoardScene scene;
+    rig.board->presentation().build_scene(k_no_space, scene);
+    const RecordView first = rig.shell->feed().view(0);
+    REQUIRE(first.record->chosen_space_count == 1);
+    CHECK(label_view(first.record->chosen_label) == scene.layout->label(first.record->chosen_spaces[0]));
+    CHECK(rig.board_has_text("Heat"));
+    CHECK(rig.board_has_text("Chosen"));
+    CHECK(rig.board_has_text("Values"));
+    CHECK(rig.shell->annotation_flags() == AnnotationFlags{ true, true, false });
+    CHECK(find_annotation_kind(rig.shell->annotations(), AnnotationKind::Chosen));
+}
+
+TEST_CASE("OasisShell: a chip on the board and the View menu switch the same annotation flags")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    rig.frames(4);
+    CHECK_FALSE(rig.shell->annotation_flags().value);
+    rig.click_at(rig.board_centre_of("Values"));
+    rig.frames(3);
+    CHECK(rig.shell->annotation_flags().value);
+    CHECK(rig.board->annotation_flags().value);
+
+    rig.click_text("View");
+    rig.frames(2);
+    rig.click_text("Board heat");
+    rig.frames(3);
+    CHECK_FALSE(rig.shell->annotation_flags().heat);
+    CHECK_FALSE(rig.board->annotation_flags().heat);
+}
+
+TEST_CASE("OasisShell: an older selected decision is shown as a ghost and following removes the badge")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    rig.frames(3);
+    rig.play_until_decisions(2);
+    REQUIRE(rig.shell->feed().size() >= 2);
+    CHECK(rig.shell->model().follow_latest);
+    CHECK_FALSE(rig.board_has_text("Ghost"));
+
+    select_record(rig.shell->model(), rig.shell->feed().view(0).record->sequence);
+    rig.frames(3);
+    CHECK(rig.board_has_text("Ghost"));
+
+    follow_latest_record(rig.shell->model());
+    rig.frames(3);
+    CHECK_FALSE(rig.board_has_text("Ghost"));
+}
+
+TEST_CASE("OasisShell: pointing at a board space tells the Decision row which action ends there")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    rig.frames(3);
+    rig.play_until_decisions(1);
+    REQUIRE(rig.shell->feed().size() >= 1);
+    const RecordView latest = rig.shell->feed().view(rig.shell->feed().size() - 1);
+    REQUIRE(latest.record->chosen_space_count == 1);
+
+    rig.window->inject_cursor(rig.cell(latest.record->chosen_spaces[0])[0], rig.cell(latest.record->chosen_spaces[0])[1]);
+    rig.frames(4);
+    CHECK(rig.shell->model().board_hovered_action == latest.record->chosen);
+
+    rig.window->inject_cursor(1.0f, 1.0f);
+    rig.frames(4);
+    CHECK(rig.shell->model().board_hovered_action == INVALID_ACTION);
+}
+
+TEST_CASE("OasisShell: a new match leaves nothing of the previous one on the board")
+{
+    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    rig.frames(3);
+    rig.play_until_decisions(2);
+    REQUIRE(rig.shell->feed().size() >= 2);
+    select_record(rig.shell->model(), rig.shell->feed().view(0).record->sequence);
+    rig.shell->model().pinned_action = rig.shell->feed().view(0).record->chosen;
+    rig.frames(3);
+    REQUIRE(rig.board_has_text("Ghost"));
+
+    rig.shell->feed().begin_match();
+    rig.frames(3);
+    CHECK_FALSE(rig.board_has_text("Ghost"));
+    CHECK(rig.shell->model().follow_latest);
+    CHECK(rig.shell->model().pinned_action == INVALID_ACTION);
+    CHECK_FALSE(find_annotation_kind(rig.shell->annotations(), AnnotationKind::Chosen));
+    CHECK_FALSE(find_annotation_kind(rig.shell->annotations(), AnnotationKind::Heat));
+}
+
+TEST_CASE("OasisShell: the annotation controls vanish with the dashboard")
+{
+    ShellRig rig(oasis::DashboardFlag::Off, "tictactoe", "minimax");
+    rig.frames(4);
+    CHECK_FALSE(rig.board_has_text("Heat"));
 }
 
 TEST_CASE("OasisShell: a switch before any move happens at once")

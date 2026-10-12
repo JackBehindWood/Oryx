@@ -102,15 +102,16 @@ TEST_CASE("dashboard panel: collapsing a header hides its view")
     CHECK(dump_layout(f.context) != before);
 }
 
-TEST_CASE("dashboard panel: the header counts matches and decisions")
+TEST_CASE("dashboard panel: the views draw no counter strip of their own")
 {
     PanelFixture f;
     f.frames();
-    CHECK(f.find_text("Waiting for the first decision") != nullptr);
+    CHECK(f.find_text("No decision to show") != nullptr);
     f.add_decision();
     f.frames();
-    CHECK(f.find_text("Waiting for the first decision") == nullptr);
-    CHECK(f.find_text("Decisions") != nullptr);
+    CHECK(f.find_text("No decision to show") == nullptr);
+    CHECK(f.find_text("Decisions") == nullptr);
+    CHECK(f.find_text("Match") == nullptr);
 }
 
 TEST_CASE("dashboard panel: layout golden for a populated feed")
@@ -138,7 +139,7 @@ TEST_CASE("dashboard panel: a warm frame with a populated feed allocates nothing
 TEST_CASE("dashboard panel: views on one side are tabbed together and a bottom view docks apart")
 {
     GuiFixture f;
-    DashboardPanelState state = make_panel_state({ "trace", "probabilities", "values", "stats" });
+    DashboardPanelState state = make_panel_state({ "trace", "decision", "stats" });
     register_dashboard_panels(state, true);
     const gui::PanelTable& panels = gui::panels();
     auto hint = [&](std::string_view name) -> const gui::PanelDesc*
@@ -146,15 +147,14 @@ TEST_CASE("dashboard panel: views on one side are tabbed together and a bottom v
         return gui::find_panel(panels, gui::make_panel_id(name));
     };
     const gui::PanelDesc* trace = hint("view/trace");
-    const gui::PanelDesc* probabilities = hint("view/probabilities");
-    const gui::PanelDesc* values = hint("view/values");
+    const gui::PanelDesc* decision = hint("view/decision");
     const gui::PanelDesc* stats = hint("view/stats");
-    REQUIRE((trace != nullptr && probabilities != nullptr && values != nullptr && stats != nullptr));
+    REQUIRE((trace != nullptr && decision != nullptr && stats != nullptr));
     CHECK(trace->dock_side == gui::DropZone::Bottom);
     CHECK_FALSE(gui::is_valid(trace->dock_near));
     CHECK_FALSE(gui::is_valid(trace->dock_tabbed_with));
-    CHECK(probabilities->dock_side == gui::DropZone::Right);
-    CHECK_FALSE(gui::is_valid(probabilities->dock_tabbed_with));
-    CHECK(values->dock_tabbed_with == probabilities->id);
-    CHECK(stats->dock_tabbed_with == probabilities->id);
+    CHECK(decision->dock_side == gui::DropZone::Right);
+    CHECK(decision->dock_size == doctest::Approx(360.0f));
+    CHECK_FALSE(gui::is_valid(decision->dock_tabbed_with));
+    CHECK(stats->dock_tabbed_with == decision->id);
 }

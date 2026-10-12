@@ -394,3 +394,96 @@ TEST_CASE("A feed that is never attached stays empty")
     match.play();
     CHECK(feed.size() == 0);
 }
+
+namespace
+{
+
+class TableDescriber final : public IActionDescriber
+{
+public:
+    bool describe(const IState&, ActionId action, ActionDescription& out) const override
+    {
+        if (action == 3)
+        {
+            return false;
+        }
+        const std::string name = "sq" + std::to_string(action);
+        set_label(out.label, name);
+        out.space_count = 2;
+        out.spaces[0] = action;
+        out.spaces[1] = action + 10;
+        return true;
+    }
+};
+
+} // namespace
+
+TEST_CASE("DashboardFeed names actions and records their spaces through the describer")
+{
+    DummyState state(10);
+    DashboardFeed feed(small_options(4));
+    feed.set_describer(create_shared<TableDescriber>());
+    feed.on_decision(state, make_decision(0, 2, { 1, 2, 3 }));
+
+    RecordView view = feed.view(0);
+    CHECK(label_view(view.record->chosen_label) == "sq2");
+    REQUIRE(view.record->chosen_space_count == 2);
+    CHECK(view.record->chosen_spaces[0] == 2);
+    CHECK(view.record->chosen_spaces[1] == 12);
+    CHECK(label_view(view.scores[0].label) == "sq1");
+    REQUIRE(view.scores[0].space_count == 2);
+    CHECK(view.scores[0].spaces[1] == 11);
+}
+
+TEST_CASE("DashboardFeed falls back to action_to_string without spaces when the describer declines or is absent")
+{
+    DummyState state(10);
+    DashboardFeed feed(small_options(4));
+    feed.on_decision(state, make_decision(0, 2, { 1, 2, 3 }));
+    CHECK(label_view(feed.view(0).record->chosen_label) == "take 2");
+    CHECK(feed.view(0).record->chosen_space_count == 0);
+
+    feed.set_describer(create_shared<TableDescriber>());
+    feed.on_decision(state, make_decision(0, 3, { 1, 2, 3 }));
+    RecordView declined = feed.view(1);
+    CHECK(label_view(declined.record->chosen_label) == "take 3");
+    CHECK(declined.record->chosen_space_count == 0);
+    CHECK(label_view(declined.scores[2].label) == "take 3");
+    CHECK(declined.scores[2].space_count == 0);
+    CHECK(label_view(declined.scores[0].label) == "sq1");
+}
+
+TEST_CASE("DashboardFeed keeps each record's spaces across a ring wrap")
+{
+    DummyState state(10);
+    DashboardFeed feed(small_options(2));
+    feed.set_describer(create_shared<TableDescriber>());
+    feed.on_decision(state, make_decision(0, 1, { 1, 2 }));
+    feed.on_decision(state, make_decision(0, 2, { 1, 2 }));
+    feed.on_decision(state, make_decision(0, 1, { 1, 2 }));
+
+    REQUIRE(feed.size() == 2);
+    CHECK(feed.view(0).record->chosen_spaces[0] == 2);
+    CHECK(feed.view(1).record->chosen_spaces[0] == 1);
+    CHECK(feed.view(1).scores[1].spaces[0] == 2);
+}
+
+TEST_CASE("DashboardFeed allocates nothing per decision with a describer attached")
+{
+    if (!MemoryTracker::is_installed())
+    {
+        return;
+    }
+    DummyState state(10);
+    DashboardFeed feed(small_options(16));
+    feed.set_describer(create_shared<TableDescriber>());
+    Decision decision = make_decision(0, 2, { 1, 2, 3 });
+    feed.on_decision(state, decision);
+
+    MemoryStats before = all_allocations();
+    for (int32_t i = 0; i < 1000; ++i)
+    {
+        feed.on_decision(state, decision);
+    }
+    CHECK(memory_delta(before, all_allocations()).allocation_count == 0);
+}

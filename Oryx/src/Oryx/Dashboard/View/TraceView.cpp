@@ -19,6 +19,7 @@ struct TraceState
 {
     float pinned_offset = 0.0f;
     bool following = false;
+    bool wheeled = false;
 };
 
 class TraceView final : public IDashboardView
@@ -36,11 +37,23 @@ public:
             return;
         }
         handle_keys(model);
-        draw_follow_toggle(model);
+        draw_toolbar(model);
         draw_table(model);
     }
 
 private:
+    static bool has_probability(const DashboardFeed& feed)
+    {
+        for (size_t i = 0; i < feed.size(); ++i)
+        {
+            if (!std::isnan(feed.view(i).record->chosen_probability))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static uint64_t oldest_sequence(const DashboardFeed& feed) { return feed.view(0).record->sequence; }
     static uint64_t latest_sequence(const DashboardFeed& feed) { return feed.view(feed.size() - 1).record->sequence; }
 
@@ -77,8 +90,11 @@ private:
         }
     }
 
-    static void draw_follow_toggle(DashboardModel& model)
+    static void draw_toolbar(DashboardModel& model)
     {
+        FrameArena& arena = gui::context().arena();
+        const DashboardFeed& feed = *model.feed;
+        gui::begin_row("trace-bar");
         bool follow = model.follow_latest;
         if (gui::toggle("Follow latest", follow))
         {
@@ -88,9 +104,20 @@ private:
             }
             else
             {
-                select_record(model, latest_sequence(*model.feed));
+                select_record(model, latest_sequence(feed));
             }
         }
+        gui::spacer();
+        const uint64_t total = feed.total_decisions();
+        const uint32_t match = feed.view(feed.size() - 1).record->match_index + 1;
+        std::string_view text = arena.format("Match %u \xC2\xB7 %llu %s", match, static_cast<unsigned long long>(total), total == 1 ? "decision" : "decisions");
+        const RecordView selected = selected_view(model);
+        if (!model.follow_latest && selected.valid)
+        {
+            text = arena.format("%.*s \xC2\xB7 viewing %llu of %zu", static_cast<int32_t>(text.size()), text.data(), static_cast<unsigned long long>(selected.record->sequence - oldest_sequence(feed) + 1), feed.size());
+        }
+        gui::label(text);
+        gui::end_row();
     }
 
     void draw_table(DashboardModel& model)
@@ -105,11 +132,15 @@ private:
         options.row_count = static_cast<uint32_t>(feed.size());
         options.row_height = k_row_height;
         gui::TableScope table("trace", options);
-        table.column("#", fixed(56.0f));
-        table.column("Player", fixed(52.0f));
-        table.column("Action", grow());
-        table.column("Value", fixed(64.0f), false, TextAlign::Right);
-        table.column("Prob", fixed(56.0f), false, TextAlign::Right);
+        const bool any_probability = has_probability(feed);
+        table.column("#", fixed(48.0f));
+        table.column("Player", fixed(76.0f));
+        table.column("Action", grow(1.0f, 64.0f));
+        table.column("Value", fixed(72.0f), false, TextAlign::Right);
+        if (any_probability)
+        {
+            table.column("Prob", fixed(64.0f), false, TextAlign::Right);
+        }
         place_scroll(model, pin, selected, oldest);
         std::ignore = table.headers();
 
@@ -126,11 +157,14 @@ private:
             }
             table.cell(arena.format("%u.%u", record.match_index + 1, record.decision_index + 1));
             table.begin_cell();
-            gui::text_coloured(arena.format("%u", static_cast<uint32_t>(record.player)), theme.palette[record.player % k_palette_size]);
+            gui::text_coloured(player_name(arena, record.player), player_colour(theme, record.player));
             table.end_cell();
             table.cell(label_view(record.chosen_label));
             table.cell(format_view_number(arena, record.chosen_value));
-            table.cell(format_view_number(arena, record.chosen_probability));
+            if (any_probability)
+            {
+                table.cell(format_view_number(arena, record.chosen_probability));
+            }
         }
     }
 
@@ -140,9 +174,12 @@ private:
         const float end = static_cast<float>(model.feed->size()) * k_row_height;
         const bool was_following = pin.following;
         pin.following = model.follow_latest;
+        // The wheel moves the offset a frame later, and a layout settle moves it too, so only a wheel move counts as leaving the pin.
+        const bool wheeled = pin.wheeled;
+        pin.wheeled = gui::context().input().wheel[1] != 0.0f;
         if (model.follow_latest)
         {
-            if (was_following && scroll_offset_now() < pin.pinned_offset - k_pin_slack)
+            if (was_following && (wheeled || pin.wheeled) && scroll_offset_now() < pin.pinned_offset - k_pin_slack)
             {
                 select_record(model, latest_sequence(*model.feed));
                 pin.following = false;

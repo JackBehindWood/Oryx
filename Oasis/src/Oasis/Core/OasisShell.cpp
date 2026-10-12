@@ -15,6 +15,18 @@ constexpr const char* k_showcase_panel = "view/gui-showcase";
 constexpr float k_showcase_min_width = 320.0f;
 constexpr float k_showcase_min_height = 240.0f;
 
+oryx::AnnotationFlags flags_of(const DashboardSettings& settings)
+{
+    AnnotationFlags flags;
+    for (const std::string& name : settings.annotations)
+    {
+        flags.heat = flags.heat || name == "heat";
+        flags.chosen = flags.chosen || name == "chosen";
+        flags.value = flags.value || name == "value";
+    }
+    return flags;
+}
+
 oryx::FeedOptions feed_options(const DashboardSettings& settings)
 {
     FeedOptions options;
@@ -30,6 +42,8 @@ OasisShell::OasisShell(InputRouter& router, DashboardFlag flag)
     , m_settings(settings_of<DashboardSettings>())
 {
     m_model.feed = &m_feed;
+    m_flags = flags_of(m_settings);
+    m_pushed_flags = m_flags;
     m_panel = make_panel_state(m_settings.views);
     m_settings_subscription = on_settings_changed<DashboardSettings>(
         [this](const DashboardSettings& changed)
@@ -76,6 +90,70 @@ bool OasisShell::showcase_open()
     return gui::is_panel_open(k_showcase_panel);
 }
 
+void OasisShell::board_created(IGraphicsBoard& board, const std::string& game)
+{
+    m_graphics_board = &board;
+    m_pushed_flags = board.annotation_flags();
+    m_feed.set_describer(make_presenter_describer(game));
+    m_model.pinned_action = INVALID_ACTION;
+    m_model.board_hovered_action = INVALID_ACTION;
+    m_annotations.items.clear();
+}
+
+void OasisShell::board_released(IGraphicsBoard& board)
+{
+    if (m_graphics_board == &board)
+    {
+        m_graphics_board = nullptr;
+    }
+}
+
+void OasisShell::sync_board()
+{
+    if (m_graphics_board == nullptr)
+    {
+        return;
+    }
+    const AnnotationFlags on_board = m_graphics_board->annotation_flags();
+    if (!(on_board == m_pushed_flags))
+    {
+        m_flags = on_board;
+    }
+    const bool enabled = dashboard_open();
+    if (m_feed.match_index() != m_seen_match)
+    {
+        m_seen_match = m_feed.match_index();
+        m_model.pinned_action = INVALID_ACTION;
+        follow_latest_record(m_model);
+    }
+    sanitise_selection(m_model);
+    RecordView selected = selected_view(m_model);
+    // A restart leaves the last decision of the finished match as the newest record; nothing of it belongs on the fresh board.
+    if (selected.valid && selected.record->match_index != m_feed.match_index())
+    {
+        selected = RecordView{};
+    }
+    annotate_decision(selected, m_annotations);
+    const bool ghost = enabled && selected.valid && m_feed.size() > 0 && selected.record->sequence != m_feed.view(m_feed.size() - 1).record->sequence;
+    m_legend.clear();
+    if (enabled && selected.valid)
+    {
+        char text[96];
+        std::snprintf(text, sizeof(text), "Ply %u \xC2\xB7 Player %d \xC2\xB7 %s", selected.record->decision_index + 1, static_cast<int32_t>(selected.record->player) + 1, m_board != nullptr ? m_board->opponent_name().c_str() : "");
+        m_legend = text;
+    }
+    m_model.board_hovered_action = enabled ? action_ending_at(selected, m_graphics_board->hovered_space()) : INVALID_ACTION;
+    BoardAnnotationRequest request;
+    request.annotations = enabled ? &m_annotations : nullptr;
+    request.flags = enabled ? m_flags : AnnotationFlags{};
+    request.controls = enabled;
+    request.legend = m_legend;
+    request.ghost = ghost;
+    request.linked = enabled ? action_destination(selected, linked_action(m_model)) : k_no_space;
+    m_graphics_board->set_annotations(request);
+    m_pushed_flags = request.flags;
+}
+
 void OasisShell::set_font(Font* font)
 {
     GuiTheme theme = m_context.gui_theme();
@@ -89,6 +167,7 @@ void OasisShell::apply_settings()
     if (m_settings_dirty)
     {
         m_settings_dirty = false;
+        m_flags = flags_of(m_settings);
         DashboardPanelState fresh = make_panel_state(m_settings.views);
         ContextScope<GuiContext> scope(m_context);
         register_dashboard_panels(fresh, m_settings.enabled);
@@ -104,6 +183,7 @@ void OasisShell::frame(const FrameInfo& info)
     }
     m_window = info.logical;
     run(make_im_input(info.input, 0, info.logical, info.scale, static_cast<float>(info.delta_time)));
+    sync_board();
 
     if (Window* window = Application::Get().window())
     {
@@ -212,6 +292,7 @@ void OasisShell::build()
 
 void OasisShell::menus()
 {
+    m_model.hovered_action = INVALID_ACTION;
     gui::begin_menu_bar("menu");
     game_menu();
     opponent_menu();
@@ -237,8 +318,27 @@ void OasisShell::view_menu()
     {
         static_cast<void>(gui::set_group_open(k_dashboard_group, !gui::is_group_open(k_dashboard_group)));
     }
+    annotation_menu();
     gui::dock_menu();
     gui::end_menu();
+}
+
+void OasisShell::annotation_menu()
+{
+    gui::separator();
+    if (gui::menu_item("Board heat", m_flags.heat).clicked)
+    {
+        m_flags.heat = !m_flags.heat;
+    }
+    if (gui::menu_item("Chosen move", m_flags.chosen).clicked)
+    {
+        m_flags.chosen = !m_flags.chosen;
+    }
+    if (gui::menu_item("Move values", m_flags.value).clicked)
+    {
+        m_flags.value = !m_flags.value;
+    }
+    gui::separator();
 }
 
 void OasisShell::game_menu()

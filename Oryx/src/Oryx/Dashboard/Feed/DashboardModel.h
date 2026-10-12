@@ -13,12 +13,22 @@ struct DashboardModel
     bool follow_latest = true;
     // Set by the host each frame: this view's panel has focus and no text field wants the keys.
     bool keyboard_focus = false;
+    // Plain action ids so panels and the board can point at each other without naming a space: the Decision row under the pointer (cleared by the host each frame), the row a click pinned, and the action whose destination the board pointer is over.
+    ActionId hovered_action = INVALID_ACTION;
+    ActionId pinned_action = INVALID_ACTION;
+    ActionId board_hovered_action = INVALID_ACTION;
 };
 
 inline void select_record(DashboardModel& model, uint64_t sequence)
 {
     model.selected_sequence = sequence;
     model.follow_latest = false;
+}
+
+// The action the board should single out: the hovered row, else the pinned one.
+[[nodiscard]] inline ActionId linked_action(const DashboardModel& model)
+{
+    return is_game_action(model.hovered_action) ? model.hovered_action : model.pinned_action;
 }
 
 inline void follow_latest_record(DashboardModel& model)

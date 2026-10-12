@@ -23,6 +23,9 @@ public:
     void render(const BoardInput& input) override;
     void render_stage(RenderStage stage, StageContext& context) override;
     bool shows_moves() const override { return true; }
+    void set_annotations(const BoardAnnotationRequest& request) override;
+    [[nodiscard]] AnnotationFlags annotation_flags() const override { return m_annotation_flags; }
+    [[nodiscard]] SpaceId hovered_space() const override { return m_interaction.hovered(); }
 
     [[nodiscard]] const BoardPresentation& presentation() const { return m_interaction.presentation(); }
     [[nodiscard]] SpaceId hovered() const { return m_interaction.hovered(); }
@@ -32,6 +35,7 @@ public:
     [[nodiscard]] const UiContext& ui() const { return m_ui; }
 
 private:
+    [[nodiscard]] BoardAnnotationOverlay annotation_overlay() const;
     void refresh_text(const BoardScene& scene);
     void refresh_ui_theme();
     void apply_ui_theme(Font* font);
@@ -42,6 +46,12 @@ private:
     BoardProjection2D m_projection;
     UiContext m_ui;
     BoardOverlayResult m_overlay;
+    BoardAnnotations m_annotations;
+    AnnotationFlags m_annotation_flags;
+    std::string m_legend;
+    bool m_controls = false;
+    bool m_ghost = false;
+    SpaceId m_linked = k_no_space;
     std::string m_status;
     std::string_view m_status_variant;
     std::string m_headline;
