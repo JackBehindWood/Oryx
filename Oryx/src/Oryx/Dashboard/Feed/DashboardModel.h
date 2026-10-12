@@ -11,6 +11,8 @@ struct DashboardModel
     const DashboardFeed* feed = nullptr;
     uint64_t selected_sequence = 0;
     bool follow_latest = true;
+    // Set by the host each frame: this view's panel has focus and no text field wants the keys.
+    bool keyboard_focus = false;
 };
 
 inline void select_record(DashboardModel& model, uint64_t sequence)
@@ -36,6 +38,15 @@ inline void follow_latest_record(DashboardModel& model)
         return model.feed->size() == 0 ? RecordView{} : model.feed->view(model.feed->size() - 1);
     }
     return model.feed->find_sequence(model.selected_sequence);
+}
+
+// A selection that left the ring (wrapped out or cleared by a game switch) returns to following, so no view is stranded on "No decision".
+inline void sanitise_selection(DashboardModel& model)
+{
+    if (!model.follow_latest && !selected_view(model).valid)
+    {
+        model.follow_latest = true;
+    }
 }
 
 } // namespace oryx

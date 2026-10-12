@@ -134,3 +134,27 @@ TEST_CASE("dashboard panel: a warm frame with a populated feed allocates nothing
     f.frames(3);
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("dashboard panel: views on one side are tabbed together and a bottom view docks apart")
+{
+    GuiFixture f;
+    DashboardPanelState state = make_panel_state({ "trace", "probabilities", "values", "stats" });
+    register_dashboard_panels(state, true);
+    const gui::PanelTable& panels = gui::panels();
+    auto hint = [&](std::string_view name) -> const gui::PanelDesc*
+    {
+        return gui::find_panel(panels, gui::make_panel_id(name));
+    };
+    const gui::PanelDesc* trace = hint("view/trace");
+    const gui::PanelDesc* probabilities = hint("view/probabilities");
+    const gui::PanelDesc* values = hint("view/values");
+    const gui::PanelDesc* stats = hint("view/stats");
+    REQUIRE((trace != nullptr && probabilities != nullptr && values != nullptr && stats != nullptr));
+    CHECK(trace->dock_side == gui::DropZone::Bottom);
+    CHECK_FALSE(gui::is_valid(trace->dock_near));
+    CHECK_FALSE(gui::is_valid(trace->dock_tabbed_with));
+    CHECK(probabilities->dock_side == gui::DropZone::Right);
+    CHECK_FALSE(gui::is_valid(probabilities->dock_tabbed_with));
+    CHECK(values->dock_tabbed_with == probabilities->id);
+    CHECK(stats->dock_tabbed_with == probabilities->id);
+}

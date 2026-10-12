@@ -64,6 +64,9 @@ void feed_uniform(DashboardFeed& feed, const std::string& game_id, int32_t chose
         set_probability(decision, action, 1.0 / static_cast<double>(actions.size()));
         set_value(decision, action, action == decision.chosen ? 0.5 : -0.25);
     }
+    add_metric(decision.extra, "search/nodes", 12.0);
+    max_metric(decision.extra, "search/depth_max", 3.0);
+    add_metric(decision.extra, "plain", 1.0);
     feed.on_decision(*state, decision);
 }
 
@@ -77,7 +80,7 @@ std::string first_label(const DashboardFeed& feed)
 
 TEST_CASE("dashboard view: the built-in views register by id and an unknown id is null")
 {
-    for (const char* id : { "probabilities", "values" })
+    for (const char* id : { "probabilities", "values", "trace", "stats" })
     {
         UniquePtr<IDashboardView> view = DashboardViewRegistry::create(id);
         REQUIRE(view != nullptr);
@@ -230,9 +233,9 @@ TEST_CASE("dashboard view: clicking the value history selects that record")
     CHECK(f.model.selected_sequence < 4);
 }
 
-TEST_CASE("dashboard view: both views allocate nothing once warm")
+TEST_CASE("dashboard view: every view allocates nothing once warm")
 {
-    for (const char* id : { "probabilities", "values" })
+    for (const char* id : { "probabilities", "values", "trace", "stats" })
     {
         INFO(id);
         ViewFixture f(id);
@@ -250,7 +253,7 @@ TEST_CASE("dashboard view: both views allocate nothing once warm")
 
 TEST_CASE("dashboard view: a view's frame replays through the null renderer")
 {
-    for (const char* id : { "probabilities", "values" })
+    for (const char* id : { "probabilities", "values", "trace", "stats" })
     {
         INFO(id);
         UniquePtr<RendererContext> renderer = create_renderer_context({ RHIBackend::Null });
@@ -267,5 +270,278 @@ TEST_CASE("dashboard view: a view's frame replays through the null renderer")
         batcher.end();
         CHECK_FALSE(sink.empty());
         renderer->rhi->wait_idle();
+    }
+}
+
+namespace
+{
+
+void feed_numbered(DashboardFeed& feed, int32_t count, int32_t first = 0)
+{
+    DummyState state(10);
+    for (int32_t i = first; i < first + count; ++i)
+    {
+        Decision decision;
+        decision.chosen = static_cast<ActionId>(i);
+        set_value(decision, decision.chosen, static_cast<double>(i));
+        feed.on_decision(state, decision);
+    }
+}
+
+uint32_t count_text_prefix(const GuiContext& context, std::string_view prefix)
+{
+    uint32_t count = 0;
+    for (uint32_t index = 0; index < context.layout().node_count(); ++index)
+    {
+        count += context.layout().node(index).paint.text.starts_with(prefix) ? 1u : 0u;
+    }
+    return count;
+}
+
+} // namespace
+
+TEST_CASE("dashboard trace: only the visible rows are submitted whatever the history size")
+{
+    ViewFixture f("trace");
+    feed_numbered(f.feed, 1000);
+    f.settle();
+    f.frames();
+    const uint32_t rows = count_text_prefix(f.context, "take ");
+    CHECK(rows > 0);
+    CHECK(rows < 40);
+}
+
+TEST_CASE("dashboard trace: following keeps the newest row in view as decisions arrive")
+{
+    ViewFixture f("trace");
+    feed_numbered(f.feed, 400);
+    f.settle();
+    f.frames();
+    CHECK(f.find_text("take 399") != nullptr);
+    for (int32_t i = 400; i < 405; ++i)
+    {
+        feed_numbered(f.feed, 1, i);
+        f.frames(3);
+    }
+    CHECK(f.find_text("take 404") != nullptr);
+    CHECK(f.model.follow_latest);
+}
+
+TEST_CASE("dashboard trace: clicking a row selects its decision and stops following")
+{
+    ViewFixture f("trace");
+    feed_numbered(f.feed, 20);
+    f.settle();
+    f.frames();
+    const LayoutNode* row = f.find_text("take 10");
+    REQUIRE(row != nullptr);
+    f.driver.click(rect_centre(row->rect), f.column_of([&f] { f.view->draw(f.model); }));
+    CHECK_FALSE(f.model.follow_latest);
+    const RecordView selected = selected_view(f.model);
+    REQUIRE(selected.valid);
+    CHECK(selected.record->chosen == 10);
+}
+
+TEST_CASE("dashboard trace: scrolling away from the end pauses following and the toggle resumes it")
+{
+    ViewFixture f("trace");
+    feed_numbered(f.feed, 200);
+    f.settle();
+    f.frames();
+    REQUIRE(f.model.follow_latest);
+    f.driver.move_to({ 100.0f, 200.0f });
+    f.driver.wheel({ 0.0f, 3.0f });
+    f.frames(3);
+    CHECK_FALSE(f.model.follow_latest);
+    const LayoutNode* toggle = f.find_text("Follow latest");
+    REQUIRE(toggle != nullptr);
+    f.driver.click(rect_centre(toggle->rect), f.column_of([&f] { f.view->draw(f.model); }));
+    CHECK(f.model.follow_latest);
+}
+
+TEST_CASE("dashboard trace: arrow keys move the selection only while the panel has the keyboard")
+{
+    ViewFixture f("trace");
+    feed_numbered(f.feed, 30);
+    f.settle();
+    f.frames();
+    const uint64_t latest = f.feed.view(f.feed.size() - 1).record->sequence;
+
+    f.driver.key_press(ImKey::Up);
+    f.frames(1);
+    CHECK(f.model.follow_latest);
+
+    f.model.keyboard_focus = true;
+    f.driver.key_press(ImKey::Up);
+    f.frames(1);
+    CHECK_FALSE(f.model.follow_latest);
+    CHECK(f.model.selected_sequence == latest - 1);
+
+    f.driver.key_press(ImKey::Home);
+    f.frames(1);
+    CHECK(f.model.selected_sequence == f.feed.view(0).record->sequence);
+
+    f.driver.key_press(ImKey::Down);
+    f.frames(1);
+    CHECK(f.model.selected_sequence == f.feed.view(0).record->sequence + 1);
+
+    f.driver.key_press(ImKey::End);
+    f.frames(1);
+    CHECK(f.model.follow_latest);
+}
+
+TEST_CASE("dashboard stats: keys are grouped by namespace and show the feed's aggregates")
+{
+    ViewFixture f("stats");
+    DummyState state(10);
+    for (double nodes : { 10.0, 30.0 })
+    {
+        Decision decision;
+        decision.chosen = 1;
+        add_metric(decision.extra, "search/nodes", nodes);
+        add_metric(decision.extra, "eval/score", 0.5);
+        add_metric(decision.extra, "loose", 7.0);
+        f.feed.on_decision(state, decision);
+    }
+    f.settle();
+    f.frames();
+    CHECK(f.find_text("search") != nullptr);
+    CHECK(f.find_text("eval") != nullptr);
+    CHECK(f.find_text("other") != nullptr);
+    CHECK(f.find_text("nodes") != nullptr);
+    CHECK(f.find_text("20") != nullptr);
+    CHECK(f.find_text("0.5") != nullptr);
+    CHECK(f.find_text("Dropped") == nullptr);
+}
+
+TEST_CASE("dashboard stats: the Ply column follows the selected decision")
+{
+    ViewFixture f("stats");
+    DummyState state(10);
+    for (double nodes : { 111.0, 222.0 })
+    {
+        Decision decision;
+        decision.chosen = 1;
+        add_metric(decision.extra, "search/nodes", nodes);
+        f.feed.on_decision(state, decision);
+    }
+    f.settle();
+    f.frames();
+    CHECK(f.find_text("222") != nullptr);
+    select_record(f.model, f.feed.view(0).record->sequence);
+    f.frames();
+    CHECK(f.find_text("111") != nullptr);
+}
+
+TEST_CASE("dashboard stats: overflowing keys are reported and an empty feed says so")
+{
+    FeedOptions options;
+    options.max_keys = 1;
+    ViewFixture f("stats", options);
+    f.frames();
+    CHECK(f.find_text("No diagnostics reported") != nullptr);
+    DummyState state(10);
+    Decision decision;
+    decision.chosen = 1;
+    add_metric(decision.extra, "a/one", 1.0);
+    add_metric(decision.extra, "a/two", 2.0);
+    f.feed.on_decision(state, decision);
+    f.settle();
+    f.frames();
+    CHECK(count_text_prefix(f.context, "Dropped:") == 1);
+}
+
+TEST_CASE("dashboard views: shapes no current game produces still draw")
+{
+    for (const char* id : { "trace", "stats", "probabilities", "values" })
+    {
+        INFO(id);
+        FeedOptions options;
+        options.max_scores = 8;
+        options.max_keys = 128;
+        options.max_metrics = 128;
+        ViewFixture f(id, options);
+        DummyState state(600);
+        for (int32_t i = 0; i < 6; ++i)
+        {
+            Decision decision;
+            decision.player = static_cast<PlayerId>(i);
+            decision.chosen = static_cast<ActionId>(i);
+            for (int32_t a = 0; a < 500; ++a)
+            {
+                set_value(decision, static_cast<ActionId>(a), a == i ? std::numeric_limits<double>::infinity() : std::numeric_limits<double>::quiet_NaN());
+            }
+            for (int32_t k = 0; k < 120; ++k)
+            {
+                add_metric(decision.extra, "ns" + std::to_string(k % 20) + "/key" + std::to_string(k), static_cast<double>(k) * 1.5);
+            }
+            f.feed.on_decision(state, decision);
+        }
+        CHECK_NOTHROW(f.settle());
+        CHECK_NOTHROW(f.frames());
+    }
+}
+
+TEST_CASE("dashboard views: every registered game against every registered strategy draws the trace and stats")
+{
+    for (const std::string& game_id : GameRegistry::names())
+    {
+        UniquePtr<IGame> game = GameRegistry::create(game_id);
+        if (game == nullptr)
+        {
+            continue;
+        }
+        for (const std::string& strategy_id : StrategyRegistry::names())
+        {
+            INFO(game_id << " / " << strategy_id);
+            SmallVector<UniquePtr<IStrategy>, 2> owned;
+            SmallVector<IStrategy*, 2> seats;
+            bool usable = true;
+            for (int32_t seat = 0; seat < game->num_players() && usable; ++seat)
+            {
+                try
+                {
+                    owned.push_back(StrategyRegistry::create(strategy_id, {}));
+                }
+                catch (const Error&)
+                {
+                    usable = false;
+                }
+                usable = usable && owned.back() != nullptr;
+                seats.push_back(usable ? owned.back().get() : nullptr);
+            }
+            if (!usable)
+            {
+                continue;
+            }
+            Match match(*game, seats);
+            if (!Match::missing_capabilities(*seats[0], Match::build_context(*game, match.state())).empty())
+            {
+                continue;
+            }
+            ViewFixture f("trace");
+            UniquePtr<IDashboardView> trace = std::move(f.view);
+            UniquePtr<IDashboardView> stats = DashboardViewRegistry::create("stats");
+            f.feed.begin_match();
+            match.set_observer(&f.feed);
+            for (int32_t step = 0; step < 12 && !match.is_terminal(); ++step)
+            {
+                try
+                {
+                    match.apply(match.decide());
+                }
+                catch (const Error&)
+                {
+                    break;
+                }
+                f.view = std::move(trace);
+                CHECK_NOTHROW(f.frames(1));
+                trace = std::move(f.view);
+                f.view = std::move(stats);
+                CHECK_NOTHROW(f.frames(1));
+                stats = std::move(f.view);
+            }
+            match.set_observer(nullptr);
+        }
     }
 }

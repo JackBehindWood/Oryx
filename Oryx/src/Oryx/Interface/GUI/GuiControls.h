@@ -144,6 +144,8 @@ void begin_scroll(std::string_view name, const ScrollOptions& options = {});
 void end_scroll();
 // The offset of the region `name` would have in the current id scope, in pixels from the top; for widgets that draw only what is visible.
 [[nodiscard]] float scroll_offset(std::string_view name);
+// Moves region `name` ahead of its begin_scroll, clamped to the range of the last solve (so past the end means the bottom, and the first frame keeps the offset), and scroll_offset reports the result at once.
+void set_scroll_offset(std::string_view name, float offset);
 
 class ScrollScope
 {

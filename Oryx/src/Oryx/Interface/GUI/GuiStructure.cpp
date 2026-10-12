@@ -223,6 +223,16 @@ float scroll_offset(std::string_view name)
     return ctx.state<ScrollState>(ctx.id(name)).offset;
 }
 
+void set_scroll_offset(std::string_view name, float offset)
+{
+    GuiContext& ctx = context();
+    const ImId id = ctx.id(name);
+    Rect view;
+    Vec2f content;
+    const float max_offset = scroll_range(ctx, id, view, content) ? math::max(0.0f, content[1] - view.size[1]) : math::max(offset, 0.0f);
+    ctx.state<ScrollState>(id).offset = math::clamp(offset, 0.0f, max_offset);
+}
+
 void end_scroll()
 {
     GuiContext& ctx = context();

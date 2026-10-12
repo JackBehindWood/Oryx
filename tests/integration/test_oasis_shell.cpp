@@ -197,7 +197,9 @@ TEST_CASE("OasisShell hands the board the viewport panel's rect, which the views
         CHECK(rig.board_region().size[0] < k_window[0]);
         CHECK(rig.board_region().size[0] > 0.0f);
         CHECK(rig.board_region().min[1] > 0.0f);
-        CHECK(rig.board_region().min[1] + rig.board_region().size[1] == doctest::Approx(k_window[1]));
+        const float board_bottom = rig.board_region().min[1] + rig.board_region().size[1];
+        CHECK(board_bottom < k_window[1]);
+        CHECK(board_bottom > 0.5f * k_window[1]);
         CHECK(rig.probe.size[0] == doctest::Approx(rig.board_region().size[0]));
     }
     ShellRig rig(oasis::DashboardFlag::Off, "hexapawn", selection::k_human_opponent);

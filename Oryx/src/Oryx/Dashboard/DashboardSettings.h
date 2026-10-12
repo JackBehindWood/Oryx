@@ -10,7 +10,7 @@ struct DashboardSettings
 {
     bool enabled = false;
     int32_t history = 256;
-    std::vector<std::string> views = { "probabilities", "values" };
+    std::vector<std::string> views = { "trace", "probabilities", "values", "stats" };
 };
 
 void read_settings(DashboardSettings& settings, const SettingsNode& node);

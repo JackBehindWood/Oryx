@@ -65,6 +65,8 @@ Rules:
 4. **Copy, do not retain.** The `Decision` and state are valid only during the call.
 5. **Namespace your keys** and keep them from colliding with experiment built-ins (`matches`, `decisions`, `wins/N`, `reward/N`).
 
+6. **What the dashboard shows.** Scores are optional: the Trace view needs only `player` and `chosen`, so a strategy that publishes nothing still appears there. Metric keys are `namespace/name` doubles; the Stats view groups by the text before the first `/` and shows last, mean, max and count per key, and a key ending `_max` keeps its maximum. No dashboard code is needed per strategy.
+
 `MinimaxStrategy` (depth, nodes, per-root-action values) and `RandomStrategy` (uniform probabilities) are the reference examples.
 
 ## Sinks

@@ -64,3 +64,26 @@ TEST_CASE("DashboardRecord is plain data a GUI Values stride can read")
     static_assert(std::is_standard_layout_v<DashboardRecord>);
     CHECK(sizeof(DashboardRecord) % alignof(float) == 0);
 }
+
+TEST_CASE("sanitise_selection returns a selection that left the ring to following and leaves a held one")
+{
+    FeedOptions options;
+    options.capacity = 4;
+    DashboardFeed feed(options);
+    DashboardModel model;
+    model.feed = &feed;
+    add_decisions(feed, 3);
+
+    select_record(model, 1);
+    sanitise_selection(model);
+    CHECK_FALSE(model.follow_latest);
+
+    add_decisions(feed, 6);
+    sanitise_selection(model);
+    CHECK(model.follow_latest);
+
+    feed.clear();
+    select_record(model, 2);
+    sanitise_selection(model);
+    CHECK(model.follow_latest);
+}

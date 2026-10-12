@@ -418,7 +418,7 @@ TEST_CASE("dashboard settings default to off, read their keys and reject non-pos
     const DashboardSettings& defaults = settings_of<DashboardSettings>();
     CHECK_FALSE(defaults.enabled);
     CHECK(defaults.history == 256);
-    CHECK(defaults.views == std::vector<std::string>{ "probabilities", "values" });
+    CHECK(defaults.views == std::vector<std::string>{ "trace", "probabilities", "values", "stats" });
 
     TempDir dir;
     load_from(dir.write("d.yaml", "dashboard:\n  enabled: true\n  history: 64\n  views: [values]\n"));

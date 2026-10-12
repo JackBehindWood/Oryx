@@ -192,3 +192,27 @@ TEST_CASE("GUI table: warm frames allocate nothing, scrolling included")
     s.scroll_lines(5.0f);
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("GUI table: set_scroll_offset moves the body at once and clamps to the last solve")
+{
+    TableScene s;
+    s.settle();
+    const float max_offset = s.content()[1] - 100.0f;
+    float seen = -1.0f;
+    s.f.driver.frame(s.f.column_of(
+        [&]
+        {
+            gui::TableOptions options;
+            options.row_count = s.row_count;
+            options.row_height = k_row_height;
+            options.height = fixed(100.0f);
+            gui::TableScope table("trace", options);
+            table.column("Ply", fixed(50.0f));
+            gui::set_scroll_offset("body", 1e9f);
+            seen = gui::scroll_offset("body");
+            std::ignore = table.headers();
+        }));
+    CHECK(seen > 0.0f);
+    CHECK(seen <= max_offset + 25.0f);
+    CHECK(seen >= max_offset - 25.0f);
+}
