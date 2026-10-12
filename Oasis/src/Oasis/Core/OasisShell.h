@@ -47,6 +47,8 @@ private:
     void view_menu();
     void apply_settings();
     void claim_input();
+    // A floating showcase draws over the shell, since its own context renders beneath it.
+    bool showcase_floating();
     void draw_showcase(const oryx::FrameInfo& info);
 
     oryx::InputRouter& m_router;

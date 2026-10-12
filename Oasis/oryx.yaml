@@ -19,6 +19,8 @@ gui:
   dock_toolbar_placement: auto   # auto | above_tabs | below_tabs
   dock_tab_position: top   # top | bottom
   dock_close_buttons: always   # always | on_hover | never
+  dock_tear_off: live   # live | on_release | never: when a dragged tab becomes a floating window
+  dock_tab_cycle: layout   # layout | recent: Ctrl+Tab order (stacks then floats, or most recently focused first)
   dock_compact: false
   dock_preview_opacity: 100   # percent, 0-100
   dock_guides: true

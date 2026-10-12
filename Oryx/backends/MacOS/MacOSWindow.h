@@ -32,7 +32,7 @@ public:
 private:
     GLFWwindow* m_window = nullptr;
     PolledInput m_input;
-    GLFWcursor* m_cursors[5] = {};
+    GLFWcursor* m_cursors[7] = {};
     CursorKind m_cursor_kind = CursorKind::Arrow;
 };
 

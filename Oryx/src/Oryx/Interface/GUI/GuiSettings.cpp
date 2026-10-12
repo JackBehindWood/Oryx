@@ -48,6 +48,10 @@ void read_settings(GuiSettings& settings, const SettingsNode& node)
         { { "top", gui::TabPosition::Top }, { "bottom", gui::TabPosition::Bottom } });
     dock.close_buttons = choose<gui::CloseButtons>(node, "dock_close_buttons", dock.close_buttons,
         { { "on_hover", gui::CloseButtons::OnHover }, { "always", gui::CloseButtons::Always }, { "never", gui::CloseButtons::Never } });
+    dock.tear_off = choose<gui::TearOff>(node, "dock_tear_off", dock.tear_off,
+        { { "live", gui::TearOff::Live }, { "on_release", gui::TearOff::OnRelease }, { "never", gui::TearOff::Never } });
+    dock.tab_cycle = choose<gui::TabCycle>(node, "dock_tab_cycle", dock.tab_cycle,
+        { { "layout", gui::TabCycle::Layout }, { "recent", gui::TabCycle::Recent } });
     dock.compact = node.boolean("dock_compact", dock.compact);
     dock.guides = node.boolean("dock_guides", dock.guides);
     dock.drop_flash = node.boolean("dock_drop_flash", dock.drop_flash);

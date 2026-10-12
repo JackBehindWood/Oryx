@@ -30,7 +30,9 @@ enum class CursorKind : uint8_t
     Hand,
     ResizeHorizontal,
     ResizeVertical,
-    Text
+    Text,
+    ResizeNWSE,
+    ResizeNESW
 };
 
 class Window

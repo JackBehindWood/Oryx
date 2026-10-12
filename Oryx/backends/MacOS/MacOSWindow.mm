@@ -140,7 +140,7 @@ MacOSWindow::~MacOSWindow()
 
 void MacOSWindow::set_cursor_kind(CursorKind kind)
 {
-    static constexpr int k_shapes[5] = { GLFW_ARROW_CURSOR, GLFW_POINTING_HAND_CURSOR, GLFW_RESIZE_EW_CURSOR, GLFW_RESIZE_NS_CURSOR, GLFW_IBEAM_CURSOR };
+    static constexpr int k_shapes[7] = { GLFW_ARROW_CURSOR, GLFW_POINTING_HAND_CURSOR, GLFW_RESIZE_EW_CURSOR, GLFW_RESIZE_NS_CURSOR, GLFW_IBEAM_CURSOR, GLFW_RESIZE_NWSE_CURSOR, GLFW_RESIZE_NESW_CURSOR };
     if (kind == m_cursor_kind)
     {
         return;

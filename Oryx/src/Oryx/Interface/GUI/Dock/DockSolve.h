@@ -20,6 +20,24 @@ enum class CloseButtons : uint8_t
     Never
 };
 
+enum class TabCycle : uint8_t
+{
+    // Ctrl+Tab walks the panels in layout order: stacks depth first, then floats.
+    Layout,
+    // Ctrl+Tab walks the panels most recently focused first, like Alt+Tab.
+    Recent
+};
+
+enum class TearOff : uint8_t
+{
+    // A held tab becomes a float as soon as the pointer leaves its strip, as in ImGui.
+    Live,
+    // A tab floats only when released outside the surface.
+    OnRelease,
+    // Tabs never float by dragging; floating stays available through float_panel.
+    Never
+};
+
 // The user's look-and-feel choices, all plain values so a settings loader fills them. Precedence for toolbars: this style, then the panel's own placement, then the node's context rule.
 struct DockStyle
 {
@@ -27,6 +45,8 @@ struct DockStyle
     bool toolbars = true;
     TabPosition tab_position = TabPosition::Top;
     CloseButtons close_buttons = CloseButtons::Always;
+    TearOff tear_off = TearOff::Live;
+    TabCycle tab_cycle = TabCycle::Layout;
     // Scales strip and toolbar heights and tab padding.
     bool compact = false;
     // Alpha factor of the drop preview fill.
@@ -49,6 +69,14 @@ struct DockMetrics
     float toolbar_height = 24.0f;
     // The unit the drop guides scale from (the tab text height): a guide's half size is a node's smaller side over 8, clamped to half and one and a half units, as in ImGui.
     float guide_unit = 16.0f;
+    float close_size = 14.0f;
+    float close_icon = 8.0f;
+    // Thickness of a float's resize bands; they straddle the border.
+    float grip_band = 6.0f;
+    float splitter_pad = 3.0f;
+    float underline = 2.0f;
+    float float_width = 320.0f;
+    float float_height = 240.0f;
     DockStyle style;
 };
 
@@ -127,6 +155,22 @@ struct SolvedLayout
 // `rect` grown to at least `min_size`, then fitted inside `surface` (the surface wins when it is smaller than the minimum).
 [[nodiscard]] Rect clamp_float(const Rect& rect, const Vec2f& min_size, const Rect& surface);
 
+enum : uint8_t
+{
+    k_edge_left = 1,
+    k_edge_right = 2,
+    k_edge_top = 4,
+    k_edge_bottom = 8
+};
+
+// `anchor` with the edges in the `edges` mask moved by `total` (the press-relative pointer travel); a dragged edge stops at `min_size` instead of pushing the opposite edge, then the result is fitted inside `surface`.
+[[nodiscard]] Rect resize_float(const Rect& anchor, uint8_t edges, const Vec2f& total, const Vec2f& min_size, const Rect& surface);
+
+// ImGui's rule for lifting a held tab out of its strip: the pointer is `1.5` text heights above or below the tab (the allowance grows with the sideways travel `max_drag_x`, up to 5.5, so reordering never tears), or `2.2` heights past the strip's first or last tab in that direction.
+[[nodiscard]] bool tear_off_due(const DockLayout& layout, const SolvedLayout& solved, int32_t node, uint32_t tab, const Vec2f& pointer, float max_drag_x);
+// Where a torn tab's float goes: the size the panel last floated at (`remembered`, zero when unknown), else the size of the node it left (at most one and a half default floats and 90% of the surface, at least the panel's minimum), placed so the grab offset (pointer minus the tab's top-left) is unchanged.
+[[nodiscard]] Rect tear_off_rect(const PanelTable& panels, const SolvedLayout& solved, int32_t node, PanelId panel, const Vec2f& pointer, const Vec2f& grab, const Vec2f& remembered = Vec2f(0.0f, 0.0f));
+
 // The placement a node's selected panel gets after style, panel and context are weighed.
 [[nodiscard]] ToolbarPlacement resolve_toolbar_placement(const DockStyle& style, const PanelDesc& panel, uint32_t tab_count);
 
@@ -201,9 +245,6 @@ struct DropPlan
     int32_t guide = -1;
     uint8_t surface = 0;
 };
-
-inline constexpr float k_dock_float_width = 320.0f;
-inline constexpr float k_dock_float_height = 240.0f;
 
 // The one place that decides a drag, shared by the host's preview and its release. `float_only` (Shift) skips every dock target; a pointer outside the surface also floats when the panel may.
 [[nodiscard]] DropPlan resolve_drop(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, PanelId panel, const Vec2f& pointer, bool float_only);

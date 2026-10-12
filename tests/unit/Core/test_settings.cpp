@@ -379,6 +379,8 @@ TEST_CASE("gui settings default, read the layout file and dock look-and-feel and
     CHECK(defaults.dock.toolbar_placement == gui::ToolbarPlacement::Auto);
     CHECK(defaults.dock.tab_position == gui::TabPosition::Top);
     CHECK(defaults.dock.close_buttons == gui::CloseButtons::Always);
+    CHECK(defaults.dock.tear_off == gui::TearOff::Live);
+    CHECK(defaults.dock.tab_cycle == gui::TabCycle::Layout);
     CHECK_FALSE(defaults.dock.compact);
     CHECK(defaults.dock.preview_opacity == doctest::Approx(1.0f));
     CHECK(defaults.dock.guides);
@@ -392,12 +394,14 @@ TEST_CASE("gui settings default, read the layout file and dock look-and-feel and
     CHECK_FALSE(settings_of<GuiSettings>().docking);
     CHECK(settings_of<GuiSettings>().layout_file.empty());
 
-    load_from(dir.write("s.yaml", "gui:\n  dock_toolbars: false\n  dock_toolbar_placement: below_tabs\n  dock_tab_position: bottom\n  dock_close_buttons: on_hover\n  dock_compact: true\n  dock_preview_opacity: 40\n  dock_guides: false\n  dock_drop_flash: false\n"));
+    load_from(dir.write("s.yaml", "gui:\n  dock_toolbars: false\n  dock_toolbar_placement: below_tabs\n  dock_tab_position: bottom\n  dock_close_buttons: on_hover\n  dock_tear_off: on_release\n  dock_tab_cycle: recent\n  dock_compact: true\n  dock_preview_opacity: 40\n  dock_guides: false\n  dock_drop_flash: false\n"));
     const GuiSettings& styled = settings_of<GuiSettings>();
     CHECK_FALSE(styled.dock.toolbars);
     CHECK(styled.dock.toolbar_placement == gui::ToolbarPlacement::BelowTabs);
     CHECK(styled.dock.tab_position == gui::TabPosition::Bottom);
     CHECK(styled.dock.close_buttons == gui::CloseButtons::OnHover);
+    CHECK(styled.dock.tear_off == gui::TearOff::OnRelease);
+    CHECK(styled.dock.tab_cycle == gui::TabCycle::Recent);
     CHECK(styled.dock.compact);
     CHECK(styled.dock.preview_opacity == doctest::Approx(0.4f));
     CHECK_FALSE(styled.dock.guides);

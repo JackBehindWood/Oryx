@@ -56,7 +56,9 @@ enum class CursorShape : uint8_t
     Hand,
     ResizeHorizontal,
     ResizeVertical,
-    Text
+    Text,
+    ResizeNWSE,
+    ResizeNESW
 };
 
 // What a frame asks of its owner, read after end_frame. Reset by begin_frame.
@@ -71,10 +73,11 @@ static_assert(std::is_trivially_copyable_v<ImOutput> && std::is_standard_layout_
 
 inline constexpr size_t k_max_widget_state_size = 64;
 
-// Reserved draw channels, above the default canvas channel (1): popups, then tooltips, then a dragged ghost.
-inline constexpr uint32_t k_channel_popup = 2;
-inline constexpr uint32_t k_channel_tooltip = 3;
-inline constexpr uint32_t k_channel_drag = 4;
+// Reserved draw channels, above the default canvas channel (1): floating windows, then popups, then tooltips, then a dragged ghost.
+inline constexpr uint32_t k_channel_float = 2;
+inline constexpr uint32_t k_channel_popup = 3;
+inline constexpr uint32_t k_channel_tooltip = 4;
+inline constexpr uint32_t k_channel_drag = 5;
 
 // Alpha factor of the boxes inside a disabled scope.
 inline constexpr float k_disabled_alpha = 0.45f;

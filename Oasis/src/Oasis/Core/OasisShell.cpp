@@ -113,8 +113,22 @@ void OasisShell::frame(const FrameInfo& info)
             window->set_clipboard_text(m_context.output().copy_text);
         }
     }
-    draw_showcase(info);
-    Renderer::scene().submit(*this);
+    if (showcase_floating())
+    {
+        Renderer::scene().submit(*this);
+        draw_showcase(info);
+    }
+    else
+    {
+        draw_showcase(info);
+        Renderer::scene().submit(*this);
+    }
+}
+
+bool OasisShell::showcase_floating()
+{
+    ContextScope<GuiContext> scope(m_context);
+    return gui::is_panel_floating(k_showcase_panel);
 }
 
 void OasisShell::draw_showcase(const FrameInfo& info)

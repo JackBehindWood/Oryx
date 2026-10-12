@@ -19,8 +19,10 @@ struct DragScene
     DockLayout& layout = f.context.dock_model().layout;
     DockLayout original;
 
-    DragScene()
+    // The drop rules are the subject of most cases here, so tabs float on release; the tear-off cases ask for Live.
+    explicit DragScene(TearOff tear_off = TearOff::OnRelease)
     {
+        set_dock_style([tear_off](DockStyle& style) { style.tear_off = tear_off; });
         f.driver.input().surface_size = { 800.0f, 600.0f };
         model().panels = make_panels();
         layout = make_sample(model().panels);
@@ -236,7 +238,7 @@ TEST_CASE("panel host drag: escape cancels and the layout is unchanged")
     CHECK(diff(scene.layout, scene.original).empty());
 }
 
-TEST_CASE("panel host drag: ctrl+tab cycles the focused node's tabs and wraps, shift reverses")
+TEST_CASE("panel host drag: ctrl+tab steps through the panels in layout order, shift reverses")
 {
     DragScene scene;
     focus_panel("b");
@@ -248,10 +250,10 @@ TEST_CASE("panel host drag: ctrl+tab cycles the focused node's tabs and wraps, s
         scene.frames(1);
     };
     REQUIRE(scene.layout.nodes[1].selected == 1);
-    press_tab(false);
+    press_tab(true);
     CHECK(scene.layout.nodes[1].selected == 0);
     CHECK(is_panel_focused("a"));
-    press_tab(true);
+    press_tab(false);
     CHECK(scene.layout.nodes[1].selected == 1);
     CHECK(is_panel_focused("b"));
 }

@@ -43,6 +43,8 @@ void end_panel_toolbar();
 
 // Panels by name. Unknown names are answered with false / UnknownPanel, never thrown. Edits obey the panels' flags and docking rules, are undoable and are saved by the same reactive autosave.
 [[nodiscard]] bool is_panel_open(std::string_view name);
+// Open as a floating window rather than in a tab stack.
+[[nodiscard]] bool is_panel_floating(std::string_view name);
 DockResult set_panel_open(std::string_view name, bool open);
 DockResult toggle_panel(std::string_view name);
 // The panel that last took a press (a viewport press included); the owner may set it too (a shortcut).

@@ -89,6 +89,9 @@ struct DragState
 {
     DragSource source = DragSource::None;
     PanelId panel;
+    // Where the press landed, and the farthest the pointer has strayed from it sideways (it widens the tear-off allowance).
+    Vec2f press{ 0.0f, 0.0f };
+    float max_drag_x = 0.0f;
     // Pointer minus the dragged tab's or float's top-left corner when the drag began.
     Vec2f grab{ 0.0f, 0.0f };
     DropPlan plan;
@@ -99,6 +102,9 @@ struct DragState
     // A tab drag reorders its strip live; where the tab started, so Esc or a refused drop can put it back.
     uint32_t origin_slot = 0;
     bool reordered = false;
+    // A tab that tore off into a float: the layout before it did, for Esc and refused drops.
+    bool torn = false;
+    DockLayout before_tear;
     // Seconds the pointer has rested in a strip's edge zone, and since the last auto-scroll step.
     float edge_dwell = 0.0f;
     float scroll_clock = 0.0f;
@@ -141,6 +147,13 @@ struct DockModel
     DockLayout last_good;
     bool has_good = false;
     PanelId focused;
+    // Focus history, most recent first, for Ctrl+Tab in Recent order; `cycling` freezes it while Ctrl is held and `cycle_at` is the entry shown.
+    PanelId recent[k_max_panels] = {};
+    uint32_t recent_count = 0;
+    uint32_t cycle_at = 0;
+    bool cycling = false;
+    // The size each panel last floated at this session (view state, never saved), indexed like `panels`; zero when unknown.
+    Vec2f float_size[k_max_panels] = {};
     uint32_t reported[k_max_reported_panels] = {};
     uint32_t reported_count = 0;
     DragState drag;

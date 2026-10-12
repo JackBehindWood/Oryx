@@ -13,10 +13,6 @@ namespace
 
 constexpr float k_landing_flash_seconds = 0.6f;
 
-constexpr float k_close_size = 14.0f;
-
-constexpr float k_splitter_pad = 3.0f;
-
 constexpr float k_edge_dwell_seconds = 0.25f;
 
 constexpr float k_edge_step_seconds = 0.12f;
@@ -101,6 +97,13 @@ DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
     metrics.tab_max_width = 160.0f * scale;
     metrics.guide_unit = tab.text_height;
     metrics.strip_button = metrics.strip_height;
+    metrics.close_size = 14.0f * scale;
+    metrics.close_icon = 8.0f * scale;
+    metrics.grip_band = 6.0f * scale;
+    metrics.splitter_pad = 3.0f * scale;
+    metrics.underline = 2.0f * scale;
+    metrics.float_width = 320.0f * scale;
+    metrics.float_height = 240.0f * scale;
     return metrics;
 }
 
@@ -123,6 +126,17 @@ uint32_t open_fill(GuiContext& ctx, const DockView& h, const Rect& rect, const I
     if (!border)
         paint.border_width = 0.0f;
     return index;
+}
+
+// An outline with no fill, for panels that draw nothing themselves (viewports) or have no body (collapsed stacks).
+void focus_ring(GuiContext& ctx, const DockView& h, const Rect& rect)
+{
+    const uint32_t index = ctx.begin_box(ImId{}, placed(h, rect));
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    paint.has_fill = false;
+    paint.border_width = 1.0f;
+    paint.border = ctx.dock_theme().focus_ring;
+    ctx.end_box();
 }
 
 int32_t find_body_index(const DockView& h, PanelId id)
@@ -186,15 +200,35 @@ void draw_body(GuiContext& ctx, DockView& h, const DockNode& node, const SolvedN
     const PanelId id = node.tabs[node.selected];
     if (place_body(ctx, h, id, solved.body, solved.toolbar, 0))
         h.model->focused = id;
+    const PanelDesc* desc = find_panel(h.model->panels, id);
+    if (desc != nullptr && desc->kind == PanelKind::Viewport && h.model->focused == id)
+        focus_ring(ctx, h, solved.body);
 }
 
-void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& grab, const Rect& origin = {})
+bool tab_location(const DockLayout& layout, PanelId panel, int32_t& node, uint32_t& index)
+{
+    for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
+    {
+        const DockNode& candidate = layout.nodes[n];
+        for (uint32_t t = 0; candidate.kind == DockNodeKind::Tabs && t < candidate.count && t < k_max_dock_tabs; ++t)
+            if (candidate.tabs[t] == panel)
+            {
+                node = static_cast<int32_t>(n);
+                index = t;
+                return true;
+            }
+    }
+    return false;
+}
+
+void begin_drag(DockView& h, DragSource source, PanelId panel, const Vec2f& press, const Vec2f& grab, const Rect& origin = {})
 {
     if (h.model->drag.source != DragSource::None)
         return;
     h.model->drag = DragState{};
     h.model->drag.source = source;
     h.model->drag.panel = panel;
+    h.model->drag.press = press;
     h.model->drag.grab = grab;
     h.model->drag.origin_rect = origin;
 }
@@ -207,11 +241,11 @@ bool draggable(const PanelTable& panels, PanelId panel)
 
 Rect padded(const Rect& rect, float pad) { return Rect{ Vec2f(rect.min[0] - pad, rect.min[1] - pad), Vec2f(rect.size[0] + 2.0f * pad, rect.size[1] + 2.0f * pad) }; }
 
-void close_mark(GuiContext& ctx, const ImStyle& style, const ItemState& close, float pad)
+void close_mark(GuiContext& ctx, const DockMetrics& metrics, const ImStyle& style, const ItemState& close, float pad)
 {
     LayoutStyle mark;
-    mark.width = fixed(k_close_size);
-    mark.height = fixed(k_close_size);
+    mark.width = fixed(metrics.close_size);
+    mark.height = fixed(metrics.close_size);
     mark.floating = { true, AttachPoint::CentreRight, AttachPoint::CentreRight, FloatTarget::Parent, {}, { -pad, 0.0f } };
     const uint32_t mark_index = ctx.begin_box(ImId{}, mark);
     BoxPaint& paint = ctx.layout().node(mark_index).paint;
@@ -220,7 +254,7 @@ void close_mark(GuiContext& ctx, const ImStyle& style, const ItemState& close, f
     paint.radius = uniform_radius(style.radius);
     paint.icon = Icon::Cross;
     paint.icon_colour = close.hovered ? style.text : Colour{ style.text.r, style.text.g, style.text.b, style.text.a * 0.6f };
-    paint.icon_size = 8.0f;
+    paint.icon_size = metrics.close_icon;
     ctx.end_box();
 }
 
@@ -238,8 +272,9 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     const bool chosen = index == node.selected;
     const bool closable = can_close(h.model->panels, id) == DockReason::None && close_buttons != CloseButtons::Never;
     const bool dragged = h.model->drag.source == DragSource::Tab && h.model->drag.panel == id;
+    const DockMetrics& metrics = h.solved.metrics;
     const float pad = style.padding.right * 0.5f;
-    const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - k_close_size, rect.min[1]), Vec2f(k_close_size + pad, rect.size[1]) };
+    const Rect close_rect{ Vec2f(rect.min[0] + rect.size[0] - pad - metrics.close_size, rect.min[1]), Vec2f(metrics.close_size + pad, rect.size[1]) };
 
     IdScope scope(ctx, ctx.index_id(id.hash));
     const ImId tab_id = ctx.id("tab");
@@ -252,13 +287,13 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     if (tab.hovered)
         ctx.request_cursor(CursorShape::Hand);
     if (drag.started && !close.held && draggable(h.model->panels, id))
-        begin_drag(h, DragSource::Tab, id, drag.start - rect.min);
+        begin_drag(h, DragSource::Tab, id, drag.start, drag.start - rect.min);
     if (drag.started && !close.held && h.model->drag.panel == id)
         h.model->drag.origin_slot = index;
 
     LayoutStyle box = placed(h, rect);
     box.padding = style.padding;
-    box.padding.right += show_close ? k_close_size + pad : 0.0f;
+    box.padding.right += show_close ? metrics.close_size + pad : 0.0f;
     box.align_y = Align::Centre;
     const uint32_t box_index = ctx.begin_box(ImId{}, box);
     {
@@ -278,12 +313,12 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         }
     }
     if (show_close)
-        close_mark(ctx, style, close, pad);
+        close_mark(ctx, metrics, style, close, pad);
     if (chosen)
     {
         LayoutStyle underline;
         underline.width = grow();
-        underline.height = fixed(2.0f);
+        underline.height = fixed(metrics.underline);
         const bool bottom = h.style.tab_position == TabPosition::Bottom;
         const AttachPoint edge = bottom ? AttachPoint::TopLeft : AttachPoint::BottomLeft;
         underline.floating = { true, edge, edge, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
@@ -365,6 +400,8 @@ void draw_strip(GuiContext& ctx, DockView& h, int32_t node_index, PanelId& pendi
     const uint32_t first = solved.first_visible;
     for (uint32_t i = first; i < first + solved.visible_count && i < node.count; ++i)
         draw_tab(ctx, h, node_index, node, i, solved.tab_rects[i], pending_close);
+    if (collapsed && node.selected < node.count && node.tabs[node.selected] == h.model->focused)
+        focus_ring(ctx, h, solved.strip);
 
     if (!is_empty(solved.collapse_button))
     {
@@ -376,7 +413,7 @@ void draw_strip(GuiContext& ctx, DockView& h, int32_t node_index, PanelId& pendi
         BoxPaint& paint = ctx.layout().current().paint;
         paint.icon = collapsed ? Icon::ChevronRight : Icon::ChevronDown;
         paint.icon_colour = style.text;
-        paint.icon_size = 8.0f;
+        paint.icon_size = h.solved.metrics.close_icon;
         ctx.end_box();
         if (chevron.clicked)
             note(h, set_collapsed(*h.layout, h.model->panels, node_index, node.collapsed == 0));
@@ -393,7 +430,7 @@ void draw_splitter(GuiContext& ctx, DockView& h, int32_t node_index)
     {
         IdScope scope(ctx, ctx.index_id(static_cast<uint64_t>(node_index)));
         const ImId id = ctx.id("splitter");
-        state = ctx.item(id, padded(solved.splitter, k_splitter_pad * ctx.gui_theme().tab.text_height / 16.0f));
+        state = ctx.item(id, padded(solved.splitter, h.solved.metrics.splitter_pad));
         const ItemDrag drag = ctx.item_drag(id);
         const bool horizontal = node.axis == DockAxis::Horizontal;
         const uint32_t axis = horizontal ? 0 : 1;
@@ -425,22 +462,32 @@ struct Grip
 {
     const char* name;
     Rect rect;
+    uint8_t edges;
     CursorShape cursor;
-    bool width;
-    bool height;
 };
 
+// Bands straddle the border; the top ones lean outward so they never take the title bar's close button.
 void draw_grips(GuiContext& ctx, DockView& h, uint32_t f)
 {
+    if (can_resize(h.model->panels, h.layout->floats[f].panel) != DockReason::None)
+        return;
     const Rect& rect = h.solved.floats[f];
-    const float band = 6.0f;
+    const float band = h.solved.metrics.grip_band;
     const float title = h.solved.float_parts[f].title.size[1];
-    const float right = rect.min[0] + rect.size[0];
-    const float bottom = rect.min[1] + rect.size[1];
-    const Grip grips[3] = {
-        { "grip_corner", Rect{ Vec2f(right - band * 2.0f, bottom - band * 2.0f), Vec2f(band * 2.0f, band * 2.0f) }, CursorShape::ResizeHorizontal, true, true },
-        { "grip_right", Rect{ Vec2f(right - band * 0.5f, rect.min[1] + title), Vec2f(band, rect.size[1] - title - band * 2.0f) }, CursorShape::ResizeHorizontal, true, false },
-        { "grip_bottom", Rect{ Vec2f(rect.min[0], bottom - band * 0.5f), Vec2f(rect.size[0] - band * 2.0f, band) }, CursorShape::ResizeVertical, false, true },
+    const float left = rect.min[0];
+    const float top = rect.min[1];
+    const float right = left + rect.size[0];
+    const float bottom = top + rect.size[1];
+    const float half = band * 0.5f;
+    const Grip grips[8] = {
+        { "grip_tl", Rect{ Vec2f(left - half, top - band), Vec2f(band * 1.5f, band * 1.5f) }, k_edge_left | k_edge_top, CursorShape::ResizeNWSE },
+        { "grip_tr", Rect{ Vec2f(right - band, top - band), Vec2f(band * 1.5f, band * 1.5f) }, k_edge_right | k_edge_top, CursorShape::ResizeNESW },
+        { "grip_bl", Rect{ Vec2f(left - half, bottom - band * 1.5f), Vec2f(band * 2.0f, band * 2.0f) }, k_edge_left | k_edge_bottom, CursorShape::ResizeNESW },
+        { "grip_br", Rect{ Vec2f(right - band * 1.5f, bottom - band * 1.5f), Vec2f(band * 2.0f, band * 2.0f) }, k_edge_right | k_edge_bottom, CursorShape::ResizeNWSE },
+        { "grip_top", Rect{ Vec2f(left + band, top - band), Vec2f(rect.size[0] - band * 2.0f, band * 1.5f) }, k_edge_top, CursorShape::ResizeVertical },
+        { "grip_bottom", Rect{ Vec2f(left + band * 1.5f, bottom - half), Vec2f(rect.size[0] - band * 3.0f, band) }, k_edge_bottom, CursorShape::ResizeVertical },
+        { "grip_left", Rect{ Vec2f(left - half, top + title), Vec2f(band, rect.size[1] - title - band * 1.5f) }, k_edge_left, CursorShape::ResizeHorizontal },
+        { "grip_right", Rect{ Vec2f(right - half, top + title), Vec2f(band, rect.size[1] - title - band * 1.5f) }, k_edge_right, CursorShape::ResizeHorizontal },
     };
     for (const Grip& grip : grips)
     {
@@ -454,9 +501,7 @@ void draw_grips(GuiContext& ctx, DockView& h, uint32_t f)
             h.model->anchor.rect = rect;
         if (drag.started || drag.dragging)
         {
-            Rect resized = h.model->anchor.rect;
-            resized.size = Vec2f(resized.size[0] + (grip.width ? drag.total[0] : 0.0f), resized.size[1] + (grip.height ? drag.total[1] : 0.0f));
-            resized = clamp_float(resized, float_min_size(h.model->panels, h.layout->floats[f].panel, h.solved.metrics), h.solved.surface_rect);
+            const Rect resized = resize_float(h.model->anchor.rect, grip.edges, drag.total, float_min_size(h.model->panels, h.layout->floats[f].panel, h.solved.metrics), h.solved.surface_rect);
             if (!(resized == h.layout->floats[f].rect))
             {
                 h.layout->floats[f].rect = resized;
@@ -485,17 +530,20 @@ void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close
     const bool focused = h.model->focused == id;
     const bool closable = can_close(h.model->panels, id) == DockReason::None;
     const float pad = style.padding.right * 0.5f;
-    const Rect close_rect{ Vec2f(parts.title.min[0] + parts.title.size[0] - pad - k_close_size, parts.title.min[1]), Vec2f(k_close_size + pad, parts.title.size[1]) };
+    const DockMetrics& metrics = h.solved.metrics;
+    const Rect close_rect{ Vec2f(parts.title.min[0] + parts.title.size[0] - pad - metrics.close_size, parts.title.min[1]), Vec2f(metrics.close_size + pad, parts.title.size[1]) };
 
     IdScope scope(ctx, ctx.index_id(id.hash));
-    ctx.add_shield(rect);
+    ctx.add_shield(padded(rect, metrics.grip_band));
     ctx.begin_shield_layer();
-    open_fill(ctx, h, rect, theme.panel, theme.panel.background, true, k_channel_popup);
+    open_fill(ctx, h, rect, theme.panel, theme.panel.background, true, k_channel_float);
+    if (desc->foreign_body)
+        ctx.layout().current().paint.has_fill = false;
     if (focused)
         ctx.layout().current().paint.border = ctx.dock_theme().focus_ring;
     ctx.end_box();
 
-    const bool pressed_body = place_body(ctx, h, id, parts.body, parts.toolbar, k_channel_popup);
+    const bool pressed_body = place_body(ctx, h, id, parts.body, parts.toolbar, k_channel_float);
     if (pressed_body)
     {
         h.model->focused = id;
@@ -511,11 +559,11 @@ void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close
     if (title.hovered)
         ctx.request_cursor(CursorShape::Hand);
     if (drag.started && !close.held)
-        begin_drag(h, DragSource::Float, id, drag.start - rect.min, rect);
+        begin_drag(h, DragSource::Float, id, drag.start, drag.start - rect.min, rect);
 
-    LayoutStyle bar = placed(h, parts.title, k_channel_popup);
+    LayoutStyle bar = placed(h, parts.title, k_channel_float);
     bar.padding = style.padding;
-    bar.padding.right += closable ? k_close_size + pad : 0.0f;
+    bar.padding.right += closable ? metrics.close_size + pad : 0.0f;
     bar.align_y = Align::Centre;
     const uint32_t bar_index = ctx.begin_box(ImId{}, bar);
     BoxPaint& paint = ctx.layout().node(bar_index).paint;
@@ -526,7 +574,7 @@ void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close
     paint.text_colour = style.text;
     paint.ellipsis = true;
     if (closable)
-        close_mark(ctx, style, close, pad);
+        close_mark(ctx, metrics, style, close, pad);
     ctx.end_box();
 
     if (title.pressed && !close.hovered)
@@ -864,6 +912,12 @@ void restore_float(DockView& h, const DragState& d)
         }
 }
 
+void restore_tear(DockView& h, const DragState& d)
+{
+    *h.layout = d.before_tear;
+    h.result.layout_changed = true;
+}
+
 // Runs after the frame's drawing so no op reshapes the tree while its tabs are still being drawn.
 // Resting the pointer in an overflowing strip's edge zone scrolls it a tab at a time, so hidden slots can be reached mid-drag.
 void auto_scroll_strip(DockView& h, DragState& d, const Vec2f& pointer, float delta_time)
@@ -894,6 +948,35 @@ void auto_scroll_strip(DockView& h, DragState& d, const Vec2f& pointer, float de
     scroll_strip(h, node_index, step);
 }
 
+// ImGui's live undock: once the held tab is far enough out of its strip the panel becomes a float under the pointer and the drag carries on as a float drag.
+bool tear_off_tab(DockView& h, DragState& d, const Vec2f& pointer)
+{
+    DockLayout& layout = *h.layout;
+    int32_t node = k_no_node;
+    uint32_t index = 0;
+    if (!tab_location(layout, d.panel, node, index) || !tear_off_due(layout, h.solved, node, index, pointer, d.max_drag_x))
+        return false;
+    if (can_float(h.model->panels, d.panel) != DockReason::None || layout.float_count >= k_max_dock_floats)
+        return false;
+    const PanelDesc* desc = find_panel(h.model->panels, d.panel);
+    const Vec2f remembered = desc != nullptr ? h.model->float_size[desc - h.model->panels.descs] : Vec2f(0.0f, 0.0f);
+    const Rect rect = tear_off_rect(h.model->panels, h.solved, node, d.panel, pointer, d.grab, remembered);
+    const DockLayout before = layout;
+    const DockResult floated = float_panel(layout, h.model->panels, d.panel, rect, h.solved.surface);
+    note(h, floated);
+    if (!floated.applied)
+        return false;
+    d.source = DragSource::Float;
+    d.torn = true;
+    d.before_tear = before;
+    d.origin_rect = Rect{};
+    d.reordered = false;
+    d.plan = DropPlan{};
+    d.guides = DropGuides{};
+    h.model->focused = d.panel;
+    return true;
+}
+
 void update_drag(GuiContext& ctx, DockView& h)
 {
     DragState& d = h.model->drag;
@@ -905,13 +988,25 @@ void update_drag(GuiContext& ctx, DockView& h)
         if (key_pressed(input.keys, ImKey::Escape))
         {
             restore_reorder(h, d);
-            if (d.source == DragSource::Float)
+            if (d.torn)
+                restore_tear(h, d);
+            else if (d.source == DragSource::Float)
                 restore_float(h, d);
         }
         d = DragState{};
         return;
     }
     const Vec2f pointer = input.pointer.position;
+    if (d.source == DragSource::Tab)
+    {
+        d.max_drag_x = math::max(d.max_drag_x, math::abs(pointer[0] - d.press[0]));
+        if (h.solved.metrics.style.tear_off == TearOff::Live && button_of(input, MouseCode::Left).down && tear_off_tab(h, d, pointer))
+        {
+            h.result.interacting = true;
+            h.result.dragging = true;
+            return;
+        }
+    }
     if (d.source == DragSource::Float)
         move_dragged_float(h, pointer);
     if (d.source == DragSource::Tab)
@@ -926,7 +1021,11 @@ void update_drag(GuiContext& ctx, DockView& h)
     if (!button_of(input, MouseCode::Left).down)
     {
         if (d.plan.action == DropAction::Cancel)
+        {
             restore_reorder(h, d);
+            if (d.torn)
+                restore_tear(h, d);
+        }
         apply_drop(h, d);
         d = DragState{};
         return;
@@ -939,55 +1038,110 @@ void update_drag(GuiContext& ctx, DockView& h)
     draw_drag_feedback(ctx, h);
 }
 
-// Ctrl+Tab walks the tabs of the focused panel's node; a node with one tab hands the walk to the next node.
-void cycle_tabs(DockView& h, const ImKeys& keys)
+// Visits Tabs nodes depth first (first child before second), then floats back to front: the order Ctrl+Tab walks.
+uint32_t focus_order(const DockLayout& layout, uint8_t surface, PanelId* out)
 {
-    if (!keys.ctrl || !key_pressed(keys, ImKey::Tab) || h.model->drag.source != DragSource::None)
-        return;
-    DockLayout& layout = *h.layout;
-    const int32_t step = keys.shift ? -1 : 1;
-    int32_t current = k_no_node;
-    for (uint32_t n = 0; n < layout.node_count && current == k_no_node; ++n)
+    uint32_t count = 0;
+    int32_t pending[k_max_dock_nodes];
+    uint32_t top = 0;
+    if (surface < k_max_dock_surfaces && layout.roots[surface] != k_no_node)
+        pending[top++] = layout.roots[surface];
+    while (top > 0 && count < k_max_panels)
     {
-        const DockNode& node = layout.nodes[n];
-        for (uint32_t t = 0; node.kind == DockNodeKind::Tabs && t < node.count; ++t)
-            if (node.tabs[t] == h.model->focused)
-                current = static_cast<int32_t>(n);
+        const DockNode& node = layout.nodes[pending[--top]];
+        if (node.kind == DockNodeKind::Tabs)
+        {
+            for (uint32_t t = 0; t < node.count && count < k_max_panels; ++t)
+                out[count++] = node.tabs[t];
+        }
+        else if (node.kind == DockNodeKind::Split && top + 2 <= k_max_dock_nodes)
+        {
+            pending[top++] = node.second;
+            pending[top++] = node.first;
+        }
     }
-    if (current == k_no_node)
-    {
-        for (uint32_t n = 0; n < layout.node_count && current == k_no_node; ++n)
-            if (layout.nodes[n].kind == DockNodeKind::Tabs && layout.nodes[n].count > 0)
-                current = static_cast<int32_t>(n);
-        if (current == k_no_node)
-            return;
-        h.model->focused = layout.nodes[current].tabs[layout.nodes[current].selected];
-        return;
-    }
-    const DockNode& node = layout.nodes[current];
-    int32_t target = current;
+    for (uint32_t f = 0; f < layout.float_count && count < k_max_panels; ++f)
+        if (layout.floats[f].surface == surface)
+            out[count++] = layout.floats[f].panel;
+    return count;
+}
+
+// Selects a tab or raises a float and gives it focus.
+void focus_target(DockView& h, PanelId target)
+{
+    int32_t node = k_no_node;
     uint32_t index = 0;
-    if (node.count > 1)
+    if (tab_location(*h.layout, target, node, index))
+        note(h, select_tab(*h.layout, node, index));
+    else
+        raise_float(h, target);
+    h.model->focused = target;
+}
+
+// Ctrl+Tab in Recent order: the first press goes to the previous panel, further presses walk deeper into a frozen history until Ctrl is released.
+bool cycle_recent(DockView& h, bool reverse)
+{
+    DockModel& m = *h.model;
+    if (m.recent_count < 2)
+        return false;
+    if (!m.cycling)
     {
-        index = static_cast<uint32_t>((static_cast<int32_t>(node.selected) + step + static_cast<int32_t>(node.count)) % static_cast<int32_t>(node.count));
+        m.cycling = true;
+        m.cycle_at = reverse ? m.recent_count - 1u : 1u;
     }
     else
     {
-        const int32_t total = static_cast<int32_t>(layout.node_count);
-        for (int32_t i = 1; i <= total; ++i)
-        {
-            const int32_t candidate = ((current + step * i) % total + total) % total;
-            if (layout.nodes[candidate].kind == DockNodeKind::Tabs && layout.nodes[candidate].count > 0)
-            {
-                target = candidate;
-                break;
-            }
-        }
-        index = layout.nodes[target].selected;
+        m.cycle_at = reverse ? (m.cycle_at + m.recent_count - 1u) % m.recent_count : (m.cycle_at + 1u) % m.recent_count;
     }
-    note(h, select_tab(layout, target, index));
-    h.model->focused = layout.nodes[target].tabs[index];
-    h.result.layout_changed = true;
+    focus_target(h, m.recent[m.cycle_at]);
+    return true;
+}
+
+// Ctrl+Tab steps through every panel (layout order: stacks depth first, then floats; or most recent first); from nothing it starts at the first, Shift at the last.
+void cycle_tabs(DockView& h, const ImKeys& keys, uint8_t surface)
+{
+    DockModel& m = *h.model;
+    if (!keys.ctrl)
+        m.cycling = false;
+    if (!keys.ctrl || !key_pressed(keys, ImKey::Tab) || m.drag.source != DragSource::None)
+        return;
+    if (h.style.tab_cycle == TabCycle::Recent && cycle_recent(h, keys.shift))
+        return;
+    DockLayout& layout = *h.layout;
+    PanelId order[k_max_panels];
+    const uint32_t count = focus_order(layout, surface, order);
+    if (count == 0)
+        return;
+    uint32_t current = count;
+    for (uint32_t i = 0; i < count && current == count; ++i)
+        if (order[i] == m.focused)
+            current = i;
+    uint32_t next = 0;
+    if (current == count)
+        next = keys.shift ? count - 1u : 0u;
+    else
+        next = keys.shift ? (current + count - 1u) % count : (current + 1u) % count;
+    focus_target(h, order[next]);
+}
+
+// Keeps the focus history current: closed panels leave it, and a new focus moves to the front unless Ctrl+Tab is mid-walk.
+void note_focus(DockModel& m)
+{
+    uint32_t kept = 0;
+    for (uint32_t i = 0; i < m.recent_count; ++i)
+        if (is_open(m.layout, m.recent[i]))
+            m.recent[kept++] = m.recent[i];
+    m.recent_count = kept;
+    if (m.cycling || !is_valid(m.focused) || (m.recent_count > 0 && m.recent[0] == m.focused))
+        return;
+    uint32_t at = m.recent_count < k_max_panels ? m.recent_count : k_max_panels - 1u;
+    for (uint32_t i = 0; i < m.recent_count; ++i)
+        if (m.recent[i] == m.focused)
+            at = i;
+    for (uint32_t i = at; i > 0; --i)
+        m.recent[i] = m.recent[i - 1u];
+    m.recent[0] = m.focused;
+    m.recent_count = math::min(math::max(m.recent_count, at + 1u), k_max_panels);
 }
 
 void draw_empty(GuiContext& ctx, DockView& h)
@@ -1028,6 +1182,15 @@ void draw_host(GuiContext& ctx, DockView& h)
 {
     sync_drag_scroll(h);
     h.solved = solve(*h.layout, h.model->panels, metrics_of(ctx.gui_theme(), h.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface), &h.tab_scroll);
+    for (uint32_t f = 0; f < h.solved.float_count; ++f)
+    {
+        if (h.layout->floats[f].surface != h.solved.surface)
+            continue;
+        if (!(h.layout->floats[f].rect == h.solved.floats[f]))
+            h.layout->floats[f].rect = h.solved.floats[f];
+        if (const PanelDesc* desc = find_panel(h.model->panels, h.layout->floats[f].panel))
+            h.model->float_size[desc - h.model->panels.descs] = h.solved.floats[f].size;
+    }
     const int32_t root = h.layout->roots[ctx.input().surface];
     if (root == k_no_node && h.layout->float_count == 0)
     {
@@ -1035,7 +1198,7 @@ void draw_host(GuiContext& ctx, DockView& h)
         return;
     }
     ctx.push_id("panel_host");
-    cycle_tabs(h, ctx.input().keys);
+    cycle_tabs(h, ctx.input().keys, h.solved.surface);
     PanelId pending_close;
     PanelId pending_raise;
     const uint32_t count = h.solved.node_count;
@@ -1126,22 +1289,6 @@ DockModel& loaded_model()
     DockModel& m = context().dock_model();
     ensure_loaded(m);
     return m;
-}
-
-bool tab_location(const DockLayout& layout, PanelId panel, int32_t& node, uint32_t& index)
-{
-    for (uint32_t n = 0; n < layout.node_count && n < k_max_dock_nodes; ++n)
-    {
-        const DockNode& candidate = layout.nodes[n];
-        for (uint32_t t = 0; candidate.kind == DockNodeKind::Tabs && t < candidate.count && t < k_max_dock_tabs; ++t)
-            if (candidate.tabs[t] == panel)
-            {
-                node = static_cast<int32_t>(n);
-                index = t;
-                return true;
-            }
-    }
-    return false;
 }
 
 DockResult unknown_panel() { return DockResult{ false, DockReason::UnknownPanel }; }
@@ -1288,6 +1435,7 @@ void end_panel_host()
             keep_valid(h, m.layout);
         if (is_valid(m.focused) && !is_open(m.layout, m.focused))
             m.focused = PanelId{};
+        note_focus(m);
         if (!h.result.interacting)
             push(m.history, m.layout);
         if (m.autosave != nullptr && !settings.layout_file.empty())
@@ -1453,6 +1601,16 @@ Rect panel_toolbar_rect(std::string_view name)
 {
     const PanelBody* body = find_body(host_of(context()), make_panel_id(name));
     return body != nullptr ? body->toolbar : Rect{};
+}
+
+bool is_panel_floating(std::string_view name)
+{
+    const DockLayout& layout = loaded_model().layout;
+    const PanelId id = make_panel_id(name);
+    for (uint32_t f = 0; f < layout.float_count; ++f)
+        if (layout.floats[f].panel == id)
+            return true;
+    return false;
 }
 
 bool is_panel_open(std::string_view name)

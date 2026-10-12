@@ -265,6 +265,23 @@ Rect clamp_float(const Rect& rect, const Vec2f& min_size, const Rect& surface)
     return Rect{ Vec2f(x, y), Vec2f(w, h) };
 }
 
+Rect resize_float(const Rect& anchor, uint8_t edges, const Vec2f& total, const Vec2f& min_size, const Rect& surface)
+{
+    float left = anchor.min[0];
+    float top = anchor.min[1];
+    float right = anchor.min[0] + anchor.size[0];
+    float bottom = anchor.min[1] + anchor.size[1];
+    if ((edges & k_edge_left) != 0)
+        left = math::max(math::min(left + total[0], right - min_size[0]), surface.min[0]);
+    if ((edges & k_edge_right) != 0)
+        right = math::min(math::max(right + total[0], left + min_size[0]), surface.min[0] + surface.size[0]);
+    if ((edges & k_edge_top) != 0)
+        top = math::max(math::min(top + total[1], bottom - min_size[1]), surface.min[1]);
+    if ((edges & k_edge_bottom) != 0)
+        bottom = math::min(math::max(bottom + total[1], top + min_size[1]), surface.min[1] + surface.size[1]);
+    return clamp_float(Rect{ Vec2f(left, top), Vec2f(right - left, bottom - top) }, min_size, surface);
+}
+
 SolvedLayout solve(const DockLayout& layout, const PanelTable& panels, const DockMetrics& metrics, const Rect& surface_rect, uint8_t surface, TabScroll* scroll)
 {
     SolvedLayout out;
@@ -586,8 +603,8 @@ Rect float_preview(const PanelTable& panels, const SolvedLayout& solved, PanelId
     const DockMetrics& metrics = solved.metrics;
     const float tool_h = metrics.style.toolbars && desc != nullptr && desc->toolbar ? metrics.toolbar_height : 0.0f;
     const Rect& surface = solved.surface_rect;
-    const float w = math::min(math::max(k_dock_float_width, desc != nullptr ? desc->min_w : 0.0f), surface.size[0]);
-    const float h = math::min(math::max(k_dock_float_height, (desc != nullptr ? desc->min_h : 0.0f) + metrics.strip_height + tool_h), surface.size[1]);
+    const float w = math::min(math::max(metrics.float_width, desc != nullptr ? desc->min_w : 0.0f), surface.size[0]);
+    const float h = math::min(math::max(metrics.float_height, (desc != nullptr ? desc->min_h : 0.0f) + metrics.strip_height + tool_h), surface.size[1]);
     const float x = math::clamp(pointer[0] - w * 0.5f, surface.min[0], surface.min[0] + surface.size[0] - w);
     const float y = math::clamp(pointer[1] - metrics.strip_height * 0.5f, surface.min[1], surface.min[1] + surface.size[1] - h);
     return Rect{ Vec2f(x, y), Vec2f(w, h) };
@@ -635,6 +652,37 @@ Rect centre_preview(const SolvedNode& node)
     return node.body.size[0] > 0.0f && node.body.size[1] > 0.0f ? node.body : node.rect;
 }
 
+}
+
+bool tear_off_due(const DockLayout& layout, const SolvedLayout& solved, int32_t node, uint32_t tab, const Vec2f& pointer, float max_drag_x)
+{
+    if (node < 0 || static_cast<uint32_t>(node) >= solved.node_count || tab >= layout.nodes[node].count)
+        return false;
+    const SolvedNode& n = solved.nodes[node];
+    if (tab < n.first_visible || tab >= static_cast<uint32_t>(n.first_visible) + n.visible_count)
+        return false;
+    const float unit = solved.metrics.guide_unit;
+    const Rect& rect = n.tab_rects[tab];
+    const float allowance = 1.5f * unit + math::clamp((max_drag_x - 2.0f * unit) * 0.2f, 0.0f, 4.0f * unit);
+    const float beyond_y = math::max(rect.min[1] - pointer[1], pointer[1] - (rect.min[1] + rect.size[1]));
+    if (beyond_y >= allowance)
+        return true;
+    const bool first = tab == 0;
+    const bool last = tab + 1u == layout.nodes[node].count;
+    return (first && rect.min[0] - pointer[0] > 2.2f * unit) || (last && pointer[0] - (rect.min[0] + rect.size[0]) > 2.2f * unit);
+}
+
+Rect tear_off_rect(const PanelTable& panels, const SolvedLayout& solved, int32_t node, PanelId panel, const Vec2f& pointer, const Vec2f& grab, const Vec2f& remembered)
+{
+    const Rect& surface = solved.surface_rect;
+    const Vec2f least = float_min_size(panels, panel, solved.metrics);
+    const Vec2f from = node >= 0 && static_cast<uint32_t>(node) < solved.node_count ? solved.nodes[node].rect.size : Vec2f(0.0f, 0.0f);
+    const bool known = remembered[0] > 0.0f && remembered[1] > 0.0f;
+    const float want_w = known ? remembered[0] : math::min(from[0], solved.metrics.float_width * 1.5f);
+    const float want_h = known ? remembered[1] : math::min(from[1], solved.metrics.float_height * 1.5f);
+    const float w = math::min(math::max(want_w, least[0]), surface.size[0] * 0.9f);
+    const float h = math::min(math::max(want_h, least[1]), surface.size[1] * 0.9f);
+    return clamp_float(Rect{ Vec2f(pointer[0] - grab[0], pointer[1] - grab[1]), Vec2f(w, h) }, least, surface);
 }
 
 int32_t strip_at(const DockLayout& layout, const SolvedLayout& solved, const Vec2f& pointer)
@@ -724,7 +772,7 @@ static DropPlan decide_drop(const DockLayout& layout, const PanelTable& panels, 
         return plan;
     }
 
-    if (floating)
+    if (floating || solved.metrics.style.tear_off == TearOff::Never)
         return DropPlan{};
     const DockReason reason = can_float(panels, panel);
     if (reason != DockReason::None)

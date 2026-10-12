@@ -82,7 +82,7 @@ bool round_trips(const DockLayout& layout, const PanelTable& panels)
 }
 
 // The invariant set of the docking audit, as the first violation found or an empty string.
-std::string first_violation(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, bool roundtrip)
+std::string first_violation(const DockLayout& layout, const PanelTable& panels, const SolvedLayout& solved, bool roundtrip, bool shown_rects = false)
 {
     try
     {
@@ -122,6 +122,8 @@ std::string first_violation(const DockLayout& layout, const PanelTable& panels, 
         const std::string where = "float " + std::to_string(f) + "\n" + dump(layout, panels);
         if (!inside(rect, solved.surface_rect))
             return "float off the surface: " + where;
+        if (shown_rects && !(layout.floats[f].rect == rect))
+            return "float stored rect differs from the shown rect: " + where;
         if (is_empty(solved.float_parts[f].title))
             return "float without a title bar: " + where;
         const Vec2f floor = float_min_size(panels, layout.floats[f].panel, metrics);
@@ -237,7 +239,12 @@ struct SweepScene
         {
             const uint32_t f_index = rng.below(layout.float_count);
             const Rect& rect = solved.floats[f_index];
-            return pick == 5 ? Vec2f(rect.min[0] + rect.size[0] - 3.0f, rect.min[1] + rect.size[1] - 3.0f) : rect_centre(solved.float_parts[f_index].title);
+            if (pick != 5)
+                return rect_centre(solved.float_parts[f_index].title);
+            const float band = solved.metrics.grip_band;
+            const Vec2f corners[8] = { { rect.min[0] + 2.0f, rect.min[1] - band * 0.5f }, { rect.min[0] + rect.size[0] - 2.0f, rect.min[1] - band * 0.5f }, { rect.min[0] + 2.0f, rect.min[1] + rect.size[1] - 2.0f }, { rect.min[0] + rect.size[0] - 2.0f, rect.min[1] + rect.size[1] - 2.0f },
+                                       { rect.min[0] + rect.size[0] * 0.5f, rect.min[1] - band * 0.5f }, { rect.min[0] + rect.size[0] * 0.5f, rect.min[1] + rect.size[1] + 1.0f }, { rect.min[0] - 1.0f, rect.min[1] + rect.size[1] * 0.6f }, { rect.min[0] + rect.size[0] + 1.0f, rect.min[1] + rect.size[1] * 0.6f } };
+            return corners[rng.below(8)];
         }
         return Vec2f(rng.unit() * size[0], rng.unit() * size[1]);
     }
@@ -306,7 +313,7 @@ TEST_CASE("dock sweep: synthetic input through the panel host keeps every invari
                 break;
             }
             scene.frames(3);
-            const std::string violation = first_violation(scene.layout, scene.model().panels, scene.host().solved, step % 3 == 0);
+            const std::string violation = first_violation(scene.layout, scene.model().panels, scene.host().solved, step % 3 == 0, true);
             REQUIRE_MESSAGE(violation.empty(), violation);
             const PanelId focus = scene.model().focused;
             REQUIRE_MESSAGE((!is_valid(focus) || is_open(scene.layout, focus)), "focus points at a closed panel");
