@@ -274,6 +274,17 @@ TEST_CASE("Every registered game and strategy plays identically with an observer
             CHECK(attached.actions == detached.actions);
             CHECK(attached.rewards == detached.rewards);
             CHECK(trace.entries().size() == attached.actions.size());
+            const std::string own = strategy_id.substr(slash == std::string::npos ? 0 : slash + 1);
+            for (const TraceEntry& entry : trace.entries())
+            {
+                for (const auto& [key, value] : entry.decision.extra.values)
+                {
+                    const std::string family = key.substr(0, key.find('/'));
+                    INFO("diagnostic key '" << key << "'");
+                    CHECK(key.find('/') != std::string::npos);
+                    CHECK((family == own || family == "search" || family == "eval" || family == "policy"));
+                }
+            }
             ++combinations;
         }
     }

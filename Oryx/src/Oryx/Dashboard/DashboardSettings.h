@@ -13,6 +13,14 @@ struct DashboardSettings
     std::vector<std::string> annotations = { "heat", "chosen" };
 };
 
-void read_settings(DashboardSettings& settings, const SettingsNode& node);
+template<typename Visitor>
+void reflect(Visitor& v, DashboardSettings& s)
+{
+    v.removed("enabled", "the dashboard's views are added in code (Dashboard::add_view) and View > Window opens and closes it");
+    v.removed("views", "the dashboard's views are added in code (Dashboard::add_view) and View > Window opens and closes it");
+    v.field("history", s.history, Range{ 1, INT32_MAX }, Doc{ "Decisions the feed keeps" });
+    v.field("max_tree_nodes", s.max_tree_nodes, Range{ 0, 65536 }, Doc{ "Search tree nodes kept per decision (0 keeps none)" });
+    v.field("annotations", s.annotations, one_of({ "heat", "chosen", "value" }), Doc{ "Board overlays on at start: heat, chosen, value" });
+}
 
 } // namespace oryx

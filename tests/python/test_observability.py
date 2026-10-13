@@ -49,7 +49,7 @@ def test_decision_to_dict_is_plain_data():
 
     data = match.trace[0].to_dict()
     assert set(data) == {"ply", "player", "chosen", "chosen_label", "scores", "extra", "tree"}
-    assert data["tree"] == []
+    assert data["tree"] and set(data["tree"][0]) == {"parent", "action", "visits", "value"}
     assert isinstance(data["chosen_label"], str)
 
 

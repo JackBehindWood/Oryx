@@ -436,3 +436,107 @@ TEST_CASE("dashboard settings read their keys, reject non-positive sizes and say
     CHECK(calls == 1);
     reset_settings();
 }
+
+TEST_CASE("reflected settings are read and written as text by path, and a rejected value changes nothing")
+{
+    reset_settings();
+    CHECK(get_setting("dashboard.history") == "256");
+    CHECK(get_setting("dashboard.annotations") == "heat,chosen");
+
+    set_setting("dashboard.history", "64");
+    set_setting("dashboard.annotations", "value, heat");
+    CHECK(settings_of<DashboardSettings>().history == 64);
+    CHECK(settings_of<DashboardSettings>().annotations == std::vector<std::string>{ "value", "heat" });
+
+    CHECK_THROWS_WITH_AS(set_setting("dashboard.history", "0"), "dashboard.history must be between 1 and 2147483647, got 0", SettingsError);
+    CHECK_THROWS_AS(set_setting("dashboard.history", "many"), SettingsError);
+    CHECK_THROWS_AS(set_setting("dashboard.annotations", "shine"), SettingsError);
+    CHECK_THROWS_AS(set_setting("dashboard.nothing", "1"), SettingsError);
+    CHECK_THROWS_AS(set_setting("nothing.history", "1"), SettingsError);
+    CHECK_THROWS_AS(get_setting("history"), SettingsError);
+    CHECK(settings_of<DashboardSettings>().history == 64);
+    reset_settings();
+}
+
+#ifdef OX_ENABLE_GRAPHICS
+TEST_CASE("reflected enums and percentages go through their names and whole numbers")
+{
+    reset_settings();
+    CHECK(get_setting("gui.dock_tab_position") == "top");
+    set_setting("gui.dock_tab_position", "bottom");
+    CHECK(settings_of<GuiSettings>().dock.tab_position == gui::TabPosition::Bottom);
+    CHECK_THROWS_AS(set_setting("gui.dock_tab_position", "left"), SettingsError);
+
+    set_setting("gui.dock_preview_opacity", "40");
+    CHECK(settings_of<GuiSettings>().dock.preview_opacity == doctest::Approx(0.4f));
+    CHECK(get_setting("gui.dock_preview_opacity") == "40");
+    CHECK_THROWS_AS(set_setting("gui.dock_preview_opacity", "101"), SettingsError);
+    reset_settings();
+}
+
+#endif
+
+TEST_CASE("describe_settings lists every field with its description and allowed names")
+{
+    const std::vector<SettingsText::Entry> entries = describe_settings("dashboard");
+    REQUIRE_FALSE(entries.empty());
+    const auto position = std::find_if(entries.begin(), entries.end(), [](const SettingsText::Entry& entry) { return entry.key == "dashboard.annotations"; });
+    REQUIRE(position != entries.end());
+    CHECK(position->choices == std::vector<std::string>{ "heat", "chosen", "value" });
+    CHECK_FALSE(position->doc.empty());
+    CHECK(describe_settings("").size() >= entries.size());
+}
+
+TEST_CASE("every committed or reloaded change bumps the section's version")
+{
+    reset_settings();
+    const uint64_t before = settings_version("dashboard");
+    set_setting("dashboard.history", "10");
+    CHECK(settings_version("dashboard") > before);
+    reset_settings();
+}
+
+TEST_CASE("Save writes only what differs from the settings file, beside it, and reload applies it over the file")
+{
+    TempDir dir;
+    const std::filesystem::path base = dir.write("oryx.yaml", "# kept\ndashboard:\n  history: 100\n");
+    load_from(base);
+    CHECK(settings_override_file() == base.parent_path() / "oryx.local.yaml");
+
+    set_setting("dashboard.max_tree_nodes", "8");
+    set_setting("dashboard.history", "100");
+    save_settings();
+    const std::string saved = [&] { std::ifstream in(settings_override_file()); return std::string(std::istreambuf_iterator<char>(in), {}); }();
+    CHECK(saved.find("max_tree_nodes") != std::string::npos);
+    CHECK(saved.find("history") == std::string::npos);
+
+    std::ifstream original(base);
+    const std::string base_text(std::istreambuf_iterator<char>(original), {});
+    CHECK(base_text.find("# kept") != std::string::npos);
+
+    set_setting("dashboard.max_tree_nodes", "999");
+    reload_settings();
+    CHECK(settings_of<DashboardSettings>().max_tree_nodes == 8);
+    CHECK(settings_of<DashboardSettings>().history == 100);
+
+    set_setting("dashboard.max_tree_nodes", "256");
+    save_settings();
+    reload_settings();
+    CHECK(settings_of<DashboardSettings>().max_tree_nodes == 256);
+    reset_settings();
+}
+
+#ifdef OX_ENABLE_CONSOLE_COMMANDS
+TEST_CASE("console settings commands read, apply and list reflected settings")
+{
+    reset_settings();
+    CHECK(console::run("settings.get dashboard.history").output.find("256") != std::string::npos);
+    CHECK(console::run("settings.set dashboard.history 12").ok);
+    CHECK(settings_of<DashboardSettings>().history == 12);
+    const ConsoleResult bad = console::run("settings.set dashboard.history 0");
+    CHECK_FALSE(bad.ok);
+    CHECK(settings_of<DashboardSettings>().history == 12);
+    CHECK(console::run("settings.list dashboard").output.find("dashboard.max_tree_nodes = 256") != std::string::npos);
+    reset_settings();
+}
+#endif

@@ -487,3 +487,56 @@ TEST_CASE("DashboardFeed allocates nothing per decision with a describer attache
     }
     CHECK(memory_delta(before, all_allocations()).allocation_count == 0);
 }
+
+namespace
+{
+
+// Headroom over the measured ~1 (random) and ~8 (minimax) per decision; see observability.md.
+constexpr uint64_t k_attached_allocations_per_decision = 16;
+
+struct MatchCost
+{
+    uint64_t allocations = 0;
+    size_t decisions = 0;
+};
+
+MatchCost measure_match(const std::string& strategy_id, IDecisionObserver* observer)
+{
+    oasis::TicTacToeGame game;
+    Params params;
+    if (strategy_id == "random")
+    {
+        params["seed"] = static_cast<int64_t>(7);
+    }
+    UniquePtr<IStrategy> first = StrategyRegistry::create(strategy_id, params);
+    UniquePtr<IStrategy> second = StrategyRegistry::create(strategy_id, params);
+    SmallVector<IStrategy*, 2> strategies;
+    strategies.push_back(first.get());
+    strategies.push_back(second.get());
+    Match match(game, std::move(strategies));
+    match.set_observer(observer);
+    const MemoryStats before = all_allocations();
+    match.play();
+    return MatchCost{ memory_delta(before, all_allocations()).allocation_count, match.history().actions().size() };
+}
+
+} // namespace
+
+TEST_CASE("a Match with the feed attached costs a bounded number of allocations per decision")
+{
+    if (!MemoryTracker::is_installed())
+    {
+        return;
+    }
+    DashboardFeed feed;
+    for (const char* id : { "random", "minimax" })
+    {
+        measure_match(id, &feed);
+        const MatchCost detached = measure_match(id, nullptr);
+        const MatchCost attached = measure_match(id, &feed);
+        INFO(id << ": detached " << detached.allocations << ", attached " << attached.allocations << " over " << attached.decisions << " decisions");
+        CHECK(attached.decisions == detached.decisions);
+        CHECK(detached.allocations == 0);
+        CHECK(attached.allocations <= attached.decisions * k_attached_allocations_per_decision);
+    }
+}

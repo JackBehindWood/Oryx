@@ -201,6 +201,7 @@
 #include "Oryx/Interface/GUI/GuiShowcase.h"
 #include "Oryx/Dashboard/Dashboard.h"
 #include "Oryx/Devtools/ConsoleWorkbench.h"
+#include "Oryx/Devtools/SettingsWorkbench.h"
 #include "Oryx/Board/Graphics/BoardProjection2D.h"
 #include "Oryx/Board/Graphics/BoardOverlay2D.h"
 #include "Oryx/Board/Graphics/BoardRenderer2D.h"

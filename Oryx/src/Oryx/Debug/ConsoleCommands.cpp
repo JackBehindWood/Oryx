@@ -1,6 +1,7 @@
 #include "oxpch.h"
 #include "Oryx/Debug/ConsoleCommands.h"
 
+#include "Oryx/Core/Settings.h"
 #include "Oryx/Debug/MemoryTracker.h"
 
 namespace oryx
@@ -381,6 +382,25 @@ std::string_view ConsoleHistory::next()
         --m_cursor;
     }
     return m_cursor == 0 ? std::string_view() : at(m_cursor);
+}
+
+OX_CONSOLE_COMMAND(console_settings_get, "settings.get <section.key>", "Prints a setting's value")
+{
+    call.print("%s = %s", std::string(call.arg(0)).c_str(), get_setting(call.arg(0)).c_str());
+}
+
+OX_CONSOLE_COMMAND(console_settings_set, "settings.set <section.key> <value>", "Applies a setting live (not saved; lists are comma-separated)")
+{
+    set_setting(call.arg(0), call.arg(1));
+    call.print("%s = %s", std::string(call.arg(0)).c_str(), get_setting(call.arg(0)).c_str());
+}
+
+OX_CONSOLE_COMMAND(console_settings_list, "settings.list [section]", "Lists the settings of the reflected sections with their values")
+{
+    for (const SettingsText::Entry& entry : describe_settings(call.count() > 0 ? call.arg(0) : std::string_view()))
+    {
+        call.print("%s = %s%s%s", entry.key.c_str(), entry.text.c_str(), entry.doc.empty() ? "" : "  # ", entry.doc.c_str());
+    }
 }
 
 } // namespace oryx

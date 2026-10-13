@@ -70,6 +70,11 @@ SettingsNode::SettingsNode(UniquePtr<Impl> impl)
 
 SettingsNode::~SettingsNode() = default;
 
+std::string_view SettingsNode::section() const
+{
+    return m_impl->section;
+}
+
 bool SettingsNode::has(std::string_view key) const
 {
     return SettingsAccess::child(*this, key).IsDefined();
@@ -176,6 +181,7 @@ namespace
 
 constexpr const char* k_settings_option = "settings";
 constexpr const char* k_default_file_name = "oryx.yaml";
+constexpr const char* k_override_file_name = "oryx.local.yaml";
 
 struct Section
 {
@@ -184,6 +190,10 @@ struct Section
     SharedPtr<void> value;
     SettingsBuilder build;
     SettingsAssigner assign;
+    SettingsWalker walk;
+    SettingsCloner clone;
+    mutable uint64_t version = 1;
+    mutable SharedPtr<void> persisted;
 };
 
 struct Subscriber
@@ -201,6 +211,7 @@ struct State
     std::filesystem::path file;
     bool file_required = false;
     std::vector<std::filesystem::path> default_files;
+    YAML::Node base_root;
 };
 
 State& state()
@@ -212,6 +223,7 @@ State& state()
 // Callbacks may unsubscribe while running, so each call goes through a copy; one that throws is logged and the rest still run.
 void notify(const Section& section)
 {
+    ++section.version;
     std::vector<Subscriber> pending;
     for (const Subscriber& subscriber : state().subscribers)
     {
@@ -267,6 +279,26 @@ void apply(const std::filesystem::path& file, bool required)
         throw SettingsError(file.string() + ": the settings file must be a mapping of section names");
     }
 
+    const YAML::Node base = root.IsDefined() ? YAML::Clone(root) : YAML::Node();
+    YAML::Node overrides;
+    if (read_root(file.parent_path() / k_override_file_name, false, overrides) && overrides.IsMap())
+    {
+        if (!root.IsMap())
+        {
+            root = YAML::Node(YAML::NodeType::Map);
+        }
+        for (const auto& section : overrides)
+        {
+            if (section.second.IsMap())
+            {
+                for (const auto& key : section.second)
+                {
+                    root[section.first.as<std::string>()][key.first.as<std::string>()] = key.second;
+                }
+            }
+        }
+    }
+
     const YAML::Node& view = root;
     std::vector<SharedPtr<void>> staged;
     staged.reserve(current.sections.size());
@@ -303,10 +335,16 @@ void apply(const std::filesystem::path& file, bool required)
 
     for (size_t i = 0; i < current.sections.size(); ++i)
     {
-        current.sections[i].assign(current.sections[i].value.get(), staged[i].get());
+        Section& section = current.sections[i];
+        section.assign(section.value.get(), staged[i].get());
+        if (section.clone != nullptr)
+        {
+            section.persisted = section.clone(section.value.get());
+        }
     }
     current.file = file;
     current.file_required = required;
+    current.base_root = base;
     for (const Section& section : current.sections)
     {
         notify(section);
@@ -323,9 +361,9 @@ void apply(const std::filesystem::path& file, bool required)
 
 } // namespace
 
-void register_settings_section(std::string name, std::type_index type, SharedPtr<void> value, SettingsBuilder build, SettingsAssigner assign)
+void register_settings_section(std::string name, std::type_index type, SharedPtr<void> value, SettingsBuilder build, SettingsAssigner assign, SettingsWalker walk, SettingsCloner clone)
 {
-    state().sections.push_back(Section{ std::move(name), type, std::move(value), std::move(build), assign });
+    state().sections.push_back(Section{ std::move(name), type, std::move(value), std::move(build), assign, walk, clone });
 }
 
 namespace
@@ -453,6 +491,10 @@ void reset_settings()
     {
         SharedPtr<void> defaults = section.build(nullptr);
         section.assign(section.value.get(), defaults.get());
+        if (section.clone != nullptr)
+        {
+            section.persisted = section.clone(section.value.get());
+        }
     }
     current.file.clear();
     current.file_required = false;
@@ -461,6 +503,173 @@ void reset_settings()
     {
         notify(section);
     }
+}
+
+namespace
+{
+
+const Section& reflected_section(std::string_view name)
+{
+    for (const Section& section : state().sections)
+    {
+        if (section.name == name)
+        {
+            if (section.walk == nullptr)
+            {
+                throw SettingsError("settings section '" + std::string(name) + "' has no reflect description");
+            }
+            return section;
+        }
+    }
+    throw SettingsError("no settings section named '" + std::string(name) + "'");
+}
+
+} // namespace
+
+std::vector<std::string> settings_sections()
+{
+    std::vector<std::string> names;
+    for (const Section& section : state().sections)
+    {
+        if (section.walk != nullptr)
+        {
+            names.push_back(section.name);
+        }
+    }
+    return names;
+}
+
+SharedPtr<void> settings_copy(std::string_view section)
+{
+    const Section& found = reflected_section(section);
+    return found.clone(found.value.get());
+}
+
+SharedPtr<void> settings_defaults(std::string_view section)
+{
+    return reflected_section(section).build(nullptr);
+}
+
+void walk_settings(std::string_view section, void* value, ISettingsSink& sink)
+{
+    reflected_section(section).walk(value, sink);
+}
+
+void commit_settings(std::string_view section, void* value)
+{
+    const Section& found = reflected_section(section);
+    found.assign(found.value.get(), value);
+    notify(found);
+}
+
+SharedPtr<void> settings_persisted(std::string_view section)
+{
+    const Section& found = reflected_section(section);
+    return found.clone(found.persisted != nullptr ? found.persisted.get() : found.value.get());
+}
+
+uint64_t settings_version(std::string_view section)
+{
+    return reflected_section(section).version;
+}
+
+std::filesystem::path settings_override_file()
+{
+    const State& current = state();
+    const std::filesystem::path directory = current.file.empty() ? std::filesystem::absolute(".") : current.file.parent_path();
+    return directory / k_override_file_name;
+}
+
+void save_settings()
+{
+    State& current = state();
+    const std::filesystem::path file = settings_override_file();
+    YAML::Node root;
+    read_root(file, false, root);
+    if (!root.IsMap())
+    {
+        root = YAML::Node(YAML::NodeType::Map);
+    }
+
+    for (const Section& section : current.sections)
+    {
+        if (section.walk == nullptr)
+        {
+            continue;
+        }
+        YAML::Node base_node = current.base_root.IsMap() ? current.base_root[section.name] : YAML::Node();
+        SharedPtr<void> base;
+        if (base_node.IsDefined() && base_node.IsMap())
+        {
+            SettingsNode reader = SettingsAccess::make(base_node, current.file, section.name);
+            base = section.build(&reader);
+        }
+        else
+        {
+            base = section.build(nullptr);
+        }
+        SharedPtr<void> live = section.clone(section.value.get());
+        SettingsText was;
+        SettingsText now;
+        section.walk(base.get(), was);
+        section.walk(live.get(), now);
+
+        YAML::Node changed(YAML::NodeType::Map);
+        for (size_t i = 0; i < now.entries().size(); ++i)
+        {
+            const SettingsText::Entry& entry = now.entries()[i];
+            if (entry.text == was.entries()[i].text)
+            {
+                continue;
+            }
+            if (!entry.list)
+            {
+                changed[entry.key] = entry.text;
+                continue;
+            }
+            YAML::Node items(YAML::NodeType::Sequence);
+            std::stringstream stream(entry.text);
+            for (std::string item; std::getline(stream, item, ',');)
+            {
+                items.push_back(item);
+            }
+            changed[entry.key] = items;
+        }
+        if (changed.size() == 0)
+        {
+            root.remove(section.name);
+        }
+        else
+        {
+            root[section.name] = changed;
+        }
+    }
+
+    YAML::Emitter emitter;
+    emitter << root;
+    const std::filesystem::path temporary = file.string() + ".tmp";
+    {
+        std::ofstream out(temporary, std::ios::trunc);
+        out << "# Written by Save in the settings panel; delete a key to fall back to the settings file.\n" << emitter.c_str() << "\n";
+        if (!out)
+        {
+            throw SettingsError("cannot write " + temporary.string());
+        }
+    }
+    std::error_code error;
+    std::filesystem::rename(temporary, file, error);
+    if (error)
+    {
+        throw SettingsError("cannot write " + file.string() + ": " + error.message());
+    }
+    for (const Section& section : current.sections)
+    {
+        if (section.clone != nullptr)
+        {
+            section.persisted = section.clone(section.value.get());
+        }
+    }
+    OX_CORE_INFO("Settings: saved overrides to {}", file.string());
 }
 
 namespace

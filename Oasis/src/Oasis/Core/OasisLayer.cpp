@@ -56,6 +56,7 @@ struct OasisLayer::Chrome
         }
         static_cast<void>(oryx::gui::register_panel(k_showcase_panel, showcase));
         console = &workbenches.add<oryx::ConsoleWorkbench>(console_open);
+        static_cast<void>(workbenches.add<oryx::SettingsWorkbench>());
         observer = oryx::create_unique<SyntheticTreeObserver>(dashboard->feed());
     }
 

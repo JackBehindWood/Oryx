@@ -168,7 +168,7 @@ def run_all(
     ctx.invoke(configure, ctx)
     ctx.invoke(compile_project, ctx)
     from pyforge.commands.test import run_suites
-    ctx.invoke(run_suites, ctx, suites=suites, list_=False)
+    ctx.invoke(run_suites, ctx, suites=suites, list_=False, shards=None)
 
 
 EXECUTABLE_KINDS = ("ConsoleApp", "WindowedApp")

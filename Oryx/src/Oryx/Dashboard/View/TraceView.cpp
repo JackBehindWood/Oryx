@@ -124,7 +124,8 @@ private:
     {
         const DashboardFeed& feed = *model.feed;
         FrameArena& arena = gui::context().arena();
-        TraceState& pin = gui::state<TraceState>(gui::id("trace-state"));
+        const GuiId pin_id = gui::id("trace-state");
+        TraceState pin = gui::state<TraceState>(pin_id);
         const RecordView selected = selected_view(model);
         const uint64_t oldest = oldest_sequence(feed);
 
@@ -142,6 +143,7 @@ private:
             table.column("Prob", fixed(64.0f), false, TextAlign::Right);
         }
         place_scroll(model, pin, selected, oldest);
+        gui::state<TraceState>(pin_id) = pin;
         std::ignore = table.headers();
 
         const GuiTheme& theme = gui::theme();

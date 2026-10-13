@@ -3,6 +3,7 @@
 #include "Oryx/Core/Base.h"
 #include "Oryx/Core/CommandLine.h"
 #include "Oryx/Core/Error.h"
+#include "Oryx/Core/SettingsReflect.h"
 
 namespace oryx
 {
@@ -29,6 +30,7 @@ public:
     SettingsNode(const SettingsNode&) = delete;
     SettingsNode& operator=(const SettingsNode&) = delete;
 
+    [[nodiscard]] std::string_view section() const;
     [[nodiscard]] bool has(std::string_view key) const;
     [[nodiscard]] std::string string(std::string_view key, std::string fallback = "") const;
     [[nodiscard]] int64_t integer(std::string_view key, int64_t fallback = 0) const;
@@ -58,8 +60,13 @@ void load_settings(const ApplicationCommandLineArgs& args);
 // An application's own settings file, relative to the working directory, tried before oryx.yaml.
 void register_default_settings_file(std::filesystem::path file);
 
-// Reads the same file again; a failed reload keeps the values that were in effect. Does nothing before a first load.
+// Reads the same file again, then the override file beside it; a failed reload keeps the values that were in effect. Does nothing before a first load.
 void reload_settings();
+
+// Overrides are the keys Save wrote because they differ from the loaded file; they sit in oryx.local.yaml next to it and win over it, so a hand-written file is never rewritten.
+[[nodiscard]] std::filesystem::path settings_override_file();
+// Writes the reflected sections' keys that differ from the loaded file to the override file (other sections already in it are kept); throws SettingsError when it cannot write.
+void save_settings();
 
 // Every section back to its defaults, no file remembered and no default file registered.
 void reset_settings();
@@ -68,8 +75,30 @@ const void* settings_value(std::type_index type);
 
 using SettingsBuilder = std::function<SharedPtr<void>(const SettingsNode*)>;
 using SettingsAssigner = void (*)(void* to, void* from);
+using SettingsWalker = void (*)(void* value, ISettingsSink& sink);
+using SettingsCloner = SharedPtr<void> (*)(const void* value);
 
-void register_settings_section(std::string name, std::type_index type, SharedPtr<void> value, SettingsBuilder build, SettingsAssigner assign);
+// `walk` and `clone` are null for a section that has no reflect description.
+void register_settings_section(std::string name, std::type_index type, SharedPtr<void> value, SettingsBuilder build, SettingsAssigner assign, SettingsWalker walk, SettingsCloner clone);
+
+// Sections with a reflect description, in registration order.
+[[nodiscard]] std::vector<std::string> settings_sections();
+// A private copy of a section's live values (or of its defaults) to edit and walk; throws SettingsError for an unknown or unreflected section.
+[[nodiscard]] SharedPtr<void> settings_copy(std::string_view section);
+[[nodiscard]] SharedPtr<void> settings_defaults(std::string_view section);
+// What the files hold: the values after the last load, reload or Save (or the defaults after a reset). A change since then is unsaved.
+[[nodiscard]] SharedPtr<void> settings_persisted(std::string_view section);
+void walk_settings(std::string_view section, void* value, ISettingsSink& sink);
+// Assigns a copy as the section's live values and notifies; the file is not touched.
+void commit_settings(std::string_view section, void* value);
+// Grows with every load, reload, reset and update of the section.
+[[nodiscard]] uint64_t settings_version(std::string_view section);
+
+// Console-style access by "section.key"; both throw SettingsError for an unknown path or a rejected value.
+[[nodiscard]] std::string get_setting(std::string_view path);
+void set_setting(std::string_view path, std::string_view text);
+// Every field of a section (all sections when empty) as text, with its description.
+[[nodiscard]] std::vector<SettingsText::Entry> describe_settings(std::string_view section);
 
 void assign_settings(std::type_index type, void* edited);
 [[nodiscard]] uint64_t subscribe_settings(std::type_index type, std::function<void(const void*)> callback);
@@ -116,7 +145,7 @@ void update_settings(const std::function<void(T&)>& edit)
     assign_settings(std::type_index(typeid(T)), &edited);
 }
 
-// A section is a default-constructible, assignable, data-only struct plus `void read_settings(T&, const SettingsNode&)` next to it.
+// A section is a default-constructible, assignable, data-only struct plus either `reflect(Visitor&, T&)` (SettingsReflect.h; the panel, console and Save see it) or the older `void read_settings(T&, const SettingsNode&)` next to it.
 template<typename T>
 class RegisterSettings
 {
@@ -131,11 +160,50 @@ public:
                 SharedPtr<T> value = create_shared<T>();
                 if (node != nullptr)
                 {
-                    read_settings(*value, *node);
+                    if constexpr (SettingsReflected<T>)
+                    {
+                        SettingsReader reader(*node);
+                        SettingsVisitor visitor(reader);
+                        reflect(visitor, *value);
+                    }
+                    else
+                    {
+                        read_settings(*value, *node);
+                    }
                 }
                 return value;
             },
-            [](void* to, void* from) { *static_cast<T*>(to) = std::move(*static_cast<T*>(from)); });
+            [](void* to, void* from) { *static_cast<T*>(to) = std::move(*static_cast<T*>(from)); },
+            walker(), cloner());
+    }
+
+private:
+    static SettingsWalker walker()
+    {
+        if constexpr (SettingsReflected<T>)
+        {
+            return [](void* value, ISettingsSink& sink)
+            {
+                SettingsVisitor visitor(sink);
+                reflect(visitor, *static_cast<T*>(value));
+            };
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    static SettingsCloner cloner()
+    {
+        if constexpr (SettingsReflected<T>)
+        {
+            return [](const void* value) -> SharedPtr<void> { return create_shared<T>(*static_cast<const T*>(value)); };
+        }
+        else
+        {
+            return nullptr;
+        }
     }
 };
 

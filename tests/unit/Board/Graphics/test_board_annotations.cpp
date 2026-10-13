@@ -389,6 +389,10 @@ TEST_CASE("every registered game against every registered strategy annotates and
         for (const std::string& strategy_id : StrategyRegistry::names())
         {
             INFO(game_id << " / " << strategy_id);
+            if (const size_t slash = strategy_id.find('/'); slash != std::string::npos && strategy_id.substr(0, slash) != game_id)
+            {
+                continue;
+            }
             SmallVector<UniquePtr<IStrategy>, 2> owned;
             SmallVector<IStrategy*, 2> seats;
             bool usable = true;
