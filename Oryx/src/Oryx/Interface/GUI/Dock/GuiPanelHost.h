@@ -45,15 +45,10 @@ void end_panel_host();
 
 // The body rect of a viewport panel in the latest frame; empty when it is absent, closed, collapsed or unselected. Valid outside a frame.
 [[nodiscard]] Rect viewport_rect(std::string_view name);
-// The body rect of any visible panel in the latest frame (floats included); empty when absent, closed, collapsed or unselected. For a PanelOptions::foreign_body panel another context draws into it.
+// The body rect of any visible panel in the latest frame (floats included); empty when absent, closed, collapsed or unselected.
 [[nodiscard]] Rect panel_rect(std::string_view name);
 // True when a float drawn above panel `name` (all of them for a docked panel) covered `point` last frame, so a second context beneath the host should not take the pointer there. Popups are not counted: popup_open() says that.
 [[nodiscard]] bool panel_occluded(std::string_view name, const Vec2f& point);
-// For a foreign_body panel: the host hides the pointer from the other context (a float over the panel at the pointer, or an open popup).
-[[nodiscard]] bool panel_blocked(std::string_view name);
-// For a foreign_body panel: its body is visible and the other context wants the pointer / keyboard that the host must not hand on.
-[[nodiscard]] bool panel_claims_pointer(std::string_view name, const GuiContext& other);
-[[nodiscard]] bool panel_claims_keyboard(std::string_view name, const GuiContext& other);
 [[nodiscard]] PanelHostResult panel_host_result();
 
 // The toolbar strip reserved for the panel being drawn (PanelOptions::toolbar); false, with nothing to close, when the panel has none, is hidden or this is not a docked panel. Call between begin_panel and end_panel.
@@ -81,6 +76,11 @@ enum class GroupEdit : uint8_t
 
 [[nodiscard]] bool is_group_open(std::string_view group);
 DockResult set_group_open(std::string_view group, bool open, GroupEdit edit = GroupEdit::User);
+
+// Sections of the layout file that the dock stores without reading them, by key (a workbench's saved state). `yaml` is a YAML document; an empty one removes the key. Both load the layout first, so register panels before the first call;
+// a change is written by the same autosave as the layout (nothing is written with an empty gui.layout_file, or for a file from a newer build).
+[[nodiscard]] std::string_view layout_extension(std::string_view key);
+void set_layout_extension(std::string_view key, std::string_view yaml);
 
 // Single edits by name: the same operations a drag makes. An empty `target` docks beside the whole tree; `target` otherwise names a panel whose tab stack is the target.
 DockResult dock_panel(std::string_view panel, std::string_view target, DropZone zone);

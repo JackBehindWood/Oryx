@@ -13,11 +13,13 @@ def engine_boundaries(project_root: Path) -> BoundarySpec:
 
     core, game, strategy, simulation, text, board = t.Core, t.Game, t.Strategy, t.Simulation, t.Text, t.Board
     assets, dashboard, shaders, renderer = t.Assets, t.Dashboard, t.Shaders, t.Renderer
-    canvas, ui, gui = t.Interface.Canvas, t.Interface.UI, t.Interface.GUI
-    feed, view, panel = t.Dashboard.Feed, t.Dashboard.View, t.Dashboard.Panel
+    canvas, ui, gui, workbench = t.Interface.Canvas, t.Interface.UI, t.Interface.GUI, t.Interface.Workbench
+    feed, view = t.Dashboard.Feed, t.Dashboard.View
     board_graphics = t.Board.Graphics
+    devtools = t.Devtools
 
-    graphics = spec.group("graphics", t.Graphics, shaders, renderer, canvas, ui, gui, view, panel, board_graphics)
+    dashboard_workbench = spec.files("dashboard-workbench", "Dashboard/Dashboard.*")
+    graphics = spec.group("graphics", t.Graphics, shaders, renderer, canvas, ui, gui, workbench, devtools, view, dashboard_workbench, board_graphics)
     headless = spec.group("headless", game, strategy, simulation, core, text, board, feed)
 
     backends = spec.files("backends", "**/backends/**", allow_empty=True)
@@ -34,15 +36,19 @@ def engine_boundaries(project_root: Path) -> BoundarySpec:
     spec.forbid(headless, graphics, unless=board_graphics, because="only Board/Graphics sits above the renderer")
     spec.forbid([graphics, text], assets, because="fonts reach the renderer through Text/IFontSource")
 
-    canvas.must_not_include(ui, gui, board, assets, because="the shared immediate-mode layer")
+    canvas.must_not_include(ui, gui, workbench, board, assets, because="the shared immediate-mode layer")
     spec.peers(ui, gui, because="the player UI and developer tooling never mix")
-    ui.must_not_include(board, assets, game, strategy, because="the player-facing layer")
-    gui.must_not_include(board, assets, game, strategy, dashboard, because="the developer-tooling layer")
-    spec.isolate([feed, view, panel], from_=[board, assets], because="the dashboard reads only feed data")
+    ui.must_not_include(workbench, board, assets, game, strategy, because="the player-facing layer")
+    gui.must_not_include(workbench, board, assets, game, strategy, dashboard, because="the developer-tooling layer")
+    workbench.must_not_include(ui, board, assets, game, strategy, dashboard, devtools, because="workbenches consume the GUI and know no app")
+    devtools.must_not_include(ui, board, assets, game, strategy, dashboard, because="devtools are workbenches over the GUI and the log")
+    spec.forbid([canvas, ui, gui, workbench, view, dashboard_workbench, board_graphics], devtools, because="only an app composes the devtools")
+    spec.isolate([feed, view], from_=[board, assets], because="the dashboard reads only feed data")
     spec.above(dashboard, core, game, strategy, simulation, because="these sit below the dashboard")
 
     spec.layers(t.Graphics, shaders, renderer, canvas, ui, board_graphics)
-    spec.layers(renderer, canvas, gui, view, panel)
+    spec.layers(renderer, canvas, gui, view)
+    spec.layers(canvas, gui, workbench)
 
     python = spec.symbols("python", "oryx::python", "oryx::PythonRuntime", "pybind11")
     cpython = spec.symbols("cpython", prefixes=["Py", "_Py"])

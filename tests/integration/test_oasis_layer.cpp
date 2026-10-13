@@ -6,7 +6,7 @@
 
 #include "NullRHI.h"
 #include "NullWindow.h"
-#include "Oasis/Core/OasisShell.h"
+#include "Oasis/Core/OasisLayer.h"
 #include "Oryx/Renderer/RendererContext.h"
 #include "unit/MemoryTestSupport.h"
 #include "unit/Renderer/FakeFontSource.h"
@@ -85,7 +85,7 @@ struct ShellRig
 {
     LayoutFile layout_file;
 
-    ShellRig(oasis::DashboardFlag flag, const std::string& game, const std::string& opponent, const std::string& layout_text = std::string())
+    ShellRig(const std::string& game, const std::string& opponent, const std::string& layout_text = std::string())
         : renderer(RHIBackend::Null)
         , app({ 0, nullptr })
     {
@@ -96,7 +96,8 @@ struct ShellRig
         window = static_cast<NullWindow*>(&app.adopt_window(create_unique<NullWindow>(WindowDesc{ "Test", static_cast<int32_t>(k_window[0]), static_cast<int32_t>(k_window[1]) })));
         graphics = &app.push_overlay<GraphicsLayer>();
         simulation = &app.push_layer<SimulationLayer>();
-        shell = create_unique<oasis::OasisShell>(graphics->router(), flag);
+        shell = create_unique<oasis::OasisLayer>(oasis::Options{});
+        shell->use_graphics(graphics->router());
         graphics->add_client(*shell, { FramePhase::Interface });
         BoardFactory factory = [this](const std::string& name, PlayerId seat) -> SharedPtr<IBoard>
         {
@@ -220,6 +221,12 @@ struct ShellRig
 
     void click_text(std::string_view text) { click_at(centre_of(text)); }
 
+    void close_dashboard()
+    {
+        shell->set_dashboard_open(false);
+        frames(3);
+    }
+
     [[nodiscard]] Vec2f cell(SpaceId space) const
     {
         BoardScene scene;
@@ -241,16 +248,16 @@ struct ShellRig
     SimulationLayer* simulation = nullptr;
     BoardLayer* layer = nullptr;
     PresentedGraphicsBoard2D* board = nullptr;
-    UniquePtr<oasis::OasisShell> shell;
+    UniquePtr<oasis::OasisLayer> shell;
     WorldProbe probe;
 };
 
 } // namespace
 
-TEST_CASE("OasisShell hands the board the viewport panel's rect, which the views beside it narrow")
+TEST_CASE("OasisLayer hands the board the viewport panel's rect, which the views beside it narrow")
 {
     {
-        ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+        ShellRig rig("hexapawn", selection::k_human_opponent);
         rig.frames(3);
         CHECK(rig.board_region().size[0] < k_window[0]);
         CHECK(rig.board_region().size[0] > 0.0f);
@@ -260,28 +267,33 @@ TEST_CASE("OasisShell hands the board the viewport panel's rect, which the views
         CHECK(board_bottom > 0.5f * k_window[1]);
         CHECK(rig.probe.size[0] == doctest::Approx(rig.board_region().size[0]));
     }
-    ShellRig rig(oasis::DashboardFlag::Off, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
+    rig.close_dashboard();
     rig.frames(3);
     CHECK(rig.board_region().size[0] == doctest::Approx(k_window[0]));
 }
 
-TEST_CASE("OasisShell starts with the dashboard the flag or the setting asks for")
+TEST_CASE("OasisLayer: the first run opens the dashboard and a saved closed layout stays closed")
 {
-    LayoutFile layout_file;
-    InputRouter router;
-    CHECK_FALSE(oasis::OasisShell(router, oasis::DashboardFlag::Default).dashboard_open());
-    CHECK(oasis::OasisShell(router, oasis::DashboardFlag::On).dashboard_open());
-    CHECK_FALSE(oasis::OasisShell(router, oasis::DashboardFlag::Off).dashboard_open());
-
-    update_settings<DashboardSettings>([](DashboardSettings& settings) { settings.enabled = true; });
-    CHECK(oasis::OasisShell(router, oasis::DashboardFlag::Default).dashboard_open());
-    CHECK(oasis::OasisShell(router, oasis::DashboardFlag::On).dashboard_open());
-    CHECK_FALSE(oasis::OasisShell(router, oasis::DashboardFlag::Off).dashboard_open());
+    std::string saved;
+    {
+        ShellRig rig("hexapawn", selection::k_human_opponent);
+        rig.frames(3);
+        CHECK(rig.shell->dashboard_open());
+        rig.close_dashboard();
+        rig.frames(60);
+        CHECK_FALSE(rig.shell->dashboard_open());
+        saved = rig.layout_file.text();
+    }
+    REQUIRE_FALSE(saved.empty());
+    ShellRig again("hexapawn", selection::k_human_opponent, saved);
+    again.frames(3);
+    CHECK_FALSE(again.shell->dashboard_open());
 }
 
-TEST_CASE("OasisShell: a click on the panel never reaches the board, a click on the board does")
+TEST_CASE("OasisLayer: a click on the panel never reaches the board, a click on the board does")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
     CHECK(rig.board->presentation().view().status == "White to move");
 
@@ -298,9 +310,9 @@ TEST_CASE("OasisShell: a click on the panel never reaches the board, a click on 
     CHECK(rig.board->presentation().view().status == "Black to move");
 }
 
-TEST_CASE("OasisShell: an open menu claims Escape, which closes it; the next Escape reaches the board")
+TEST_CASE("OasisLayer: an open menu claims Escape, which closes it; the next Escape reaches the board")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
     rig.click_text("Game");
     rig.frames(2);
@@ -320,20 +332,20 @@ TEST_CASE("OasisShell: an open menu claims Escape, which closes it; the next Esc
     CHECK(rig.app.closing());
 }
 
-TEST_CASE("OasisShell: the View menu hides and shows the dashboard and the board follows")
+TEST_CASE("OasisLayer: the Window menu hides and shows the dashboard and the board follows")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
     const float with_panel = rig.board_region().size[0];
 
-    rig.click_text("View");
+    rig.click_text("Window");
     rig.frames(2);
     rig.click_text("Dashboard");
     rig.frames(3);
     CHECK_FALSE(rig.shell->dashboard_open());
     CHECK(rig.board_region().size[0] == doctest::Approx(k_window[0]));
 
-    rig.click_text("View");
+    rig.click_text("Window");
     rig.frames(2);
     rig.click_text("Dashboard");
     rig.frames(3);
@@ -341,9 +353,9 @@ TEST_CASE("OasisShell: the View menu hides and shows the dashboard and the board
     CHECK(rig.board_region().size[0] == doctest::Approx(with_panel));
 }
 
-TEST_CASE("OasisShell: Help opens the GUI showcase as a docked panel beside the views")
+TEST_CASE("OasisLayer: Help opens the GUI showcase as a docked panel beside the views")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
     const float with_panel = rig.board_region().size[0];
     CHECK_FALSE(rig.shell->showcase_open());
@@ -353,7 +365,7 @@ TEST_CASE("OasisShell: Help opens the GUI showcase as a docked panel beside the 
     rig.click_text("GUI Showcase");
     rig.frames(3);
     CHECK(rig.shell->showcase_open());
-    CHECK(rig.panel_open("view/gui-showcase"));
+    CHECK(rig.panel_open("tools/gui-showcase"));
     CHECK(rig.board_region().size[0] == doctest::Approx(with_panel));
 
     rig.click_text("Help");
@@ -363,9 +375,9 @@ TEST_CASE("OasisShell: Help opens the GUI showcase as a docked panel beside the 
     CHECK_FALSE(rig.shell->showcase_open());
 }
 
-TEST_CASE("OasisShell: Reset layout restores the default and Undo layout takes back the last change")
+TEST_CASE("OasisLayer: Reset layout restores the default and Undo layout takes back the last change")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
     const gui::DockLayout initial = rig.shell->layout();
 
@@ -375,20 +387,20 @@ TEST_CASE("OasisShell: Reset layout restores the default and Undo layout takes b
     rig.frames(4);
     REQUIRE(rig.shell->showcase_open());
 
-    rig.click_text("View");
+    rig.click_text("Window");
     rig.frames(2);
     rig.click_text("Undo layout");
     rig.frames(4);
     CHECK_FALSE(rig.shell->showcase_open());
     CHECK(gui::equal(rig.shell->layout(), initial));
 
-    rig.click_text("View");
+    rig.click_text("Window");
     rig.frames(2);
     rig.click_text("Redo layout");
     rig.frames(4);
     CHECK(rig.shell->showcase_open());
 
-    rig.click_text("View");
+    rig.click_text("Window");
     rig.frames(2);
     rig.click_text("Reset layout");
     rig.frames(4);
@@ -396,41 +408,98 @@ TEST_CASE("OasisShell: Reset layout restores the default and Undo layout takes b
     CHECK(gui::equal(rig.shell->layout(), initial));
 }
 
-TEST_CASE("OasisShell: the Panels menu lists the dock panels and reopens a closed one")
+TEST_CASE("OasisLayer: the Panels menu lists the dock panels and reopens a closed one")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
-    rig.click_text("View");
+    rig.click_text("Window");
     rig.frames(2);
     rig.click_text("Panels  >");
     rig.frames(2);
     REQUIRE(rig.has_text("GUI Showcase"));
     rig.click_text("GUI Showcase");
     rig.frames(3);
-    CHECK(rig.panel_open("view/gui-showcase"));
+    CHECK(rig.panel_open("tools/gui-showcase"));
 }
 
-TEST_CASE("OasisShell: autosave writes the layout after a change and a flag override alone writes nothing")
+TEST_CASE("OasisLayer: autosave writes the layout after a change and an untouched run writes nothing")
 {
-    {
-        ShellRig rig(oasis::DashboardFlag::Off, "hexapawn", selection::k_human_opponent);
-        rig.frames(60);
-        CHECK_FALSE(std::filesystem::exists(rig.layout_file.file()));
-        CHECK_FALSE(rig.shell->dashboard_open());
+    ShellRig rig("hexapawn", selection::k_human_opponent);
+    rig.frames(60);
+    CHECK_FALSE(std::filesystem::exists(rig.layout_file.file()));
+    CHECK(rig.shell->dashboard_open());
 
-        rig.click_text("Help");
-        rig.frames(2);
-        rig.click_text("GUI Showcase");
-        rig.frames(60);
-        CHECK(std::filesystem::exists(rig.layout_file.file()));
-        CHECK(rig.layout_file.text().find("gui-showcase") != std::string::npos);
-    }
+    rig.click_text("Help");
+    rig.frames(2);
+    rig.click_text("GUI Showcase");
+    rig.frames(60);
+    CHECK(std::filesystem::exists(rig.layout_file.file()));
+    CHECK(rig.layout_file.text().find("gui-showcase") != std::string::npos);
 }
 
-TEST_CASE("OasisShell: a layout file from a newer build is never overwritten")
+TEST_CASE("OasisLayer: the dashboard's annotation flags are kept in the layout file and read back")
+{
+    std::string saved;
+    {
+        ShellRig rig("tictactoe", "minimax");
+        rig.frames(3);
+        const AnnotationFlags before = rig.shell->annotation_flags();
+        rig.click_text("View");
+        rig.frames(2);
+        rig.click_text("Move values");
+        rig.frames(60);
+        CHECK(rig.shell->annotation_flags().value != before.value);
+        saved = rig.layout_file.text();
+        CHECK(saved.find("workbench.dashboard") != std::string::npos);
+    }
+    ShellRig again("tictactoe", "minimax", saved);
+    again.frames(6);
+    CHECK(again.shell->annotation_flags().value);
+}
+
+TEST_CASE("OasisLayer: the status bar shows the decision counts and its Console button opens and closes the drawer")
+{
+    ShellRig rig("tictactoe", "minimax");
+    rig.frames(4);
+    const LayoutTree& tree = rig.shell->context().layout();
+    bool counts = false;
+    for (uint32_t index = 0; index < tree.node_count(); ++index)
+    {
+        counts = counts || tree.node(index).paint.text.rfind("Match ", 0) == 0;
+    }
+    CHECK(counts);
+    CHECK_FALSE(rig.shell->console_open());
+    CHECK_FALSE(rig.has_text("search"));
+
+    rig.click_text("Console");
+    rig.frames(3);
+    CHECK(rig.shell->console_open());
+    CHECK(rig.has_text("search"));
+    CHECK(rig.has_text("Follow"));
+
+    rig.click_text("Console");
+    rig.frames(3);
+    CHECK_FALSE(rig.shell->console_open());
+    CHECK_FALSE(rig.has_text("Follow"));
+}
+
+TEST_CASE("OasisLayer: the Window menu lists the workbenches and the console panel opens from it")
+{
+    ShellRig rig("hexapawn", selection::k_human_opponent);
+    rig.frames(3);
+    rig.click_text("Window");
+    rig.frames(2);
+    REQUIRE(rig.has_text("Dashboard"));
+    REQUIRE(rig.has_text("Console"));
+    rig.click_text("Console");
+    rig.frames(4);
+    CHECK(rig.panel_open("console/log"));
+}
+
+TEST_CASE("OasisLayer: a layout file from a newer build is never overwritten")
 {
     const std::string newer = "version: 99\nsurfaces: []\n";
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent, newer);
+    ShellRig rig("hexapawn", selection::k_human_opponent, newer);
     rig.frames(3);
     rig.click_text("Help");
     rig.frames(2);
@@ -440,17 +509,17 @@ TEST_CASE("OasisShell: a layout file from a newer build is never overwritten")
     CHECK(rig.layout_file.text() == newer);
 }
 
-TEST_CASE("OasisShell: a corrupt layout file is set aside and the default layout is used")
+TEST_CASE("OasisLayer: a corrupt layout file is set aside and the default layout is used")
 {
-    ShellRig rig(oasis::DashboardFlag::Default, "hexapawn", selection::k_human_opponent, "version: 1\nsurfaces: nope\n");
+    ShellRig rig("hexapawn", selection::k_human_opponent, "version: 1\nsurfaces: nope\n");
     rig.frames(3);
     CHECK(std::filesystem::exists(std::filesystem::path(rig.layout_file.file()) += ".bad"));
     CHECK(rig.panel_open("viewport/0"));
 }
 
-TEST_CASE("OasisShell: switching asks first once a move was played, and Cancel keeps the match")
+TEST_CASE("OasisLayer: switching asks first once a move was played, and Cancel keeps the match")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
     rig.frames(3);
     rig.click_at(rig.cell(7));
     rig.click_at(rig.cell(4));
@@ -472,9 +541,9 @@ TEST_CASE("OasisShell: switching asks first once a move was played, and Cancel k
     CHECK(rig.layer->match_in_progress());
 }
 
-TEST_CASE("OasisShell: confirming a switch starts the new match with a new board and an empty feed")
+TEST_CASE("OasisLayer: confirming a switch starts the new match with a new board and an empty feed")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
     for (uint32_t attempt = 0; attempt < 40 && !rig.layer->match_in_progress(); ++attempt)
     {
         rig.frames(5);
@@ -512,9 +581,9 @@ TEST_CASE("OasisShell: confirming a switch starts the new match with a new board
     CHECK(rig.shell->feed().size() < before);
 }
 
-TEST_CASE("OasisShell: decisions use the board's own names and the board shows its annotation controls")
+TEST_CASE("OasisLayer: decisions use the board's own names and the board shows its annotation controls")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
     rig.frames(3);
     rig.play_until_decisions(1);
     REQUIRE(rig.shell->feed().size() >= 1);
@@ -531,9 +600,9 @@ TEST_CASE("OasisShell: decisions use the board's own names and the board shows i
     CHECK(find_annotation_kind(rig.shell->annotations(), AnnotationKind::Chosen));
 }
 
-TEST_CASE("OasisShell: a chip on the board and the View menu switch the same annotation flags")
+TEST_CASE("OasisLayer: a chip on the board and the View menu switch the same annotation flags")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
     rig.frames(4);
     CHECK_FALSE(rig.shell->annotation_flags().value);
     rig.click_at(rig.board_centre_of("Values"));
@@ -549,9 +618,9 @@ TEST_CASE("OasisShell: a chip on the board and the View menu switch the same ann
     CHECK_FALSE(rig.board->annotation_flags().heat);
 }
 
-TEST_CASE("OasisShell: an older selected decision is shown as a ghost and following removes the badge")
+TEST_CASE("OasisLayer: an older selected decision is shown as a ghost and following removes the badge")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
     rig.frames(3);
     rig.play_until_decisions(2);
     REQUIRE(rig.shell->feed().size() >= 2);
@@ -567,9 +636,9 @@ TEST_CASE("OasisShell: an older selected decision is shown as a ghost and follow
     CHECK_FALSE(rig.board_has_text("Ghost"));
 }
 
-TEST_CASE("OasisShell: pointing at a board space tells the Decision row which action ends there")
+TEST_CASE("OasisLayer: pointing at a board space tells the Decision row which action ends there")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
     rig.frames(3);
     rig.play_until_decisions(1);
     REQUIRE(rig.shell->feed().size() >= 1);
@@ -585,9 +654,9 @@ TEST_CASE("OasisShell: pointing at a board space tells the Decision row which ac
     CHECK(rig.shell->model().board_hovered_action == INVALID_ACTION);
 }
 
-TEST_CASE("OasisShell: a new match leaves nothing of the previous one on the board")
+TEST_CASE("OasisLayer: a new match leaves nothing of the previous one on the board")
 {
-    ShellRig rig(oasis::DashboardFlag::On, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
     rig.frames(3);
     rig.play_until_decisions(2);
     REQUIRE(rig.shell->feed().size() >= 2);
@@ -605,16 +674,18 @@ TEST_CASE("OasisShell: a new match leaves nothing of the previous one on the boa
     CHECK_FALSE(find_annotation_kind(rig.shell->annotations(), AnnotationKind::Heat));
 }
 
-TEST_CASE("OasisShell: the annotation controls vanish with the dashboard")
+TEST_CASE("OasisLayer: the annotation controls vanish with the dashboard")
 {
-    ShellRig rig(oasis::DashboardFlag::Off, "tictactoe", "minimax");
+    ShellRig rig("tictactoe", "minimax");
+    rig.close_dashboard();
     rig.frames(4);
     CHECK_FALSE(rig.board_has_text("Heat"));
 }
 
-TEST_CASE("OasisShell: a switch before any move happens at once")
+TEST_CASE("OasisLayer: a switch before any move happens at once")
 {
-    ShellRig rig(oasis::DashboardFlag::Off, "hexapawn", selection::k_human_opponent);
+    ShellRig rig("hexapawn", selection::k_human_opponent);
+    rig.close_dashboard();
     rig.frames(3);
     rig.click_text("Game");
     rig.frames(2);
@@ -624,9 +695,10 @@ TEST_CASE("OasisShell: a switch before any move happens at once")
     CHECK(rig.layer->game_name() == "tictactoe");
 }
 
-TEST_CASE("OasisShell: the opponent menu changes only the opponent")
+TEST_CASE("OasisLayer: the opponent menu changes only the opponent")
 {
-    ShellRig rig(oasis::DashboardFlag::Off, "tictactoe", selection::k_human_opponent);
+    ShellRig rig("tictactoe", selection::k_human_opponent);
+    rig.close_dashboard();
     rig.frames(3);
     rig.click_text("Opponent");
     rig.frames(2);
@@ -636,14 +708,15 @@ TEST_CASE("OasisShell: the opponent menu changes only the opponent")
     CHECK(rig.layer->opponent_name() == "random");
 }
 
-TEST_CASE("OasisShell: the chrome lists the menus and a warm frame allocates nothing")
+TEST_CASE("OasisLayer: the chrome lists the menus and a warm frame allocates nothing")
 {
     test::FakeFontSource* source = nullptr;
     Font font = test::make_fake_font(source);
     LayoutFile layout_file;
     PolledInput input;
     InputRouter router;
-    oasis::OasisShell shell(router, oasis::DashboardFlag::On);
+    oasis::OasisLayer shell{ oasis::Options{} };
+    shell.use_graphics(router);
     shell.set_font(&font);
     ImInput im;
     im.surface_size = k_window;
@@ -660,7 +733,7 @@ TEST_CASE("OasisShell: the chrome lists the menus and a warm frame allocates not
         frame();
     }
     const LayoutTree& tree = shell.context().layout();
-    for (const char* name : { "Game", "Opponent", "View", "Help" })
+    for (const char* name : { "Game", "Opponent", "View", "Window", "Help" })
     {
         bool found = false;
         for (uint32_t index = 0; index < tree.node_count(); ++index)

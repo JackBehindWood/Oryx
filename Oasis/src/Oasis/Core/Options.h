@@ -5,14 +5,6 @@
 namespace oasis
 {
 
-// What --dashboard / --no-dashboard asked for; Default leaves the `dashboard:` setting in charge.
-enum class DashboardFlag
-{
-    Default,
-    On,
-    Off
-};
-
 struct Options
 {
     bool headless = false;
@@ -21,7 +13,6 @@ struct Options
     std::string opponent;
     std::string simulate;
     std::string rhi;
-    DashboardFlag dashboard = DashboardFlag::Default;
 };
 
 enum class LaunchMode

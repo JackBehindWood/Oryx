@@ -87,3 +87,10 @@ Experiments opt in with `RunOptions::collect_diagnostics`; it is not part of `Ex
 ## Not built
 
 Dashboard transport (Phase 11), fan-out observers, Python-defined observers, populated search trees (MCTS). The seams are `Match::set_observer`, `Match::build_context(..., observer)` and `SearchNode`.
+
+## The in-app console (Step 9)
+
+Two headless pieces feed the Oasis console drawer and are usable on their own:
+
+- **Log capture** (`Core/LogCapture.h`): when built (`log_capture` forge option, on by default, `--without log_capture` off) both loggers also write into a fixed ring of 2048 lines (level, logger, sequence, 240 bytes of text) behind one mutex, so simulation threads may log while the UI reads. `log_capture::snapshot` copies the held lines oldest first; `dropped()` counts what the ring overwrote. Lines logged before `Log::init` are not captured.
+- **Console commands** (`Debug/ConsoleCommands.h`): `OX_CONSOLE_COMMAND(id, "usage", "help") { ... }` registers one command (`OX_REGISTER_CONSOLE_COMMAND` for an existing function, `OX_CONSOLE_COMMAND_ALIAS` for a second name); `console::run` runs a line and prints an `Error` instead of throwing. Without `OX_ENABLE_CONSOLE_COMMANDS` the macros register nothing. Built in: `help`, `clear`, `log.level <core|app> <level>`, `stats.memory`; workbench commands join as `<workbench>.<command>`.

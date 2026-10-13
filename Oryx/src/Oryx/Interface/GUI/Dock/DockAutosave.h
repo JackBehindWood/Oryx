@@ -13,6 +13,8 @@ struct DockFileLoad
     bool autosave_allowed = true;
     // True when the layout was read from the file, so it is the user's and not the default.
     bool from_file = false;
+    // The file's extension sections (see LayoutExtensions); empty without a readable file.
+    LayoutExtensions extensions;
 };
 
 // Missing file: `fallback`, silently. Corrupt or invalid file: logged, moved aside to `<file>.bad`, `fallback`. Newer version: logged, `fallback`, autosave off. Never throws.
@@ -30,13 +32,15 @@ public:
     void rebase(const DockLayout& layout);
 
     // Call once per frame after the host; it compares against the last layout seen and writes only on a change. Returns true when it wrote the file.
-    bool update(const DockLayout& layout, bool interacting, const std::filesystem::path& file, const PanelTable& panels);
-    bool flush(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels);
+    // `extensions` are written with the layout; mark_dirty says they changed.
+    bool update(const DockLayout& layout, bool interacting, const std::filesystem::path& file, const PanelTable& panels, const LayoutExtensions* extensions = nullptr);
+    bool flush(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels, const LayoutExtensions* extensions = nullptr);
+    void mark_dirty() { m_dirty = true; }
 
     [[nodiscard]] bool pending() const { return m_dirty || m_unsaved; }
 
 private:
-    bool write(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels);
+    bool write(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels, const LayoutExtensions* extensions);
 
     DockLayout m_seen;
     bool m_allowed;

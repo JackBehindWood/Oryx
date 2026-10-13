@@ -109,7 +109,10 @@ public:
         }
         box.floating = { true, attach, attach, FloatTarget::Root, {}, offset };
         const uint32_t index = ctx.begin_box(id, box);
-        im::paint_surface(ctx.layout().node(index).paint, style, style.background);
+        if (options.anchor != AreaAnchor::Fill)
+        {
+            im::paint_surface(ctx.layout().node(index).paint, style, style.background);
+        }
         ctx.push_id(name);
         if (options.scroll)
         {

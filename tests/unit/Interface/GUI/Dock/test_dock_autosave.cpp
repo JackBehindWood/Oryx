@@ -102,8 +102,6 @@ TEST_CASE("panel host: panel_rect reports any visible panel and panel_occluded s
     DockLayout& layout = f.context.dock_model().layout;
     layout = make_sample(f.context.dock_model().panels);
     settle_dock(f.context.dock_model());
-    PanelOptions foreign;
-    foreign.foreign_body = true;
     const auto draw = [&]
     {
         PanelHostScope host;

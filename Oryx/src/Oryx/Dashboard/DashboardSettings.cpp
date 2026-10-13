@@ -21,7 +21,10 @@ int32_t at_least_one(const SettingsNode& node, std::string_view key, int32_t fal
 
 void read_settings(DashboardSettings& settings, const SettingsNode& node)
 {
-    settings.enabled = node.boolean("enabled", settings.enabled);
+    if (node.has("enabled") || node.has("views"))
+    {
+        throw SettingsError(std::string("dashboard.") + (node.has("enabled") ? "enabled" : "views") + " was removed: the dashboard's views are added in code (Dashboard::add_view) and View > Window opens and closes it");
+    }
     settings.history = at_least_one(node, "history", settings.history);
     const int64_t tree_nodes = node.integer("max_tree_nodes", settings.max_tree_nodes);
     if (tree_nodes < 0 || tree_nodes > 65536)
@@ -39,10 +42,6 @@ void read_settings(DashboardSettings& settings, const SettingsNode& node)
                 throw SettingsError("dashboard.annotations: unknown overlay '" + name + "' (heat, chosen or value)");
             }
         }
-    }
-    if (node.has("views"))
-    {
-        settings.views = node.strings("views");
     }
 }
 

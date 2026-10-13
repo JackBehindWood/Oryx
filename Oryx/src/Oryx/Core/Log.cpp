@@ -1,5 +1,7 @@
 #include "Log.h"
 
+#include "Oryx/Core/LogCapture.h"
+
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace oryx {
@@ -13,6 +15,9 @@ void Log::init()
 
     s_core_logger = spdlog::stdout_color_mt("ORYX");
     s_client_logger = spdlog::stdout_color_mt("APP");
+
+    log_capture::attach(*s_core_logger, LogSource::Core);
+    log_capture::attach(*s_client_logger, LogSource::App);
 
 #ifdef OX_DEBUG
     s_core_logger->set_level(spdlog::level::trace);

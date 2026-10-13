@@ -143,3 +143,31 @@ def test_oasis_game_rules_cannot_reach_the_app_shell_or_the_renderer(tmp_path):
 
 def test_the_suite_names_both_trees():
     assert list(SUITE.specs) == ["oryx", "oasis"]
+
+
+def test_gui_and_canvas_may_not_include_the_workbench_layer(tmp_path):
+    src = _tree(tmp_path, {
+        "Interface/GUI/Gui.h": '#include "Oryx/Interface/Workbench/Workbench.h"\n',
+        "Interface/Canvas/Painter.h": '#include "Oryx/Interface/Workbench/Workbench.h"\n',
+        "Interface/Workbench/Workbench.h": '#include "Oryx/Interface/GUI/Gui.h"\n',
+    })
+    assert len(check_includes(src)) == 2
+
+
+def test_workbench_layer_knows_no_dashboard_devtools_or_assets(tmp_path):
+    src = _tree(tmp_path, {
+        "Interface/Workbench/A.h": '#include "Oryx/Dashboard/Dashboard.h"\n',
+        "Interface/Workbench/B.h": '#include "Oryx/Devtools/ConsoleWorkbench.h"\n',
+        "Interface/Workbench/C.h": '#include "Oryx/Assets/ImageAsset.h"\n',
+        "Interface/Workbench/D.h": '#include "Oryx/Interface/Canvas/Painter.h"\n#include "Oryx/Core/Base.h"\n',
+    })
+    assert len(check_includes(src)) == 3
+
+
+def test_devtools_build_on_the_workbench_layer_and_nothing_else_includes_them(tmp_path):
+    src = _tree(tmp_path, {
+        "Devtools/ConsoleWorkbench.h": '#include "Oryx/Interface/Workbench/Workbench.h"\n#include "Oryx/Debug/ConsoleCommands.h"\n',
+        "Devtools/Bad.h": '#include "Oryx/Board/BoardLayer.h"\n',
+        "Interface/GUI/Gui.h": '#include "Oryx/Devtools/ConsoleWorkbench.h"\n',
+    })
+    assert len(check_includes(src)) == 2

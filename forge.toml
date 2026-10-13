@@ -19,6 +19,7 @@ fetch = "auto"
 [options]
 python = { default = true, off = "--no-python", help = "Embedded Python backend" }
 graphics = { default = true, off = "--no-graphics", help = "Window backends, RHI and 2D renderer" }
+log_capture = { default = true, off = "--no-log-capture", help = "Log capture and console commands for the in-app console" }
 sanitize = { default = false, on = "--sanitize", help = "ASan+UBSan diagnostic build" }
 
 [targets.oasis]

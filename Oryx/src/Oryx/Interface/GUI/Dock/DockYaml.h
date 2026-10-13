@@ -25,13 +25,17 @@ enum class DockYamlStatus : uint8_t
 
 [[nodiscard]] const char* to_string(DockYamlStatus status);
 
+// Top-level sections of the file that the dock keeps and writes back without reading (a workbench's saved state): name to YAML text. They share the file's version, validity and quarantine rules, and adding one needs no version bump.
+using LayoutExtensions = std::map<std::string, std::string>;
+
 // Unregistered ids are kept and written as `{hash: N}` so a view registered later still finds its place.
-[[nodiscard]] bool serialize_layout_to_string(const DockLayout& layout, const PanelTable& panels, std::string& out);
-[[nodiscard]] bool deserialize_layout_from_string(DockLayout& out, const PanelTable& panels, std::string_view yaml, DockYamlStatus* status = nullptr);
+[[nodiscard]] bool serialize_layout_to_string(const DockLayout& layout, const PanelTable& panels, std::string& out, const LayoutExtensions* extensions = nullptr);
+// `extensions`, when given, is replaced by the file's sections; a rejected document leaves it alone.
+[[nodiscard]] bool deserialize_layout_from_string(DockLayout& out, const PanelTable& panels, std::string_view yaml, DockYamlStatus* status = nullptr, LayoutExtensions* extensions = nullptr);
 
 // Writes a sibling temp file and renames it over `path`, so a crash never leaves a truncated layout.
-[[nodiscard]] bool save_layout_yaml(const DockLayout& layout, const PanelTable& panels, const std::filesystem::path& path);
-[[nodiscard]] bool load_layout_yaml(DockLayout& out, const PanelTable& panels, const std::filesystem::path& path, DockYamlStatus* status = nullptr);
+[[nodiscard]] bool save_layout_yaml(const DockLayout& layout, const PanelTable& panels, const std::filesystem::path& path, const LayoutExtensions* extensions = nullptr);
+[[nodiscard]] bool load_layout_yaml(DockLayout& out, const PanelTable& panels, const std::filesystem::path& path, DockYamlStatus* status = nullptr, LayoutExtensions* extensions = nullptr);
 
 // Moves an unreadable layout aside to `<path>.bad` so the next save cannot destroy it.
 [[nodiscard]] bool quarantine_layout_file(const std::filesystem::path& path);
@@ -48,7 +52,7 @@ struct DockMigration
     void (*apply)(YAML::Node& root) = nullptr;
 };
 
-[[nodiscard]] bool deserialize_with_migrations(DockLayout& out, const PanelTable& panels, std::string_view yaml, const DockMigration* migrations, uint32_t migration_count, DockYamlStatus* status);
+[[nodiscard]] bool deserialize_with_migrations(DockLayout& out, const PanelTable& panels, std::string_view yaml, const DockMigration* migrations, uint32_t migration_count, DockYamlStatus* status, LayoutExtensions* extensions = nullptr);
 
 }
 

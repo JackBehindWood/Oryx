@@ -398,12 +398,54 @@ const char* to_string(DockYamlStatus status)
     return "unknown";
 }
 
-bool serialize_layout_to_string(const DockLayout& layout, const PanelTable& panels, std::string& out)
+namespace
+{
+
+void write_extensions(YAML::Node& doc, const LayoutExtensions* extensions)
+{
+    if (extensions == nullptr)
+        return;
+    YAML::Node section;
+    for (const auto& [key, text] : *extensions)
+    {
+        if (text.empty())
+            continue;
+        try
+        {
+            section[key] = YAML::Load(text);
+        }
+        catch (const std::exception& error)
+        {
+            OX_WARN("Layout extension '{}' not written: {}", key, error.what());
+        }
+    }
+    if (section.size() > 0)
+        doc["extensions"] = section;
+}
+
+void read_extensions(const YAML::Node& doc, LayoutExtensions& out)
+{
+    out.clear();
+    if (!doc.IsMap())
+        return;
+    const YAML::Node section = doc["extensions"];
+    if (!section.IsDefined() || !section.IsMap())
+        return;
+    for (auto it = section.begin(); it != section.end(); ++it)
+        if (it->first.IsScalar())
+            out[it->first.as<std::string>()] = YAML::Dump(it->second);
+}
+
+}
+
+bool serialize_layout_to_string(const DockLayout& layout, const PanelTable& panels, std::string& out, const LayoutExtensions* extensions)
 {
     try
     {
         YAML::Emitter emitter;
-        emitter << write_document(layout, panels);
+        YAML::Node doc = write_document(layout, panels);
+        write_extensions(doc, extensions);
+        emitter << doc;
         if (!emitter.good())
             corrupt(emitter.GetLastError());
         out = emitter.c_str();
@@ -424,7 +466,7 @@ bool serialize_layout_to_string(const DockLayout& layout, const PanelTable& pane
 namespace detail
 {
 
-bool deserialize_with_migrations(DockLayout& out, const PanelTable& panels, std::string_view yaml, const DockMigration* migrations, uint32_t migration_count, DockYamlStatus* status)
+bool deserialize_with_migrations(DockLayout& out, const PanelTable& panels, std::string_view yaml, const DockMigration* migrations, uint32_t migration_count, DockYamlStatus* status, LayoutExtensions* extensions)
 {
     report(status, DockYamlStatus::Corrupt);
     try
@@ -450,6 +492,8 @@ bool deserialize_with_migrations(DockLayout& out, const PanelTable& panels, std:
             reject(DockYamlStatus::Invalid, error.what());
         }
         out = *scratch;
+        if (extensions != nullptr)
+            read_extensions(doc, *extensions);
         report(status, DockYamlStatus::Ok);
         return true;
     }
@@ -474,15 +518,15 @@ constexpr detail::DockMigration k_migrations[] = { { 0, nullptr } };
 
 }
 
-bool deserialize_layout_from_string(DockLayout& out, const PanelTable& panels, std::string_view yaml, DockYamlStatus* status)
+bool deserialize_layout_from_string(DockLayout& out, const PanelTable& panels, std::string_view yaml, DockYamlStatus* status, LayoutExtensions* extensions)
 {
-    return detail::deserialize_with_migrations(out, panels, yaml, k_migrations, 0, status);
+    return detail::deserialize_with_migrations(out, panels, yaml, k_migrations, 0, status, extensions);
 }
 
-bool save_layout_yaml(const DockLayout& layout, const PanelTable& panels, const std::filesystem::path& path)
+bool save_layout_yaml(const DockLayout& layout, const PanelTable& panels, const std::filesystem::path& path, const LayoutExtensions* extensions)
 {
     std::string text;
-    if (!serialize_layout_to_string(layout, panels, text))
+    if (!serialize_layout_to_string(layout, panels, text, extensions))
         return false;
 
     std::error_code ec;
@@ -512,7 +556,7 @@ bool save_layout_yaml(const DockLayout& layout, const PanelTable& panels, const 
     return true;
 }
 
-bool load_layout_yaml(DockLayout& out, const PanelTable& panels, const std::filesystem::path& path, DockYamlStatus* status)
+bool load_layout_yaml(DockLayout& out, const PanelTable& panels, const std::filesystem::path& path, DockYamlStatus* status, LayoutExtensions* extensions)
 {
     std::error_code ec;
     if (!std::filesystem::is_regular_file(path, ec))
@@ -536,7 +580,7 @@ bool load_layout_yaml(DockLayout& out, const PanelTable& panels, const std::file
         OX_ERROR("Dock layout '{}' rejected (corrupt): read failed", path.string());
         return false;
     }
-    return deserialize_layout_from_string(out, panels, text, status);
+    return deserialize_layout_from_string(out, panels, text, status, extensions);
 }
 
 bool quarantine_layout_file(const std::filesystem::path& path)

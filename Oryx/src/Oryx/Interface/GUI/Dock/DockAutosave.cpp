@@ -9,7 +9,7 @@ DockFileLoad load_layout_file(const std::filesystem::path& file, const PanelTabl
     DockFileLoad result;
     DockLayout loaded;
     DockYamlStatus status = DockYamlStatus::Ok;
-    if (load_layout_yaml(loaded, panels, file, &status))
+    if (load_layout_yaml(loaded, panels, file, &status, &result.extensions))
     {
         result.layout = loaded;
         result.from_file = true;
@@ -34,27 +34,27 @@ void DockAutosave::rebase(const DockLayout& layout)
     m_seen = layout;
 }
 
-bool DockAutosave::update(const DockLayout& layout, bool interacting, const std::filesystem::path& file, const PanelTable& panels)
+bool DockAutosave::update(const DockLayout& layout, bool interacting, const std::filesystem::path& file, const PanelTable& panels, const LayoutExtensions* extensions)
 {
     if (!equal(layout, m_seen))
     {
         m_seen = layout;
         m_dirty = true;
     }
-    return m_dirty && !interacting && write(layout, file, panels);
+    return m_dirty && !interacting && write(layout, file, panels, extensions);
 }
 
-bool DockAutosave::flush(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels)
+bool DockAutosave::flush(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels, const LayoutExtensions* extensions)
 {
     if (!equal(layout, m_seen))
     {
         m_seen = layout;
         m_dirty = true;
     }
-    return pending() && write(layout, file, panels);
+    return pending() && write(layout, file, panels, extensions);
 }
 
-bool DockAutosave::write(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels)
+bool DockAutosave::write(const DockLayout& layout, const std::filesystem::path& file, const PanelTable& panels, const LayoutExtensions* extensions)
 {
     m_dirty = false;
     if (!m_allowed)
@@ -62,7 +62,7 @@ bool DockAutosave::write(const DockLayout& layout, const std::filesystem::path& 
         m_unsaved = false;
         return false;
     }
-    if (!save_layout_yaml(layout, panels, file))
+    if (!save_layout_yaml(layout, panels, file, extensions))
     {
         m_unsaved = true;
         if (!m_failure_logged)

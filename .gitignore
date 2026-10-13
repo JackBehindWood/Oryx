@@ -112,5 +112,6 @@ resources/compiled/
 Oasis/resources/compiled/shader/
 Oasis/resources/compiled/shadermap/
 
-# Dock layout written next to the working directory by a run
+# Dock layout and workbench state written by a run (Oasis/oasis-layout.yaml; gui-layout.yaml is the default name of other apps)
 gui-layout.yaml
+oasis-layout.yaml

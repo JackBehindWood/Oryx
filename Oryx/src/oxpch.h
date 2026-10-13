@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <charconv>
 #include <atomic>
 #include <iomanip>
 #include <limits>

@@ -253,3 +253,33 @@ TEST_CASE("GUI area: a warm frame allocates nothing")
     s.f.driver.frame([&] { s.build(); });
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+TEST_CASE("area: a Fill area paints nothing, so a board drawn beneath it shows through, while a Reserve area paints its strip")
+{
+    GuiFixture f;
+    f.driver.input().surface_size = { 200.0f, 100.0f };
+    const auto build = [&]
+    {
+        if (gui::AreaScope bar("bar", { .anchor = gui::AreaAnchor::Top }); bar)
+            gui::label("bar");
+        if (gui::AreaScope body("body"); body)
+            gui::label("body");
+    };
+    f.driver.run_frames(4, f.frame_of(build));
+    const Rect body = gui::area_rect("body");
+    const Rect bar = gui::area_rect("bar");
+    REQUIRE_FALSE(is_empty(body));
+    bool body_filled = false;
+    bool bar_filled = false;
+    const LayoutTree& tree = f.context.layout();
+    for (uint32_t index = 0; index < tree.node_count(); ++index)
+    {
+        const LayoutNode& node = tree.node(index);
+        const bool is_body = node.rect.size[0] == body.size[0] && node.rect.size[1] == body.size[1] && node.rect.min[1] == body.min[1];
+        const bool is_bar = node.rect.size[0] == bar.size[0] && node.rect.size[1] == bar.size[1] && node.rect.min[1] == bar.min[1];
+        body_filled = body_filled || (is_body && node.paint.has_fill);
+        bar_filled = bar_filled || (is_bar && node.paint.has_fill);
+    }
+    CHECK_FALSE(body_filled);
+    CHECK(bar_filled);
+}

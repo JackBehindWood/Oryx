@@ -28,6 +28,7 @@ project "Oasis"
     }
 
     useOryxGraphics()
+    useOryxLogCapture()
 
     useOryxWholeArchive()
     useOryxAllocationCensus()

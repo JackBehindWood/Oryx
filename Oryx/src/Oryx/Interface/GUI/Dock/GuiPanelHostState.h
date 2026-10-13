@@ -30,8 +30,6 @@ struct PanelOptions : im::WidgetOptions
     // Reserves a toolbar strip drawn with begin_panel_toolbar; where it sits against the tabs follows DockStyle, then this placement, then the node.
     bool toolbar = false;
     ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
-    // The body belongs to another context drawn beneath the host (see panel_rect): no backdrop.
-    bool foreign_body = false;
     // Placement hints (see PanelDesc): names of other panels and of a group; the GUI builds the default layout and reopens from them.
     std::string_view dock_near;
     std::string_view dock_tabbed_with;
@@ -171,6 +169,8 @@ struct DockModel
     PanelId landed;
     float landed_age = 0.0f;
     DockLoad load = DockLoad::None;
+    // The layout file's extension sections, kept as read and written back with the layout.
+    LayoutExtensions extensions;
     bool from_file = false;
     // Surfaces that exist; a saved float or tree beyond it migrates to surface 0 at load.
     uint32_t surface_count = 1;

@@ -385,15 +385,6 @@ bool has_focus_ring(GuiFixture& f, const Rect& rect)
     return false;
 }
 
-bool has_fill_over(GuiFixture& f, const Rect& rect)
-{
-    const LayoutTree& tree = f.context.layout();
-    for (uint32_t i = 0; i < tree.node_count(); ++i)
-        if (tree.node(i).paint.has_fill && near_rect(tree.node(i).rect, rect))
-            return true;
-    return false;
-}
-
 }
 
 TEST_CASE("focus ring: a focused viewport and a focused collapsed stack are outlined, unfocused ones are not")
@@ -414,22 +405,6 @@ TEST_CASE("focus ring: a focused viewport and a focused collapsed stack are outl
     focus_panel("vp");
     scene.frames(3);
     CHECK_FALSE(has_focus_ring(scene.f, scene.solved().nodes[1].strip));
-}
-
-TEST_CASE("foreign float: a foreign-body panel fills nothing under its body, an ordinary float fills it")
-{
-    FloatScene scene;
-    find_panel(scene.model().panels, pid("c"))->foreign_body = true;
-    require_applied(float_panel(scene.layout, scene.model().panels, pid("c"), Rect{ { 100.0f, 100.0f }, { 240.0f, 180.0f } }));
-    require_applied(float_panel(scene.layout, scene.model().panels, pid("a"), Rect{ { 400.0f, 100.0f }, { 240.0f, 180.0f } }));
-    scene.frames(4);
-    const uint32_t c = float_of(scene.layout, "c");
-    const uint32_t a = float_of(scene.layout, "a");
-    REQUIRE(c < k_max_dock_floats);
-    REQUIRE(a < k_max_dock_floats);
-    CHECK_FALSE(has_fill_over(scene.f, scene.solved().float_parts[c].body));
-    CHECK(has_fill_over(scene.f, scene.solved().float_parts[c].title));
-    CHECK(has_fill_over(scene.f, scene.solved().float_parts[a].body));
 }
 
 TEST_CASE("float layer: floats draw on the float channel and an open menu on the popup channel above it")

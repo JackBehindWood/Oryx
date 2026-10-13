@@ -61,6 +61,7 @@ project "Oryx"
     end
 
     useOryxGraphics()
+    useOryxLogCapture()
 
     files {
         "backends/Null/NullWindow.h",
@@ -117,7 +118,8 @@ project "Oryx"
             "src/Oryx/Renderer/**",
             "src/Oryx/Interface/**",
             "src/Oryx/Dashboard/View/**",
-            "src/Oryx/Dashboard/Panel/**",
+            "src/Oryx/Dashboard/Dashboard.*",
+            "src/Oryx/Devtools/**",
             "src/Oryx/Board/Graphics/**",
             "src/Oryx/Assets/Gpu*"
         }

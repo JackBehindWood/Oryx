@@ -185,17 +185,14 @@ bool place_body(GuiContext& ctx, DockView& h, PanelId id, const Rect& body, cons
     if (desc->kind == PanelKind::Viewport || is_empty(body))
         return false;
     const GuiTheme& theme = ctx.gui_theme();
-    if (!desc->foreign_body)
+    open_fill(ctx, h, body, theme.panel, theme.panel.background, false, channel);
+    if (h.model->focused == id)
     {
-        open_fill(ctx, h, body, theme.panel, theme.panel.background, false, channel);
-        if (h.model->focused == id)
-        {
-            BoxPaint& paint = ctx.layout().current().paint;
-            paint.border_width = 1.0f;
-            paint.border = ctx.dock_theme().focus_ring;
-        }
-        ctx.end_box();
+        BoxPaint& paint = ctx.layout().current().paint;
+        paint.border_width = 1.0f;
+        paint.border = ctx.dock_theme().focus_ring;
     }
+    ctx.end_box();
     IdScope scope(ctx, ctx.index_id(id.hash));
     return ctx.item(ctx.id("body"), body).pressed;
 }
@@ -663,8 +660,6 @@ void draw_float(GuiContext& ctx, DockView& h, uint32_t f, PanelId& pending_close
     ctx.add_shield(padded(rect, metrics.grip_band));
     ctx.begin_shield_layer();
     open_fill(ctx, h, rect, theme.panel, theme.panel.background, true, k_channel_float);
-    if (desc->foreign_body)
-        ctx.layout().current().paint.has_fill = false;
     if (focused)
         ctx.layout().current().paint.border = ctx.dock_theme().focus_ring;
     ctx.end_box();
@@ -1447,6 +1442,8 @@ void ensure_loaded(DockModel& m)
         OX_WARN("Dock layout: closed {} panel(s) that break the group rules", repaired);
     m.from_file = loaded.from_file && usable;
     m.has_good = false;
+    if (use_file)
+        m.extensions = std::move(loaded.extensions);
     m.file = use_file ? settings.layout_file : std::filesystem::path();
     m.autosave = use_file ? create_unique<DockAutosave>(m.layout, loaded.autosave_allowed) : nullptr;
     m.load = use_file ? DockLoad::File : DockLoad::DefaultOnly;
@@ -1496,7 +1493,7 @@ DockModel::~DockModel()
     try
     {
         if (autosave != nullptr && load == DockLoad::File)
-            autosave->flush(layout, file, panels);
+            autosave->flush(layout, file, panels, &extensions);
     }
     catch (...)
     {
@@ -1512,7 +1509,6 @@ bool register_panel(std::string_view name, const PanelOptions& options)
     desc->flags = PanelFlags{ flags_of(options) };
     desc->toolbar = options.toolbar;
     desc->toolbar_placement = options.toolbar_placement;
-    desc->foreign_body = options.foreign_body;
     desc->dock_near = options.dock_near.empty() ? PanelId{} : make_panel_id(options.dock_near);
     desc->dock_tabbed_with = options.dock_tabbed_with.empty() ? PanelId{} : make_panel_id(options.dock_tabbed_with);
     desc->group = options.group.empty() ? PanelId{} : make_panel_id(options.group);
@@ -1646,7 +1642,7 @@ void end_panel_host()
         if (!h.result.interacting)
             push(m.history, m.layout);
         if (m.autosave != nullptr && !settings.layout_file.empty())
-            static_cast<void>(m.autosave->update(m.layout, h.result.interacting || m.drag.source != DragSource::None, settings.layout_file, m.panels));
+            static_cast<void>(m.autosave->update(m.layout, h.result.interacting || m.drag.source != DragSource::None, settings.layout_file, m.panels, &m.extensions));
     }
     h.in_host = false;
 }
@@ -1749,22 +1745,6 @@ bool panel_occluded(std::string_view name, const Vec2f& point)
     return false;
 }
 
-bool panel_blocked(std::string_view name)
-{
-    GuiContext& ctx = context();
-    return panel_occluded(name, ctx.input().pointer.position) || ctx.popup_open();
-}
-
-bool panel_claims_pointer(std::string_view name, const GuiContext& other)
-{
-    return !is_empty(panel_rect(name)) && (other.wants_mouse() || other.popup_open());
-}
-
-bool panel_claims_keyboard(std::string_view name, const GuiContext& other)
-{
-    return !is_empty(panel_rect(name)) && (other.wants_keyboard() || other.popup_open());
-}
-
 PanelHostResult panel_host_result()
 {
     return host_of(context()).result;
@@ -1856,6 +1836,28 @@ bool is_group_open(std::string_view group)
 {
     DockModel& m = loaded_model();
     return group_open(m.layout, m.panels, make_panel_id(group));
+}
+
+std::string_view layout_extension(std::string_view key)
+{
+    const DockModel& m = loaded_model();
+    const auto found = m.extensions.find(std::string(key));
+    return found == m.extensions.end() ? std::string_view() : std::string_view(found->second);
+}
+
+void set_layout_extension(std::string_view key, std::string_view yaml)
+{
+    DockModel& m = loaded_model();
+    const std::string name(key);
+    const auto found = m.extensions.find(name);
+    if (yaml.empty() ? found == m.extensions.end() : (found != m.extensions.end() && found->second == yaml))
+        return;
+    if (yaml.empty())
+        m.extensions.erase(name);
+    else
+        m.extensions[name] = std::string(yaml);
+    if (m.autosave != nullptr)
+        m.autosave->mark_dirty();
 }
 
 DockResult set_group_open(std::string_view group, bool open, GroupEdit edit)

@@ -129,8 +129,6 @@ struct PanelDesc
     // Reserves a toolbar strip of DockMetrics::toolbar_height for the panel.
     bool toolbar = false;
     ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
-    // The body is drawn by another context beneath the host, so the host paints no backdrop there.
-    bool foreign_body = false;
     // Placement hints from the registering consumer (ids are hashes of names): the GUI decides and skips what it cannot honour. Chain: recorded home, tabbed_with, near on dock_side, the surface edge, the first tab stack.
     PanelId dock_near;
     PanelId dock_tabbed_with;
