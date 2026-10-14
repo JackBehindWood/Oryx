@@ -3,6 +3,7 @@
 #include "Oryx/Interface/GUI/GuiControls.h"
 #include "Oryx/Interface/GUI/GuiMenus.h"
 #include "Oryx/Interface/GUI/GuiSettings.h"
+#include "Oryx/Interface/GUI/GuiTextField.h"
 #include "Oryx/Interface/GUI/GuiWidgets.h"
 
 namespace oryx::gui
@@ -102,13 +103,22 @@ DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
     metrics.grip_band = 6.0f * scale;
     metrics.splitter_pad = 3.0f * scale;
     metrics.underline = 2.0f * scale;
-    if (theme.tab_style.shape == TabShape::Sloped)
+    const TabStyle look = style.tab_look == TabLook::Sloped    ? TabStyle::sloped()
+                          : style.tab_look == TabLook::Rounded ? TabStyle::rounded()
+                          : style.tab_look == TabLook::Flat    ? TabStyle::flat()
+                                                               : theme.tab_style;
+    if (look.shape == TabShape::Sloped)
     {
-        metrics.tab_overlap = theme.tab_style.overlap * scale;
-        metrics.tab_slope = theme.tab_style.slope * scale;
-        metrics.tab_shoulder = theme.tab_style.shoulder * scale;
-        metrics.tab_raise = theme.tab_style.selected_raise * scale;
+        metrics.tab_overlap = look.overlap * scale;
+        metrics.tab_slope = look.slope * scale;
+        metrics.tab_shoulder = look.shoulder * scale;
+        metrics.tab_raise = look.selected_raise * scale;
     }
+    else if (look.shape == TabShape::Rounded)
+    {
+        metrics.tab_radius = look.radius * scale;
+    }
+    metrics.tab_fit = true;
     metrics.float_width = 320.0f * scale;
     metrics.float_height = 240.0f * scale;
     return metrics;
@@ -380,6 +390,8 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
         paint.text_height = style.text_height;
         paint.text_colour = style.text;
         paint.ellipsis = true;
+        if (metrics.tab_radius > 0.0f)
+            paint.radius = bottom_tabs ? CornerRadius{ 0.0f, 0.0f, metrics.tab_radius, metrics.tab_radius } : CornerRadius{ metrics.tab_radius, metrics.tab_radius, 0.0f, 0.0f };
         if (sloped)
         {
             paint.slope = metrics.tab_slope;
@@ -1339,11 +1351,26 @@ void select_all_tabs(DockView& h, const ImKeys& keys, const Vec2f& pointer)
     m.multi_anchor = node.tabs[0];
 }
 
+void measure_tab_widths(GuiContext& ctx, PanelTable& panels, const DockMetrics& metrics)
+{
+    const ImStyle& tab = ctx.gui_theme().tab;
+    const float pad = tab.padding.right * 0.5f;
+    const float lean = metrics.tab_slope * 0.5f;
+    const float close = metrics.style.close_buttons == CloseButtons::Never ? 0.0f : metrics.close_size + pad;
+    for (uint32_t i = 0; i < panels.count; ++i)
+    {
+        PanelDesc& desc = panels.descs[i];
+        desc.tab_width = detail::measure_text(ctx, desc.title, tab.text_height) + tab.padding.left + tab.padding.right + 2.0f * lean + close;
+    }
+}
+
 void draw_host(GuiContext& ctx, DockView& h)
 {
     sanitize_multi(h);
     sync_drag_scroll(h);
-    h.solved = solve(*h.layout, h.model->panels, metrics_of(ctx.gui_theme(), h.style), h.host_rect, static_cast<uint8_t>(ctx.input().surface), &h.tab_scroll);
+    const DockMetrics metrics = metrics_of(ctx.gui_theme(), h.style);
+    measure_tab_widths(ctx, h.model->panels, metrics);
+    h.solved = solve(*h.layout, h.model->panels, metrics, h.host_rect, static_cast<uint8_t>(ctx.input().surface), &h.tab_scroll);
     for (uint32_t f = 0; f < h.solved.float_count; ++f)
     {
         if (h.layout->floats[f].surface != h.solved.surface)

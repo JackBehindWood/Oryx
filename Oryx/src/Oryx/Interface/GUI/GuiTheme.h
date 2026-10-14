@@ -20,7 +20,9 @@ enum class TabShape : uint8_t
     // A plain rectangle, the look before tab styles.
     Flat,
     // A trapezoid whose sides lean in, with curved shoulders; neighbours overlap and the chosen tab stands taller.
-    Sloped
+    Sloped,
+    // A rectangle with rounded top corners (bottom ones for tabs along the bottom of a strip), no overlap.
+    Rounded
 };
 
 // The look of a tab, shared by the dock's strips and the tab_bar widget; named by what it draws. Lengths are points at a 16 point tab text and scale with the tab text height.
@@ -35,9 +37,12 @@ struct TabStyle
     float overlap = 6.0f;
     // How much taller the chosen tab stands than the others.
     float selected_raise = 3.0f;
+    // Rounded tabs: the radius of the outer corners.
+    float radius = 0.0f;
 
     [[nodiscard]] static constexpr TabStyle sloped() { return TabStyle{}; }
-    [[nodiscard]] static constexpr TabStyle flat() { return TabStyle{ TabShape::Flat, 0.0f, 0.0f, 0.0f, 0.0f }; }
+    [[nodiscard]] static constexpr TabStyle flat() { return TabStyle{ TabShape::Flat, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
+    [[nodiscard]] static constexpr TabStyle rounded() { return TabStyle{ TabShape::Rounded, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f }; }
 };
 
 static_assert(std::is_trivially_copyable_v<TabStyle> && std::is_standard_layout_v<TabStyle>);

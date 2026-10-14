@@ -22,6 +22,7 @@ void reflect(Visitor& v, GuiSettings& s)
     v.field("layout_file", s.layout_file, Doc{ "Where the dock layout is saved (empty keeps it in memory)" });
     v.field("dock_toolbars", dock.toolbars, Doc{ "Panel toolbars" });
     v.field("dock_toolbar_placement", dock.toolbar_placement, choices<gui::ToolbarPlacement>({ { "auto", gui::ToolbarPlacement::Auto }, { "above_tabs", gui::ToolbarPlacement::AboveTabs }, { "below_tabs", gui::ToolbarPlacement::BelowTabs } }), Doc{ "Toolbar position relative to the tab strip" });
+    v.field("dock_tab_style", dock.tab_look, choices<gui::TabLook>({ { "theme", gui::TabLook::Theme }, { "sloped", gui::TabLook::Sloped }, { "rounded", gui::TabLook::Rounded }, { "flat", gui::TabLook::Flat } }), Doc{ "Tab shape; theme follows the active GUI theme" });
     v.field("dock_tab_position", dock.tab_position, choices<gui::TabPosition>({ { "top", gui::TabPosition::Top }, { "bottom", gui::TabPosition::Bottom } }), Doc{ "Tab strip edge" });
     v.field("dock_close_buttons", dock.close_buttons, choices<gui::CloseButtons>({ { "on_hover", gui::CloseButtons::OnHover }, { "always", gui::CloseButtons::Always }, { "never", gui::CloseButtons::Never } }), Doc{ "When tabs show a close button" });
     v.field("dock_tear_off", dock.tear_off, choices<gui::TearOff>({ { "live", gui::TearOff::Live }, { "on_release", gui::TearOff::OnRelease }, { "never", gui::TearOff::Never } }), Doc{ "When a dragged tab becomes a floating panel" });

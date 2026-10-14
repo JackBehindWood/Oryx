@@ -189,3 +189,33 @@ TEST_CASE("tab style: a flat theme keeps the rectangles and the underline")
     CHECK(f.context.draw_list().command_count(DrawKind::Polygon) == 0);
     CHECK(f.context.dock_view().solved.metrics.tab_overlap == 0.0f);
 }
+
+TEST_CASE("tab style: the rounded preset has radius and no slope or overlap")
+{
+    CHECK(TabStyle::rounded().shape == TabShape::Rounded);
+    CHECK(TabStyle::rounded().radius > 0.0f);
+    CHECK(TabStyle::rounded().slope == 0.0f);
+    CHECK(TabStyle::rounded().overlap == 0.0f);
+}
+
+TEST_CASE("tab fit: tabs take the width their label asks for while they fit, else share the strip")
+{
+    PanelTable panels = make_panels();
+    const DockLayout layout = three_tabs(panels);
+    DockMetrics metrics;
+    metrics.strip_button = 0.0f;
+    metrics.tab_fit = true;
+    find_panel(panels, pid("a"))->tab_width = 60.0f;
+    find_panel(panels, pid("b"))->tab_width = 90.0f;
+    find_panel(panels, pid("c"))->tab_width = 70.0f;
+    const SolvedNode& fitted = solve(layout, panels, metrics, k_surface).nodes[0];
+    CHECK(fitted.tab_rects[0].size[0] == doctest::Approx(60.0f));
+    CHECK(fitted.tab_rects[1].size[0] == doctest::Approx(90.0f));
+    CHECK(fitted.tab_rects[1].min[0] == doctest::Approx(60.0f));
+    CHECK(fitted.tab_rects[2].size[0] == doctest::Approx(70.0f));
+
+    metrics.tab_max_width = 1000.0f;
+    find_panel(panels, pid("b"))->tab_width = 900.0f;
+    const SolvedNode& crowded = solve(layout, panels, metrics, k_surface).nodes[0];
+    CHECK(crowded.tab_rects[0].size[0] == doctest::Approx(crowded.tab_rects[1].size[0]));
+}

@@ -124,6 +124,30 @@ struct Solver
         float tab_w = (avail + overlap * static_cast<float>(count - 1)) / static_cast<float>(count);
         uint32_t visible = count;
         uint32_t first = 0;
+        float wanted[k_max_dock_tabs] = {};
+        float wanted_total = -overlap * static_cast<float>(count - 1);
+        bool fits = metrics.tab_fit;
+        for (uint32_t t = 0; t < count && fits; ++t)
+        {
+            const PanelDesc* desc = find_panel(panels, n.tabs[t]);
+            fits = desc != nullptr && desc->tab_width > 0.0f;
+            wanted[t] = fits ? math::clamp(desc->tab_width, metrics.tab_min_width, metrics.tab_max_width) : 0.0f;
+            wanted_total += wanted[t];
+        }
+        if (fits && wanted_total <= avail)
+        {
+            float x = rect.min[0];
+            for (uint32_t t = 0; t < count; ++t)
+            {
+                s.tab_rects[t] = Rect{ Vec2f(x, strip_y), Vec2f(wanted[t], strip_h) };
+                x += wanted[t] - overlap;
+            }
+            s.first_visible = 0;
+            s.visible_count = static_cast<uint8_t>(count);
+            if (scroll != nullptr)
+                scroll->first[node] = 0;
+            return;
+        }
         if (tab_w >= metrics.tab_min_width)
         {
             tab_w = math::min(tab_w, metrics.tab_max_width);

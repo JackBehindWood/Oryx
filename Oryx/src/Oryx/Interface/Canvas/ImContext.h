@@ -91,7 +91,7 @@ inline constexpr uint32_t k_channel_tooltip = 4;
 inline constexpr uint32_t k_channel_drag = 5;
 
 // Alpha factor of the boxes inside a disabled scope.
-inline constexpr float k_disabled_alpha = 0.45f;
+inline constexpr float k_disabled_alpha = 0.5f;
 
 inline constexpr uint32_t k_max_popup_depth = 8;
 inline constexpr uint32_t k_max_popups_per_frame = 16;

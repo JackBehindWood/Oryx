@@ -369,6 +369,11 @@ bool TabBarFrame::draw_tab(std::string_view label, bool closable, bool* open)
     const bool chosen = index == m_selected;
     im::paint_surface(ctx.layout().node(node_index).paint, style, im::interaction_fill(style, tab, chosen ? style.selected : style.background));
     ctx.layout().node(node_index).paint.border_width = 0.0f;
+    if (look.shape == TabShape::Rounded)
+    {
+        const float radius = look.radius * scale;
+        ctx.layout().node(node_index).paint.radius = CornerRadius{ radius, radius, 0.0f, 0.0f };
+    }
     if (sloped)
     {
         ctx.layout().node(node_index).paint.slope = look.slope * scale;
@@ -397,7 +402,7 @@ bool TabBarFrame::draw_tab(std::string_view label, bool closable, bool* open)
         ctx.layout().node(node_index).paint.text_height = style.text_height;
         ctx.layout().node(node_index).paint.text_colour = style.text;
     }
-    if (chosen && !sloped)
+    if (chosen && look.shape == TabShape::Flat)
     {
         LayoutStyle underline;
         underline.width = grow();

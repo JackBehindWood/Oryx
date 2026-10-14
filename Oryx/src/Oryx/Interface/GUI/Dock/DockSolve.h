@@ -39,8 +39,18 @@ enum class TearOff : uint8_t
 };
 
 // The user's look-and-feel choices, all plain values so a settings loader fills them. Precedence for toolbars: this style, then the panel's own placement, then the node's context rule.
+// Which tab look the dock strips draw; Theme follows GuiTheme::tab_style.
+enum class TabLook : uint8_t
+{
+    Theme,
+    Sloped,
+    Rounded,
+    Flat
+};
+
 struct DockStyle
 {
+    TabLook tab_look = TabLook::Theme;
     ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
     bool toolbars = true;
     TabPosition tab_position = TabPosition::Top;
@@ -80,6 +90,10 @@ struct DockMetrics
     float tab_slope = 0.0f;
     float tab_shoulder = 0.0f;
     float tab_raise = 0.0f;
+    // Radius of the outer corners of a rounded tab; zero for the other looks.
+    float tab_radius = 0.0f;
+    // Tabs take the width their label asks for (PanelDesc::tab_width) while the strip has room, else they share it equally.
+    bool tab_fit = false;
     float float_width = 320.0f;
     float float_height = 240.0f;
     DockStyle style;

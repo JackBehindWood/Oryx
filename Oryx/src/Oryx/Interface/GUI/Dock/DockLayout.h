@@ -119,6 +119,8 @@ struct PanelDesc
     PanelFlags flags{ panel_flag::all };
     float min_w = 0.0f;
     float min_h = 0.0f;
+    // The width its tab prefers (label, padding and close button), set by the host every frame; zero means no preference.
+    float tab_width = 0.0f;
     char name[k_panel_text_size] = {};
     char title[k_panel_text_size] = {};
     // Optional docking limits: when dock_only is not empty the panel may only dock into (tab with or split beside) a node holding one of those panels; it never docks into a node holding a dock_never panel.
