@@ -33,6 +33,7 @@ struct UiFixture
     {
         theme.font = &font;
         context.set_theme(theme);
+        context.set_animations(false);
     }
 
     template<typename Body>

@@ -85,7 +85,7 @@ TEST_CASE("fit_board_2d inside a region keeps the board within it, and the viewp
     CHECK(high[1] <= viewport[1] - region.min[1] + 0.01f);
 
     BoardProjection2D bands = fit_board_2d(scene, viewport);
-    BoardProjection2D explicit_region = fit_board_2d(scene, viewport, board_region_2d(viewport));
+    BoardProjection2D explicit_region = fit_board_2d(scene, viewport, board_region_2d(viewport, !scene.options.empty()));
     CHECK(bands.scale == explicit_region.scale);
     CHECK(bands.origin == explicit_region.origin);
     CHECK(fit_board_2d(scene, viewport, { { 0.0f, 0.0f }, { 0.0f, 50.0f } }).scale == 0.0f);
