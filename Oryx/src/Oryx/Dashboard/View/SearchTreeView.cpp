@@ -12,7 +12,6 @@ namespace oryx
 namespace
 {
 
-constexpr float k_row_height = 22.0f;
 constexpr float k_indent = 12.0f;
 constexpr uint32_t k_path_nodes = 8;
 
@@ -26,7 +25,7 @@ public:
         const RecordView view = selected_view(model);
         if (!view.valid)
         {
-            gui::label(model.feed->size() == 0 ? "Waiting for the first decision" : "No decision to show");
+            gui::empty_state("No decisions yet", "Make a move or start a match");
             return;
         }
         if (view.record->tree_count == 0)
@@ -48,8 +47,7 @@ public:
 private:
     static void draw_empty(const DashboardModel& model)
     {
-        gui::label("No search tree for this decision");
-        gui::label(model.feed->options().max_tree_nodes == 0 ? "Tree storage is off: set dashboard.max_tree_nodes" : "The strategy did not publish one");
+        gui::empty_state("No search tree for this decision", model.feed->options().max_tree_nodes == 0 ? "Tree storage is off: set dashboard.max_tree_nodes" : "The strategy did not publish one");
     }
 
     void sync(const RecordView& view)
@@ -229,7 +227,7 @@ private:
         FrameArena& arena = gui::context().arena();
         gui::TableOptions options;
         options.row_count = static_cast<uint32_t>(m_rows.size());
-        options.row_height = k_row_height;
+        options.row_height = gui::theme().row_height;
         gui::TableScope table("search", options);
         table.column("Node", grow(1.0f, 96.0f), true);
         table.column("Visits", fixed(72.0f), true, TextAlign::Right);
@@ -293,8 +291,8 @@ private:
         {
             return;
         }
-        const float top = static_cast<float>(at) * k_row_height;
-        const float bottom = top + k_row_height;
+        const float top = static_cast<float>(at) * gui::theme().row_height;
+        const float bottom = top + gui::theme().row_height;
         const float offset = gui::scroll_offset("body");
         if (top < offset)
         {

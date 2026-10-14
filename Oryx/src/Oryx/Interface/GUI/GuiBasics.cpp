@@ -155,6 +155,27 @@ void caption(std::string_view text, const WidgetOptions& options)
     label(text, sized);
 }
 
+void empty_state(std::string_view heading, std::string_view hint)
+{
+    GuiContext& ctx = context();
+    LayoutStyle column;
+    column.width = grow();
+    column.height = grow();
+    column.direction = Direction::Column;
+    column.align_x = Align::Centre;
+    column.align_y = Align::Centre;
+    column.gap = ctx.gui_theme().spacing;
+    ctx.begin_box(heading, column);
+    ctx.push_id(heading);
+    title(heading);
+    if (!hint.empty())
+    {
+        caption(hint);
+    }
+    ctx.pop_id();
+    ctx.end_box();
+}
+
 ItemState label_ellipsis(std::string_view text, const WidgetOptions& options)
 {
     GuiContext& ctx = context();

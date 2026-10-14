@@ -82,6 +82,8 @@ struct GuiTheme : ImTheme
     float space_md = 8.0f;
     // One height for every bar: dock tab strips and toolbars, the menu bar, the status bar and table headers.
     float bar_height = 24.0f;
+    // One height for every row of a table, list or decision table.
+    float row_height = 22.0f;
     // Type scale as multiples of the role's text height (the body size): title, body (1) and caption.
     float title_scale = 1.125f;
     float caption_scale = 0.8125f;

@@ -158,10 +158,10 @@ TEST_CASE("dashboard view: empty states say why nothing is drawn")
     {
         ViewFixture f(id);
         f.frames();
-        CHECK(f.find_text("No decision to show") != nullptr);
+        CHECK(f.find_text("No decisions yet") != nullptr);
         f.model.feed = nullptr;
         f.frames();
-        CHECK(f.find_text("No decision to show") != nullptr);
+        CHECK(f.find_text("No decisions yet") != nullptr);
     }
 
     ViewFixture probabilities("probabilities");
@@ -485,7 +485,7 @@ TEST_CASE("dashboard stats: overflowing keys are reported and an empty feed says
     options.max_keys = 1;
     ViewFixture f("stats", options);
     f.frames();
-    CHECK(f.find_text("No diagnostics reported") != nullptr);
+    CHECK(f.find_text("No diagnostics yet") != nullptr);
     DummyState state(10);
     Decision decision;
     decision.chosen = 1;
@@ -734,7 +734,7 @@ TEST_CASE("dashboard decision: the value history waits for a second record")
     f.settle();
     f.frames();
     CHECK(f.find_named("chosen value") != nullptr);
-    CHECK(f.find_text("Chosen value by decision") != nullptr);
+    CHECK(f.find_text("Chosen value over the match") != nullptr);
 }
 
 TEST_CASE("dashboard stats: whole numbers group thousands and a lone sample drops the repeated columns")
@@ -892,4 +892,22 @@ TEST_CASE("search view: steady frames allocate nothing")
     const MemoryStats before = test::all_allocations();
     f.frames(3);
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
+}
+
+TEST_CASE("dashboard decision: equal values say there is no evaluation, differing ones show the colour legend")
+{
+    ViewFixture flat("decision");
+    add_scored(flat.feed, 1, { { 1, 0.0, 0.0 }, { 2, 0.0, 0.0 }, { 3, 0.0, 0.0 } }, false, true);
+    flat.settle();
+    flat.frames();
+    CHECK(flat.find_text("No evaluation: every action has the same value") != nullptr);
+    CHECK(flat.find_text("Blue: good for the player to move, orange: bad") == nullptr);
+
+    ViewFixture varied("decision");
+    add_scored(varied.feed, 1, { { 1, 0.0, 1.0 }, { 2, 0.0, -0.5 } }, false, true);
+    varied.settle();
+    varied.frames();
+    CHECK(varied.find_text("No evaluation: every action has the same value") == nullptr);
+    CHECK(varied.find_text("Blue: good for the player to move, orange: bad") != nullptr);
+    CHECK(varied.find_text("Hover a row to see it on the board, click to pin it") != nullptr);
 }

@@ -8,8 +8,8 @@ namespace
 
 constexpr float k_label_height = 16.0f;
 constexpr float k_target_dot = 0.16f;
-constexpr float k_ring_thickness = 0.22f;
-constexpr float k_cross_thickness = 0.16f;
+constexpr float k_ring_thickness = 0.17f;
+constexpr float k_cross_thickness = 0.13f;
 constexpr float k_outline = 1.08f;
 constexpr float k_chosen_ring = 0.86f;
 constexpr float k_chosen_ring_thickness = 0.11f;
@@ -18,11 +18,12 @@ constexpr float k_arrow_min_thickness = 3.0f;
 constexpr float k_arrow_head = 0.30f;
 constexpr float k_link_thickness = 2.5f;
 constexpr float k_chip_height = 20.0f;
-constexpr float k_chip_char = 8.5f;
 constexpr float k_chip_padding = 12.0f;
 constexpr float k_chip_text = 15.0f;
-constexpr float k_heat_text = 14.0f;
-constexpr float k_heat_text_inset = 4.0f;
+constexpr float k_heat_text = 12.0f;
+constexpr float k_heat_text_inset = 3.0f;
+constexpr float k_heat_pill_padding = 3.0f;
+constexpr float k_chip_inset = 3.0f;
 
 void draw_text_centred(BatchRenderer2D& batcher, Font& font, const Vec2f& centre, const std::string& text, float pixel_height, const Colour& colour)
 {
@@ -177,7 +178,10 @@ void draw_heat_text(BatchRenderer2D& batcher, const BoardLayout2D& board, const 
         const Vec2f centre = board_to_world(layout, board.position(space));
         char text[16];
         std::snprintf(text, sizeof(text), "%.0f%%", static_cast<double>(item.value) * 100.0);
-        batcher.draw_text({ centre[0] - size[0] * 0.5f + k_heat_text_inset, centre[1] + size[1] * 0.5f - k_heat_text_inset - font.ascent(k_heat_text) }, text, font, style);
+        const Vec2f pill = { font.measure(text, k_heat_text).width + 2.0f * k_heat_pill_padding, k_heat_text + 2.0f * k_heat_pill_padding };
+        const Vec2f pill_centre = { centre[0] - size[0] * 0.5f + k_heat_text_inset + pill[0] * 0.5f, centre[1] + size[1] * 0.5f - k_heat_text_inset - pill[1] * 0.5f };
+        batcher.draw_rect(pill_centre, pill, theme.heat_pill);
+        draw_text_centred(batcher, font, pill_centre, text, k_heat_text, style.colour);
     }
 }
 
@@ -255,9 +259,9 @@ void draw_value_chip(BatchRenderer2D& batcher, const BoardLayout2D& board, const
     }
     char text[24];
     std::snprintf(text, sizeof(text), math::abs(item.value) < 100.0f ? "%+.2f" : "%+.0f", static_cast<double>(item.value));
-    const float width = static_cast<float>(std::strlen(text)) * k_chip_char + k_chip_padding;
+    const float width = font.measure(text, k_chip_text).width + k_chip_padding;
     const Vec2f size = space_size(board, space, layout);
-    const Vec2f centre = board_to_world(layout, board.position(space)) + Vec2f(0.0f, size[1] * 0.5f);
+    const Vec2f centre = board_to_world(layout, board.position(space)) - Vec2f(0.0f, size[1] * 0.5f - k_chip_height * 0.5f - k_chip_inset);
     batcher.draw_rect(centre, { width + 2.0f, k_chip_height + 2.0f }, theme.piece_outline);
     batcher.draw_rect(centre, { width, k_chip_height }, item.value >= 0.0f ? theme.value_positive : theme.value_negative);
     TextStyle style;

@@ -47,6 +47,8 @@ void overlay_text(std::string_view text, const ImStyle& style);
 
 // The type scale: title (theme.title_scale x the body), body is label(), caption (theme.caption_scale x, in theme.caption_colour).
 void title(std::string_view text, const WidgetOptions& options = {});
+// What a view shows instead of its content when there is none yet: a title over a caption hint, centred in the space the parent leaves.
+void empty_state(std::string_view heading, std::string_view hint = {});
 void caption(std::string_view text, const WidgetOptions& options = {});
 // A one-line label that cuts overlong text with "..." and shows the full text as a tooltip while it is cut. The row is the label's width at most.
 ItemState label_ellipsis(std::string_view text, const WidgetOptions& options = {});

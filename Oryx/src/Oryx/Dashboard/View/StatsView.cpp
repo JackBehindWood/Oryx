@@ -11,7 +11,6 @@ namespace oryx
 namespace
 {
 
-constexpr float k_row_height = 20.0f;
 constexpr float k_name_min_width = 96.0f;
 constexpr float k_number_width = 76.0f;
 constexpr size_t k_open_by_default_keys = 24;
@@ -27,7 +26,7 @@ public:
         const DashboardFeed& feed = *model.feed;
         if (feed.key_count() == 0)
         {
-            gui::label("No diagnostics reported");
+            gui::empty_state("No diagnostics yet", "The strategy has not reported any metrics");
             return;
         }
         FrameArena& arena = gui::context().arena();
@@ -84,11 +83,11 @@ private:
         {
             gui::TableOptions options;
             options.row_count = rows;
-            options.row_height = k_row_height;
-            options.height = fixed(static_cast<float>(rows + 1) * k_row_height);
+            options.row_height = gui::theme().row_height;
+            options.height = fixed(static_cast<float>(rows) * gui::theme().row_height + gui::theme().bar_height);
             gui::TableScope table("keys", options);
             table.column("Name", grow(1.0f, k_name_min_width));
-            table.column(single ? "Value" : "Ply", fixed(k_number_width), false, TextAlign::Right, true);
+            table.column(single ? "Value" : "Now", fixed(k_number_width), false, TextAlign::Right, true);
             if (!single)
             {
                 table.column("Last", fixed(k_number_width), false, TextAlign::Right, true);

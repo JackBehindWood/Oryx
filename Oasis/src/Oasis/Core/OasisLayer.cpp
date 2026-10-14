@@ -20,7 +20,7 @@ namespace
 constexpr bool k_graphics_built = true;
 constexpr const char* k_showcase_panel = "tools/gui-showcase";
 constexpr float k_showcase_width = 360.0f;
-constexpr float k_console_height = 220.0f;
+constexpr float k_console_height = 180.0f;
 constexpr float k_console_min_height = 120.0f;
 constexpr float k_showcase_min_width = 320.0f;
 constexpr float k_showcase_min_height = 240.0f;

@@ -3,14 +3,15 @@
 namespace oryx
 {
 
-Rect board_region_2d(const Vec2f& viewport)
+Rect board_region_2d(const Vec2f& viewport, bool has_options)
 {
-    return { { k_board_gutter, k_board_status_band }, { viewport[0] - 2.0f * k_board_gutter, viewport[1] - k_board_status_band - k_board_menu_band - k_board_gutter } };
+    const float menu = has_options ? k_board_menu_band : 0.0f;
+    return { { k_board_gutter, k_board_status_band }, { viewport[0] - 2.0f * k_board_gutter, viewport[1] - k_board_status_band - menu - k_board_gutter } };
 }
 
 BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport)
 {
-    return fit_board_2d(scene, viewport, board_region_2d(viewport));
+    return fit_board_2d(scene, viewport, board_region_2d(viewport, !scene.options.empty()));
 }
 
 BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport, const Rect& region)

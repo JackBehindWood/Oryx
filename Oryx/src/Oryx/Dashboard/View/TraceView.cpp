@@ -11,8 +11,7 @@ namespace oryx
 namespace
 {
 
-constexpr float k_row_height = 22.0f;
-constexpr float k_trace_height = 220.0f;
+constexpr float k_trace_height = 180.0f;
 constexpr float k_pin_slack = 1.0f;
 
 struct TraceState
@@ -33,7 +32,7 @@ public:
         const DashboardFeed& feed = *model.feed;
         if (feed.size() == 0)
         {
-            gui::label("Waiting for the first decision");
+            gui::empty_state("No decisions yet", "Make a move or start a match");
             return;
         }
         handle_keys(model);
@@ -96,7 +95,7 @@ private:
         const DashboardFeed& feed = *model.feed;
         gui::begin_row("trace-bar");
         bool follow = model.follow_latest;
-        if (gui::toggle("Follow latest", follow))
+        if (gui::toggle(follow ? "Following" : "Follow latest", follow))
         {
             if (follow)
             {
@@ -131,10 +130,10 @@ private:
 
         gui::TableOptions options;
         options.row_count = static_cast<uint32_t>(feed.size());
-        options.row_height = k_row_height;
+        options.row_height = gui::theme().row_height;
         gui::TableScope table("trace", options);
         const bool any_probability = has_probability(feed);
-        table.column("#", fixed(48.0f), false, TextAlign::Left, true);
+        table.column("Move", fixed(56.0f), false, TextAlign::Left, true);
         table.column("Player", fixed(76.0f));
         table.column("Action", grow(1.0f, 64.0f));
         table.column("Value", fixed(72.0f), false, TextAlign::Right, true);
@@ -173,7 +172,7 @@ private:
     // Following pins the list to its end; a wheel move away from the pin pauses following, like a log tail. A key selection scrolls its row into view instead.
     void place_scroll(DashboardModel& model, TraceState& pin, const RecordView& selected, uint64_t oldest)
     {
-        const float end = static_cast<float>(model.feed->size()) * k_row_height;
+        const float end = static_cast<float>(model.feed->size()) * gui::theme().row_height;
         const bool was_following = pin.following;
         pin.following = model.follow_latest;
         // The wheel moves the offset a frame later, and a layout settle moves it too, so only a wheel move counts as leaving the pin.
@@ -209,8 +208,8 @@ private:
         {
             return;
         }
-        const float top = row * k_row_height;
-        const float bottom = top + k_row_height;
+        const float top = row * gui::theme().row_height;
+        const float bottom = top + gui::theme().row_height;
         const float offset = gui::scroll_offset("body");
         if (top < offset)
         {

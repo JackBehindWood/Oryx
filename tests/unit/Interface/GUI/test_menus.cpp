@@ -272,3 +272,18 @@ TEST_CASE("GUI text: the type scale orders title above body above caption")
     CHECK(title > body_height);
     CHECK(body_height > caption);
 }
+
+TEST_CASE("GUI text: an empty state centres its title over its hint")
+{
+    GuiFixture f;
+    f.driver.input().surface_size = { 200.0f, 100.0f };
+    const auto body = [&] { gui::empty_state("Nothing here", "Do something"); };
+    f.driver.settle(f.column_of(body));
+    const LayoutNode* heading = f.find_text("Nothing here");
+    const LayoutNode* hint = f.find_text("Do something");
+    REQUIRE(heading != nullptr);
+    REQUIRE(hint != nullptr);
+    CHECK(rect_centre(heading->rect)[0] == doctest::Approx(100.0f));
+    CHECK(heading->rect.min[1] < hint->rect.min[1]);
+    CHECK(heading->paint.text_height > hint->paint.text_height);
+}

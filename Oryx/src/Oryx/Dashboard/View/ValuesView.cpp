@@ -3,6 +3,7 @@
 #include "Oryx/Dashboard/View/DashboardViewRegistry.h"
 #include "Oryx/Dashboard/View/DecisionTable.h"
 #include "Oryx/Interface/GUI/Gui.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 
 namespace oryx
 {
@@ -20,7 +21,7 @@ public:
         const RecordView view = selected_view(model);
         if (!view.valid)
         {
-            gui::label("No decision to show");
+            gui::empty_state("No decisions yet", "Make a move or start a match");
             return;
         }
         draw_decision_table(model, view, { false, true });

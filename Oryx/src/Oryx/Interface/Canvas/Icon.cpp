@@ -48,6 +48,13 @@ void draw_icon(DrawList& list, const Rect& box, Icon icon, const Colour& colour,
             stroke(-half, 0.0f, -quarter * 0.5f, quarter);
             stroke(-quarter * 0.5f, quarter, half, -quarter);
             break;
+        case Icon::Pin:
+            stroke(-half * 0.6f, -half, half * 0.6f, -half);
+            stroke(-half * 0.35f, -half, -half * 0.35f, 0.0f);
+            stroke(half * 0.35f, -half, half * 0.35f, 0.0f);
+            stroke(-half * 0.6f, 0.0f, half * 0.6f, 0.0f);
+            stroke(0.0f, 0.0f, 0.0f, half);
+            break;
         case Icon::Search:
         {
             constexpr uint32_t k_segments = 12;

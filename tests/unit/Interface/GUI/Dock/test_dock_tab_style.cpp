@@ -219,3 +219,21 @@ TEST_CASE("tab fit: tabs take the width their label asks for while they fit, els
     const SolvedNode& crowded = solve(layout, panels, metrics, k_surface).nodes[0];
     CHECK(crowded.tab_rects[0].size[0] == doctest::Approx(crowded.tab_rects[1].size[0]));
 }
+
+TEST_CASE("tab fit: crowded tabs shrink in proportion to their labels while each stays above the minimum")
+{
+    PanelTable panels = make_panels();
+    const DockLayout layout = three_tabs(panels);
+    DockMetrics metrics;
+    metrics.strip_button = 0.0f;
+    metrics.tab_fit = true;
+    metrics.tab_max_width = 1000.0f;
+    find_panel(panels, pid("a"))->tab_width = 100.0f;
+    find_panel(panels, pid("b"))->tab_width = 200.0f;
+    find_panel(panels, pid("c"))->tab_width = 300.0f;
+    const SolvedNode& node = solve(layout, panels, metrics, k_surface).nodes[0];
+    CHECK(node.tab_rects[0].size[0] < 100.0f);
+    CHECK(node.tab_rects[1].size[0] == doctest::Approx(2.0f * node.tab_rects[0].size[0]));
+    CHECK(node.tab_rects[2].size[0] == doctest::Approx(3.0f * node.tab_rects[0].size[0]));
+    CHECK(node.tab_rects[2].min[0] + node.tab_rects[2].size[0] == doctest::Approx(k_surface.size[0]));
+}

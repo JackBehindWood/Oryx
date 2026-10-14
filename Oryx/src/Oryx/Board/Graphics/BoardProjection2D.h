@@ -15,12 +15,12 @@ struct BoardProjection2D
     float scale = 1.0f;
 };
 
-constexpr float k_board_status_band = 56.0f;
+constexpr float k_board_status_band = 44.0f;
 constexpr float k_board_menu_band = 64.0f;
-constexpr float k_board_gutter = 28.0f;
+constexpr float k_board_gutter = 20.0f;
 
-// The part of a viewport the board may use (logical points, origin top left): the status band on top, the menu band and gutters elsewhere.
-[[nodiscard]] Rect board_region_2d(const Vec2f& viewport);
+// The part of a viewport the board may use (logical points, origin top left): the status band on top, gutters at the sides and bottom, and the menu band only when the scene has option buttons.
+[[nodiscard]] Rect board_region_2d(const Vec2f& viewport, bool has_options = true);
 
 // Fits the scene's extent into the viewport, centred and uniformly scaled; a degenerate viewport or scene gives scale 0.
 [[nodiscard]] BoardProjection2D fit_board_2d(const BoardScene& scene, const Vec2f& viewport);

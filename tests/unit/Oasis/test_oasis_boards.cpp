@@ -120,3 +120,18 @@ TEST_CASE("--dashboard and --no-dashboard are gone: the dashboard is always part
     CHECK_THROWS_AS(oryx::CommandLine::global().parse(std::vector<std::string>{ "--dashboard" }), oryx::Error);
     CHECK_THROWS_AS(oryx::CommandLine::global().parse(std::vector<std::string>{ "--no-dashboard" }), oryx::Error);
 }
+
+#ifdef OX_ENABLE_GRAPHICS
+TEST_CASE("HexapawnPresenter: both sides read against both tile tones")
+{
+    HexapawnPresenter presenter;
+    const BoardTheme2D theme;
+    for (PlayerId player : { 0, 1 })
+    {
+        for (const Colour& tone : theme.tones)
+        {
+            CHECK(contrast_ratio(presenter.piece_style(0, player).colour, tone) >= 3.0f);
+        }
+    }
+}
+#endif

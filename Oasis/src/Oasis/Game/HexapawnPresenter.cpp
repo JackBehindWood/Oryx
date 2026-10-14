@@ -58,7 +58,7 @@ oryx::PieceStyle HexapawnPresenter::piece_style(oryx::PieceKind, oryx::PlayerId 
     {
         return { "W", { 0.94f, 0.92f, 0.86f, 1.0f }, oryx::PieceShape::Disc };
     }
-    return { "B", { 0.42f, 0.45f, 0.56f, 1.0f }, oryx::PieceShape::Disc };
+    return { "B", { 0.50f, 0.58f, 0.82f, 1.0f }, oryx::PieceShape::Disc };
 }
 
 OX_REGISTER_BOARD_PRESENTER(HexapawnPresenter, "hexapawn")

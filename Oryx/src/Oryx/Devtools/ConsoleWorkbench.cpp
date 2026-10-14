@@ -247,7 +247,7 @@ void ConsoleWorkbench::draw_console()
     {
         gui::RowScope controls("console controls", { .width = grow(), .align = Align::Centre, .gap = gui::theme().space_md });
         {
-            gui::ComboScope level("level", k_level_names[m_state.level]);
+            gui::ComboScope level("level", k_level_names[m_state.level], { .label_width = 0.0f, .width = fixed(100.0f) });
             for (int32_t index = 0; index < static_cast<int32_t>(k_console_levels); ++index)
             {
                 if (level.item(k_level_names[index], index == m_state.level))
@@ -270,7 +270,7 @@ void ConsoleWorkbench::draw_console()
         {
             copy_selection(m_select_from == 0);
         }
-        gui::checkbox("Follow", m_state.follow);
+        gui::checkbox("Follow", m_state.follow, { .label_width = 0.0f });
     }
     if (filter_changed)
     {

@@ -90,7 +90,7 @@ TEST_CASE("dashboard workbench: views on one side are tabbed together and a bott
     CHECK_FALSE(gui::is_valid(trace->dock_near));
     CHECK_FALSE(gui::is_valid(trace->dock_tabbed_with));
     CHECK(decision->dock_side == gui::DropZone::Right);
-    CHECK(decision->dock_size == doctest::Approx(360.0f));
+    CHECK(decision->dock_size == doctest::Approx(380.0f));
     CHECK(stats->dock_tabbed_with == decision->id);
 }
 
@@ -129,7 +129,7 @@ TEST_CASE("dashboard workbench: the status shows the match and decision counts")
     DashboardRig rig;
     rig.add_decision();
     rig.f.driver.frame(rig.f.frame_of([&] { rig.workbenches.status(); }));
-    CHECK(rig.f.find_text("Match 0 \xC2\xB7 1 decisions") != nullptr);
+    CHECK(rig.f.find_text("Match 1 \xC2\xB7 1 decision") != nullptr);
 }
 
 TEST_CASE("dashboard workbench: the annotation flags start from the setting")

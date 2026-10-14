@@ -134,7 +134,19 @@ struct Solver
             wanted[t] = fits ? math::clamp(desc->tab_width, metrics.tab_min_width, metrics.tab_max_width) : 0.0f;
             wanted_total += wanted[t];
         }
-        if (fits && wanted_total <= avail)
+        if (fits && wanted_total > avail)
+        {
+            const float share = (avail + overlap * static_cast<float>(count - 1)) / (wanted_total + overlap * static_cast<float>(count - 1));
+            bool roomy = true;
+            for (uint32_t t = 0; t < count; ++t)
+            {
+                wanted[t] *= share;
+                roomy = roomy && wanted[t] >= metrics.tab_min_width;
+            }
+            fits = roomy;
+            wanted_total = fits ? avail : wanted_total;
+        }
+        if (fits && wanted_total <= avail + 0.01f)
         {
             float x = rect.min[0];
             for (uint32_t t = 0; t < count; ++t)

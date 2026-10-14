@@ -27,7 +27,7 @@ Vec2f cursor_at(const BoardProjection2D& layout, const Vec2f& board)
 
 } // namespace
 
-TEST_CASE("fit_board_2d centres the board between the status and menu bands at any window size")
+TEST_CASE("fit_board_2d centres the board between the status band and the gutters at any window size")
 {
     BoardScene scene = grid_scene(3, 3);
     for (Vec2f viewport : { Vec2f(800.0f, 600.0f), Vec2f(1600.0f, 1200.0f), Vec2f(500.0f, 900.0f) })
@@ -40,7 +40,7 @@ TEST_CASE("fit_board_2d centres the board between the status and menu bands at a
         Vec2f high = board_to_world(layout, scene.layout->max());
         CHECK(low[0] >= k_board_gutter - 0.01f);
         CHECK(high[0] <= viewport[0] - k_board_gutter + 0.01f);
-        CHECK(low[1] >= k_board_menu_band + k_board_gutter - 0.01f);
+        CHECK(low[1] >= k_board_gutter - 0.01f);
         CHECK(high[1] <= viewport[1] - k_board_status_band + 0.01f);
         CHECK((low[0] + high[0]) * 0.5f == doctest::Approx(viewport[0] * 0.5f));
     }
@@ -97,4 +97,12 @@ TEST_CASE("board_region_2d leaves the status band on top and the menu band and g
     CHECK(region.min == Vec2f(k_board_gutter, k_board_status_band));
     CHECK(rect_max(region)[0] == doctest::Approx(800.0f - k_board_gutter));
     CHECK(rect_max(region)[1] == doctest::Approx(600.0f - k_board_menu_band - k_board_gutter));
+}
+
+TEST_CASE("board_region_2d reserves the menu band only when the scene has option buttons")
+{
+    const Rect with_options = board_region_2d({ 800.0f, 600.0f }, true);
+    const Rect without = board_region_2d({ 800.0f, 600.0f }, false);
+    CHECK(without.size[1] == doctest::Approx(with_options.size[1] + k_board_menu_band));
+    CHECK(rect_max(without)[1] == doctest::Approx(600.0f - k_board_gutter));
 }

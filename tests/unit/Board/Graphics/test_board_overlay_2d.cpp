@@ -48,8 +48,8 @@ TEST_CASE("The board overlay lays out the status, the board area and the option 
 
     CHECK(dump_layout(fixture.ui) ==
           "overlay [0.00 0.00 800.00 600.00] row w=grow(1.00) h=grow(1.00)\n"
-          "  board [28.00 56.00 744.00 452.00] row w=grow(1.00) h=grow(1.00)\n"
-          "  player 1 [343.00 16.00 114.00 24.00] row w=fit h=fit floating text=\"player 1\"\n"
+          "  board [20.00 44.00 760.00 472.00] row w=grow(1.00) h=grow(1.00)\n"
+          "  player 1 [343.00 10.00 114.00 24.00] row w=fit h=fit floating text=\"player 1\"\n"
           "  options [208.00 536.00 384.00 64.00] row w=fit h=fixed(64.00) floating\n"
           "    take1 [208.00 550.00 120.00 36.00] row w=fixed(120.00) h=fixed(36.00) text=\"take1\"\n"
           "    take2 [340.00 550.00 120.00 36.00] row w=fixed(120.00) h=fixed(36.00) text=\"take2\"\n"
@@ -64,7 +64,7 @@ TEST_CASE("The board overlay records the status text and flat option buttons")
     CHECK(dump(fixture.ui.draw_list()) ==
           "surface 0\n"
           "channel 0\n"
-          "  text (400.00 37.00) h=24.00 align=1 \"player 1\" rgba(1.00 1.00 1.00 1.00)\n"
+          "  text (400.00 31.00) h=24.00 align=1 \"player 1\" rgba(1.00 1.00 1.00 1.00)\n"
           "  rect [208.00 550.00 120.00 36.00] rgba(0.25 0.28 0.36 1.00)\n"
           "  text (268.00 575.00) h=18.00 align=1 \"take1\" rgba(1.00 1.00 1.00 1.00)\n"
           "  rect [340.00 550.00 120.00 36.00] rgba(0.25 0.28 0.36 1.00)\n"

@@ -3,7 +3,9 @@
 #include "Oryx/Dashboard/View/DecisionTable.h"
 #include "Oryx/Dashboard/View/ViewFormat.h"
 #include "Oryx/Interface/GUI/Gui.h"
+#include "Oryx/Interface/GUI/GuiControls.h"
 #include "Oryx/Interface/GUI/GuiData.h"
+#include "Oryx/Interface/GUI/GuiMenus.h"
 
 namespace oryx
 {
@@ -13,7 +15,6 @@ namespace
 
 constexpr size_t k_min_history = 2;
 constexpr float k_history_height = 100.0f;
-constexpr float k_row_height = 22.0f;
 constexpr float k_pad = 8.0f;
 constexpr float k_marker_width = 3.0f;
 constexpr float k_marker_gap = 6.0f;
@@ -77,6 +78,7 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
 
     FrameArena& arena = gui::context().arena();
     const GuiTheme& theme = gui::theme();
+    const float row_height = theme.row_height;
     std::span<uint32_t> order = arena.allocate_array<uint32_t>(record.score_count);
     size_t rows = 0;
     float extent = 0.0f;
@@ -99,7 +101,23 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
     // Stable, so equal scores keep the strategy's own order.
     std::stable_sort(order.begin(), order.begin() + static_cast<std::ptrdiff_t>(rows), [&](uint32_t a, uint32_t b) { return sort_key(view.scores[a], shown.probabilities) > sort_key(view.scores[b], shown.probabilities); });
 
-    const float height = static_cast<float>(rows + 1) * k_row_height;
+    bool flat_values = shown.values;
+    float first_value = 0.0f;
+    bool seen_value = false;
+    for (size_t row = 0; row < rows && flat_values; ++row)
+    {
+        const ScoreEntry& score = view.scores[order[row]];
+        if (!score.has_value)
+        {
+            continue;
+        }
+        flat_values = !seen_value || static_cast<float>(score.value) == first_value;
+        first_value = static_cast<float>(score.value);
+        seen_value = true;
+    }
+    flat_values = flat_values && seen_value && rows > 1;
+
+    const float height = static_cast<float>(rows + 1) * row_height;
     im::CanvasArea area = gui::canvas("decision-rows", grow(), fixed(height));
     Painter& painter = area.painter;
     const Rect& rect = area.rect;
@@ -125,20 +143,33 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
     TextSpec header_text;
     header_text.pixel_height = text_height;
     header_text.colour = muted;
-    painter.text({ { left, rect.min[1] }, { label_width, k_row_height } }, "Action", header_text);
+    painter.text({ { left, rect.min[1] }, { label_width, row_height } }, "Action", header_text);
     if (shown.probabilities)
     {
-        painter.text({ { probability_x, rect.min[1] }, { column_width, k_row_height } }, "Probability", header_text);
+        painter.text({ { probability_x, rect.min[1] }, { column_width, row_height } }, "Probability", header_text);
     }
     if (shown.values)
     {
-        painter.text({ { value_x, rect.min[1] }, { column_width, k_row_height } }, "Value", header_text);
+        painter.text({ { value_x, rect.min[1] }, { column_width, row_height } }, "Value", header_text);
+    }
+
+    if (area.item.hovered && area.pointer_local[1] < row_height)
+    {
+        const float x = area.pointer_local[0] + rect.min[0];
+        if (shown.probabilities && x >= probability_x && x < probability_x + column_width)
+        {
+            gui::tooltip(area.item, "How likely the strategy was to play this action");
+        }
+        else if (shown.values && x >= value_x && x < value_x + column_width)
+        {
+            gui::tooltip(area.item, "Estimated outcome for the player to move: +1 win, 0 even, -1 loss");
+        }
     }
 
     size_t hovered_row = rows;
-    if (area.item.hovered && area.pointer_local[1] >= k_row_height)
+    if (area.item.hovered && area.pointer_local[1] >= row_height)
     {
-        hovered_row = static_cast<size_t>((area.pointer_local[1] - k_row_height) / k_row_height);
+        hovered_row = static_cast<size_t>((area.pointer_local[1] - row_height) / row_height);
     }
     const ActionId board_action = model.board_hovered_action;
     model.hovered_action = hovered_row < rows ? view.scores[order[hovered_row]].action : INVALID_ACTION;
@@ -152,7 +183,7 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
     {
         const ScoreEntry& score = view.scores[order[row]];
         const bool chosen = score.action == record.chosen;
-        const Rect line = { { rect.min[0], rect.min[1] + static_cast<float>(row + 1) * k_row_height }, { rect.size[0], k_row_height } };
+        const Rect line = { { rect.min[0], rect.min[1] + static_cast<float>(row + 1) * row_height }, { rect.size[0], row_height } };
         if (chosen)
         {
             painter.fill_rect(line, with_alpha(theme.base.accent, k_chosen_tint));
@@ -165,13 +196,14 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
         if (score.action == model.pinned_action)
         {
             painter.border(line, {}, 1.0f, theme.base.accent);
+            painter.icon({ { line.min[0] + line.size[0] - row_height, line.min[1] }, { row_height, row_height } }, Icon::Pin, theme.base.accent, row_height * 0.5f);
         }
 
         TextSpec label_spec;
         label_spec.pixel_height = text_height;
         label_spec.colour = chosen ? theme.base.text : with_alpha(theme.base.text, 0.85f);
         label_spec.ellipsis = true;
-        painter.text({ { left, line.min[1] }, { label_width, k_row_height } }, label_view(score.label), label_spec);
+        painter.text({ { left, line.min[1] }, { label_width, row_height } }, label_view(score.label), label_spec);
 
         TextSpec number_spec;
         number_spec.pixel_height = text_height;
@@ -182,8 +214,8 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
         {
             const float probability = math::clamp(static_cast<float>(score.probability), 0.0f, 1.0f);
             draw_track(painter, line, probability_x, track_width, theme);
-            painter.fill_rounded_rect({ { probability_x, line.min[1] + (k_row_height - k_bar_height) * 0.5f }, { track_width * probability, k_bar_height } }, uniform_radius(2.0f), with_alpha(theme.base.accent, chosen ? 1.0f : k_rest_alpha));
-            painter.text({ { probability_x + track_width + k_number_gap, line.min[1] }, { k_number_width, k_row_height } }, arena.format("%.1f%%", static_cast<double>(probability) * 100.0), number_spec);
+            painter.fill_rounded_rect({ { probability_x, line.min[1] + (row_height - k_bar_height) * 0.5f }, { track_width * probability, k_bar_height } }, uniform_radius(2.0f), with_alpha(theme.base.accent, chosen ? 1.0f : k_rest_alpha));
+            painter.text({ { probability_x + track_width + k_number_gap, line.min[1] }, { k_number_width, row_height } }, arena.format("%.1f%%", static_cast<double>(probability) * 100.0), number_spec);
         }
         if (shown.values && score.has_value)
         {
@@ -191,15 +223,20 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
             draw_track(painter, line, value_x, track_width, theme);
             const float centre = value_x + track_width * 0.5f;
             const float reach = track_width * 0.5f * math::min(1.0f, math::abs(value) / extent);
-            const float top = line.min[1] + (k_row_height - k_bar_height) * 0.5f;
-            if (reach >= 1.0f)
+            const float top = line.min[1] + (row_height - k_bar_height) * 0.5f;
+            if (reach >= 1.0f && !flat_values)
             {
                 const Colour fill = value > 0.0f ? theme.palette[0] : theme.palette[1];
                 painter.fill_rect({ { value > 0.0f ? centre : centre - reach, top }, { reach, k_bar_height } }, with_alpha(fill, chosen ? 1.0f : k_rest_alpha + 0.2f));
             }
             painter.fill_rect({ { centre - k_zero_tick * 0.5f, top - 2.0f }, { k_zero_tick, k_bar_height + 4.0f } }, with_alpha(theme.base.text, k_zero_line_alpha));
-            painter.text({ { value_x + track_width + k_number_gap, line.min[1] }, { k_number_width, k_row_height } }, value_text(arena, value), number_spec);
+            painter.text({ { value_x + track_width + k_number_gap, line.min[1] }, { k_number_width, row_height } }, value_text(arena, value), number_spec);
         }
+    }
+    gui::caption(flat_values ? "No evaluation: every action has the same value" : "Hover a row to see it on the board, click to pin it");
+    if (shown.values && !flat_values)
+    {
+        gui::caption("Blue: good for the player to move, orange: bad");
     }
 }
 
@@ -211,7 +248,20 @@ void draw_value_history(DashboardModel& model)
     {
         return;
     }
-    gui::label("Chosen value by decision");
+    gui::caption("Chosen value over the match");
+    float first = 0.0f;
+    bool varies = false;
+    for (size_t index = 0; index < feed.size() && !varies; ++index)
+    {
+        const float value = feed.view(index).record->chosen_value;
+        varies = index > 0 && value != first;
+        first = value;
+    }
+    if (!varies)
+    {
+        gui::caption("The chosen value has not changed yet");
+        return;
+    }
     const Values history = { &feed.data()->chosen_value, static_cast<uint32_t>(feed.size()), static_cast<uint32_t>(feed.first_slot()), sizeof(DashboardRecord) };
     gui::PlotScope plot("chosen value", { .height = fixed(k_history_height) });
     plot.line("value", history);

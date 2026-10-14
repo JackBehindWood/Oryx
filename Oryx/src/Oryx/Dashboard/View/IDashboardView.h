@@ -10,7 +10,7 @@ namespace oryx
 struct DashboardViewPlacement
 {
     gui::DropZone side = gui::DropZone::Right;
-    float size = 360.0f;
+    float size = 380.0f;
     bool beside_board = true;
 };
 

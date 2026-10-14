@@ -210,7 +210,8 @@ void Dashboard::sync_board()
 
 void Dashboard::status()
 {
-    gui::label(gui::context().arena().format("Match %u \xC2\xB7 %u decisions", m_feed.match_index(), static_cast<uint32_t>(m_feed.size())));
+    const uint32_t decisions = static_cast<uint32_t>(m_feed.size());
+    gui::label(gui::context().arena().format("Match %u \xC2\xB7 %u %s", m_feed.match_index() + 1, decisions, decisions == 1 ? "decision" : "decisions"));
 }
 
 void Dashboard::menu()

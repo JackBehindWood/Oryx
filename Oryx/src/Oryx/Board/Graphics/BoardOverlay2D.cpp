@@ -137,7 +137,7 @@ void build_overlay(UiContext& ui, const BoardScene& scene, const BoardOverlayTex
     LayoutStyle root;
     root.width = grow();
     root.height = grow();
-    root.padding = { k_board_gutter, k_board_status_band, k_board_gutter, k_board_menu_band + k_board_gutter };
+    root.padding = { k_board_gutter, k_board_status_band, k_board_gutter, (scene.options.empty() ? 0.0f : k_board_menu_band) + k_board_gutter };
     ui::BoxScope overlay("overlay", root);
 
     {

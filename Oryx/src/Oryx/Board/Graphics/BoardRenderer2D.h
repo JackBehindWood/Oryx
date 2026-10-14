@@ -27,9 +27,11 @@ struct BoardTheme2D
     // Fraction of a space's footprint left empty around its tile, so a grid reads as cells.
     float space_gap = 0.06f;
     // A piece's size as a fraction of its space's footprint.
-    float piece_size = 0.64f;
+    float piece_size = 0.58f;
     // Annotations: none of these is red or green, so they read under the common colour-vision deficiencies.
     Colour heat = { 0.80f, 0.47f, 0.65f, 1.0f };
+    // The dark plate the heat percentage is printed on, so it reads over any tile or piece.
+    Colour heat_pill = { 0.05f, 0.05f, 0.07f, 0.78f };
     Colour chosen = { 0.98f, 0.82f, 0.25f, 1.0f };
     Colour value_positive = { 0.34f, 0.71f, 0.91f, 1.0f };
     Colour value_negative = { 0.90f, 0.62f, 0.0f, 1.0f };

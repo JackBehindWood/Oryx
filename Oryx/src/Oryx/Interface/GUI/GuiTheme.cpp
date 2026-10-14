@@ -198,6 +198,7 @@ GuiTheme scale_gui_theme(const GuiTheme& theme, float factor)
     scaled.space_xs *= factor;
     scaled.space_md *= factor;
     scaled.bar_height *= factor;
+    scaled.row_height *= factor;
     scaled.min_hit_size *= factor;
     return scaled;
 }
