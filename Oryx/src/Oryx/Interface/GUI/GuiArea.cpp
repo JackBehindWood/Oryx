@@ -186,11 +186,13 @@ private:
 bool begin_area(std::string_view name, const AreaOptions& options)
 {
     GuiContext& ctx = context();
-    if (options.open != nullptr && !*options.open)
+    const ImId id = ctx.id(name);
+    const bool slides = options.slide && options.open != nullptr && options.anchor != AreaAnchor::Fill;
+    const float reveal = slides ? ctx.animate(make_im_id("reveal", id), *options.open ? 1.0f : 0.0f, 0.0f, AnimSpec::standard()) : 1.0f;
+    if (options.open != nullptr && !*options.open && !(slides && reveal > 0.0f))
     {
         return false;
     }
-    const ImId id = ctx.id(name);
     const ItemState item = options.anchor == AreaAnchor::Fill ? ItemState{} : ctx.item(id);
     if (options.open != nullptr && options.mode == AreaMode::Overlay && item.hovered && key_pressed(ctx.input().keys, ImKey::Escape))
     {
@@ -202,7 +204,7 @@ bool begin_area(std::string_view name, const AreaOptions& options)
     const bool horizontal = is_horizontal_edge(options.anchor);
     const float extent = horizontal ? remaining.size[1] : remaining.size[0];
     const float resized = ctx.state<AreaState>(id).size;
-    const float thickness = options.anchor == AreaAnchor::Fill ? extent : resolve_thickness(ctx, id, options, resized, extent);
+    const float thickness = options.anchor == AreaAnchor::Fill ? extent : resolve_thickness(ctx, id, options, resized, extent) * reveal;
     Rect left_over;
     const Rect rect = carve(options.anchor, remaining, thickness, left_over);
     if (options.mode == AreaMode::Reserve)

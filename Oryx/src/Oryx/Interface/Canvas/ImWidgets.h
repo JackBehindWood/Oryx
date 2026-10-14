@@ -54,6 +54,8 @@ struct RowOptions
 void paint_text(BoxPaint& paint, const LayoutNode& node, const ImStyle& style, TextAlign align, bool ellipsis);
 void paint_surface(BoxPaint& paint, const ImStyle& style, const Colour& fill);
 [[nodiscard]] Colour interaction_fill(const ImStyle& style, const ItemState& state, const Colour& rest);
+// The same fill eased: it travels between `rest`, hover and pressed along AnimSpec::quick() under `id` (an invalid id or animations off give the plain fill).
+[[nodiscard]] Colour interaction_fill(ImContext& context, ImId id, const ImStyle& style, const ItemState& state, const Colour& rest);
 // `colour` moved towards white by `amount` (negative: towards black), alpha kept.
 [[nodiscard]] Colour tint(const Colour& colour, float amount);
 // A fill that keeps its identity under the pointer: `colour` lightened while hovered and darkened while held, so a chosen control never swaps to the hover colour.

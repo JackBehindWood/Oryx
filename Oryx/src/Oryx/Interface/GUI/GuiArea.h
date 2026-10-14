@@ -39,6 +39,8 @@ struct AreaOptions : WidgetOptions
     bool* open = nullptr;
     // The content scrolls vertically instead of being clipped.
     bool scroll = false;
+    // With `open`, the area eases its thickness in and out instead of appearing at once (follows gui.animations).
+    bool slide = false;
 };
 
 static_assert(std::is_trivially_copyable_v<AreaOptions>);

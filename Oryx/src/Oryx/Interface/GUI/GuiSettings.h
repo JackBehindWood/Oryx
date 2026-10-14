@@ -10,6 +10,8 @@ namespace oryx
 struct GuiSettings
 {
     bool docking = true;
+    bool animations = true;
+    float animation_speed = 1.0f;
     std::filesystem::path layout_file = "gui-layout.yaml";
     gui::DockStyle dock;
 };
@@ -19,6 +21,8 @@ void reflect(Visitor& v, GuiSettings& s)
 {
     gui::DockStyle& dock = s.dock;
     v.field("docking", s.docking, Doc{ "Panels dock; off keeps the viewport panel alone" });
+    v.field("animations", s.animations, Doc{ "Ease hover, press, panel and toast transitions; off snaps them" });
+    v.field("animation_speed", s.animation_speed, Doc{ "Pace of transitions: 1 is normal, 2 twice as fast" });
     v.field("layout_file", s.layout_file, Doc{ "Where the dock layout is saved (empty keeps it in memory)" });
     v.field("dock_toolbars", dock.toolbars, Doc{ "Panel toolbars" });
     v.field("dock_toolbar_placement", dock.toolbar_placement, choices<gui::ToolbarPlacement>({ { "auto", gui::ToolbarPlacement::Auto }, { "above_tabs", gui::ToolbarPlacement::AboveTabs }, { "below_tabs", gui::ToolbarPlacement::BelowTabs } }), Doc{ "Toolbar position relative to the tab strip" });

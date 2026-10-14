@@ -249,7 +249,7 @@ ComboFrame::ComboFrame(std::string_view preview, const FieldOptions& options)
     button.align_x = Align::Start;
     const uint32_t index = ctx.begin_box(m_control, button);
     BoxPaint& paint = ctx.layout().node(index).paint;
-    im::paint_surface(paint, style, im::interaction_fill(style, m_state, style.background));
+    im::paint_surface(paint, style, im::interaction_fill(ctx, m_control, style, m_state, style.background));
     paint.text = ctx.arena().store(preview);
     paint.text_height = style.text_height;
     paint.text_colour = style.text;

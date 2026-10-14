@@ -317,6 +317,8 @@ void OasisLayer::run(const oryx::ImInput& input)
     oryx::ContextScope<oryx::GuiContext> scope(m_chrome->context);
     try
     {
+        const oryx::GuiSettings& gui_settings = oryx::settings_of<oryx::GuiSettings>();
+        m_chrome->context.set_animations(gui_settings.animations, gui_settings.animation_speed);
         m_chrome->context.begin_frame(input);
         build();
         m_chrome->context.end_frame();
@@ -379,6 +381,7 @@ void OasisLayer::build()
     drawer.size = oryx::fixed(k_console_height);
     drawer.size.min = k_console_min_height;
     drawer.resizable = true;
+    drawer.slide = true;
     drawer.open = &chrome.console_open;
     if (oryx::gui::AreaScope console("console_drawer", drawer); console)
     {

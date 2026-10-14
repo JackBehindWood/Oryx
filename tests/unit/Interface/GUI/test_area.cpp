@@ -339,3 +339,41 @@ TEST_CASE("GUI area: a resizable edge never shrinks below its minimum size")
     f.driver.run_frames(3, f.frame_of(build));
     CHECK(gui::area_rect("drawer").size[1] == doctest::Approx(50.0f));
 }
+
+TEST_CASE("area: a sliding drawer eases its thickness in and keeps drawing while it closes")
+{
+    GuiFixture f;
+    f.context.set_animations(true);
+    f.driver.input().surface_size = { 200.0f, 300.0f };
+    bool open = false;
+    const auto body = [&]
+    {
+        gui::AreaOptions options;
+        options.anchor = gui::AreaAnchor::Bottom;
+        options.size = fixed(100.0f);
+        options.open = &open;
+        options.slide = true;
+        if (gui::AreaScope drawer("drawer", options); drawer)
+        {
+            gui::label("inside");
+        }
+    };
+    f.driver.run_frames(2, f.column_of(body));
+    CHECK(gui::area_rect("drawer").size[1] == 0.0f);
+    open = true;
+    f.driver.frame(f.column_of(body));
+    f.driver.frame(f.column_of(body));
+    const float partway = gui::area_rect("drawer").size[1];
+    CHECK(partway > 0.0f);
+    CHECK(partway < 100.0f);
+    f.driver.run_frames(30, f.column_of(body));
+    CHECK(gui::area_rect("drawer").size[1] == doctest::Approx(100.0f));
+    open = false;
+    f.driver.frame(f.column_of(body));
+    f.driver.frame(f.column_of(body));
+    const float closing = gui::area_rect("drawer").size[1];
+    CHECK(closing > 0.0f);
+    CHECK(closing < 100.0f);
+    f.driver.run_frames(30, f.column_of(body));
+    CHECK(f.find_text("inside") == nullptr);
+}

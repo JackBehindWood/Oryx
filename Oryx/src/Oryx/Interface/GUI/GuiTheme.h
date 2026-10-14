@@ -42,7 +42,7 @@ struct TabStyle
 
     [[nodiscard]] static constexpr TabStyle sloped() { return TabStyle{}; }
     [[nodiscard]] static constexpr TabStyle flat() { return TabStyle{ TabShape::Flat, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
-    [[nodiscard]] static constexpr TabStyle rounded() { return TabStyle{ TabShape::Rounded, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f }; }
+    [[nodiscard]] static constexpr TabStyle rounded() { return TabStyle{ TabShape::Rounded, 0.0f, 0.0f, 0.0f, 0.0f, 8.0f }; }
 };
 
 static_assert(std::is_trivially_copyable_v<TabStyle> && std::is_standard_layout_v<TabStyle>);

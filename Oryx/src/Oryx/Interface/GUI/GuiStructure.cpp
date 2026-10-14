@@ -110,7 +110,7 @@ bool header_impl(std::string_view label, bool* visible, bool default_open, const
     box.align_y = Align::Centre;
     box.gap = 4.0f;
     const uint32_t index = ctx.begin_box(label, box);
-    im::paint_surface(ctx.layout().node(index).paint, style, im::interaction_fill(style, state, style.background));
+    im::paint_surface(ctx.layout().node(index).paint, style, im::interaction_fill(ctx, id, style, state, style.background));
     std::ignore = begin_icon_box(ctx, ImId{}, open ? Icon::ChevronDown : Icon::ChevronRight, state.hovered ? style.text : muted(style.text));
     ctx.end_box();
     title_box(ctx, label, style);
@@ -367,7 +367,7 @@ bool TabBarFrame::draw_tab(std::string_view label, bool closable, bool* open)
     }
     const uint32_t node_index = ctx.begin_box(tab_id, box);
     const bool chosen = index == m_selected;
-    im::paint_surface(ctx.layout().node(node_index).paint, style, im::interaction_fill(style, tab, chosen ? style.selected : style.background));
+    im::paint_surface(ctx.layout().node(node_index).paint, style, im::interaction_fill(ctx, tab_id, style, tab, chosen ? style.selected : style.background));
     ctx.layout().node(node_index).paint.border_width = 0.0f;
     if (look.shape == TabShape::Rounded)
     {

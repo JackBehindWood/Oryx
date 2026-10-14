@@ -25,7 +25,7 @@ struct LayoutFile
     {
         std::filesystem::remove_all(dir);
         std::filesystem::create_directories(dir);
-        update_settings<GuiSettings>([this](GuiSettings& settings) { settings.layout_file = file(); });
+        update_settings<GuiSettings>([this](GuiSettings& settings) { settings.layout_file = file(); settings.animations = false; });
     }
 
     ~LayoutFile()

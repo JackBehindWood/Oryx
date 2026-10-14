@@ -490,3 +490,41 @@ TEST_CASE("theme: the gui:: setters edit the active theme and re-derive the dock
     gui::set_theme(dark_gui_theme());
     CHECK(gui::dock_theme().refusal == gui::derive_dock_theme(dark_gui_theme()).refusal);
 }
+
+TEST_CASE("states: with animations on, a hover fill eases from rest to the hover colour and back")
+{
+    GuiFixture f;
+    f.context.set_animations(true);
+    const auto build = f.column_of([&] { std::ignore = gui::button("go"); });
+    f.driver.run_frames(2, build);
+    const Colour rest = f.find_text("go")->paint.fill;
+    f.driver.move_to(rect_centre(f.find_text("go")->rect));
+    f.driver.frame(build);
+    f.driver.frame(build);
+    const Colour partway = f.find_text("go")->paint.fill;
+    CHECK(f.context.animation_count() == 1);
+    f.driver.run_frames(20, build);
+    const Colour hovered = f.find_text("go")->paint.fill;
+    CHECK(distance(hovered, rest) > distance(partway, rest));
+    CHECK(distance(partway, rest) > 0.0f);
+    f.driver.leave();
+    f.driver.run_frames(20, build);
+    CHECK(distance(f.find_text("go")->paint.fill, rest) == doctest::Approx(0.0f));
+    CHECK(f.context.animation_count() == 0);
+}
+
+TEST_CASE("gui::animate: a user widget eases a value by name and snaps with animations off")
+{
+    GuiFixture f;
+    float shown = -1.0f;
+    const auto build = f.column_of([&] { shown = gui::animate("slide", 10.0f, 0.0f, { 0.1f, Easing::linear() }); });
+    f.driver.frame(build);
+    CHECK(shown == 10.0f);
+    f.context.set_animations(true);
+    f.driver.frame(build);
+    f.driver.frame(build);
+    CHECK(shown > 0.0f);
+    CHECK(shown < 10.0f);
+    f.driver.run_frames(10, build);
+    CHECK(shown == 10.0f);
+}

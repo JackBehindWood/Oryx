@@ -423,3 +423,133 @@ TEST_CASE("ImContext: item_at grows tiny items to the minimum hit size")
     CHECK(context.item_at({ 100.0f, 100.0f }) == tiny);
     CHECK_FALSE(is_valid(context.item_at({ 60.0f, 60.0f })));
 }
+
+namespace
+{
+
+ImInput timed(float delta)
+{
+    ImInput input;
+    input.delta_time = delta;
+    return input;
+}
+
+float step(TestContext& context, ImId id, float target, float rest, const AnimSpec& spec = { 0.1f, Easing::linear() })
+{
+    context.begin_frame(timed(0.025f));
+    const float value = context.animate(id, target, rest, spec);
+    context.end_frame();
+    return value;
+}
+
+} // namespace
+
+TEST_CASE("easing: every curve starts at 0 and ends at 1, and ease-out leads linear")
+{
+    const Easing curves[] = { Easing::linear(), Easing::ease_in(), Easing::ease_out(), Easing::ease_in_out(), Easing::bezier(0.25f, 0.1f, 0.25f, 1.0f), Easing::spring() };
+    for (const Easing& curve : curves)
+    {
+        CHECK(ease(curve, 0.0f) == 0.0f);
+        CHECK(ease(curve, 1.0f) == 1.0f);
+        CHECK(ease(curve, -1.0f) == 0.0f);
+        CHECK(ease(curve, 2.0f) == 1.0f);
+    }
+    CHECK(ease(Easing::ease_out(), 0.3f) > 0.3f);
+    CHECK(ease(Easing::ease_in(), 0.3f) < 0.3f);
+    CHECK(ease(Easing::bezier(0.25f, 0.25f, 0.75f, 0.75f), 0.4f) == doctest::Approx(0.4f).epsilon(0.01));
+    bool overshoots = false;
+    for (float t = 0.05f; t < 1.0f; t += 0.05f)
+    {
+        overshoots = overshoots || ease(Easing::spring(), t) > 1.0f;
+    }
+    CHECK(overshoots);
+}
+
+TEST_CASE("animate: a value off its rest travels to the target and the slot is released at rest")
+{
+    TestContext context;
+    const ImId id = context.id("fade");
+    CHECK(step(context, id, 0.0f, 0.0f) == 0.0f);
+    CHECK(context.animation_count() == 0);
+    const float first = step(context, id, 1.0f, 0.0f);
+    CHECK(first > 0.0f);
+    CHECK(first < 1.0f);
+    CHECK(context.animation_count() == 1);
+    float last = first;
+    for (uint32_t frame = 0; frame < 8; ++frame)
+    {
+        const float next = step(context, id, 1.0f, 0.0f);
+        CHECK(next >= last);
+        last = next;
+    }
+    CHECK(last == 1.0f);
+    CHECK(context.animation_count() == 1);
+    const float back = step(context, id, 0.0f, 0.0f);
+    CHECK(back < 1.0f);
+    CHECK(back > 0.0f);
+    for (uint32_t frame = 0; frame < 8; ++frame)
+    {
+        std::ignore = step(context, id, 0.0f, 0.0f);
+    }
+    CHECK(context.animation_count() == 0);
+}
+
+TEST_CASE("animate: off, an invalid id and a full table all snap")
+{
+    TestContext context;
+    context.set_animations(false);
+    CHECK(step(context, context.id("a"), 1.0f, 0.0f) == 1.0f);
+    CHECK(context.animation_count() == 0);
+    context.set_animations(true);
+    CHECK(step(context, ImId{}, 1.0f, 0.0f) == 1.0f);
+    context.begin_frame(timed(0.025f));
+    for (uint32_t index = 0; index < k_max_animations; ++index)
+    {
+        const float value = context.animate(context.index_id(index), 1.0f, 0.0f, { 0.1f, Easing::linear() });
+        CHECK(value < 1.0f);
+    }
+    CHECK(context.animation_count() == k_max_animations);
+    CHECK(context.animate(context.index_id(k_max_animations), 1.0f, 0.0f) == 1.0f);
+    context.end_frame();
+}
+
+TEST_CASE("animate: colours and vectors move together, speed scales the pace, and animating tells the owner to draw on")
+{
+    TestContext context;
+    context.set_animations(true, 2.0f);
+    context.begin_frame(timed(0.025f));
+    const Colour mid = context.animate(context.id("c"), Colour{ 1.0f, 1.0f, 1.0f, 1.0f }, Colour{ 0.0f, 0.0f, 0.0f, 1.0f }, { 0.1f, Easing::linear() });
+    const Vec2f pos = context.animate(context.id("v"), Vec2f(10.0f, 20.0f), Vec2f(0.0f, 0.0f), { 0.1f, Easing::linear() });
+    context.end_frame();
+    CHECK(mid.r == doctest::Approx(0.5f));
+    CHECK(mid.g == doctest::Approx(mid.r));
+    CHECK(pos[0] == doctest::Approx(5.0f));
+    CHECK(pos[1] == doctest::Approx(10.0f));
+    context.begin_frame(timed(0.025f));
+    CHECK(context.animating());
+    for (uint32_t frame = 0; frame < 4; ++frame)
+    {
+        context.end_frame();
+        context.begin_frame(timed(0.025f));
+        std::ignore = context.animate(context.id("c"), Colour{ 1.0f, 1.0f, 1.0f, 1.0f }, Colour{ 0.0f, 0.0f, 0.0f, 1.0f }, { 0.1f, Easing::linear() });
+        std::ignore = context.animate(context.id("v"), Vec2f(10.0f, 20.0f), Vec2f(0.0f, 0.0f), { 0.1f, Easing::linear() });
+    }
+    context.end_frame();
+    context.begin_frame(timed(0.025f));
+    CHECK_FALSE(context.animating());
+    context.end_frame();
+}
+
+TEST_CASE("animate: a slot whose widget disappears is reclaimed")
+{
+    TestContext context;
+    std::ignore = step(context, context.id("gone"), 1.0f, 0.0f);
+    CHECK(context.animation_count() == 1);
+    context.begin_frame(timed(0.025f));
+    context.end_frame();
+    context.begin_frame(timed(0.025f));
+    context.end_frame();
+    context.begin_frame(timed(0.025f));
+    context.end_frame();
+    CHECK(context.animation_count() == 0);
+}

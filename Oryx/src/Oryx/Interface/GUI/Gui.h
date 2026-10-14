@@ -66,6 +66,14 @@ void end_widget();
 // A reserved box to paint into; see im::canvas.
 [[nodiscard]] im::CanvasArea canvas(std::string_view name, Sizing width = grow(), Sizing height = grow(), const im::CanvasOptions& options = {});
 
+// Transitions for widgets of your own: the value named `name` (in the current id scope) eases to `target` along `spec`; `rest` is what it is when nothing happens to it, and only values away from it cost anything (see ImContext::animate).
+// With gui.animations off every call returns `target`.
+[[nodiscard]] float animate(std::string_view name, float target, float rest = 0.0f, const AnimSpec& spec = AnimSpec::standard());
+[[nodiscard]] Vec2f animate(std::string_view name, const Vec2f& target, const Vec2f& rest, const AnimSpec& spec = AnimSpec::standard());
+[[nodiscard]] Colour animate(std::string_view name, const Colour& target, const Colour& rest, const AnimSpec& spec = AnimSpec::quick());
+// A transition was still moving in the latest frame.
+[[nodiscard]] bool animating();
+
 void label(std::string_view text, const WidgetOptions& options = {});
 ItemState button(std::string_view text, const WidgetOptions& options = {});
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options = {});

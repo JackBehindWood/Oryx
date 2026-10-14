@@ -43,6 +43,130 @@ void ImContext::begin_frame(const ImInput& input)
     m_disabled = 0;
     m_scope_depth = 0;
     m_layout.set_alpha(1.0f);
+    m_animating = m_animating_next;
+    m_animating_next = false;
+    for (AnimSlot& slot : m_anim)
+    {
+        if (is_valid(slot.id) && slot.touched + 1 < m_frame)
+        {
+            slot.id = ImId{};
+        }
+    }
+}
+
+uint32_t ImContext::animation_count() const
+{
+    uint32_t count = 0;
+    for (const AnimSlot& slot : m_anim)
+    {
+        count += is_valid(slot.id) ? 1u : 0u;
+    }
+    return count;
+}
+
+float* ImContext::animate_values(ImId id, const float* target, const float* rest, uint32_t count, const AnimSpec& spec)
+{
+    static thread_local float result[4];
+    const auto same = [count](const float* a, const float* b) {
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            if (a[i] != b[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    const auto give = [&](const float* values) {
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            result[i] = values[i];
+        }
+        return result;
+    };
+    if (!m_animations || !is_valid(id))
+    {
+        return give(target);
+    }
+    AnimSlot* slot = nullptr;
+    AnimSlot* free_slot = nullptr;
+    for (AnimSlot& candidate : m_anim)
+    {
+        if (candidate.id == id)
+        {
+            slot = &candidate;
+            break;
+        }
+        free_slot = !is_valid(candidate.id) && free_slot == nullptr ? &candidate : free_slot;
+    }
+    if (slot == nullptr)
+    {
+        if (same(target, rest) || free_slot == nullptr)
+        {
+            return give(target);
+        }
+        slot = free_slot;
+        *slot = AnimSlot{};
+        slot->id = id;
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            slot->from[i] = rest[i];
+            slot->value[i] = rest[i];
+            slot->to[i] = target[i];
+        }
+    }
+    else if (!same(target, slot->to))
+    {
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            slot->from[i] = slot->value[i];
+            slot->to[i] = target[i];
+        }
+        slot->t = 0.0f;
+        slot->advanced = 0;
+    }
+    slot->touched = m_frame;
+    if (slot->advanced != m_frame)
+    {
+        slot->advanced = m_frame;
+        slot->t = math::min(slot->t + m_input.delta_time * m_animation_speed / math::max(spec.seconds, 0.001f), 1.0f);
+        const float eased = ease(spec.easing, slot->t);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            slot->value[i] = slot->t >= 1.0f ? slot->to[i] : math::lerp(slot->from[i], slot->to[i], eased);
+        }
+    }
+    if (slot->t < 1.0f)
+    {
+        m_animating_next = true;
+    }
+    else if (same(slot->to, rest))
+    {
+        slot->id = ImId{};
+        return give(rest);
+    }
+    return give(slot->value);
+}
+
+float ImContext::animate(ImId id, float target, float rest, const AnimSpec& spec)
+{
+    return animate_values(id, &target, &rest, 1, spec)[0];
+}
+
+Vec2f ImContext::animate(ImId id, const Vec2f& target, const Vec2f& rest, const AnimSpec& spec)
+{
+    const float to[2] = { target[0], target[1] };
+    const float from[2] = { rest[0], rest[1] };
+    const float* value = animate_values(id, to, from, 2, spec);
+    return { value[0], value[1] };
+}
+
+Colour ImContext::animate(ImId id, const Colour& target, const Colour& rest, const AnimSpec& spec)
+{
+    const float to[4] = { target.r, target.g, target.b, target.a };
+    const float from[4] = { rest.r, rest.g, rest.b, rest.a };
+    const float* value = animate_values(id, to, from, 4, spec);
+    return { value[0], value[1], value[2], value[3] };
 }
 
 Vec2f ImContext::consume_wheel()

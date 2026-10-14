@@ -165,7 +165,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
     box.height = fixed(height);
     box.overflow = Overflow::Clip;
     const uint32_t index = ctx.begin_box(id, box);
-    im::paint_surface(ctx.layout().node(index).paint, style, im::interaction_fill(style, outcome.item, style.background));
+    im::paint_surface(ctx.layout().node(index).paint, style, im::interaction_fill(ctx, id, style, outcome.item, style.background));
     if (focused)
     {
         ctx.layout().node(index).paint.border = style.accent;

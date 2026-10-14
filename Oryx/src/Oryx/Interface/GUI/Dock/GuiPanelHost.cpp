@@ -383,7 +383,7 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     const uint32_t box_index = ctx.begin_box(ImId{}, box);
     {
         BoxPaint& paint = ctx.layout().node(box_index).paint;
-        im::paint_surface(paint, style, im::interaction_fill(style, tab, chosen || picked ? style.selected : style.background));
+        im::paint_surface(paint, style, im::interaction_fill(ctx, tab_id, style, tab, chosen || picked ? style.selected : style.background));
         paint.border_width = picked ? 1.0f : 0.0f;
         paint.border = ctx.dock_theme().chip_border;
         paint.text = ctx.arena().store(desc->title);

@@ -46,6 +46,11 @@ Colour interaction_fill(const ImStyle& style, const ItemState& state, const Colo
     return state.held ? style.pressed : state.hovered ? style.hover : rest;
 }
 
+Colour interaction_fill(ImContext& context, ImId id, const ImStyle& style, const ItemState& state, const Colour& rest)
+{
+    return context.animate(id, interaction_fill(style, state, rest), rest, AnimSpec::quick());
+}
+
 Colour tint(const Colour& colour, float amount)
 {
     const float target = amount >= 0.0f ? 1.0f : 0.0f;
@@ -62,10 +67,11 @@ Colour keep_fill(const ItemState& state, const Colour& colour)
 ItemState interactive_box(ImContext& context, std::string_view text, const WidgetOptions& options, const Colour* rest)
 {
     const ImStyle& style = resolved_style(context, options);
-    const ItemState state = context.item(context.id(text));
+    const ImId id = context.id(text);
+    const ItemState state = context.item(id);
     const uint32_t index = context.begin_box(text, widget_box(style, options));
     LayoutNode& node = context.layout().node(index);
-    paint_surface(node.paint, style, interaction_fill(style, state, rest != nullptr ? *rest : style.background));
+    paint_surface(node.paint, style, interaction_fill(context, id, style, state, rest != nullptr ? *rest : style.background));
     paint_text(node.paint, node, style, TextAlign::Centre, true);
     context.end_box();
     return state;

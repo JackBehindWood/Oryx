@@ -15,6 +15,7 @@ public:
     {
         m_input.surface_size = surface_size;
         m_input.delta_time = delta_time;
+        m_context.set_animations(false);
     }
 
     [[nodiscard]] Context& context() { return m_context; }

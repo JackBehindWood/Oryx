@@ -160,6 +160,7 @@
 #include "Oryx/Renderer/Renderer.h"
 #include "Oryx/Interface/Canvas/Rect.h"
 #include "Oryx/Interface/Canvas/DrawList.h"
+#include "Oryx/Interface/Canvas/Animation.h"
 #include "Oryx/Interface/Canvas/Icon.h"
 #include "Oryx/Interface/Canvas/Painter.h"
 #include "Oryx/Interface/Canvas/Replay.h"

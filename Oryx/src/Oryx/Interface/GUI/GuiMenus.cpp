@@ -7,6 +7,9 @@ namespace oryx::gui
 namespace
 {
 
+constexpr float k_toast_fade_seconds = 0.2f;
+
+
 // Which menu of a bar or menu list is open, as its id.
 struct MenuHost
 {
@@ -119,7 +122,7 @@ bool begin_menu(std::string_view label, const WidgetOptions& options)
     }
     const uint32_t index = ctx.begin_box(id, header);
     LayoutNode& node = ctx.layout().node(index);
-    im::paint_surface(node.paint, style, im::interaction_fill(style, state, open ? style.hover : style.background));
+    im::paint_surface(node.paint, style, im::interaction_fill(ctx, id, style, state, open ? style.hover : style.background));
     node.paint.border_width = 0.0f;
     node.paint.text = top_level ? ctx.arena().store(label) : ctx.arena().format("%.*s  >", static_cast<int>(label.size()), label.data());
     node.paint.text_height = style.text_height;
@@ -331,6 +334,8 @@ void show_toasts()
         }
         LayoutStyle box;
         box.padding = style.padding;
+        const float fade = ctx.animate(make_im_id("toast", ctx.index_id(slot)), toast.remaining > k_toast_fade_seconds ? 1.0f : 0.0f, 0.0f, AnimSpec::standard());
+        ctx.layout().set_alpha(fade);
         const uint32_t index = ctx.begin_box(ImId{}, box);
         BoxPaint& paint = ctx.layout().node(index).paint;
         im::paint_surface(paint, style, style.background);
@@ -339,6 +344,7 @@ void show_toasts()
         paint.text_height = style.text_height;
         paint.text_colour = style.text;
         ctx.end_box();
+        ctx.layout().set_alpha(1.0f);
         toast.remaining -= ctx.delta_time();
     }
     if (any)

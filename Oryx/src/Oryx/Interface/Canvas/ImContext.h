@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Oryx/Interface/Canvas/Animation.h"
 #include "Oryx/Interface/Canvas/DrawList.h"
 #include "Oryx/Interface/Canvas/FrameArena.h"
 #include "Oryx/Interface/Canvas/ImInput.h"
@@ -91,6 +92,7 @@ inline constexpr uint32_t k_channel_tooltip = 4;
 inline constexpr uint32_t k_channel_drag = 5;
 
 // Alpha factor of the boxes inside a disabled scope.
+inline constexpr uint32_t k_max_animations = 64;
 inline constexpr float k_disabled_alpha = 0.5f;
 
 inline constexpr uint32_t k_max_popup_depth = 8;
@@ -154,6 +156,22 @@ public:
 
     [[nodiscard]] const ImInput& input() const { return m_input; }
     [[nodiscard]] float delta_time() const { return m_input.delta_time; }
+
+    // Transitions. A value that differs from its `rest` (what it is when nothing happens to it) occupies one of k_max_animations slots, keyed by `id`, and travels to `target` along `spec`; it is released once it settles back at `rest`,
+    // so a thousand idle widgets cost nothing. The first call that asks for a target other than `rest` starts from `rest`. Calling twice in a frame gives the same value. With animations off, an invalid id or a full table the target is returned at once.
+    [[nodiscard]] float animate(ImId id, float target, float rest, const AnimSpec& spec = {});
+    [[nodiscard]] Vec2f animate(ImId id, const Vec2f& target, const Vec2f& rest, const AnimSpec& spec = {});
+    [[nodiscard]] Colour animate(ImId id, const Colour& target, const Colour& rest, const AnimSpec& spec = {});
+    // Off snaps every transition (tests, reduced motion); `speed` scales their pace (2 is twice as fast).
+    void set_animations(bool enabled, float speed = 1.0f)
+    {
+        m_animations = enabled;
+        m_animation_speed = math::max(speed, 0.01f);
+    }
+    [[nodiscard]] bool animations() const { return m_animations; }
+    // A transition was still travelling in the latest frame, so the owner should draw another one even without input.
+    [[nodiscard]] bool animating() const { return m_animating; }
+    [[nodiscard]] uint32_t animation_count() const;
 
     // Hands the frame's wheel to the first caller and zero to every later one, so only the innermost scroll region that asks moves.
     [[nodiscard]] Vec2f consume_wheel();
@@ -386,6 +404,24 @@ private:
     uint64_t m_frame = 0;
     size_t m_arena_high_water = 0;
     float m_time = 0.0f;
+
+    struct AnimSlot
+    {
+        ImId id;
+        uint64_t touched = 0;
+        uint64_t advanced = 0;
+        float from[4] = {};
+        float to[4] = {};
+        float value[4] = {};
+        float t = 0.0f;
+    };
+    float* animate_values(ImId id, const float* target, const float* rest, uint32_t count, const AnimSpec& spec);
+
+    AnimSlot m_anim[k_max_animations];
+    bool m_animations = true;
+    bool m_animating = false;
+    bool m_animating_next = false;
+    float m_animation_speed = 1.0f;
     ImId m_last_click_id;
     float m_last_click_time = 0.0f;
     ImId m_drag_id;
