@@ -98,6 +98,7 @@ private:
         style.pixel_height = command.pixel_height;
         style.colour = command.colour;
         style.align = command.align;
+        style.tabular = command.tabular;
         m_batcher.draw_ui_text(world(command.origin), m_list.text(command), m_font, style);
     }
 

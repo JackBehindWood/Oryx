@@ -23,6 +23,10 @@ struct BoxPaint
     Colour text_colour = { 1.0f, 1.0f, 1.0f, 1.0f };
     TextAlign text_align = TextAlign::Left;
     bool ellipsis = false;
+    // The reach in points of a soft drop shadow under the fill (one elevation for everything that floats); zero draws none.
+    float shadow = 0.0f;
+    // Digits share one advance (TextSpec::tabular).
+    bool tabular = false;
     // A picture inside the padding, drawn over the fill and under the border; `radius` rounds it as it does the fill.
     bool has_image = false;
     ImageHandle image;
@@ -65,6 +69,8 @@ struct TextMeasure
 {
     float (*width)(void* user, std::string_view text, float pixel_height) = nullptr;
     void* user = nullptr;
+    // Same as `width` with every digit as wide as the widest; a null one falls back to `width`.
+    float (*tabular_width)(void* user, std::string_view text, float pixel_height) = nullptr;
 };
 
 // A box tree rebuilt every frame and solved once at its end, in the manner of Clay: fit sizes bottom-up, then grow/compress, alignment and floating placement top-down.

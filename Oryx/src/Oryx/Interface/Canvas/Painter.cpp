@@ -93,9 +93,9 @@ void Painter::icon(const Rect& box, Icon icon, const Colour& colour, float size,
     draw_icon(m_list, box, icon, colour, size, thickness);
 }
 
-float Painter::text_width(std::string_view text, float pixel_height)
+float Painter::text_width(std::string_view text, float pixel_height, bool tabular)
 {
-    return m_font.measure(text, pixel_height).width;
+    return m_font.measure(text, pixel_height, 1.0f, tabular).width;
 }
 
 void Painter::text(const Rect& box, std::string_view text, const TextSpec& spec)
@@ -106,7 +106,7 @@ void Painter::text(const Rect& box, std::string_view text, const TextSpec& spec)
     }
     bool clip_to_box = false;
     char truncated[k_truncation_capacity];
-    if (text_width(text, spec.pixel_height) > box.size[0])
+    if (text_width(text, spec.pixel_height, spec.tabular) > box.size[0])
     {
         if (spec.ellipsis)
         {
@@ -116,7 +116,7 @@ void Painter::text(const Rect& box, std::string_view text, const TextSpec& spec)
             while (index < text.size())
             {
                 decode_utf8(text, index);
-                if (text_width(text.substr(0, index), spec.pixel_height) > available)
+                if (text_width(text.substr(0, index), spec.pixel_height, spec.tabular) > available)
                 {
                     break;
                 }
@@ -146,7 +146,7 @@ void Painter::text(const Rect& box, std::string_view text, const TextSpec& spec)
     {
         m_list.push_clip(box);
     }
-    m_list.add_text(Vec2f(snap_to_pixel(x, m_scale), baseline), text, spec.pixel_height, spec.align, spec.colour);
+    m_list.add_text(Vec2f(snap_to_pixel(x, m_scale), baseline), text, spec.pixel_height, spec.align, spec.colour, spec.tabular);
     if (clip_to_box)
     {
         m_list.pop_clip();

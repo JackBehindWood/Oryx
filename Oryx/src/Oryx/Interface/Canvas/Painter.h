@@ -14,6 +14,8 @@ struct TextSpec
     TextAlign align = TextAlign::Left;
     // Cuts overlong text to fit with "..."; otherwise it is clipped to the box.
     bool ellipsis = false;
+    // Digits share one advance, for columns of changing numbers.
+    bool tabular = false;
 };
 
 struct ImageSpec
@@ -59,7 +61,7 @@ public:
     // Draws one line of text centred vertically in `box` and placed horizontally by `spec.align`. Skipped while the font is not ready.
     void text(const Rect& box, std::string_view text, const TextSpec& spec = {});
 
-    [[nodiscard]] float text_width(std::string_view text, float pixel_height);
+    [[nodiscard]] float text_width(std::string_view text, float pixel_height, bool tabular = false);
 
 private:
     DrawList& m_list;

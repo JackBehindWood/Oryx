@@ -71,6 +71,7 @@ GuiTheme make_gui_theme(const GuiPalette& palette)
     theme.overlay = role(palette, palette.overlay, palette.field_border, math::max(1.0f, palette.border_width));
     const float required = palette.panel_border ? 7.0f : 4.5f;
     theme.log_debug = legible(lerp(palette.text, palette.field, 0.45f), palette.text, palette.field, required);
+    theme.caption_colour = legible(lerp(palette.text, palette.panel, 0.3f), palette.text, palette.panel, required);
     theme.log_info = palette.text;
     theme.log_warning = legible({ 0.90f, 0.62f, 0.10f, 1.0f }, palette.text, palette.field, required);
     theme.log_error = legible({ 0.92f, 0.30f, 0.28f, 1.0f }, palette.text, palette.field, required);
@@ -93,6 +94,7 @@ void apply_gui_palette(GuiTheme& theme, const GuiPalette& palette)
         style.radius = from.radius;
         style.border_width = from.border_width;
     };
+    theme.caption_colour = fresh.caption_colour;
     theme.log_debug = fresh.log_debug;
     theme.log_info = fresh.log_info;
     theme.log_warning = fresh.log_warning;
@@ -192,6 +194,10 @@ GuiTheme scale_gui_theme(const GuiTheme& theme, float factor)
     scaled.scroll_line_px *= factor;
     scaled.scrollbar_width *= factor;
     scaled.indent *= factor;
+    scaled.elevation *= factor;
+    scaled.space_xs *= factor;
+    scaled.space_md *= factor;
+    scaled.bar_height *= factor;
     scaled.min_hit_size *= factor;
     return scaled;
 }

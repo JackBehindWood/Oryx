@@ -37,7 +37,7 @@ public:
     TableFrame(const TableFrame&) = delete;
     TableFrame& operator=(const TableFrame&) = delete;
 
-    void column(std::string_view label, Sizing width, bool sortable, TextAlign align);
+    void column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular);
     TableResult headers();
     [[nodiscard]] uint32_t first_row() const { return m_first; }
     [[nodiscard]] uint32_t last_row() const { return m_last; }
@@ -53,6 +53,7 @@ private:
         Sizing width;
         TextAlign align = TextAlign::Left;
         bool sortable = false;
+        bool tabular = false;
     };
 
     void close_row();
@@ -104,7 +105,7 @@ TableFrame::~TableFrame()
     ctx.end_box();
 }
 
-void TableFrame::column(std::string_view label, Sizing width, bool sortable, TextAlign align)
+void TableFrame::column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular)
 {
     if (m_headers)
     {
@@ -114,7 +115,7 @@ void TableFrame::column(std::string_view label, Sizing width, bool sortable, Tex
     {
         throw Error("TableScope holds at most sixteen columns");
     }
-    m_columns[m_column_count++] = { m_context.arena().store(label), width, align, sortable };
+    m_columns[m_column_count++] = { m_context.arena().store(label), width, align, sortable, tabular };
 }
 
 void TableFrame::spacer_rows(uint32_t count)
@@ -159,7 +160,7 @@ TableResult TableFrame::headers()
     {
         LayoutStyle strip;
         strip.width = grow();
-        strip.height = fixed(row_height);
+        strip.height = fixed(theme.bar_height);
         strip.padding.right = scrolls ? theme.scrollbar_width : 0.0f;
         strip.align_y = Align::Centre;
         const uint32_t strip_index = ctx.begin_box(ctx.id("header"), strip);
@@ -274,6 +275,7 @@ void TableFrame::cell(std::string_view text)
     paint.text_colour = m_style->text;
     paint.text_align = column.align;
     paint.ellipsis = true;
+    paint.tabular = column.tabular;
     end_cell();
 }
 
@@ -290,9 +292,9 @@ void end_table()
     context().pop_scope<TableFrame>("end_table");
 }
 
-void table_column(std::string_view label, Sizing width, bool sortable, TextAlign align)
+void table_column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular)
 {
-    table_frame("table_column").column(label, width, sortable, align);
+    table_frame("table_column").column(label, width, sortable, align, tabular);
 }
 
 TableResult table_headers()

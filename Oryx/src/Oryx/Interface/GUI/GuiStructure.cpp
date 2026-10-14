@@ -319,7 +319,7 @@ TabBarFrame::TabBarFrame(std::string_view name, uint32_t& selected, const TabBar
     GuiContext& ctx = context();
     LayoutStyle strip;
     strip.width = grow();
-    strip.gap = 2.0f;
+    strip.gap = ctx.gui_theme().space_xs;
     ctx.begin_box(name, strip);
     ctx.push_id(name);
 }

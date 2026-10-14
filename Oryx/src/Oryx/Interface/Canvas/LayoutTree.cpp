@@ -284,6 +284,18 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
             tab[point] = Vec2f(std::round(tab[point][0] * pass.scale) / pass.scale, std::round(tab[point][1] * pass.scale) / pass.scale);
         }
     }
+    if (paint.shadow > 0.0f && paint.has_fill && tab_count == 0)
+    {
+        constexpr uint32_t k_layers = 4;
+        const Rect snapped = snap_to_pixels(node.rect, pass.scale);
+        for (uint32_t layer = k_layers; layer > 0; --layer)
+        {
+            const float grow_by = paint.shadow * static_cast<float>(layer) / static_cast<float>(k_layers);
+            const Rect ring{ { snapped.min[0] - grow_by, snapped.min[1] - grow_by + paint.shadow * 0.35f }, { snapped.size[0] + 2.0f * grow_by, snapped.size[1] + 2.0f * grow_by } };
+            const CornerRadius radius{ paint.radius.top_left + grow_by, paint.radius.top_right + grow_by, paint.radius.bottom_right + grow_by, paint.radius.bottom_left + grow_by };
+            pass.list.add_rounded_rect(ring, radius, faded({ 0.0f, 0.0f, 0.0f, 0.07f }, alpha));
+        }
+    }
     if (paint.has_fill && tab_count > 0)
     {
         pass.list.add_polygon(tab, tab_count, faded(paint.fill, alpha));
@@ -317,7 +329,7 @@ void paint_node(const PaintPass& pass, uint32_t index, uint32_t inherited_channe
     }
     if (pass.painter != nullptr && !paint.text.empty())
     {
-        pass.painter->text(inset(node.rect, node.style.padding), paint.text, { paint.text_height, faded(paint.text_colour, alpha), paint.text_align, paint.ellipsis });
+        pass.painter->text(inset(node.rect, node.style.padding), paint.text, { paint.text_height, faded(paint.text_colour, alpha), paint.text_align, paint.ellipsis, paint.tabular });
     }
     if (paint.icon != Icon::None)
     {
@@ -447,7 +459,8 @@ void LayoutTree::solve(const Rect& viewport, const TextMeasure& measure, uint64_
         Vec2f content(padding_on(node, 0), padding_on(node, 1));
         if (!node.paint.text.empty())
         {
-            const float width = measure.width != nullptr ? measure.width(measure.user, node.paint.text, node.paint.text_height) : 0.0f;
+            float (*measured)(void*, std::string_view, float) = node.paint.tabular && measure.tabular_width != nullptr ? measure.tabular_width : measure.width;
+            const float width = measured != nullptr ? measured(measure.user, node.paint.text, node.paint.text_height) : 0.0f;
             content = Vec2f(content[0] + width, content[1] + node.paint.text_height);
         }
         const uint32_t axis_main = main_axis(node);

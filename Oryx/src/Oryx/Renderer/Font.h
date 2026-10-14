@@ -26,7 +26,7 @@ public:
     [[nodiscard]] uint32_t revision() const { return m_source->revision(); }
 
     // Zero while the font is not ready.
-    [[nodiscard]] TextExtent measure(std::string_view text, float pixel_height, float scale = 1.0f);
+    [[nodiscard]] TextExtent measure(std::string_view text, float pixel_height, float scale = 1.0f, bool tabular = false);
     [[nodiscard]] float line_height(float pixel_height);
     [[nodiscard]] float ascent(float pixel_height);
 

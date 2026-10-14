@@ -85,3 +85,20 @@ TEST_CASE("BuiltinFontSource: invalid descriptions throw")
     desc.pixel_height = 0.0f;
     CHECK_THROWS_AS((void)source.bake(desc), Error);
 }
+
+TEST_CASE("layout_text: tabular digits share one advance and leave other glyphs alone")
+{
+    BuiltinFontSource source;
+    GlyphAtlasDesc desc;
+    desc.pixel_height = 16.0f;
+    const GlyphAtlasData atlas = source.bake(desc);
+    const auto none = [](const Glyph&, const Vec2f&) {};
+    CHECK(layout_text(atlas, "1111", 1.0f, none, true).width == doctest::Approx(layout_text(atlas, "8888", 1.0f, none, true).width));
+    CHECK(layout_text(atlas, "iiii", 1.0f, none, true).width == doctest::Approx(layout_text(atlas, "iiii", 1.0f, none, false).width));
+    CHECK(layout_text(atlas, "1111", 1.0f, none, true).width >= layout_text(atlas, "1111", 1.0f, none, false).width);
+
+    std::vector<float> pens;
+    layout_text(atlas, "1", 1.0f, [&pens](const Glyph&, const Vec2f& pen) { pens.push_back(pen[0]); }, true);
+    REQUIRE(pens.size() == 1);
+    CHECK(pens[0] >= 0.0f);
+}

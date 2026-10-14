@@ -153,6 +153,7 @@ void ImContext::solve_layout()
     {
         measure.user = m_theme.font;
         measure.width = [](void* user, std::string_view text, float pixel_height) { return static_cast<Font*>(user)->measure(text, pixel_height).width; };
+        measure.tabular_width = [](void* user, std::string_view text, float pixel_height) { return static_cast<Font*>(user)->measure(text, pixel_height, 1.0f, true).width; };
     }
     m_layout.solve({ { 0.0f, 0.0f }, m_input.surface_size }, measure, m_frame);
     m_layout.paint(m_draw, m_theme.font, m_input.scale);

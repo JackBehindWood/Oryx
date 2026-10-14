@@ -270,7 +270,7 @@ void SettingsWorkbench::draw_row(Section& section, Row& row)
 
     gui::ColumnScope item(arena.format("%s.%s", section.name.c_str(), row.key.c_str()), { .width = grow() });
     {
-        gui::RowScope line("line", { .width = grow(), .align = Align::Centre, .gap = 6.0f });
+        gui::RowScope line("line", { .width = grow(), .align = Align::Centre, .gap = gui::theme().space_md });
         if (row.kind == SettingsKind::Bool)
         {
             bool value = row.text == "true";
@@ -328,7 +328,7 @@ void SettingsWorkbench::draw_settings()
     sync();
     FrameArena& arena = gui::context().arena();
     {
-        gui::RowScope controls("settings controls", { .width = grow(), .align = Align::Centre, .gap = 6.0f });
+        gui::RowScope controls("settings controls", { .width = grow(), .align = Align::Centre, .gap = gui::theme().space_md });
         if (gui::search_box("search", m_search, sizeof(m_search), "Search settings").changed)
         {
             m_state.search = m_search;

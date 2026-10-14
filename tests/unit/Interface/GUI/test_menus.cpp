@@ -218,3 +218,57 @@ TEST_CASE("GUI menus: warm frames with a menu, popup, tooltip and toast allocate
     s.f.driver.run_frames(3, s.f.column_of(body));
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+namespace
+{
+
+uint32_t text_nodes(const GuiFixture& f, std::string_view text)
+{
+    uint32_t count = 0;
+    for (uint32_t index = 0; index < f.context.layout().node_count(); ++index)
+    {
+        count += f.context.layout().node(index).paint.text == text ? 1u : 0u;
+    }
+    return count;
+}
+
+} // namespace
+
+TEST_CASE("GUI text: an ellipsis label shows its full text as a tooltip only while it is cut")
+{
+    GuiFixture f;
+    const auto body = [&]
+    {
+        LayoutStyle narrow;
+        narrow.width = fixed(60.0f);
+        narrow.direction = Direction::Column;
+        f.context.begin_box(ImId{}, narrow);
+        std::ignore = gui::label_ellipsis("a rather long label that cannot fit");
+        std::ignore = gui::label_ellipsis("ok");
+        f.context.end_box();
+    };
+    f.driver.settle(f.column_of(body));
+    f.driver.move_to(rect_centre(f.find_text("ok")->rect));
+    f.driver.run_frames(50, f.column_of(body));
+    CHECK(text_nodes(f, "ok") == 1);
+    f.driver.move_to(rect_centre(f.find_text("a rather long label that cannot fit")->rect));
+    f.driver.run_frames(50, f.column_of(body));
+    CHECK(text_nodes(f, "a rather long label that cannot fit") == 2);
+}
+
+TEST_CASE("GUI text: the type scale orders title above body above caption")
+{
+    GuiFixture f;
+    const auto body = [&]
+    {
+        gui::title("big");
+        gui::label("mid");
+        gui::caption("small");
+    };
+    f.driver.settle(f.column_of(body));
+    const float title = f.find_text("big")->paint.text_height;
+    const float body_height = f.find_text("mid")->paint.text_height;
+    const float caption = f.find_text("small")->paint.text_height;
+    CHECK(title > body_height);
+    CHECK(body_height > caption);
+}

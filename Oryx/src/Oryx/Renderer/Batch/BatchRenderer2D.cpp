@@ -186,7 +186,7 @@ void BatchRenderer2D::draw_text(const Vec2f& position, std::string_view text, Fo
     float align_offset = 0.0f;
     if (style.align != TextAlign::Left)
     {
-        TextExtent extent = layout_text(atlas.data(), text, style.scale, [](const Glyph&, const Vec2f&) {});
+        TextExtent extent = layout_text(atlas.data(), text, style.scale, [](const Glyph&, const Vec2f&) {}, style.tabular);
         align_offset = style.align == TextAlign::Centre ? -0.5f * extent.width : -extent.width;
     }
     layout_text(atlas.data(), text, style.scale, [&](const Glyph& glyph, const Vec2f& pen) {
@@ -200,7 +200,7 @@ void BatchRenderer2D::draw_text(const Vec2f& position, std::string_view text, Fo
         const float y1 = y0 + glyph.size[1] * style.scale;
         const Vec2f corners[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } };
         write_glyph(corners, atlas_texture, atlas.data().px_range(), style.colour, glyph);
-    });
+    }, style.tabular);
 }
 
 void BatchRenderer2D::write_glyph(const Vec2f (&corners)[4], const Texture2D& atlas_texture, float px_range, const Colour& colour, const Glyph& glyph)
@@ -307,7 +307,7 @@ void BatchRenderer2D::draw_ui_text(const Vec2f& position, std::string_view text,
     float align_offset = 0.0f;
     if (style.align != TextAlign::Left)
     {
-        TextExtent extent = layout_text(atlas.data(), text, style.scale, [](const Glyph&, const Vec2f&) {});
+        TextExtent extent = layout_text(atlas.data(), text, style.scale, [](const Glyph&, const Vec2f&) {}, style.tabular);
         align_offset = style.align == TextAlign::Centre ? -0.5f * extent.width : -extent.width;
     }
     UiPrimitive primitive;
@@ -328,7 +328,7 @@ void BatchRenderer2D::draw_ui_text(const Vec2f& position, std::string_view text,
         Vec2f uvs[4];
         quad_uvs(glyph.uv_min, glyph.uv_max, uvs);
         write_ui(corners, uvs, style.colour, primitive);
-    });
+    }, style.tabular);
 }
 
 void BatchRenderer2D::write_ui_shape(const Vec2f& position, const Vec2f& size, const float (&radii)[4], float thickness, UiMode mode, const Colour& colour)

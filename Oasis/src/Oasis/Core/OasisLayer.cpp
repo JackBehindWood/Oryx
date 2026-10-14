@@ -371,7 +371,7 @@ void OasisLayer::build()
     bottom.anchor = oryx::gui::AreaAnchor::Bottom;
     if (oryx::gui::AreaScope bar("status_area", bottom); bar)
     {
-        oryx::gui::RowScope row("status", { .width = oryx::grow(), .align = oryx::Align::Centre, .gap = 12.0f });
+        oryx::gui::RowScope row("status", { .width = oryx::grow(), .height = oryx::fixed(oryx::gui::theme().bar_height), .align = oryx::Align::Centre, .gap = 12.0f });
         chrome.workbenches.status();
     }
     oryx::gui::AreaOptions drawer;

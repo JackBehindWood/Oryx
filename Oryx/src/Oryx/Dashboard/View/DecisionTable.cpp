@@ -177,6 +177,7 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
         number_spec.pixel_height = text_height;
         number_spec.colour = label_spec.colour;
         number_spec.align = TextAlign::Right;
+        number_spec.tabular = true;
         if (shown.probabilities && score.has_probability)
         {
             const float probability = math::clamp(static_cast<float>(score.probability), 0.0f, 1.0f);

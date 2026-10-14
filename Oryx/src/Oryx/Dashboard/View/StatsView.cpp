@@ -88,13 +88,13 @@ private:
             options.height = fixed(static_cast<float>(rows + 1) * k_row_height);
             gui::TableScope table("keys", options);
             table.column("Name", grow(1.0f, k_name_min_width));
-            table.column(single ? "Value" : "Ply", fixed(k_number_width), false, TextAlign::Right);
+            table.column(single ? "Value" : "Ply", fixed(k_number_width), false, TextAlign::Right, true);
             if (!single)
             {
-                table.column("Last", fixed(k_number_width), false, TextAlign::Right);
-                table.column("Mean", fixed(k_number_width), false, TextAlign::Right);
-                table.column("Max", fixed(k_number_width), false, TextAlign::Right);
-                table.column("Count", fixed(k_number_width), false, TextAlign::Right);
+                table.column("Last", fixed(k_number_width), false, TextAlign::Right, true);
+                table.column("Mean", fixed(k_number_width), false, TextAlign::Right, true);
+                table.column("Max", fixed(k_number_width), false, TextAlign::Right, true);
+                table.column("Count", fixed(k_number_width), false, TextAlign::Right, true);
             }
             std::ignore = table.headers();
             uint32_t row = 0;

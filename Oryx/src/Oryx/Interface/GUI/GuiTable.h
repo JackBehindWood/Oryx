@@ -37,7 +37,8 @@ static_assert(std::is_trivially_copyable_v<TableResult> && std::is_standard_layo
 // for more cells than columns, and for rows or cells before headers(). begin_table always opens, so end_table always follows; TableScope does both.
 bool begin_table(std::string_view name, const TableOptions& options);
 void end_table();
-void table_column(std::string_view label, Sizing width = grow(), bool sortable = false, TextAlign align = TextAlign::Left);
+// `tabular` gives the column's digits one shared advance, so numbers that change keep their width.
+void table_column(std::string_view label, Sizing width = grow(), bool sortable = false, TextAlign align = TextAlign::Left, bool tabular = false);
 // Draws the header row and opens the scrolling body; sortable headers toggle their direction on a click.
 TableResult table_headers();
 [[nodiscard]] uint32_t table_first_row();
@@ -61,7 +62,7 @@ public:
     {
     }
 
-    void column(std::string_view label, Sizing width = grow(), bool sortable = false, TextAlign align = TextAlign::Left) { table_column(label, width, sortable, align); }
+    void column(std::string_view label, Sizing width = grow(), bool sortable = false, TextAlign align = TextAlign::Left, bool tabular = false) { table_column(label, width, sortable, align, tabular); }
     TableResult headers() { return table_headers(); }
     [[nodiscard]] uint32_t first_row() const { return table_first_row(); }
     [[nodiscard]] uint32_t last_row() const { return table_last_row(); }

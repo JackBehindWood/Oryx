@@ -91,8 +91,8 @@ DockMetrics metrics_of(const GuiTheme& theme, const DockStyle& style)
     const float density = style.compact ? 0.8f : 1.0f;
     DockMetrics metrics;
     metrics.style = style;
-    metrics.strip_height = (tab.text_height + tab.padding.top + tab.padding.bottom) * density;
-    metrics.toolbar_height = (theme.button.text_height + theme.button.padding.top + theme.button.padding.bottom + 4.0f * scale) * density;
+    metrics.strip_height = theme.bar_height * density;
+    metrics.toolbar_height = theme.bar_height * density;
     metrics.splitter = 4.0f * scale;
     metrics.tab_min_width = 48.0f * scale;
     metrics.tab_max_width = 160.0f * scale;

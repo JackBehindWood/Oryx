@@ -92,6 +92,9 @@ TEST_CASE("themes: dark, light and high contrast keep text readable on every rol
             CHECK(contrast_ratio(*log_role, theme.field.background) >= required[index]);
         }
         CHECK(distance(theme.log_warning, theme.log_error) > 0.1f);
+        CHECK(contrast_ratio(theme.caption_colour, theme.panel.background) >= required[index]);
+        CHECK(theme.elevation > 0.0f);
+        CHECK(theme.bar_height >= theme.panel.text_height);
         Colour disabled = theme.field.text;
         disabled.a = k_disabled_alpha;
         const Colour blended = lerp(theme.field.background, disabled, k_disabled_alpha);
@@ -135,6 +138,8 @@ TEST_CASE("themes: scaling multiplies the sizes and 1 undoes it")
     CHECK(big.field.text_height == doctest::Approx(theme.field.text_height * 2.0f));
     CHECK(big.field.padding.left == doctest::Approx(theme.field.padding.left * 2.0f));
     CHECK(big.spacing == doctest::Approx(theme.spacing * 2.0f));
+    CHECK(big.bar_height == doctest::Approx(theme.bar_height * 2.0f));
+    CHECK(big.elevation == doctest::Approx(theme.elevation * 2.0f));
     CHECK(big.scrollbar_width == doctest::Approx(theme.scrollbar_width * 2.0f));
     CHECK(distance(big.field.background, theme.field.background) == doctest::Approx(0.0f));
     const GuiTheme back = scale_gui_theme(big, 0.5f);

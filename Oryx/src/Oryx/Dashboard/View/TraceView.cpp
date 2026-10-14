@@ -134,13 +134,13 @@ private:
         options.row_height = k_row_height;
         gui::TableScope table("trace", options);
         const bool any_probability = has_probability(feed);
-        table.column("#", fixed(48.0f));
+        table.column("#", fixed(48.0f), false, TextAlign::Left, true);
         table.column("Player", fixed(76.0f));
         table.column("Action", grow(1.0f, 64.0f));
-        table.column("Value", fixed(72.0f), false, TextAlign::Right);
+        table.column("Value", fixed(72.0f), false, TextAlign::Right, true);
         if (any_probability)
         {
-            table.column("Prob", fixed(64.0f), false, TextAlign::Right);
+            table.column("Prob", fixed(64.0f), false, TextAlign::Right, true);
         }
         place_scroll(model, pin, selected, oldest);
         gui::state<TraceState>(pin_id) = pin;

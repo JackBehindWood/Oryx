@@ -231,11 +231,11 @@ void ConsoleWorkbench::status()
     }
     if (m_errors > 0)
     {
-        gui::badge(arena.format("%u errors", m_errors), theme.palette[5]);
+        gui::badge(arena.format("%u errors", m_errors), theme.log_error);
     }
     if (m_warnings > 0)
     {
-        gui::badge(arena.format("%u warnings", m_warnings), theme.palette[1]);
+        gui::badge(arena.format("%u warnings", m_warnings), theme.log_warning);
     }
 }
 
@@ -245,7 +245,7 @@ void ConsoleWorkbench::draw_console()
     const ImInput& input = gui::context().input();
     bool filter_changed = false;
     {
-        gui::RowScope controls("console controls", { .width = grow(), .align = Align::Centre, .gap = 6.0f });
+        gui::RowScope controls("console controls", { .width = grow(), .align = Align::Centre, .gap = gui::theme().space_md });
         {
             gui::ComboScope level("level", k_level_names[m_state.level]);
             for (int32_t index = 0; index < static_cast<int32_t>(k_console_levels); ++index)

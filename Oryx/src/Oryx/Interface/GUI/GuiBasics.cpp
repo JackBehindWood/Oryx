@@ -1,5 +1,7 @@
 #include "oxpch.h"
 #include "Oryx/Interface/GUI/GuiControls.h"
+#include "Oryx/Interface/GUI/GuiMenus.h"
+#include "Oryx/Interface/GUI/GuiTextField.h"
 
 namespace oryx::gui
 {
@@ -132,6 +134,50 @@ void text_coloured(std::string_view text, const Colour& colour, const WidgetOpti
     WidgetOptions coloured = options;
     coloured.style = &style;
     label(text, coloured);
+}
+
+void title(std::string_view text, const WidgetOptions& options)
+{
+    ImStyle style = context().role_style(options, &GuiTheme::panel);
+    style.text_height *= context().gui_theme().title_scale;
+    WidgetOptions sized = options;
+    sized.style = &style;
+    label(text, sized);
+}
+
+void caption(std::string_view text, const WidgetOptions& options)
+{
+    ImStyle style = context().role_style(options, &GuiTheme::panel);
+    style.text_height *= context().gui_theme().caption_scale;
+    style.text = context().gui_theme().caption_colour;
+    WidgetOptions sized = options;
+    sized.style = &style;
+    label(text, sized);
+}
+
+ItemState label_ellipsis(std::string_view text, const WidgetOptions& options)
+{
+    GuiContext& ctx = context();
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
+    const ImId id = ctx.id(text);
+    const ItemState state = ctx.item(id);
+    LayoutStyle box;
+    box.width = grow();
+    box.align_x = Align::Start;
+    box.padding = style.padding;
+    const uint32_t index = ctx.begin_box(id, box);
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    paint.text = ctx.arena().store(text);
+    paint.text_height = style.text_height;
+    paint.text_colour = style.text;
+    paint.ellipsis = true;
+    ctx.end_box();
+    Rect rect;
+    if (ctx.layout_rect(id, rect) && detail::measure_text(ctx, text, style.text_height) > rect.size[0] - style.padding.left - style.padding.right)
+    {
+        tooltip(state, text);
+    }
+    return state;
 }
 
 void bullet(std::string_view text, const WidgetOptions& options)

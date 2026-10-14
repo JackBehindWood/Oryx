@@ -256,8 +256,8 @@ void Showcase::data()
         options.height = fixed(220.0f);
         TableScope table("trace", options);
         table.column("Ply", fixed(60.0f), true);
-        table.column("Value", grow(), false, TextAlign::Right);
-        table.column("Visits", fixed(80.0f), false, TextAlign::Right);
+        table.column("Value", grow(), false, TextAlign::Right, true);
+        table.column("Visits", fixed(80.0f), false, TextAlign::Right, true);
         const TableResult head = table.headers();
         if (head.sort_changed)
         {
@@ -316,6 +316,16 @@ void Showcase::style()
         key_value("text on panel", arena.format("%.1f : 1", static_cast<double>(contrast_ratio(active.panel.text, active.panel.background))));
         key_value("text on field", arena.format("%.1f : 1", static_cast<double>(contrast_ratio(active.field.text, active.field.background))));
         key_value("accent on field", arena.format("%.1f : 1", static_cast<double>(contrast_ratio(active.field.accent, active.field.background))));
+    }
+    if (collapsing_header("type scale and chrome", true))
+    {
+        title("Title");
+        label("Body text, 0123456789");
+        caption("Caption: secondary information");
+        label_ellipsis("A long label that is cut with an ellipsis and shows its full text as a tooltip when hovered");
+        RowScope row("elevation", { .gap = context().gui_theme().space_md });
+        button("Menu and popup shadow");
+        label("Tooltip, toast and dialog share it");
     }
     if (collapsing_header("states", true))
     {

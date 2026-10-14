@@ -45,6 +45,11 @@ void overlay_text(std::string_view text, const ImStyle& style);
 
 // Basics
 
+// The type scale: title (theme.title_scale x the body), body is label(), caption (theme.caption_scale x, in theme.caption_colour).
+void title(std::string_view text, const WidgetOptions& options = {});
+void caption(std::string_view text, const WidgetOptions& options = {});
+// A one-line label that cuts overlong text with "..." and shows the full text as a tooltip while it is cut. The row is the label's width at most.
+ItemState label_ellipsis(std::string_view text, const WidgetOptions& options = {});
 void text_coloured(std::string_view text, const Colour& colour, const WidgetOptions& options = {});
 void bullet(std::string_view text, const WidgetOptions& options = {});
 // A row with the key on the left and the value on the right, for statistics.

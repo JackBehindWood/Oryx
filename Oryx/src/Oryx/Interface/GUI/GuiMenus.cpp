@@ -46,6 +46,7 @@ bool open_popup_box(GuiContext& ctx, ImId popup, const ImStyle& style, const Flo
     }
     const uint32_t index = ctx.begin_box(popup, popup_box(style, floating, min_width));
     im::paint_surface(ctx.layout().node(index).paint, style, style.background);
+    ctx.layout().node(index).paint.shadow = ctx.gui_theme().elevation;
     return true;
 }
 
@@ -65,8 +66,10 @@ void begin_menu_bar(std::string_view name, const WidgetOptions& options)
     if (options.layout == nullptr)
     {
         bar.width = grow();
-        bar.padding = { 2.0f, 2.0f, 2.0f, 2.0f };
-        bar.gap = 2.0f;
+        bar.height = fit(ctx.gui_theme().bar_height);
+        bar.align_y = Align::Centre;
+        bar.padding = uniform_insets(ctx.gui_theme().space_xs);
+        bar.gap = ctx.gui_theme().space_xs;
         bar.align_x = Align::Start;
     }
     const uint32_t index = ctx.begin_box(name, bar);
@@ -248,7 +251,7 @@ bool open_tooltip(GuiContext& ctx, const ItemState& item, float delay, std::stri
     {
         return false;
     }
-    const ImStyle& style = theme.base;
+    const ImStyle& style = theme.overlay;
     const ImId id = ctx.id("tooltip");
     LayoutStyle box;
     box.padding = style.padding;
@@ -257,6 +260,7 @@ bool open_tooltip(GuiContext& ctx, const ItemState& item, float delay, std::stri
     const uint32_t index = ctx.begin_box(id, box);
     BoxPaint& paint = ctx.layout().node(index).paint;
     im::paint_surface(paint, style, style.background);
+    paint.shadow = theme.elevation;
     if (!text.empty())
     {
         paint.text = ctx.arena().store(text);
@@ -330,6 +334,7 @@ void show_toasts()
         const uint32_t index = ctx.begin_box(ImId{}, box);
         BoxPaint& paint = ctx.layout().node(index).paint;
         im::paint_surface(paint, style, style.background);
+        paint.shadow = ctx.gui_theme().elevation;
         paint.text = ctx.arena().store(toast.text);
         paint.text_height = style.text_height;
         paint.text_colour = style.text;

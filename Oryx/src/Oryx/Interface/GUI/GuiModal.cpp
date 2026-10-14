@@ -54,7 +54,9 @@ bool begin_modal_impl(std::string_view name, const WidgetOptions& options, bool&
     }
     box.channel = k_channel_popup;
     box.floating = { true, AttachPoint::Centre, AttachPoint::Centre, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
-    im::paint_surface(ctx.layout().node(ctx.begin_box(dialog, box)).paint, style, style.background);
+    BoxPaint& dialog_paint = ctx.layout().node(ctx.begin_box(dialog, box)).paint;
+    im::paint_surface(dialog_paint, style, style.background);
+    dialog_paint.shadow = ctx.gui_theme().elevation;
     if (result.closed_by_escape)
     {
         ctx.end_box();

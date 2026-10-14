@@ -91,6 +91,7 @@ struct TextCmd
     uint32_t first = 0;
     uint32_t length = 0;
     uint32_t clip = k_no_clip;
+    bool tabular = false;
 };
 
 // Which command array a run indexes; a new primitive adds an array and a kind, existing code is untouched.
@@ -189,7 +190,7 @@ public:
     void add_image(const Rect& rect, ImageHandle image, const Vec2f& uv_min, const Vec2f& uv_max, const CornerRadius& radius, const Colour& tint);
     // Throws Error unless 3 to k_max_polygon_points points.
     void add_polygon(const Vec2f* points, uint32_t count, const Colour& colour);
-    void add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour);
+    void add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour, bool tabular = false);
 
     [[nodiscard]] std::string_view text(const TextCmd& command) const { return std::string_view(m_text).substr(command.first, command.length); }
     [[nodiscard]] uint32_t command_count() const;

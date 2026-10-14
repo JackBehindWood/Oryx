@@ -247,14 +247,14 @@ void DrawList::add_polygon(const Vec2f* points, uint32_t count, const Colour& co
     record(DrawKind::Polygon, array.size());
 }
 
-void DrawList::add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour)
+void DrawList::add_text(const Vec2f& origin, std::string_view text, float pixel_height, TextAlign align, const Colour& colour, bool tabular)
 {
     if (text.empty() || (!m_clip_stack.empty() && is_empty(m_clips[m_clip_stack.back()])))
     {
         return;
     }
     std::vector<TextCmd>& array = m_channels[m_current].texts;
-    array.push_back({ origin, pixel_height, align, colour, static_cast<uint32_t>(m_text.size()), static_cast<uint32_t>(text.size()), clip_index() });
+    array.push_back({ origin, pixel_height, align, colour, static_cast<uint32_t>(m_text.size()), static_cast<uint32_t>(text.size()), clip_index(), tabular });
     m_text.append(text);
     record(DrawKind::Text, array.size());
 }

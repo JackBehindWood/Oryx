@@ -75,6 +75,18 @@ struct GuiTheme : ImTheme
     Colour modal_dim = { 0.0f, 0.0f, 0.0f, 0.5f };
     // Left padding of the children of a tree node.
     float indent = 16.0f;
+    // The reach of the one drop shadow under popups, menus, tooltips, toasts and dialogs; zero turns it off.
+    float elevation = 8.0f;
+    // The 4/8-point steps the chrome spaces by besides `spacing` (4): xs for tight strips, md for rows of controls.
+    float space_xs = 2.0f;
+    float space_md = 8.0f;
+    // One height for every bar: dock tab strips and toolbars, the menu bar, the status bar and table headers.
+    float bar_height = 24.0f;
+    // Type scale as multiples of the role's text height (the body size): title, body (1) and caption.
+    float title_scale = 1.125f;
+    float caption_scale = 0.8125f;
+    // Secondary text on a panel: legible (4.5:1, 7:1 with panel_border) but quieter than `text`.
+    Colour caption_colour;
     // Log line text: debug dimmed, info plain, warning amber, error red. Each is legible on field.background; the level letter still names the level.
     Colour log_debug;
     Colour log_info;

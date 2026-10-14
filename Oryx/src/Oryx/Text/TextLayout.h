@@ -23,6 +23,8 @@ struct TextStyle
     // A world-space multiplier applied after baking.
     float scale = 1.0f;
     TextAlign align = TextAlign::Left;
+    // Digits share one advance (see layout_text).
+    bool tabular = false;
 };
 
 struct TextExtent
@@ -33,9 +35,18 @@ struct TextExtent
 
 // The one text layout, shared by measuring and drawing. `visit(const Glyph&, const Vec2f& pen)` runs for every drawable glyph with the pen on the baseline, relative to the
 // start of the text (y up, so later lines have negative y). '\n' starts a line, '\r' is skipped, '\t' advances four spaces; kerning applies between neighbouring codepoints.
+// With `tabular` every digit advances by the widest digit's advance and sits centred in it, so columns of numbers keep their width as they change.
 template<typename Visitor>
-TextExtent layout_text(const GlyphAtlasData& atlas, std::string_view text, float scale, Visitor&& visit)
+TextExtent layout_text(const GlyphAtlasData& atlas, std::string_view text, float scale, Visitor&& visit, bool tabular = false)
 {
+    float digit_advance = 0.0f;
+    if (tabular)
+    {
+        for (uint32_t digit = '0'; digit <= '9'; ++digit)
+        {
+            digit_advance = std::max(digit_advance, atlas.glyph(digit).advance);
+        }
+    }
     const float line_height = atlas.line_height() * scale;
     Vec2f pen(0.0f, 0.0f);
     TextExtent extent;
@@ -68,8 +79,10 @@ TextExtent layout_text(const GlyphAtlasData& atlas, std::string_view text, float
                 pen[0] += atlas.kerning(previous, codepoint) * scale;
             }
             const Glyph& glyph = atlas.glyph(codepoint);
-            visit(glyph, pen);
-            pen[0] += glyph.advance * scale;
+            const bool digit = tabular && codepoint >= '0' && codepoint <= '9';
+            const float advance = digit ? digit_advance : glyph.advance;
+            visit(glyph, digit ? Vec2f(pen[0] + (advance - glyph.advance) * 0.5f * scale, pen[1]) : pen);
+            pen[0] += advance * scale;
             previous = codepoint;
         }
         extent.width = std::max(extent.width, pen[0]);

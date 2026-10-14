@@ -60,13 +60,13 @@ GlyphAtlas& Font::atlas(float pixel_height)
     return *found->atlas;
 }
 
-TextExtent Font::measure(std::string_view text, float pixel_height, float scale)
+TextExtent Font::measure(std::string_view text, float pixel_height, float scale, bool tabular)
 {
     if (!ready())
     {
         return {};
     }
-    return layout_text(atlas(pixel_height).data(), text, scale, [](const Glyph&, const Vec2f&) {});
+    return layout_text(atlas(pixel_height).data(), text, scale, [](const Glyph&, const Vec2f&) {}, tabular);
 }
 
 float Font::line_height(float pixel_height)
