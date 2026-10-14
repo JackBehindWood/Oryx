@@ -203,14 +203,18 @@ void ConsoleWorkbench::run_line(std::string_view line)
 void ConsoleWorkbench::status()
 {
     FrameArena& arena = gui::context().arena();
-    gui::toggle("Console", m_drawer_open);
+    const GuiTheme& theme = gui::theme();
+    if (gui::selectable("Console", m_drawer_open, { .full_width = false }).clicked)
+    {
+        m_drawer_open = !m_drawer_open;
+    }
     if (m_errors > 0)
     {
-        gui::label(arena.format("%u errors", m_errors));
+        gui::badge(arena.format("%u errors", m_errors), theme.palette[5]);
     }
     if (m_warnings > 0)
     {
-        gui::label(arena.format("%u warnings", m_warnings));
+        gui::badge(arena.format("%u warnings", m_warnings), theme.palette[1]);
     }
 }
 

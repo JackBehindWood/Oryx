@@ -150,3 +150,88 @@ TEST_CASE("dashboard workbench: a warm frame with a populated feed allocates not
     rig.frames(3);
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+#ifdef OX_ENABLE_LOG_CAPTURE
+TEST_CASE("dashboard workbench: the trace panel and the console drawn in one frame stay stable and warm")
+{
+    log_capture::clear();
+    bool drawer = true;
+    DashboardRig rig({ "trace", "decision" });
+    ConsoleWorkbench& console = rig.workbenches.add<ConsoleWorkbench>(drawer);
+    for (uint32_t i = 0; i < 40; ++i)
+    {
+        rig.add_decision();
+        log_capture::record(2, LogSource::App, "line " + std::to_string(i));
+    }
+    rig.frames(8);
+    for (uint32_t i = 0; i < 20; ++i)
+    {
+        rig.f.driver.move_to({ 100.0f + static_cast<float>(i) * 10.0f, 120.0f + static_cast<float>(i) * 7.0f });
+        rig.f.driver.wheel({ 0.0f, i % 2 == 0 ? -1.0f : 1.0f });
+        rig.frames(1);
+    }
+    CHECK(console.visible_count() > 0);
+    rig.frames(8);
+    const MemoryStats before = test::all_allocations();
+    rig.frames(3);
+    CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
+    log_capture::clear();
+}
+#endif
+
+#ifdef OX_ENABLE_LOG_CAPTURE
+namespace
+{
+
+float drag_trace_splitter(bool console_open)
+{
+    log_capture::clear();
+    bool drawer = console_open;
+    DashboardRig rig({ "trace", "decision" });
+    ConsoleWorkbench& console = rig.workbenches.add<ConsoleWorkbench>(drawer);
+    rig.f.driver.input().surface_size = { 800.0f, 600.0f };
+    const auto build = rig.f.frame_of(
+        [&]
+        {
+            rig.workbenches.update(WorkbenchFrame{ 1.0f / 60.0f, 0 });
+            if (gui::AreaScope bar("status", { .anchor = gui::AreaAnchor::Bottom }); bar)
+                gui::label("status");
+            gui::AreaOptions area;
+            area.anchor = gui::AreaAnchor::Bottom;
+            area.size = fixed(200.0f);
+            area.resizable = true;
+            area.open = &drawer;
+            if (gui::AreaScope drawer_area("console_drawer", area); drawer_area)
+                console.draw_console();
+            if (gui::AreaScope body("body"); body)
+            {
+                gui::PanelHostScope host;
+                rig.workbenches.draw();
+            }
+        });
+    rig.f.driver.run_frames(6, build);
+    const gui::SolvedLayout& solved = rig.f.context.dock_view().solved;
+    float moved = 0.0f;
+    for (uint32_t i = 0; i < solved.node_count; ++i)
+    {
+        const Rect gap = solved.nodes[i].splitter;
+        if (is_empty(gap) || gap.size[0] < gap.size[1])
+            continue;
+        const Vec2f at = rect_centre(gap);
+        rig.f.driver.drag(at, at + Vec2f(0.0f, -40.0f), 6, build);
+        const Rect after = rig.f.context.dock_view().solved.nodes[i].splitter;
+        moved = gap.min[1] - after.min[1];
+        break;
+    }
+    log_capture::clear();
+    return moved;
+}
+
+} // namespace
+
+TEST_CASE("dashboard workbench: the trace splitter still grows the panel with the console area open")
+{
+    CHECK(drag_trace_splitter(false) > 20.0f);
+    CHECK(drag_trace_splitter(true) > 0.0f);
+}
+#endif

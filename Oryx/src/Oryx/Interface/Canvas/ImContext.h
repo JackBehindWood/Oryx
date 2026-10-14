@@ -83,7 +83,8 @@ struct ScopeTag
     static constexpr char value = 0;
 };
 
-// Reserved draw channels, above the default canvas channel (1): floating windows, then popups, then tooltips, then a dragged ghost.
+// Reserved draw channels, above the default canvas channel (0): overlay areas (a drawer), floating windows, then popups, then tooltips, then a dragged ghost.
+inline constexpr uint32_t k_channel_area = 1;
 inline constexpr uint32_t k_channel_float = 2;
 inline constexpr uint32_t k_channel_popup = 3;
 inline constexpr uint32_t k_channel_tooltip = 4;

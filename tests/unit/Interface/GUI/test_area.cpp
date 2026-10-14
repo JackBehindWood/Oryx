@@ -283,3 +283,59 @@ TEST_CASE("area: a Fill area paints nothing, so a board drawn beneath it shows t
     CHECK_FALSE(body_filled);
     CHECK(bar_filled);
 }
+
+TEST_CASE("area: an overlay is painted on a channel above docked content, a reserved area is not")
+{
+    GuiFixture f;
+    f.driver.input().surface_size = { 200.0f, 100.0f };
+    bool open = true;
+    const auto build = [&]
+    {
+        if (gui::AreaScope bar("bar", { .anchor = gui::AreaAnchor::Top }); bar)
+            gui::label("bar");
+        if (gui::AreaScope body("body"); body)
+            gui::label("body");
+        gui::AreaOptions drawer;
+        drawer.anchor = gui::AreaAnchor::Bottom;
+        drawer.mode = gui::AreaMode::Overlay;
+        drawer.size = fixed(30.0f);
+        drawer.open = &open;
+        if (gui::AreaScope console("drawer", drawer); console)
+            gui::label("console");
+    };
+    f.driver.run_frames(3, f.frame_of(build));
+    const LayoutTree& tree = f.context.layout();
+    uint32_t drawer_channel = 0;
+    uint32_t bar_channel = 99;
+    for (uint32_t index = 0; index < tree.node_count(); ++index)
+    {
+        const LayoutNode& node = tree.node(index);
+        if (node.id == f.context.id("drawer"))
+            drawer_channel = node.style.channel;
+        if (node.id == f.context.id("bar"))
+            bar_channel = node.style.channel;
+    }
+    CHECK(drawer_channel == k_channel_area);
+    CHECK(bar_channel == 0);
+}
+
+TEST_CASE("GUI area: a resizable edge never shrinks below its minimum size")
+{
+    GuiFixture f;
+    f.driver.input().surface_size = { 200.0f, 200.0f };
+    const auto build = [&]
+    {
+        gui::AreaOptions drawer;
+        drawer.anchor = gui::AreaAnchor::Bottom;
+        drawer.size = fixed(80.0f);
+        drawer.size.min = 50.0f;
+        drawer.resizable = true;
+        if (gui::AreaScope console("drawer", drawer); console)
+            gui::label("console");
+    };
+    f.driver.run_frames(3, f.frame_of(build));
+    const Rect before = gui::area_rect("drawer");
+    f.driver.drag({ 20.0f, before.min[1] + 1.0f }, { 20.0f, before.min[1] + 150.0f }, 6, f.frame_of(build));
+    f.driver.run_frames(3, f.frame_of(build));
+    CHECK(gui::area_rect("drawer").size[1] == doctest::Approx(50.0f));
+}

@@ -89,6 +89,7 @@ public:
         box.height = fixed(rect.size[1]);
         box.direction = Direction::Column;
         box.overflow = Overflow::Clip;
+        box.channel = options.mode == AreaMode::Overlay ? k_channel_area : 0;
         AttachPoint attach = AttachPoint::TopLeft;
         Vec2f offset = rect.min;
         if (measured)

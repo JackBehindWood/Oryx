@@ -12,7 +12,8 @@ namespace
 
 constexpr float k_view_min_width = 160.0f;
 constexpr float k_view_min_height = 96.0f;
-constexpr float k_board_min_size = 200.0f;
+constexpr float k_board_min_width = 200.0f;
+constexpr float k_board_min_height = 120.0f;
 
 std::string slug_of(std::string_view title)
 {
@@ -71,8 +72,8 @@ void Dashboard::declare_panels()
     gui::PanelOptions board;
     board.title = "Board";
     board.kind = gui::PanelKind::Viewport;
-    board.min_w = k_board_min_size;
-    board.min_h = k_board_min_size;
+    board.min_w = k_board_min_width;
+    board.min_h = k_board_min_height;
     if (!gui::register_panel(k_viewport_panel, board))
     {
         throw Error("the board's viewport panel could not be registered");

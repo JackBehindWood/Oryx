@@ -20,7 +20,8 @@ namespace
 constexpr bool k_graphics_built = true;
 constexpr const char* k_showcase_panel = "tools/gui-showcase";
 constexpr float k_showcase_width = 360.0f;
-constexpr float k_console_height = 280.0f;
+constexpr float k_console_height = 220.0f;
+constexpr float k_console_min_height = 120.0f;
 constexpr float k_showcase_min_width = 320.0f;
 constexpr float k_showcase_min_height = 240.0f;
 #else
@@ -373,6 +374,16 @@ void OasisLayer::build()
         oryx::gui::RowScope row("status", { .width = oryx::grow(), .align = oryx::Align::Centre, .gap = 12.0f });
         chrome.workbenches.status();
     }
+    oryx::gui::AreaOptions drawer;
+    drawer.anchor = oryx::gui::AreaAnchor::Bottom;
+    drawer.size = oryx::fixed(k_console_height);
+    drawer.size.min = k_console_min_height;
+    drawer.resizable = true;
+    drawer.open = &chrome.console_open;
+    if (oryx::gui::AreaScope console("console_drawer", drawer); console)
+    {
+        chrome.console->draw_console();
+    }
     if (oryx::gui::AreaScope body("body"); body)
     {
         oryx::gui::PanelHostScope host;
@@ -384,16 +395,6 @@ void OasisLayer::build()
                 oryx::gui::show_showcase();
             }
         }
-    }
-    oryx::gui::AreaOptions drawer;
-    drawer.anchor = oryx::gui::AreaAnchor::Bottom;
-    drawer.mode = oryx::gui::AreaMode::Overlay;
-    drawer.size = oryx::fixed(k_console_height);
-    drawer.resizable = true;
-    drawer.open = &chrome.console_open;
-    if (oryx::gui::AreaScope console("console_drawer", drawer); console)
-    {
-        chrome.console->draw_console();
     }
     answer_switch(chrome.switching, chrome.dashboard->feed());
     oryx::gui::show_toasts();
