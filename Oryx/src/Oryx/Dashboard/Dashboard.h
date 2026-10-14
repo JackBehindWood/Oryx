@@ -57,6 +57,7 @@ public:
     void board_created(IGraphicsBoard& board, const std::string& game);
     void board_released(IGraphicsBoard& board);
 
+    void draw() override;
     void status() override;
     void menu() override;
 
@@ -69,6 +70,7 @@ public:
 protected:
     void declare_panels() override;
     void draw_panel(PanelHandle panel, const PanelFrame& frame) override;
+    void draw_board_toolbar();
     void tick(const WorkbenchFrame& frame) override;
     void state_loaded() override;
 

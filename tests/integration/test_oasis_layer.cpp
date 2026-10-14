@@ -593,19 +593,19 @@ TEST_CASE("OasisLayer: decisions use the board's own names and the board shows i
     const RecordView first = rig.shell->feed().view(0);
     REQUIRE(first.record->chosen_space_count == 1);
     CHECK(label_view(first.record->chosen_label) == scene.layout->label(first.record->chosen_spaces[0]));
-    CHECK(rig.board_has_text("Heat"));
-    CHECK(rig.board_has_text("Chosen"));
-    CHECK(rig.board_has_text("Values"));
+    CHECK(rig.has_text("Heat"));
+    CHECK(rig.has_text("Chosen"));
+    CHECK(rig.has_text("Values"));
     CHECK(rig.shell->annotation_flags() == AnnotationFlags{ true, true, false });
     CHECK(find_annotation_kind(rig.shell->annotations(), AnnotationKind::Chosen));
 }
 
-TEST_CASE("OasisLayer: a chip on the board and the View menu switch the same annotation flags")
+TEST_CASE("OasisLayer: the board toolbar and the View menu switch the same annotation flags")
 {
     ShellRig rig("tictactoe", "minimax");
     rig.frames(4);
     CHECK_FALSE(rig.shell->annotation_flags().value);
-    rig.click_at(rig.board_centre_of("Values"));
+    rig.click_text("Values");
     rig.frames(3);
     CHECK(rig.shell->annotation_flags().value);
     CHECK(rig.board->annotation_flags().value);

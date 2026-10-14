@@ -50,6 +50,7 @@ private:
     AnnotationFlags m_annotation_flags;
     std::string m_legend;
     bool m_controls = false;
+    bool m_chips = true;
     bool m_ghost = false;
     SpaceId m_linked = k_no_space;
     std::string m_status;

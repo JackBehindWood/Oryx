@@ -525,7 +525,7 @@ public:
 
     [[nodiscard]] ItemState item(std::string_view label, bool selected);
     [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected);
-    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected, const Colour& text);
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected, const Colour& text, const Colour& rest_fill);
     [[nodiscard]] uint32_t first_item() const { return m_first; }
     [[nodiscard]] uint32_t last_item() const { return m_last; }
 
@@ -628,7 +628,7 @@ ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool select
     return selectable(label, selected, row_options);
 }
 
-ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool selected, const Colour& text)
+ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool selected, const Colour& text, const Colour& rest_fill)
 {
     IdScope row(context(), context().index_id(index));
     ImStyle tinted = context().role_style(m_options, &GuiTheme::panel);
@@ -636,6 +636,7 @@ ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool select
     SelectableOptions row_options;
     static_cast<WidgetOptions&>(row_options) = m_options;
     row_options.style = &tinted;
+    row_options.rest_fill = rest_fill;
     return selectable(label, selected, row_options);
 }
 
@@ -662,9 +663,9 @@ ItemState list_item(uint32_t index, std::string_view label, bool selected)
     return context().scope<ListBoxFrame>("list_item").item(index, label, selected);
 }
 
-ItemState list_item(uint32_t index, std::string_view label, bool selected, const Colour& text)
+ItemState list_item(uint32_t index, std::string_view label, bool selected, const Colour& text, const Colour& rest_fill)
 {
-    return context().scope<ListBoxFrame>("list_item").item(index, label, selected, text);
+    return context().scope<ListBoxFrame>("list_item").item(index, label, selected, text, rest_fill);
 }
 
 uint32_t list_first_item()

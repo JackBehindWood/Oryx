@@ -27,6 +27,16 @@ const Colour& level_colour(const GuiTheme& theme, uint32_t level)
     return level == k_warn_level ? theme.log_warning : level < 2 ? theme.log_debug : theme.log_info;
 }
 
+Colour level_tint(const GuiTheme& theme, uint32_t level)
+{
+    if (level < k_warn_level)
+    {
+        return { 0.0f, 0.0f, 0.0f, 0.0f };
+    }
+    const Colour& base = level >= k_error_level ? theme.log_error : theme.log_warning;
+    return { base.r, base.g, base.b, level >= k_error_level ? 0.16f : 0.10f };
+}
+
 void emit(spdlog::level::level_enum level, std::string_view text)
 {
     Log::message(level, text);
@@ -293,7 +303,7 @@ void ConsoleWorkbench::draw_console()
         {
             const LogLine& line = m_lines[m_visible[index]];
             const std::string_view label = arena.format("%c %s  %.*s", k_level_letters[math::min<uint32_t>(line.level, k_console_levels - 1)], line.source == LogSource::Core ? "ORYX" : "APP ", static_cast<int32_t>(line.length), line.text);
-            const ItemState row = list.item(index, label, selected(line.sequence), level_colour(gui::theme(), line.level));
+            const ItemState row = list.item(index, label, selected(line.sequence), level_colour(gui::theme(), line.level), level_tint(gui::theme(), line.level));
             wheel_over_rows = wheel_over_rows || (row.hovered && input.wheel[1] != 0.0f);
             if (row.right_clicked)
             {
@@ -376,7 +386,7 @@ void ConsoleWorkbench::draw_console()
         }
     }
 
-    const gui::TextInputResult typed = gui::text_input("##console input", m_input, sizeof(m_input));
+    const gui::TextInputResult typed = gui::text_input_hint("##console input", m_input, sizeof(m_input), "Type a command, Tab completes, help lists them");
     if (typed.focused || typed.submitted)
     {
         if (key_pressed(input.keys, ImKey::Tab))

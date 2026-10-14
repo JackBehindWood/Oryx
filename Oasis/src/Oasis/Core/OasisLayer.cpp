@@ -434,6 +434,24 @@ void OasisLayer::view_menu()
     {
         chrome.observer->set_enabled(!chrome.observer->enabled());
     }
+    if (oryx::gui::begin_menu("Tab style"))
+    {
+        struct Look
+        {
+            const char* label;
+            oryx::gui::TabLook look;
+        };
+        constexpr Look looks[] = { { "Theme", oryx::gui::TabLook::Theme }, { "Sloped", oryx::gui::TabLook::Sloped }, { "Rounded", oryx::gui::TabLook::Rounded }, { "Flat", oryx::gui::TabLook::Flat } };
+        const oryx::gui::TabLook current = oryx::settings_of<oryx::GuiSettings>().dock.tab_look;
+        for (const Look& entry : looks)
+        {
+            if (oryx::gui::menu_item(entry.label, entry.look == current).clicked)
+            {
+                oryx::update_settings<oryx::GuiSettings>([&entry](oryx::GuiSettings& settings) { settings.dock.tab_look = entry.look; });
+            }
+        }
+        oryx::gui::end_menu();
+    }
     oryx::gui::end_menu();
 }
 

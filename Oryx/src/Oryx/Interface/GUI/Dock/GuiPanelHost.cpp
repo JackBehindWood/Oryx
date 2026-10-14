@@ -1800,6 +1800,29 @@ bool begin_panel_toolbar()
     return true;
 }
 
+bool begin_viewport_toolbar(std::string_view name)
+{
+    GuiContext& ctx = context();
+    DockView& h = host_of(ctx);
+    if (!host_active(h, ctx) || h.dock_body_open)
+        return false;
+    if (h.toolbar_open)
+        throw Error("begin_viewport_toolbar while a toolbar is open", "close the toolbar with end_panel_toolbar");
+    const PanelBody* body = find_body(h, make_panel_id(name));
+    if (body == nullptr || !body->viewport || is_empty(body->toolbar))
+        return false;
+    LayoutStyle box = placed(h, body->toolbar, body->channel);
+    box.direction = Direction::Row;
+    box.align_y = Align::Centre;
+    box.gap = ctx.gui_theme().spacing;
+    box.padding = { ctx.gui_theme().spacing, 0.0f, ctx.gui_theme().spacing, 0.0f };
+    box.overflow = Overflow::Clip;
+    ctx.begin_box(ctx.id(name), box);
+    ctx.push_id("toolbar");
+    h.toolbar_open = true;
+    return true;
+}
+
 void end_panel_toolbar()
 {
     GuiContext& ctx = context();

@@ -327,6 +327,14 @@ void Showcase::style()
         button("Menu and popup shadow");
         label("Tooltip, toast and dialog share it");
     }
+    if (collapsing_header("motion and empty states", true))
+    {
+        toggle("Animate", basics.flag);
+        progress("eased value", gui::animate("showcase-motion", basics.flag ? 1.0f : 0.0f, 0.0f, AnimSpec::slow()));
+        label("gui::animate eases any value by name; only values away from rest cost a slot");
+        ColumnScope empty("empty-demo", { .width = grow(), .height = fixed(90.0f) });
+        empty_state("Nothing here yet", "An empty state tells the viewer what to do next");
+    }
     if (collapsing_header("states", true))
     {
         RowScope row("buttons", { .gap = 4.0f });

@@ -161,7 +161,10 @@ void build_overlay(UiContext& ui, const BoardScene& scene, const BoardOverlayTex
     }
     if (text.annotations.controls)
     {
-        build_chips(text.annotations, out);
+        if (text.annotations.chips)
+        {
+            build_chips(text.annotations, out);
+        }
         build_legend(ui, text.annotations);
     }
 

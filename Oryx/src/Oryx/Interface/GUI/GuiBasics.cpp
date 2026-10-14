@@ -155,6 +155,32 @@ void caption(std::string_view text, const WidgetOptions& options)
     label(text, sized);
 }
 
+ItemState icon_button(std::string_view name, Icon icon, const IconOptions& options)
+{
+    GuiContext& ctx = context();
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::panel);
+    const ImId id = ctx.id(name);
+    const ItemState state = ctx.item(id);
+    LayoutStyle box;
+    box.width = fixed(options.size);
+    box.height = fixed(options.size);
+    const uint32_t index = ctx.begin_box(id, box);
+    BoxPaint& paint = ctx.layout().node(index).paint;
+    paint.has_fill = state.hovered || state.held;
+    paint.fill = state.held ? style.pressed : style.hover;
+    paint.radius = uniform_radius(style.radius);
+    paint.icon = icon;
+    paint.icon_colour = options.colour.a > 0.0f ? options.colour : style.text;
+    paint.icon_size = options.size * 0.6f;
+    paint.icon_thickness = options.thickness;
+    ctx.end_box();
+    if (state.hovered)
+    {
+        ctx.request_cursor(CursorShape::Hand);
+    }
+    return state;
+}
+
 void empty_state(std::string_view heading, std::string_view hint)
 {
     GuiContext& ctx = context();
@@ -365,8 +391,9 @@ ItemState selectable(std::string_view label, bool selected, const SelectableOpti
     }
     const uint32_t index = ctx.begin_box(label, box);
     LayoutNode& node = ctx.layout().node(index);
-    node.paint.has_fill = selected || state.hovered || state.held;
-    node.paint.fill = selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : style.hover;
+    const bool tinted = options.rest_fill.a > 0.0f;
+    node.paint.has_fill = selected || state.hovered || state.held || tinted;
+    node.paint.fill = selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : state.hovered ? style.hover : options.rest_fill;
     node.paint.radius = uniform_radius(style.radius);
     im::paint_text(node.paint, node, style, TextAlign::Left, true);
     ctx.end_box();

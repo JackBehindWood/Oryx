@@ -64,4 +64,14 @@ namespace oryx
     return theme.palette[k_first + seat % (k_palette_size - k_first)];
 }
 
+// Blue for a value good for the player to move, orange for one that is bad (the hues of the value bars), quiet for zero or a gap.
+[[nodiscard]] inline Colour value_colour(const GuiTheme& theme, double value)
+{
+    if (std::isnan(value) || value == 0.0)
+    {
+        return theme.caption_colour;
+    }
+    return value > 0.0 ? theme.palette[0] : theme.palette[1];
+}
+
 } // namespace oryx

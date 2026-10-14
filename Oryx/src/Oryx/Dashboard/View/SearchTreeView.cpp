@@ -209,8 +209,21 @@ private:
             gui::icon(Icon::None, indent);
         }
         gui::IconOptions chevron;
-        chevron.size = 14.0f;
-        gui::icon(!m_index.has_children(node) ? Icon::None : m_expanded[node] != 0 ? Icon::ChevronDown : Icon::ChevronRight, chevron);
+        chevron.size = 16.0f;
+        if (m_index.has_children(node))
+        {
+            gui::push_id(arena.format("%u", node));
+            if (gui::icon_button("fold", m_expanded[node] != 0 ? Icon::ChevronDown : Icon::ChevronRight, chevron).clicked)
+            {
+                toggle(node);
+                m_selected = node;
+            }
+            gui::pop_id();
+        }
+        else
+        {
+            gui::icon(Icon::None, chevron);
+        }
         const std::string_view text = node_label(view, m_index, node, arena);
         if (m_index.is_principal(node))
         {
@@ -272,7 +285,9 @@ private:
             table.end_cell();
             const SearchNode& data = m_index.node(node);
             table.cell(format_view_number(arena, static_cast<double>(data.visits)));
-            table.cell(format_view_number(arena, data.value));
+            table.begin_cell();
+            gui::text_coloured(format_view_number(arena, data.value), value_colour(gui::theme(), data.value));
+            table.end_cell();
             const double share = m_index.share_of_parent(node);
             table.cell(std::isnan(share) ? std::string_view("-") : arena.format("%.0f%%", share * 100.0));
         }

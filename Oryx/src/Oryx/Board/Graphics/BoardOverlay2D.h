@@ -19,6 +19,7 @@ struct OverlayButton
 struct BoardAnnotationOverlay
 {
     bool controls = false;
+    bool chips = true;
     AnnotationFlags flags;
     // "Ply 7 · Player 2 · minimax"; empty draws no legend line.
     std::string_view legend;

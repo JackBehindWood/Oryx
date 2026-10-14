@@ -54,6 +54,8 @@ void end_panel_host();
 // The toolbar strip reserved for the panel being drawn (PanelOptions::toolbar); false, with nothing to close, when the panel has none, is hidden or this is not a docked panel. Call between begin_panel and end_panel.
 [[nodiscard]] bool begin_panel_toolbar();
 void end_panel_toolbar();
+// The toolbar strip of the viewport panel `name`, which has no body to draw into (so begin_panel hides it) but still reserves a strip when registered with PanelOptions::toolbar. Close it with end_panel_toolbar.
+[[nodiscard]] bool begin_viewport_toolbar(std::string_view name);
 // The strip in the latest frame; empty when absent. Valid outside a frame.
 [[nodiscard]] Rect panel_toolbar_rect(std::string_view name);
 
@@ -107,6 +109,7 @@ class PanelToolbarScope
 {
 public:
     PanelToolbarScope() : m_open(begin_panel_toolbar()) {}
+    explicit PanelToolbarScope(std::string_view viewport) : m_open(begin_viewport_toolbar(viewport)) {}
     ~PanelToolbarScope()
     {
         if (m_open)

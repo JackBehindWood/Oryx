@@ -74,6 +74,7 @@ void Dashboard::declare_panels()
     board.kind = gui::PanelKind::Viewport;
     board.min_w = k_board_min_width;
     board.min_h = k_board_min_height;
+    board.toolbar = true;
     if (!gui::register_panel(k_viewport_panel, board))
     {
         throw Error("the board's viewport panel could not be registered");
@@ -113,6 +114,23 @@ void Dashboard::add_view(UniquePtr<IDashboardView> view)
         m_side_anchor[side] = std::string(panel_name(handle));
     }
     m_views.push_back(std::move(view));
+}
+
+void Dashboard::draw()
+{
+    Workbench::draw();
+    draw_board_toolbar();
+}
+
+void Dashboard::draw_board_toolbar()
+{
+    if (gui::PanelToolbarScope bar(k_viewport_panel); bar.visible())
+    {
+        gui::caption("Overlays");
+        gui::toggle("Heat", m_flags.heat);
+        gui::toggle("Chosen", m_flags.chosen);
+        gui::toggle("Values", m_flags.value);
+    }
 }
 
 void Dashboard::draw_panel(PanelHandle panel, const PanelFrame& frame)
@@ -201,6 +219,7 @@ void Dashboard::sync_board()
     request.annotations = enabled ? &m_annotations : nullptr;
     request.flags = enabled ? m_flags : AnnotationFlags{};
     request.controls = enabled;
+    request.chips = false;
     request.legend = m_legend;
     request.ghost = ghost;
     request.linked = enabled ? action_destination(selected, linked_action(m_model)) : k_no_space;

@@ -88,6 +88,7 @@ void PresentedGraphicsBoard2D::set_annotations(const BoardAnnotationRequest& req
     }
     m_annotation_flags = request.flags;
     m_controls = request.controls;
+    m_chips = request.chips;
     m_legend.assign(request.legend);
     m_ghost = request.ghost;
     m_linked = request.linked;
@@ -97,6 +98,7 @@ BoardAnnotationOverlay PresentedGraphicsBoard2D::annotation_overlay() const
 {
     BoardAnnotationOverlay overlay;
     overlay.controls = m_controls;
+    overlay.chips = m_chips;
     overlay.flags = m_annotation_flags;
     overlay.legend = m_legend;
     overlay.ghost = m_ghost;

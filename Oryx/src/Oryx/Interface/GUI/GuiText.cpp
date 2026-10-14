@@ -346,6 +346,25 @@ TextInputResult text_input(std::string_view label, char* buffer, uint32_t capaci
     return result;
 }
 
+TextInputResult text_input_hint(std::string_view label, char* buffer, uint32_t capacity, std::string_view hint, const FieldOptions& options)
+{
+    GuiContext& ctx = context();
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
+    FieldScope field(label, options);
+    const ImId id = ctx.id("input");
+    TextEditState edit = ctx.state<TextEditState>(id);
+    detail::EditDecor decor;
+    decor.placeholder = hint;
+    const detail::EditOutcome outcome = detail::edit_field(ctx, id, style, buffer, capacity, edit, grow(1.0f, 80.0f), decor);
+    ctx.state<TextEditState>(id) = edit;
+    TextInputResult result;
+    result.changed = outcome.result.changed;
+    result.submitted = outcome.result.submitted;
+    result.cancelled = outcome.result.cancelled;
+    result.focused = outcome.focused;
+    return result;
+}
+
 TextInputResult search_box(std::string_view label, char* buffer, uint32_t capacity, std::string_view placeholder, const FieldOptions& options)
 {
     GuiContext& ctx = context();

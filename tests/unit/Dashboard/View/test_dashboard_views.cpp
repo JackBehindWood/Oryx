@@ -911,3 +911,26 @@ TEST_CASE("dashboard decision: equal values say there is no evaluation, differin
     CHECK(varied.find_text("Blue: good for the player to move, orange: bad") != nullptr);
     CHECK(varied.find_text("Hover a row to see it on the board, click to pin it") != nullptr);
 }
+
+TEST_CASE("search view: one click on a node's chevron folds or unfolds it")
+{
+    ViewFixture f("search", tree_options(32));
+    feed_tree(f.feed, 4);
+    f.settle();
+    f.frames();
+    const auto draw = f.column_of([&f] { f.view->draw(f.model); });
+    f.driver.click(rect_centre(f.find_text("Collapse")->rect), draw);
+    f.frames(2);
+    const uint32_t collapsed = f.context.layout().node_count();
+    const LayoutNode* root = f.find_text("Root");
+    REQUIRE(root != nullptr);
+    f.driver.click({ root->rect.min[0] - 8.0f, rect_centre(root->rect)[1] }, draw);
+    f.frames(2);
+    CHECK(f.context.layout().node_count() > collapsed);
+    const uint32_t expanded = f.context.layout().node_count();
+    root = f.find_text("Root");
+    REQUIRE(root != nullptr);
+    f.driver.click({ root->rect.min[0] - 8.0f, rect_centre(root->rect)[1] }, draw);
+    f.frames(2);
+    CHECK(f.context.layout().node_count() < expanded);
+}

@@ -161,10 +161,14 @@ private:
             gui::text_coloured(player_name(arena, record.player), player_colour(theme, record.player));
             table.end_cell();
             table.cell(label_view(record.chosen_label));
-            table.cell(format_view_number(arena, record.chosen_value));
+            table.begin_cell();
+            gui::text_coloured(format_view_number(arena, record.chosen_value), value_colour(theme, record.chosen_value));
+            table.end_cell();
             if (any_probability)
             {
-                table.cell(format_view_number(arena, record.chosen_probability));
+                table.begin_cell();
+                gui::text_coloured(format_view_number(arena, record.chosen_probability), std::isnan(record.chosen_probability) ? theme.caption_colour : theme.base.text);
+                table.end_cell();
             }
         }
     }

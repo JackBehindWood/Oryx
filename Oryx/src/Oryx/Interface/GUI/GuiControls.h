@@ -49,6 +49,8 @@ void overlay_text(std::string_view text, const ImStyle& style);
 void title(std::string_view text, const WidgetOptions& options = {});
 // What a view shows instead of its content when there is none yet: a title over a caption hint, centred in the space the parent leaves.
 void empty_state(std::string_view heading, std::string_view hint = {});
+// A small square that draws `icon` and reacts to the pointer (a fold chevron, a pin); `name` makes its id in the current scope.
+[[nodiscard]] ItemState icon_button(std::string_view name, Icon icon, const IconOptions& options = {});
 void caption(std::string_view text, const WidgetOptions& options = {});
 // A one-line label that cuts overlong text with "..." and shows the full text as a tooltip while it is cut. The row is the label's width at most.
 ItemState label_ellipsis(std::string_view text, const WidgetOptions& options = {});
@@ -66,6 +68,8 @@ struct SelectableOptions : WidgetOptions
 {
     // Spans the stack it sits in (list rows) instead of fitting its text.
     bool full_width = true;
+    // Painted behind an idle row (a log line's level tint); zero alpha paints nothing.
+    Colour rest_fill = { 0.0f, 0.0f, 0.0f, 0.0f };
 };
 
 static_assert(std::is_trivially_copyable_v<SelectableOptions>);
@@ -244,7 +248,7 @@ void end_list_box();
 [[nodiscard]] ItemState list_item(std::string_view label, bool selected);
 [[nodiscard]] ItemState list_item(uint32_t index, std::string_view label, bool selected);
 // A row whose text is drawn in `text`.
-[[nodiscard]] ItemState list_item(uint32_t index, std::string_view label, bool selected, const Colour& text);
+[[nodiscard]] ItemState list_item(uint32_t index, std::string_view label, bool selected, const Colour& text, const Colour& rest_fill = { 0.0f, 0.0f, 0.0f, 0.0f });
 [[nodiscard]] uint32_t list_first_item();
 [[nodiscard]] uint32_t list_last_item();
 
@@ -263,7 +267,7 @@ public:
 
     [[nodiscard]] ItemState item(std::string_view label, bool selected) { return list_item(label, selected); }
     [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected) { return list_item(index, label, selected); }
-    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected, const Colour& text) { return list_item(index, label, selected, text); }
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected, const Colour& text, const Colour& rest_fill = { 0.0f, 0.0f, 0.0f, 0.0f }) { return list_item(index, label, selected, text, rest_fill); }
     [[nodiscard]] uint32_t first_item() const { return list_first_item(); }
     [[nodiscard]] uint32_t last_item() const { return list_last_item(); }
 };
@@ -288,6 +292,9 @@ static_assert(std::is_trivially_copyable_v<TextInputResult> && std::is_standard_
 // A one-line field editing the NUL-terminated text in `buffer` (`capacity` bytes with the NUL) in place while it has focus: typing, selection with shift, home/end, shortcut+A/C/X/V and a click to place the caret.
 // Enter submits and Escape cancels (the text typed so far stays); both release focus. Caret and scroll state live under the label's id.
 TextInputResult text_input(std::string_view label, char* buffer, uint32_t capacity, const FieldOptions& options = {});
+
+// A text_input that shows `hint` in a quiet colour while it is empty.
+TextInputResult text_input_hint(std::string_view label, char* buffer, uint32_t capacity, std::string_view hint, const FieldOptions& options = {});
 
 // A text_input with a magnifier, a placeholder while empty and a clear button while it holds text; Escape clears it (and releases focus), reported as `cleared`.
 TextInputResult search_box(std::string_view label, char* buffer, uint32_t capacity, std::string_view placeholder = "Search", const FieldOptions& options = {});

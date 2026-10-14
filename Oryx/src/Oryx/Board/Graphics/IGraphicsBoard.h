@@ -16,6 +16,8 @@ struct BoardAnnotationRequest
     AnnotationFlags flags;
     // Show the on-board chips and legend.
     bool controls = false;
+    // With `controls`: draw the Heat/Chosen/Values chips too; an application with its own toolbar turns them off.
+    bool chips = true;
     // "Ply 7 · Player 2 · minimax".
     std::string_view legend;
     // The decision shown is not the latest one.
