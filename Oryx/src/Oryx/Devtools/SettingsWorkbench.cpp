@@ -329,7 +329,7 @@ void SettingsWorkbench::draw_settings()
     FrameArena& arena = gui::context().arena();
     {
         gui::RowScope controls("settings controls", { .width = grow(), .align = Align::Centre, .gap = 6.0f });
-        if (gui::text_input("search", m_search, sizeof(m_search)).changed)
+        if (gui::search_box("search", m_search, sizeof(m_search), "Search settings").changed)
         {
             m_state.search = m_search;
         }

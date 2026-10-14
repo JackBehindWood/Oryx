@@ -41,6 +41,17 @@ Colour scroll_hover(const GuiPalette& palette)
     return shift_colour(palette.thumb, math::abs(palette.hover_step) * 2.0f * (palette.hover_step >= 0.0f ? 1.0f : -1.0f));
 }
 
+// `hue` pulled toward `text` just far enough to reach `required` on `background`.
+Colour legible(const Colour& hue, const Colour& text, const Colour& background, float required)
+{
+    Colour result = hue;
+    for (uint32_t step = 0; step <= 20 && contrast_ratio(result, background) < required; ++step)
+    {
+        result = lerp(hue, text, static_cast<float>(step) * 0.05f);
+    }
+    return result;
+}
+
 } // namespace
 
 GuiTheme make_gui_theme(const GuiPalette& palette)
@@ -58,6 +69,11 @@ GuiTheme make_gui_theme(const GuiPalette& palette)
     theme.scroll = role(palette, palette.panel, palette.thumb, 0.0f);
     theme.scroll.hover = scroll_hover(palette);
     theme.overlay = role(palette, palette.overlay, palette.field_border, math::max(1.0f, palette.border_width));
+    const float required = palette.panel_border ? 7.0f : 4.5f;
+    theme.log_debug = legible(lerp(palette.text, palette.field, 0.45f), palette.text, palette.field, required);
+    theme.log_info = palette.text;
+    theme.log_warning = legible({ 0.90f, 0.62f, 0.10f, 1.0f }, palette.text, palette.field, required);
+    theme.log_error = legible({ 0.92f, 0.30f, 0.28f, 1.0f }, palette.text, palette.field, required);
     theme.min_hit_size = 18.0f;
     return theme;
 }
@@ -77,6 +93,10 @@ void apply_gui_palette(GuiTheme& theme, const GuiPalette& palette)
         style.radius = from.radius;
         style.border_width = from.border_width;
     };
+    theme.log_debug = fresh.log_debug;
+    theme.log_info = fresh.log_info;
+    theme.log_warning = fresh.log_warning;
+    theme.log_error = fresh.log_error;
     recolour(theme.base, fresh.base);
     for (ImStyle GuiTheme::* member : k_roles)
     {

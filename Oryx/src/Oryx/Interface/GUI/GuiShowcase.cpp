@@ -174,7 +174,7 @@ void Showcase::inputs()
     }
     if (collapsing_header("filtering", true))
     {
-        text_input("filter", numbers.filter, sizeof(numbers.filter));
+        search_box("filter", numbers.filter, sizeof(numbers.filter), "Filter names");
         ScrollScope names("names", { .height = fixed(110.0f) });
         for (const std::string_view name : k_names)
         {

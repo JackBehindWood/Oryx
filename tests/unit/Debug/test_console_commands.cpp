@@ -155,3 +155,28 @@ TEST_CASE("console: history keeps the last lines, skips blanks and repeats, and 
     CHECK(history.size() == k_console_history);
     CHECK(history.previous() == "line" + std::to_string(k_console_history + 9));
 }
+
+TEST_CASE("console: settings paths complete section first, then its keys")
+{
+    const std::vector<std::string> sections = settings_sections();
+    REQUIRE_FALSE(sections.empty());
+    const std::string& section = sections.front();
+    std::vector<std::string> options;
+    std::string line = "settings.get " + section.substr(0, section.size() - 1);
+    CHECK(console::complete(line, options));
+    CHECK(line.starts_with("settings.get " + section + "."));
+    CHECK(line.back() == '.');
+
+    line = "settings.get " + section + ".";
+    console::complete(line, options);
+    REQUIRE_FALSE(options.empty());
+    for (const std::string& option : options)
+    {
+        CHECK(option.starts_with(section + "."));
+        CHECK(option.size() > section.size() + 1);
+    }
+
+    line = "settings.list " + section.substr(0, 1);
+    console::complete(line, options);
+    CHECK_FALSE(options.empty());
+}

@@ -25,6 +25,16 @@ struct EditOutcome
     TextEditResult result;
     // The field held keyboard focus when the frame ended.
     bool focused = false;
+    // The clear button emptied the field this frame.
+    bool cleared = false;
+};
+
+// What a field draws besides its text: a hint while empty, a leading icon and a clear button shown while it holds text.
+struct EditDecor
+{
+    std::string_view placeholder;
+    Icon leading = Icon::None;
+    bool clearable = false;
 };
 
 // The width of `text` in points at `height`; zero without a font.
@@ -33,7 +43,7 @@ struct EditOutcome
 [[nodiscard]] uint32_t text_offset_at(GuiContext& ctx, std::string_view text, float height, float x);
 
 // Draws the field named by `id` over `buffer` and runs the editor on this frame's input while it has focus. A press focuses it and places the caret; a double click selects everything; a press elsewhere, Enter and Escape release focus.
-EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buffer, uint32_t capacity, TextEditState& state, Sizing width);
+EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buffer, uint32_t capacity, TextEditState& state, Sizing width, const EditDecor& decor = {});
 
 // The whole string as a number, spaces around it allowed; false when anything else is in it.
 [[nodiscard]] bool parse_number(std::string_view text, double& out);

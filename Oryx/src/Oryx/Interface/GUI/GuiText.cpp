@@ -12,6 +12,7 @@ namespace
 
 constexpr float k_pad = 6.0f;
 constexpr float k_caret_width = 1.5f;
+constexpr float k_decor_box = 16.0f;
 
 } // namespace
 
@@ -64,18 +65,39 @@ Colour with_alpha(const Colour& colour, float alpha)
 
 } // namespace
 
-EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buffer, uint32_t capacity, TextEditState& state, Sizing width)
+EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buffer, uint32_t capacity, TextEditState& state, Sizing width, const EditDecor& decor)
 {
     EditOutcome outcome;
     outcome.item = ctx.item(id);
     const ImInput& input = ctx.input();
     const float height = style.text_height + 6.0f;
+    const float pad_left = k_pad + (decor.leading != Icon::None ? k_decor_box + 2.0f : 0.0f);
+    const float pad_right = k_pad + (decor.clearable ? k_decor_box + 2.0f : 0.0f);
+    const ImId clear_id = ctx.id("clear");
+    const bool has_text = buffer[0] != '\0';
+    const ItemState clear = decor.clearable && has_text ? ctx.item(clear_id) : ItemState{};
     Rect rect;
     const bool known = ctx.layout_rect(id, rect);
+    if (ctx.take_text_focus(id))
+    {
+        ctx.set_focus(id);
+        state.caret = static_cast<uint32_t>(std::strlen(buffer));
+        state.anchor = state.caret;
+        state.quiet = 0.0f;
+    }
     bool focused = ctx.focus() == id;
     const bool left_pressed = button_of(input, MouseCode::Left).pressed;
     TextEditInput edit;
-    if (outcome.item.pressed)
+    if (clear.pressed)
+    {
+        buffer[0] = '\0';
+        state = TextEditState{};
+        ctx.set_focus(id);
+        focused = true;
+        outcome.cleared = true;
+        outcome.result.changed = true;
+    }
+    else if (outcome.item.pressed)
     {
         if (!focused)
         {
@@ -89,7 +111,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
         else
         {
             const std::string_view text(buffer);
-            edit.click = text_offset_at(ctx, text, style.text_height, input.pointer.position[0] - rect.min[0] - k_pad + state.scroll);
+            edit.click = text_offset_at(ctx, text, style.text_height, input.pointer.position[0] - rect.min[0] - pad_left + state.scroll);
         }
     }
     else if (outcome.item.double_clicked)
@@ -127,7 +149,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
 
     const std::string_view text(buffer);
     const float caret_x = measure_text(ctx, text.substr(0, state.caret), style.text_height);
-    const float inner = known ? math::max(1.0f, rect.size[0] - 2.0f * k_pad) : 1.0f;
+    const float inner = known ? math::max(1.0f, rect.size[0] - pad_left - pad_right) : 1.0f;
     if (focused && known)
     {
         state.scroll = math::clamp(state.scroll, caret_x - inner + k_caret_width, caret_x);
@@ -159,7 +181,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
         LayoutStyle selection;
         selection.width = fixed(x1 - x0);
         selection.height = fixed(height - 4.0f);
-        selection.floating = floating(k_pad + x0 - state.scroll, 2.0f);
+        selection.floating = floating(pad_left + x0 - state.scroll, 2.0f);
         const uint32_t selection_index = ctx.begin_box(ImId{}, selection);
         ctx.layout().node(selection_index).paint.has_fill = true;
         ctx.layout().node(selection_index).paint.fill = with_alpha(style.accent, 0.4f);
@@ -169,19 +191,55 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
     label.width = fixed(measure_text(ctx, text, style.text_height) + 2.0f);
     label.height = fixed(height);
     label.align_y = Align::Centre;
-    label.floating = floating(k_pad - state.scroll, 0.0f);
+    label.floating = floating(pad_left - state.scroll, 0.0f);
     const uint32_t label_index = ctx.begin_box(ImId{}, label);
     BoxPaint& paint = ctx.layout().node(label_index).paint;
     paint.text = ctx.arena().store(text);
     paint.text_height = style.text_height;
     paint.text_colour = style.text;
     ctx.end_box();
+    if (text.empty() && !decor.placeholder.empty())
+    {
+        LayoutStyle hint;
+        hint.width = fixed(measure_text(ctx, decor.placeholder, style.text_height) + 2.0f);
+        hint.height = fixed(height);
+        hint.align_y = Align::Centre;
+        hint.floating = floating(pad_left, 0.0f);
+        const uint32_t hint_index = ctx.begin_box(ImId{}, hint);
+        BoxPaint& hint_paint = ctx.layout().node(hint_index).paint;
+        hint_paint.text = ctx.arena().store(decor.placeholder);
+        hint_paint.text_height = style.text_height;
+        hint_paint.text_colour = with_alpha(style.text, style.text.a * 0.55f);
+        ctx.end_box();
+    }
+    if (decor.leading != Icon::None)
+    {
+        LayoutStyle mark;
+        mark.width = fixed(k_decor_box);
+        mark.height = fixed(height);
+        mark.floating = floating(k_pad, 0.0f);
+        const uint32_t mark_index = ctx.begin_box(ImId{}, mark);
+        ctx.layout().node(mark_index).paint.icon = decor.leading;
+        ctx.layout().node(mark_index).paint.icon_colour = with_alpha(style.text, style.text.a * 0.6f);
+        ctx.end_box();
+    }
+    if (decor.clearable && (has_text && !outcome.cleared))
+    {
+        LayoutStyle button;
+        button.width = fixed(k_decor_box);
+        button.height = fixed(height);
+        button.floating = { true, AttachPoint::TopRight, AttachPoint::TopRight, FloatTarget::Parent, {}, { -k_pad + 2.0f, 0.0f } };
+        const uint32_t button_index = ctx.begin_box(clear_id, button);
+        ctx.layout().node(button_index).paint.icon = Icon::Cross;
+        ctx.layout().node(button_index).paint.icon_colour = with_alpha(style.text, style.text.a * (clear.hovered ? 1.0f : 0.6f));
+        ctx.end_box();
+    }
     if (focused && std::fmod(state.quiet, 1.0f) < 0.6f)
     {
         LayoutStyle caret;
         caret.width = fixed(k_caret_width);
         caret.height = fixed(style.text_height);
-        caret.floating = floating(k_pad + caret_x - state.scroll, (height - style.text_height) * 0.5f);
+        caret.floating = floating(pad_left + caret_x - state.scroll, (height - style.text_height) * 0.5f);
         const uint32_t caret_index = ctx.begin_box(ImId{}, caret);
         ctx.layout().node(caret_index).paint.has_fill = true;
         ctx.layout().node(caret_index).paint.fill = style.text;
@@ -286,6 +344,43 @@ TextInputResult text_input(std::string_view label, char* buffer, uint32_t capaci
     result.cancelled = outcome.result.cancelled;
     result.focused = outcome.focused;
     return result;
+}
+
+TextInputResult search_box(std::string_view label, char* buffer, uint32_t capacity, std::string_view placeholder, const FieldOptions& options)
+{
+    GuiContext& ctx = context();
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
+    FieldScope field(label, options);
+    const ImId id = ctx.id("input");
+    TextEditState edit = ctx.state<TextEditState>(id);
+    detail::EditDecor decor;
+    decor.placeholder = placeholder;
+    decor.leading = Icon::Search;
+    decor.clearable = true;
+    const detail::EditOutcome outcome = detail::edit_field(ctx, id, style, buffer, capacity, edit, grow(1.0f, 80.0f), decor);
+    TextInputResult result;
+    result.changed = outcome.result.changed;
+    result.submitted = outcome.result.submitted;
+    result.cancelled = outcome.result.cancelled;
+    result.focused = outcome.focused;
+    result.cleared = outcome.cleared;
+    if (outcome.result.cancelled && buffer[0] != '\0')
+    {
+        buffer[0] = '\0';
+        edit = TextEditState{};
+        result.changed = true;
+        result.cleared = true;
+    }
+    ctx.state<TextEditState>(id) = edit;
+    return result;
+}
+
+void request_text_focus(std::string_view label)
+{
+    GuiContext& ctx = context();
+    ctx.push_id(label);
+    ctx.request_text_focus(ctx.id("input"));
+    ctx.pop_id();
 }
 
 namespace

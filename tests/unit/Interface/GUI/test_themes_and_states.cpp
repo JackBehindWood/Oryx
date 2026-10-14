@@ -86,6 +86,12 @@ TEST_CASE("themes: dark, light and high contrast keep text readable on every rol
             CHECK(contrast_ratio(role->text, role->selected) >= required[index]);
         }
         CHECK(contrast_ratio(theme.field.accent, theme.field.background) >= 3.0f);
+        const Colour* log_roles[] = { &theme.log_debug, &theme.log_info, &theme.log_warning, &theme.log_error };
+        for (const Colour* log_role : log_roles)
+        {
+            CHECK(contrast_ratio(*log_role, theme.field.background) >= required[index]);
+        }
+        CHECK(distance(theme.log_warning, theme.log_error) > 0.1f);
         CHECK(contrast_ratio(theme.field.on_accent, theme.field.accent) >= required[index]);
     }
 }

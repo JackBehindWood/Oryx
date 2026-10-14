@@ -62,6 +62,15 @@ public:
     void request_menu_close() { m_menu_close_frame = frame(); }
     [[nodiscard]] bool menu_close_requested() const { return m_menu_close_frame != 0 && m_menu_close_frame + 1 == frame(); }
 
+    // One-shot: the text field with this id takes keyboard focus the next time it is drawn.
+    void request_text_focus(ImId id) { m_text_focus = id; }
+    [[nodiscard]] bool take_text_focus(ImId id)
+    {
+        const bool taken = m_text_focus == id && is_valid(id);
+        m_text_focus = taken ? ImId{} : m_text_focus;
+        return taken;
+    }
+
     // Queues a message (the oldest is replaced when all slots are taken); gui::show_toasts draws and ages them.
     void add_toast(std::string_view text, float seconds)
     {
@@ -106,6 +115,7 @@ private:
     gui::GuiDockTheme m_dock_theme = gui::derive_dock_theme(m_gui_theme);
     GuiToast m_toasts[k_max_toasts];
     uint64_t m_menu_close_frame = 0;
+    ImId m_text_focus;
     Rect m_area_remaining;
     uint64_t m_area_frame = std::numeric_limits<uint64_t>::max();
 };

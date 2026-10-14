@@ -65,6 +65,7 @@ private:
     void rebuild_visible();
     void clear_log();
     void copy_selection(bool everything);
+    void copy_line(uint64_t sequence);
     void complete_input();
     [[nodiscard]] bool selected(uint64_t sequence) const;
 
@@ -85,6 +86,8 @@ private:
     uint64_t m_select_from = 0;
     uint64_t m_select_to = 0;
     bool m_dragging = false;
+    uint64_t m_menu_sequence = 0;
+    uint32_t m_menu_level = 0;
     char m_input[k_console_input_capacity] = {};
     char m_search[k_console_search_capacity] = {};
 };

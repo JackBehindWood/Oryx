@@ -236,6 +236,8 @@ void end_list_box();
 // A row; the state's `clicked` says it was picked. Throws Error on a virtualised list, which needs the index.
 [[nodiscard]] ItemState list_item(std::string_view label, bool selected);
 [[nodiscard]] ItemState list_item(uint32_t index, std::string_view label, bool selected);
+// A row whose text is drawn in `text`.
+[[nodiscard]] ItemState list_item(uint32_t index, std::string_view label, bool selected, const Colour& text);
 [[nodiscard]] uint32_t list_first_item();
 [[nodiscard]] uint32_t list_last_item();
 
@@ -254,6 +256,7 @@ public:
 
     [[nodiscard]] ItemState item(std::string_view label, bool selected) { return list_item(label, selected); }
     [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected) { return list_item(index, label, selected); }
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected, const Colour& text) { return list_item(index, label, selected, text); }
     [[nodiscard]] uint32_t first_item() const { return list_first_item(); }
     [[nodiscard]] uint32_t last_item() const { return list_last_item(); }
 };
@@ -269,6 +272,8 @@ struct TextInputResult
     bool submitted = false;
     bool cancelled = false;
     bool focused = false;
+    // The clear button or Escape emptied the field (changed is set too).
+    bool cleared = false;
 };
 
 static_assert(std::is_trivially_copyable_v<TextInputResult> && std::is_standard_layout_v<TextInputResult>);
@@ -276,6 +281,12 @@ static_assert(std::is_trivially_copyable_v<TextInputResult> && std::is_standard_
 // A one-line field editing the NUL-terminated text in `buffer` (`capacity` bytes with the NUL) in place while it has focus: typing, selection with shift, home/end, shortcut+A/C/X/V and a click to place the caret.
 // Enter submits and Escape cancels (the text typed so far stays); both release focus. Caret and scroll state live under the label's id.
 TextInputResult text_input(std::string_view label, char* buffer, uint32_t capacity, const FieldOptions& options = {});
+
+// A text_input with a magnifier, a placeholder while empty and a clear button while it holds text; Escape clears it (and releases focus), reported as `cleared`.
+TextInputResult search_box(std::string_view label, char* buffer, uint32_t capacity, std::string_view placeholder = "Search", const FieldOptions& options = {});
+
+// Makes the text_input or search_box named `label` (in the current id scope) take keyboard focus the next time it is drawn.
+void request_text_focus(std::string_view label);
 
 struct NumberOptions : FieldOptions
 {

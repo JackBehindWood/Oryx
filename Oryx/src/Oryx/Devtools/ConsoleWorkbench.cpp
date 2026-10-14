@@ -18,6 +18,15 @@ std::string_view text_of(const LogLine& line)
     return std::string_view(line.text, line.length);
 }
 
+const Colour& level_colour(const GuiTheme& theme, uint32_t level)
+{
+    if (level >= k_error_level)
+    {
+        return theme.log_error;
+    }
+    return level == k_warn_level ? theme.log_warning : level < 2 ? theme.log_debug : theme.log_info;
+}
+
 void emit(spdlog::level::level_enum level, std::string_view text)
 {
     Log::message(level, text);
@@ -158,6 +167,18 @@ void ConsoleWorkbench::copy_selection(bool everything)
     }
 }
 
+void ConsoleWorkbench::copy_line(uint64_t sequence)
+{
+    for (uint32_t index = 0; index < m_count; ++index)
+    {
+        if (m_lines[index].sequence == sequence)
+        {
+            gui::context().request_copy(std::string(text_of(m_lines[index])));
+            return;
+        }
+    }
+}
+
 void ConsoleWorkbench::complete_input()
 {
     std::string line(m_input);
@@ -236,7 +257,7 @@ void ConsoleWorkbench::draw_console()
                 }
             }
         }
-        if (gui::text_input("search", m_search, sizeof(m_search)).changed)
+        if (gui::search_box("search", m_search, sizeof(m_search), "Filter log").changed)
         {
             m_state.search = m_search;
             filter_changed = true;
@@ -272,8 +293,19 @@ void ConsoleWorkbench::draw_console()
         {
             const LogLine& line = m_lines[m_visible[index]];
             const std::string_view label = arena.format("%c %s  %.*s", k_level_letters[math::min<uint32_t>(line.level, k_console_levels - 1)], line.source == LogSource::Core ? "ORYX" : "APP ", static_cast<int32_t>(line.length), line.text);
-            const ItemState row = list.item(index, label, selected(line.sequence));
+            const ItemState row = list.item(index, label, selected(line.sequence), level_colour(gui::theme(), line.level));
             wheel_over_rows = wheel_over_rows || (row.hovered && input.wheel[1] != 0.0f);
+            if (row.right_clicked)
+            {
+                m_menu_sequence = line.sequence;
+                m_menu_level = line.level;
+                if (!selected(line.sequence))
+                {
+                    m_select_from = line.sequence;
+                    m_select_to = line.sequence;
+                }
+                gui::open_popup("log menu");
+            }
             if (row.pressed)
             {
                 row_pressed = true;
@@ -292,6 +324,30 @@ void ConsoleWorkbench::draw_console()
             {
                 m_select_to = line.sequence;
             }
+        }
+    }
+    if (gui::PopupScope menu("log menu"); menu)
+    {
+        if (gui::menu_item("Copy line").clicked)
+        {
+            copy_line(m_menu_sequence);
+            gui::close_current_popup();
+        }
+        if (gui::menu_item("Copy selection").clicked)
+        {
+            copy_selection(false);
+            gui::close_current_popup();
+        }
+        if (gui::menu_item("Show only this level").clicked)
+        {
+            m_state.level = static_cast<int32_t>(math::min<uint32_t>(m_menu_level, k_console_levels - 1));
+            rebuild_visible();
+            gui::close_current_popup();
+        }
+        if (gui::menu_item("Clear").clicked)
+        {
+            clear_log();
+            gui::close_current_popup();
         }
     }
     if (!button_of(input, MouseCode::Left).down)
@@ -326,6 +382,7 @@ void ConsoleWorkbench::draw_console()
         if (key_pressed(input.keys, ImKey::Tab))
         {
             complete_input();
+            gui::request_text_focus("##console input");
         }
         if (key_pressed(input.keys, ImKey::Up))
         {
@@ -340,6 +397,7 @@ void ConsoleWorkbench::draw_console()
     {
         run_line(m_input);
         m_input[0] = '\0';
+        gui::request_text_focus("##console input");
         m_state.follow = true;
     }
 }

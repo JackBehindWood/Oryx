@@ -335,3 +335,79 @@ TEST_CASE("text input: warm frames allocate nothing while typing")
     f.driver.run_frames(3, f.column_of(body));
     CHECK(memory_delta(before, test::all_allocations()).allocation_count == 0);
 }
+
+namespace
+{
+
+bool has_icon(const GuiFixture& f, Icon icon)
+{
+    for (uint32_t index = 0; index < f.context.layout().node_count(); ++index)
+    {
+        if (f.context.layout().node(index).paint.icon == icon)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+TEST_CASE("search box: a magnifier always shows and the clear button only while there is text")
+{
+    GuiFixture f;
+    char text[16] = "";
+    const auto body = [&] { std::ignore = gui::search_box("find", text, sizeof(text)); };
+    f.driver.settle(f.column_of(body));
+    CHECK(has_icon(f, Icon::Search));
+    CHECK_FALSE(has_icon(f, Icon::Cross));
+    std::snprintf(text, sizeof(text), "abc");
+    f.driver.settle(f.column_of(body));
+    CHECK(has_icon(f, Icon::Cross));
+}
+
+TEST_CASE("search box: Escape clears the text and reports cleared")
+{
+    GuiFixture f;
+    char text[16] = "abc";
+    gui::TextInputResult result;
+    const auto body = [&] { result = gui::search_box("find", text, sizeof(text)); };
+    f.driver.settle(f.column_of(body));
+    Rect field;
+    REQUIRE(f.context.layout_rect(f.context.id("find"), field));
+    f.driver.click(rect_centre(field), f.column_of(body));
+    REQUIRE(result.focused);
+    f.driver.key_press(ImKey::Escape);
+    f.driver.frame(f.column_of(body));
+    CHECK(result.cleared);
+    CHECK(result.changed);
+    CHECK(std::string_view(text).empty());
+    CHECK_FALSE(result.focused);
+}
+
+TEST_CASE("text input: a focus request focuses the field once")
+{
+    GuiFixture f;
+    char text[16] = "ab";
+    gui::TextInputResult result;
+    bool request = false;
+    const auto body = [&]
+    {
+        if (request)
+        {
+            gui::request_text_focus("name");
+            request = false;
+        }
+        result = gui::text_input("name", text, sizeof(text));
+    };
+    f.driver.settle(f.column_of(body));
+    CHECK_FALSE(result.focused);
+    request = true;
+    f.driver.frame(f.column_of(body));
+    CHECK(result.focused);
+    f.driver.frame(f.column_of(body));
+    CHECK(result.focused);
+    f.driver.type("c");
+    f.driver.frame(f.column_of(body));
+    CHECK(std::string_view(text) == "abc");
+}

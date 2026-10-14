@@ -70,6 +70,11 @@ struct GuiTheme : ImTheme
     Colour modal_dim = { 0.0f, 0.0f, 0.0f, 0.5f };
     // Left padding of the children of a tree node.
     float indent = 16.0f;
+    // Log line text: debug dimmed, info plain, warning amber, error red. Each is legible on field.background; the level letter still names the level.
+    Colour log_debug;
+    Colour log_info;
+    Colour log_warning;
+    Colour log_error;
     // Categorical colours for series, legends and tags: the Okabe-Ito set, distinguishable with the common colour-vision deficiencies.
     Colour palette[k_palette_size] = {
         { 0.337f, 0.706f, 0.914f, 1.0f },
@@ -95,6 +100,7 @@ static_assert(std::is_trivially_copyable_v<GuiTheme>);
 //   tab          tab / border, none                       tab.selected = panel (the chosen tab joins its body)
 //   scroll       panel / thumb, none                      scroll.hover = thumb shifted by twice the hover step
 //   overlay      overlay / field_border, max(1, border_width)
+//   log roles    debug/info/warning/error pulled toward text until they reach 4.5:1 (7:1 with panel_border) on field
 // make_gui_theme also sets min_hit_size 18 and version 2.
 struct GuiPalette
 {

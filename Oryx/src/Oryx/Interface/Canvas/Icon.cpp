@@ -48,6 +48,21 @@ void draw_icon(DrawList& list, const Rect& box, Icon icon, const Colour& colour,
             stroke(-half, 0.0f, -quarter * 0.5f, quarter);
             stroke(-quarter * 0.5f, quarter, half, -quarter);
             break;
+        case Icon::Search:
+        {
+            constexpr uint32_t k_segments = 12;
+            const float radius = half * 0.7f;
+            const float cx = -half * 0.2f;
+            const float cy = -half * 0.2f;
+            for (uint32_t i = 0; i < k_segments; ++i)
+            {
+                const float a0 = 2.0f * math::PI<float> * static_cast<float>(i) / k_segments;
+                const float a1 = 2.0f * math::PI<float> * static_cast<float>(i + 1) / k_segments;
+                stroke(cx + radius * std::cos(a0), cy + radius * std::sin(a0), cx + radius * std::cos(a1), cy + radius * std::sin(a1));
+            }
+            stroke(cx + radius * 0.71f, cy + radius * 0.71f, half, half);
+            break;
+        }
     }
 }
 

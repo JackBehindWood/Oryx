@@ -149,6 +149,20 @@ void collect_choices(std::string_view usage_word, std::vector<std::string>& out)
     }
 }
 
+// The setting paths that continue `partial`, each cut after the next '.' so a section completes before its keys do.
+void collect_settings(std::string_view partial, std::vector<std::string>& out)
+{
+    for (const SettingsText::Entry& entry : describe_settings({}))
+    {
+        if (entry.key.compare(0, partial.size(), partial) != 0)
+        {
+            continue;
+        }
+        const size_t dot = entry.key.find('.', partial.size());
+        out.push_back(dot == std::string::npos ? entry.key : entry.key.substr(0, dot + 1));
+    }
+}
+
 std::string common_prefix(const std::vector<std::string>& items)
 {
     std::string prefix = items.front();
@@ -248,7 +262,18 @@ bool complete(std::string& line, std::vector<std::string>& options, const IConso
     else if (const Command* command = find(words[0]))
     {
         const std::vector<std::string_view> usage = words_of(command->usage);
-        if (index < usage.size())
+        if (index < usage.size() && usage[index] == "<section.key>")
+        {
+            collect_settings(partial, candidates);
+        }
+        else if (index < usage.size() && usage[index] == "[section]")
+        {
+            for (const std::string& section : settings_sections())
+            {
+                candidates.push_back(section);
+            }
+        }
+        else if (index < usage.size())
         {
             collect_choices(usage[index], candidates);
         }
@@ -267,7 +292,7 @@ bool complete(std::string& line, std::vector<std::string>& options, const IConso
     std::sort(options.begin(), options.end());
     options.erase(std::unique(options.begin(), options.end()), options.end());
     std::string replacement = common_prefix(options);
-    if (options.size() == 1)
+    if (options.size() == 1 && replacement.back() != '.')
     {
         replacement += ' ';
     }

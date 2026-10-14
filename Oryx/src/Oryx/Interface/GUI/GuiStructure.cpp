@@ -520,6 +520,7 @@ public:
 
     [[nodiscard]] ItemState item(std::string_view label, bool selected);
     [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected);
+    [[nodiscard]] ItemState item(uint32_t index, std::string_view label, bool selected, const Colour& text);
     [[nodiscard]] uint32_t first_item() const { return m_first; }
     [[nodiscard]] uint32_t last_item() const { return m_last; }
 
@@ -622,6 +623,17 @@ ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool select
     return selectable(label, selected, row_options);
 }
 
+ItemState ListBoxFrame::item(uint32_t index, std::string_view label, bool selected, const Colour& text)
+{
+    IdScope row(context(), context().index_id(index));
+    ImStyle tinted = context().role_style(m_options, &GuiTheme::panel);
+    tinted.text = text;
+    SelectableOptions row_options;
+    static_cast<WidgetOptions&>(row_options) = m_options;
+    row_options.style = &tinted;
+    return selectable(label, selected, row_options);
+}
+
 } // namespace
 
 bool begin_list_box(std::string_view name, const ListBoxOptions& options)
@@ -643,6 +655,11 @@ ItemState list_item(std::string_view label, bool selected)
 ItemState list_item(uint32_t index, std::string_view label, bool selected)
 {
     return context().scope<ListBoxFrame>("list_item").item(index, label, selected);
+}
+
+ItemState list_item(uint32_t index, std::string_view label, bool selected, const Colour& text)
+{
+    return context().scope<ListBoxFrame>("list_item").item(index, label, selected, text);
 }
 
 uint32_t list_first_item()
