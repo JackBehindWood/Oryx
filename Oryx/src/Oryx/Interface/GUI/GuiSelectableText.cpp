@@ -1,5 +1,6 @@
 #include "oxpch.h"
 #include "Oryx/Interface/GUI/GuiSelectableText.h"
+#include "Oryx/Interface/GUI/GuiTextEdit.h"
 
 #include "Oryx/Interface/GUI/GuiTextField.h"
 
@@ -119,9 +120,16 @@ ItemState selectable_text(std::string_view id, std::string_view text, const Sele
             selection.caret_byte = selection.anchor_byte;
         }
     }
+    else if (item.triple_clicked)
+    {
+        selection = { selection.anchor_line, 0, selection.anchor_line, static_cast<uint32_t>(line_at(text, selection.anchor_line).size()) };
+    }
     else if (item.double_clicked)
     {
-        selection = everything(text);
+        uint32_t low = 0;
+        uint32_t high = 0;
+        word_range(line_at(text, selection.anchor_line), selection.anchor_byte, low, high);
+        selection = { selection.anchor_line, low, selection.anchor_line, high };
     }
     else if (focused && drag.dragging && known)
     {

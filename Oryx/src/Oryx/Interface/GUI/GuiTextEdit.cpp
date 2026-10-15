@@ -143,7 +143,35 @@ struct Editor
     }
 };
 
+bool is_word_byte(char c)
+{
+    const uint8_t byte = static_cast<uint8_t>(c);
+    return std::isalnum(byte) != 0 || c == '_' || byte >= 0x80u;
+}
+
 } // namespace
+
+void word_range(std::string_view text, uint32_t at, uint32_t& low, uint32_t& high)
+{
+    low = 0;
+    high = 0;
+    if (text.empty())
+    {
+        return;
+    }
+    at = math::min(at, static_cast<uint32_t>(text.size()) - 1u);
+    const bool word = is_word_byte(text[at]);
+    low = at;
+    high = at + 1;
+    while (low > 0 && is_word_byte(text[low - 1]) == word)
+    {
+        --low;
+    }
+    while (high < text.size() && is_word_byte(text[high]) == word)
+    {
+        ++high;
+    }
+}
 
 TextEditResult text_edit_apply(char* buffer, uint32_t capacity, TextEditState& state, const TextEditInput& input)
 {
@@ -163,6 +191,11 @@ TextEditResult text_edit_apply(char* buffer, uint32_t capacity, TextEditState& s
     {
         editor.state.anchor = 0;
         editor.state.caret = editor.length;
+        result.moved = true;
+    }
+    else if (input.select_word)
+    {
+        word_range(std::string_view(buffer, editor.length), math::min(editor.state.caret, editor.length > 0 ? editor.length - 1 : 0u), editor.state.anchor, editor.state.caret);
         result.moved = true;
     }
     else if (input.click != k_no_click)

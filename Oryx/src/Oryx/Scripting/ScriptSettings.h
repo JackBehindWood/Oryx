@@ -15,6 +15,11 @@ struct ScriptSettings
     std::vector<std::filesystem::path> roots;
 };
 
-void read_settings(ScriptSettings& settings, const SettingsNode& node);
+template<typename Visitor>
+void reflect(Visitor& v, ScriptSettings& s)
+{
+    v.field("enabled", s.enabled, Doc{ "Load scripts at all; false skips discovery" });
+    v.field("roots", s.roots, Doc{ "Directories scripts are loaded from at startup and reload" });
+}
 
 } // namespace oryx

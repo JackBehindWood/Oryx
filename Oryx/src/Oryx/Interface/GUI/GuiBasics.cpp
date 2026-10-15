@@ -181,6 +181,49 @@ ItemState icon_button(std::string_view name, Icon icon, const IconOptions& optio
     return state;
 }
 
+bool icon_toggle(std::string_view label, Icon icon, bool& value, std::string_view tip, const WidgetOptions& options)
+{
+    GuiContext& ctx = context();
+    const ImStyle& style = ctx.role_style(options, &GuiTheme::button);
+    const ImId id = ctx.id(label);
+    const ItemState state = ctx.item(id);
+    LayoutStyle row;
+    row.padding = { 6.0f, 2.0f, 8.0f, 2.0f };
+    row.gap = ctx.gui_theme().space_xs;
+    row.align_y = Align::Centre;
+    const uint32_t row_index = ctx.begin_box(id, row);
+    BoxPaint& paint = ctx.layout().node(row_index).paint;
+    paint.fill = im::row_fill(ctx, make_im_id("fill", id), style, state.hovered, state.held, value);
+    paint.has_fill = paint.fill.a > math::EPSILON<float>;
+    paint.radius = uniform_radius(style.radius);
+    LayoutStyle glyph = square_box(style.text_height);
+    BoxPaint& glyph_paint = ctx.layout().node(ctx.begin_box(ImId{}, glyph)).paint;
+    glyph_paint.icon = icon;
+    glyph_paint.icon_colour = style.text;
+    glyph_paint.icon_size = style.text_height * 0.8f;
+    glyph_paint.icon_thickness = 1.5f;
+    ctx.end_box();
+    BoxPaint& text_paint = ctx.layout().node(ctx.begin_box(ImId{}, LayoutStyle{})).paint;
+    text_paint.text = ctx.arena().store(label);
+    text_paint.text_height = style.text_height;
+    text_paint.text_colour = style.text;
+    ctx.end_box();
+    ctx.end_box();
+    if (state.hovered)
+    {
+        ctx.request_cursor(CursorShape::Hand);
+        if (!tip.empty())
+        {
+            tooltip(state, tip);
+        }
+    }
+    if (state.clicked)
+    {
+        value = !value;
+    }
+    return state.clicked;
+}
+
 void empty_state(std::string_view heading, std::string_view hint)
 {
     GuiContext& ctx = context();
@@ -282,48 +325,63 @@ Colour toward(const Colour& from, const Colour& to, float t)
     return lerp(from, to, t);
 }
 
-// The box of a checkbox or radio: a ring-less field that takes the accent when set, with a check mark or a dot.
-void choice_mark(GuiContext& ctx, const ImStyle& style, const ItemState& state, bool set, bool round)
+struct MarkState
+{
+    uint8_t shown = 0;
+};
+
+// 0..1 for how set the mark is: it eases from what it last showed, and the slot is only held while it travels.
+float mark_progress(GuiContext& ctx, ImId item, bool set)
+{
+    const ImId id = make_im_id("mark", item);
+    MarkState& mark = ctx.state<MarkState>(id);
+    const float target = set ? 1.0f : 0.0f;
+    const float progress = ctx.animate(id, target, mark.shown != 0 ? 1.0f : 0.0f, AnimSpec::quick());
+    if (math::abs(progress - target) < math::EPSILON<float>)
+    {
+        mark.shown = set ? 1 : 0;
+    }
+    return progress;
+}
+
+// The box of a checkbox or radio: a ring-less field that takes the accent as it is set, with a check mark or a dot that grow in.
+void choice_mark(GuiContext& ctx, const ImStyle& style, ImId item, const ItemState& state, bool set, bool round)
 {
     const float side = style.text_height;
     LayoutStyle box = square_box(side);
     box.align_x = Align::Centre;
     box.align_y = Align::Centre;
+    const float t = mark_progress(ctx, item, set);
     const uint32_t index = ctx.begin_box(ImId{}, box);
     BoxPaint& paint = ctx.layout().node(index).paint;
     const bool lit = state.hovered || state.held;
     const Colour rest_border = lit ? toward(style.border, style.text, 0.45f) : style.border;
+    const Colour accent = im::keep_fill(state, style.accent);
     paint.has_fill = true;
     paint.radius = uniform_radius(round ? side * 0.5f : style.radius);
     paint.border_width = math::max(1.0f, style.border_width);
+    paint.fill = round ? im::interaction_fill(ctx, make_im_id("fill", item), style, state, style.background) : toward(im::interaction_fill(ctx, make_im_id("fill", item), style, state, style.background), accent, t);
+    paint.border = toward(rest_border, accent, t);
     if (round)
     {
-        paint.fill = im::interaction_fill(style, state, style.background);
-        paint.border = set ? im::keep_fill(state, style.accent) : rest_border;
-        if (set)
+        if (t > math::EPSILON<float>)
         {
-            LayoutStyle dot = square_box(side * 0.48f);
+            LayoutStyle dot = square_box(side * 0.48f * t);
             const uint32_t dot_index = ctx.begin_box(ImId{}, dot);
             BoxPaint& dot_paint = ctx.layout().node(dot_index).paint;
             dot_paint.has_fill = true;
-            dot_paint.fill = im::keep_fill(state, style.accent);
+            dot_paint.fill = accent;
             dot_paint.radius = uniform_radius(side);
             ctx.end_box();
         }
     }
-    else if (set)
+    else if (t > math::EPSILON<float>)
     {
-        paint.fill = im::keep_fill(state, style.accent);
-        paint.border = paint.fill;
         paint.icon = Icon::Check;
         paint.icon_colour = style.on_accent;
-        paint.icon_size = side * 0.72f;
+        paint.icon_colour.a *= t;
+        paint.icon_size = side * 0.72f * math::lerp(0.6f, 1.0f, t);
         paint.icon_thickness = 2.0f;
-    }
-    else
-    {
-        paint.fill = im::interaction_fill(style, state, style.background);
-        paint.border = rest_border;
     }
     ctx.end_box();
 }
@@ -341,10 +399,11 @@ bool checkbox(std::string_view label, bool& value, const FieldOptions& options)
 {
     GuiContext& ctx = context();
     const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
-    const ItemState state = ctx.item(ctx.id(label));
+    const ImId item_id = ctx.id(label);
+    const ItemState state = ctx.item(item_id);
     {
         FieldScope field(label, label_hit(options));
-        choice_mark(ctx, style, state, value, false);
+        choice_mark(ctx, style, item_id, state, value, false);
     }
     if (state.hovered)
     {
@@ -361,10 +420,11 @@ bool radio(std::string_view label, int32_t& value, int32_t option, const FieldOp
 {
     GuiContext& ctx = context();
     const ImStyle& style = ctx.role_style(options, &GuiTheme::field);
-    const ItemState state = ctx.item(ctx.id(label));
+    const ImId item_id = ctx.id(label);
+    const ItemState state = ctx.item(item_id);
     {
         FieldScope field(label, label_hit(options));
-        choice_mark(ctx, style, state, value == option, true);
+        choice_mark(ctx, style, item_id, state, value == option, true);
     }
     if (state.hovered)
     {
@@ -391,9 +451,8 @@ ItemState selectable(std::string_view label, bool selected, const SelectableOpti
     }
     const uint32_t index = ctx.begin_box(label, box);
     LayoutNode& node = ctx.layout().node(index);
-    const bool tinted = options.rest_fill.a > 0.0f;
-    node.paint.has_fill = selected || state.hovered || state.held || tinted;
-    node.paint.fill = selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : state.hovered ? style.hover : options.rest_fill;
+    node.paint.fill = im::row_fill(ctx, make_im_id("fill", ctx.id(label)), style, state.hovered, state.held, selected, options.rest_fill);
+    node.paint.has_fill = node.paint.fill.a > math::EPSILON<float>;
     node.paint.radius = uniform_radius(style.radius);
     im::paint_text(node.paint, node, style, TextAlign::Left, true);
     ctx.end_box();

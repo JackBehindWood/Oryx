@@ -30,27 +30,33 @@ struct GuiFixture
     template<typename Body>
     auto frame_of(Body&& body)
     {
-        return [&body]
+        // A temporary body is moved into the returned callable; a named one stays by reference so state it mutates is shared.
+        using Plain = std::remove_reference_t<Body>;
+        using Held = std::conditional_t<std::is_lvalue_reference_v<Body>, std::reference_wrapper<Plain>, Plain>;
+        return [held = Held(std::forward<Body>(body))]
         {
             LayoutStyle root;
             root.width = grow();
             root.height = grow();
             gui::BoxScope scope("root", root);
-            body();
+            held();
         };
     }
 
     template<typename Body>
     auto column_of(Body&& body)
     {
-        return [&body]
+        // A temporary body is moved into the returned callable; a named one stays by reference so state it mutates is shared.
+        using Plain = std::remove_reference_t<Body>;
+        using Held = std::conditional_t<std::is_lvalue_reference_v<Body>, std::reference_wrapper<Plain>, Plain>;
+        return [held = Held(std::forward<Body>(body))]
         {
             LayoutStyle root;
             root.width = grow();
             root.height = grow();
             root.direction = Direction::Column;
             gui::BoxScope scope("root", root);
-            body();
+            held();
         };
     }
 

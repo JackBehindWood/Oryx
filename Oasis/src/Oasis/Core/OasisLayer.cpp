@@ -399,6 +399,7 @@ void OasisLayer::build()
             }
         }
     }
+    chrome.workbenches.overlay();
     answer_switch(chrome.switching, chrome.dashboard->feed());
     oryx::gui::show_toasts();
 }

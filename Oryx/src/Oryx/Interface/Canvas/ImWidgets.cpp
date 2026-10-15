@@ -51,6 +51,16 @@ Colour interaction_fill(ImContext& context, ImId id, const ImStyle& style, const
     return context.animate(id, interaction_fill(style, state, rest), rest, AnimSpec::quick());
 }
 
+Colour row_fill(ImContext& context, ImId id, const ImStyle& style, bool hovered, bool held, bool selected, const Colour& rest)
+{
+    ItemState state;
+    state.hovered = hovered;
+    state.held = held;
+    const Colour base = rest.a > 0.0f ? rest : Colour{ style.hover.r, style.hover.g, style.hover.b, 0.0f };
+    const Colour target = selected ? keep_fill(state, style.selected) : held ? style.pressed : hovered ? style.hover : base;
+    return context.animate(id, target, base, AnimSpec::quick());
+}
+
 Colour tint(const Colour& colour, float amount)
 {
     const float target = amount >= 0.0f ? 1.0f : 0.0f;

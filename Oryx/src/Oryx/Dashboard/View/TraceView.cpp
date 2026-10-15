@@ -133,13 +133,13 @@ private:
         options.row_height = gui::theme().row_height;
         gui::TableScope table("trace", options);
         const bool any_probability = has_probability(feed);
-        table.column("Move", fixed(56.0f), false, TextAlign::Left, true);
+        table.column("Move", fixed(56.0f), false, TextAlign::Left, true, "Match.decision number");
         table.column("Player", fixed(76.0f));
         table.column("Action", grow(1.0f, 64.0f));
-        table.column("Value", fixed(72.0f), false, TextAlign::Right, true);
+        table.column("Value", fixed(72.0f), false, TextAlign::Right, true, "Estimated outcome for the player to move: +1 win, 0 even, -1 loss");
         if (any_probability)
         {
-            table.column("Prob", fixed(64.0f), false, TextAlign::Right, true);
+            table.column("Prob", fixed(64.0f), false, TextAlign::Right, true, "How likely the strategy was to play the chosen action");
         }
         place_scroll(model, pin, selected, oldest);
         gui::state<TraceState>(pin_id) = pin;

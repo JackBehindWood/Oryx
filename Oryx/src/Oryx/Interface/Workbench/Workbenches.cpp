@@ -42,6 +42,10 @@ IWorkbench* Workbenches::find_named(std::string_view name)
 
 void Workbenches::update(const WorkbenchFrame& frame)
 {
+    if (shortcut_pressed({ ImKey::P, true, true, false }, gui::context().input().keys) && !m_palette.is_open())
+    {
+        open_palette();
+    }
     for (const UniquePtr<IWorkbench>& workbench : m_items)
     {
         workbench->update(frame);
@@ -80,12 +84,53 @@ void Workbenches::toolbar()
     }
 }
 
+void Workbenches::open_palette()
+{
+    std::vector<PaletteEntry> entries;
+    for (const UniquePtr<IWorkbench>& workbench : m_items)
+    {
+        for (uint32_t i = 0; i < workbench->command_count(); ++i)
+        {
+            const CommandInfo& info = workbench->command_info(CommandHandle{ i });
+            entries.push_back({ std::string(workbench->name()) + "." + info.id, info.label, shortcut_text(info.shortcut), info.enabled });
+        }
+    }
+    std::vector<console::Entry> table;
+    console::list(table);
+    for (console::Entry& command : table)
+    {
+        entries.push_back({ command.name, command.usage, command.help, true });
+    }
+    m_palette.open(std::move(entries));
+}
+
+void Workbenches::overlay()
+{
+    const int32_t chosen = m_palette.draw();
+    if (chosen < 0)
+    {
+        return;
+    }
+    const PaletteEntry& entry = m_palette.entry(chosen);
+    m_palette.remember(entry.name);
+    const ConsoleResult result = console::run(entry.name, &m_commands);
+    if (!result.output.empty())
+    {
+        OX_CORE_INFO("{}", result.output);
+    }
+}
+
 void Workbenches::window_menu()
 {
     if (!gui::begin_menu("Window"))
     {
         return;
     }
+    if (gui::menu_item(gui::context().arena().format("Command palette    %s", shortcut_text({ ImKey::P, true, true, false }).c_str())).clicked)
+    {
+        open_palette();
+    }
+    gui::separator();
     for (const UniquePtr<IWorkbench>& workbench : m_items)
     {
         const std::string_view name = workbench->name();

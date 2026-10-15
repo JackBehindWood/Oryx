@@ -23,6 +23,12 @@ ItemState item(UiId id, const Rect& rect);
 
 [[nodiscard]] float spacing();
 
+// Transitions for widgets of your own, the same call as gui::animate: the value named `name` (in the current id scope) eases to `target` along `spec`; `rest` is what it is when nothing happens to it (see ImContext::animate).
+[[nodiscard]] float animate(std::string_view name, float target, float rest = 0.0f, const AnimSpec& spec = AnimSpec::standard());
+[[nodiscard]] Vec2f animate(std::string_view name, const Vec2f& target, const Vec2f& rest, const AnimSpec& spec = AnimSpec::standard());
+[[nodiscard]] Colour animate(std::string_view name, const Colour& target, const Colour& rest, const AnimSpec& spec = AnimSpec::quick());
+[[nodiscard]] bool animating();
+
 void label(std::string_view text, const WidgetOptions& options = {});
 [[nodiscard]] ItemState button(std::string_view text, const WidgetOptions& options = {});
 bool toggle(std::string_view text, bool& value, const WidgetOptions& options = {});

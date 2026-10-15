@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "Oryx.h"
+#include "Oryx/Interface/Workbench/CommandPalette.h"
 #include "Oryx/Interface/Workbench/Workbenches.h"
 #include "unit/Interface/support/GuiFixture.h"
 #include "unit/MemoryTestSupport.h"
@@ -307,4 +308,48 @@ TEST_CASE("workbench: group rules apply on attach")
     WorkbenchOptions options;
     options.rules = gui::rules_own_group(gui::group("notes"));
     CHECK_NOTHROW(static_cast<void>(rig.add<Notes>(options)));
+}
+
+TEST_CASE("palette: fuzzy_score matches subsequences and prefers tight, word-start matches")
+{
+    CHECK(fuzzy_score("", "anything") == 0);
+    CHECK(fuzzy_score("xyz", "Toggle console") == -1);
+    CHECK(fuzzy_score("TC", "Toggle console") > 0);
+    CHECK(fuzzy_score("clear", "Clear log") > fuzzy_score("clear", "Scroll clock east a rest"));
+    CHECK(fuzzy_score("tog con", "Toggle console") > 0);
+    CHECK(fuzzy_score("ab", "ba") == -1);
+}
+
+TEST_CASE("palette: opening lists the workbench commands and Enter runs the best match")
+{
+    if (!console::available())
+    {
+        return;
+    }
+    Rig rig;
+    Notes& notes = rig.add<Notes>();
+    const auto frame = [&](bool press_enter)
+    {
+        if (press_enter)
+        {
+            rig.f.driver.key_press(ImKey::Enter);
+        }
+        rig.f.driver.frame(rig.f.frame_of(
+            [&]
+            {
+                rig.workbenches.update(WorkbenchFrame{ 1.0f / 60.0f, 0 });
+                rig.workbenches.overlay();
+            }));
+    };
+    rig.workbenches.open_palette();
+    frame(false);
+    rig.f.driver.type("ping");
+    frame(false);
+    frame(false);
+    CHECK(notes.commands == 0);
+    frame(true);
+    CHECK(notes.commands == 1);
+    CHECK(notes.last == notes.m_ping);
+    frame(false);
+    CHECK_FALSE(gui::context().popup_open());
 }

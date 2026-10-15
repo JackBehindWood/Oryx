@@ -34,7 +34,16 @@ struct ShaderSettings
 #endif
 };
 
-void read_settings(ShaderSettings& settings, const SettingsNode& node);
+template<typename Visitor>
+void reflect(Visitor& v, ShaderSettings& s)
+{
+    v.field("root", s.root, Doc{ "Directory the /Oryx/ shader mount maps to; relative to the settings file" });
+    v.field("source_mode", s.source_mode,
+            choices<ShaderSourceMode>({ { "auto", ShaderSourceMode::Auto }, { "file", ShaderSourceMode::File }, { "embedded", ShaderSourceMode::Embedded }, { "file_then_embedded", ShaderSourceMode::FileThenEmbedded }, { "cooked", ShaderSourceMode::Cooked } }),
+            Doc{ "Where shader sources come from" });
+    v.field("slangc", s.slangc, Doc{ "slangc binary; OX_SLANGC overrides it; empty falls back to the build-time path, then PATH" });
+    v.field("error_fallback", s.error_fallback, Doc{ "Replace a pixel shader that fails its first compile with the magenta ErrorPS" });
+}
 
 // Auto resolved against the build configuration.
 [[nodiscard]] ShaderSourceMode effective_source_mode(const ShaderSettings& settings);

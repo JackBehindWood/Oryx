@@ -60,6 +60,7 @@ public:
     void draw() override;
     void status() override;
     void menu() override;
+    void toolbar() override;
 
     [[nodiscard]] DashboardFeed& feed() { return m_feed; }
     [[nodiscard]] DashboardModel& model() { return m_model; }

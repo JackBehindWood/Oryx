@@ -15,9 +15,18 @@ struct GraphicsSettings
     std::string reload_key = "F5";
 };
 
-void read_settings(GraphicsSettings& settings, const SettingsNode& node);
-
 // F1-F12 or a single letter, any case; KeyCode::Unknown for anything else (and for an empty name).
 [[nodiscard]] KeyCode key_from_name(std::string_view name);
+
+template<typename Visitor>
+void reflect(Visitor& v, GraphicsSettings& s)
+{
+    v.field("vsync", s.vsync, Doc{ "Synchronise presentation with the display" });
+    v.field("max_fps", s.max_fps, Range{ 0, INT32_MAX }, Doc{ "Frame rate cap; 0 is uncapped" });
+    v.field("idle_sleep_ms", s.idle_sleep_ms, Range{ 0, INT32_MAX }, Doc{ "Sleep after a frame that was not presented" });
+    v.field("reload_key", s.reload_key,
+            Valid{ [](std::string_view name) { return name.empty() || key_from_name(name) != KeyCode::Unknown; }, "F1-F12, a letter or empty" },
+            Doc{ "Shader reload key; empty disables reload" });
+}
 
 } // namespace oryx

@@ -18,6 +18,12 @@ struct AssetSettings
     uint32_t worker_threads = 0;
 };
 
-void read_settings(AssetSettings& settings, const SettingsNode& node);
+template<typename Visitor>
+void reflect(Visitor& v, AssetSettings& s)
+{
+    v.field("roots", s.roots, Doc{ "Directories searched in order for relative asset paths; empty means the resources root" });
+    v.field("compiled_enabled", s.compiled_enabled, Doc{ "Use compiled assets (also needs resources.compiled_enabled)" });
+    v.field("worker_threads", s.worker_threads, Range{ 0, 256 }, Doc{ "Asset worker threads; 0 runs requests on the main thread" });
+}
 
 } // namespace oryx

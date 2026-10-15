@@ -13,7 +13,7 @@ namespace oryx
 {
 
 // What one widget interaction reports. `pressed` is the frame the button went down on the item, `clicked` the frame it was released over the item that it went down on.
-// `double_clicked` is a click that follows another on the same item within the theme's double_click_seconds; `right_clicked` is the right button released over the item.
+// `double_clicked` is a click that follows another on the same item within the theme's double_click_seconds, `triple_clicked` the next one in the same run (a fourth starts over); `right_clicked` is the right button released over the item.
 struct ItemState
 {
     bool hovered = false;
@@ -21,6 +21,7 @@ struct ItemState
     bool held = false;
     bool clicked = false;
     bool double_clicked = false;
+    bool triple_clicked = false;
     bool right_clicked = false;
     // Consecutive seconds the item has been hovered, zero on the first hovered frame; drives tooltip delays.
     float hovered_seconds = 0.0f;
@@ -424,6 +425,7 @@ private:
     float m_animation_speed = 1.0f;
     ImId m_last_click_id;
     float m_last_click_time = 0.0f;
+    uint32_t m_click_run = 0;
     ImId m_drag_id;
     Vec2f m_drag_press{ 0.0f, 0.0f };
     Vec2f m_drag_last{ 0.0f, 0.0f };

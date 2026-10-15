@@ -43,6 +43,7 @@ enum class ImKey : uint8_t
     C,
     V,
     X,
+    P,
     Count
 };
 

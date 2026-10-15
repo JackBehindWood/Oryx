@@ -29,7 +29,7 @@ void reflect(Visitor& v, ConsoleState& state)
 }
 
 // The captured log with a command line: level filter, search, follow-the-tail that pauses when the wheel moves away from it, row selection by click, shift-click or drag with Cmd/Ctrl+C, Tab completion and history over the console command table.
-// It is a panel of its own and, through draw_console, the body of the app's bottom drawer; the status bar item shows the warning and error counts of the held lines and flips the drawer's flag.
+// It is a panel of its own, tabbed beside the dashboard's Trace, and, through draw_console, the body of the app's bottom drawer, which stands in while there is no Trace panel; the status bar item shows the warning and error counts of the held lines and opens whichever of the two applies.
 class ConsoleWorkbench : public Workbench
 {
 public:
@@ -67,9 +67,12 @@ private:
     void copy_selection(bool everything);
     void copy_line(uint64_t sequence);
     void complete_input();
+    void toggle_console();
+    [[nodiscard]] bool console_shown() const;
     [[nodiscard]] bool selected(uint64_t sequence) const;
 
     bool& m_drawer_open;
+    PanelHandle m_log;
     CommandHandle m_clear;
     CommandHandle m_toggle;
     ConsoleState m_state;

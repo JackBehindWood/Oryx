@@ -191,6 +191,14 @@ void add_command(std::string_view usage, std::string_view help, ConsoleFunction 
     std::sort(table().begin(), table().end(), [](const Command& a, const Command& b) { return a.name < b.name; });
 }
 
+void list(std::vector<Entry>& out)
+{
+    for (const Command& command : table())
+    {
+        out.push_back({ command.name, command.usage, command.help });
+    }
+}
+
 void add_alias(std::string_view alias, std::string_view target)
 {
     const Command* original = find(target);

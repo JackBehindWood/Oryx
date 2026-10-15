@@ -411,3 +411,25 @@ TEST_CASE("text input: a focus request focuses the field once")
     f.driver.frame(f.column_of(body));
     CHECK(std::string_view(text) == "abc");
 }
+
+TEST_CASE("text edit: select_word takes the word under the caret and word_range splits runs")
+{
+    char buffer[32] = "foo_bar  baz";
+    TextEditState state;
+    state.caret = 2;
+    state.anchor = 2;
+    TextEditInput input;
+    input.select_word = true;
+    const TextEditResult result = text_edit_apply(buffer, sizeof(buffer), state, input);
+    CHECK(result.moved);
+    CHECK(selection_text(buffer, state) == "foo_bar");
+
+    uint32_t low = 0;
+    uint32_t high = 0;
+    word_range("foo_bar  baz", 8, low, high);
+    CHECK(std::string_view("foo_bar  baz").substr(low, high - low) == "  ");
+    word_range("foo_bar  baz", 11, low, high);
+    CHECK(std::string_view("foo_bar  baz").substr(low, high - low) == "baz");
+    word_range("", 0, low, high);
+    CHECK(high == 0);
+}

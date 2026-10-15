@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Debug/ConsoleCommands.h"
+#include "Oryx/Interface/Workbench/CommandPalette.h"
 #include "Oryx/Interface/Workbench/Workbench.h"
 
 namespace oryx
@@ -63,6 +64,10 @@ public:
     void menu();
     void status();
     void toolbar();
+    // Opens the command palette (also Cmd/Ctrl+Shift+P, read in update): every workbench command and every console command, run by name when chosen.
+    void open_palette();
+    // Draws the palette while it is open and runs the command it returns; call once per frame inside the GUI frame, outside any panel.
+    void overlay();
     // A "Window" menu: one check item per workbench that opens and closes it, then the dock's panel list and layout history.
     void window_menu();
 
@@ -90,6 +95,7 @@ private:
     std::vector<UniquePtr<IWorkbench>> m_items;
     WorkbenchContext m_context;
     CommandSource m_commands;
+    CommandPalette m_palette;
 };
 
 } // namespace oryx

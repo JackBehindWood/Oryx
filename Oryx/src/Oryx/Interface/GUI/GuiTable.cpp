@@ -1,6 +1,8 @@
 #include "oxpch.h"
 #include "Oryx/Interface/GUI/GuiTable.h"
 
+#include "Oryx/Interface/GUI/GuiMenus.h"
+
 namespace oryx::gui
 {
 
@@ -37,12 +39,13 @@ public:
     TableFrame(const TableFrame&) = delete;
     TableFrame& operator=(const TableFrame&) = delete;
 
-    void column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular);
+    void column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular, std::string_view tip);
     TableResult headers();
     [[nodiscard]] uint32_t first_row() const { return m_first; }
     [[nodiscard]] uint32_t last_row() const { return m_last; }
     ItemState row(uint32_t index, bool selected);
     void cell(std::string_view text);
+    void bar_cell(std::string_view text, float fraction);
     void begin_cell();
     void end_cell();
 
@@ -50,6 +53,7 @@ private:
     struct Column
     {
         std::string_view label;
+        std::string_view tip;
         Sizing width;
         TextAlign align = TextAlign::Left;
         bool sortable = false;
@@ -105,7 +109,7 @@ TableFrame::~TableFrame()
     ctx.end_box();
 }
 
-void TableFrame::column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular)
+void TableFrame::column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular, std::string_view tip)
 {
     if (m_headers)
     {
@@ -115,7 +119,7 @@ void TableFrame::column(std::string_view label, Sizing width, bool sortable, Tex
     {
         throw Error("TableScope holds at most sixteen columns");
     }
-    m_columns[m_column_count++] = { m_context.arena().store(label), width, align, sortable, tabular };
+    m_columns[m_column_count++] = { m_context.arena().store(label), tip.empty() ? tip : m_context.arena().store(tip), width, align, sortable, tabular };
 }
 
 void TableFrame::spacer_rows(uint32_t count)
@@ -173,10 +177,14 @@ TableResult TableFrame::headers()
             ItemState state;
             IdScope column_scope(ctx, ctx.index_id(index));
             const ImId cell_id = ctx.id("cell");
-            if (column.sortable)
+            if (column.sortable || !column.tip.empty())
             {
                 state = ctx.item(cell_id);
-                if (state.clicked)
+                if (!column.tip.empty())
+                {
+                    tooltip(state, column.tip);
+                }
+                if (column.sortable && state.clicked)
                 {
                     sort.ascending = sort.column == index ? !sort.ascending : true;
                     sort.column = index;
@@ -190,7 +198,7 @@ TableResult TableFrame::headers()
             paint.text_colour = style.text;
             paint.text_align = column.align;
             paint.ellipsis = true;
-            paint.has_fill = state.hovered;
+            paint.has_fill = state.hovered && column.sortable;
             paint.fill = style.hover;
             ctx.end_box();
         }
@@ -236,8 +244,8 @@ ItemState TableFrame::row(uint32_t index, bool selected)
     box.align_y = Align::Centre;
     const uint32_t node = ctx.begin_box(id, box);
     BoxPaint& paint = ctx.layout().node(node).paint;
-    paint.has_fill = selected || state.hovered;
-    paint.fill = selected ? im::keep_fill(state, style.selected) : state.held ? style.pressed : style.hover;
+    paint.fill = im::row_fill(ctx, make_im_id("fill", id), style, state.hovered, state.held, selected);
+    paint.has_fill = paint.fill.a > math::EPSILON<float>;
     ctx.push_id(id);
     m_row_open = true;
     m_cell = 0;
@@ -257,6 +265,40 @@ void TableFrame::begin_cell()
     const Column& column = m_columns[m_cell++];
     m_context.begin_box(ImId{}, cell_box(column.width, column.align));
     m_cell_open = true;
+}
+
+void TableFrame::bar_cell(std::string_view text, float fraction)
+{
+    begin_cell();
+    GuiContext& ctx = m_context;
+    const Column& column = m_columns[m_cell - 1];
+    if (!std::isnan(fraction))
+    {
+        LayoutStyle bar;
+        bar.width = percent(math::clamp(fraction, 0.0f, 1.0f));
+        bar.height = percent(0.7f);
+        bar.floating = { true, AttachPoint::CentreLeft, AttachPoint::CentreLeft, FloatTarget::Parent, {}, { 0.0f, 0.0f } };
+        const uint32_t bar_index = ctx.begin_box(ImId{}, bar);
+        BoxPaint& bar_paint = ctx.layout().node(bar_index).paint;
+        bar_paint.has_fill = true;
+        bar_paint.fill = { m_style->accent.r, m_style->accent.g, m_style->accent.b, 0.30f };
+        bar_paint.radius = uniform_radius(2.0f);
+        ctx.end_box();
+    }
+    LayoutStyle label;
+    label.width = grow();
+    label.height = grow();
+    label.align_y = Align::Centre;
+    const uint32_t label_index = ctx.begin_box(ImId{}, label);
+    BoxPaint& paint = ctx.layout().node(label_index).paint;
+    paint.text = ctx.arena().store(text);
+    paint.text_height = m_style->text_height;
+    paint.text_colour = m_style->text;
+    paint.text_align = column.align;
+    paint.ellipsis = true;
+    paint.tabular = column.tabular;
+    ctx.end_box();
+    end_cell();
 }
 
 void TableFrame::end_cell()
@@ -292,9 +334,9 @@ void end_table()
     context().pop_scope<TableFrame>("end_table");
 }
 
-void table_column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular)
+void table_column(std::string_view label, Sizing width, bool sortable, TextAlign align, bool tabular, std::string_view tip)
 {
-    table_frame("table_column").column(label, width, sortable, align, tabular);
+    table_frame("table_column").column(label, width, sortable, align, tabular, tip);
 }
 
 TableResult table_headers()
@@ -320,6 +362,11 @@ ItemState table_row(uint32_t index, bool selected)
 void table_cell(std::string_view text)
 {
     table_frame("table_cell").cell(text);
+}
+
+void table_bar_cell(std::string_view text, float fraction)
+{
+    table_frame("table_bar_cell").bar_cell(text, fraction);
 }
 
 void table_begin_cell()

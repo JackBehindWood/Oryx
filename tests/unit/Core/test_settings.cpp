@@ -378,7 +378,7 @@ TEST_CASE("gui settings default, read the layout file and dock look-and-feel and
     CHECK(defaults.dock.toolbars);
     CHECK(defaults.dock.toolbar_placement == gui::ToolbarPlacement::Auto);
     CHECK(defaults.dock.tab_position == gui::TabPosition::Top);
-    CHECK(defaults.dock.close_buttons == gui::CloseButtons::Always);
+    CHECK(defaults.dock.close_buttons == gui::CloseButtons::OnHover);
     CHECK(defaults.dock.tear_off == gui::TearOff::Live);
     CHECK(defaults.dock.tab_cycle == gui::TabCycle::Layout);
     CHECK_FALSE(defaults.dock.compact);
@@ -540,3 +540,19 @@ TEST_CASE("console settings commands read, apply and list reflected settings")
     reset_settings();
 }
 #endif
+
+TEST_CASE("resource, asset and script settings are reflected: get, set and list round-trip")
+{
+    reset_settings();
+    CHECK(get_setting("resources.root") == "resources");
+    CHECK(get_setting("assets.worker_threads") == "0");
+    CHECK(get_setting("scripting.enabled") == "true");
+
+    set_setting("assets.roots", "a, b/c");
+    CHECK(get_setting("assets.roots") == "a,b/c");
+    CHECK(settings_of<AssetSettings>().roots == std::vector<std::filesystem::path>{ "a", "b/c" });
+    set_setting("resources.compiled_enabled", "false");
+    CHECK_FALSE(settings_of<ResourceSettings>().compiled_enabled);
+    CHECK_THROWS_AS(set_setting("assets.worker_threads", "-1"), SettingsError);
+    reset_settings();
+}

@@ -54,7 +54,7 @@ struct DockStyle
     ToolbarPlacement toolbar_placement = ToolbarPlacement::Auto;
     bool toolbars = true;
     TabPosition tab_position = TabPosition::Top;
-    CloseButtons close_buttons = CloseButtons::Always;
+    CloseButtons close_buttons = CloseButtons::OnHover;
     TearOff tear_off = TearOff::Live;
     TabCycle tab_cycle = TabCycle::Layout;
     // Scales strip and toolbar heights and tab padding.

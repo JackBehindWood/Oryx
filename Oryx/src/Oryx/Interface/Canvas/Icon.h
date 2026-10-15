@@ -18,7 +18,11 @@ enum class Icon : uint8_t
     Minus,
     Check,
     Search,
-    Pin
+    Pin,
+    Heat,
+    Target,
+    Values,
+    Terminal
 };
 
 // Strokes `icon` centred in `box`. `size` is the glyph's extent in points (zero: half the smaller side of the box).

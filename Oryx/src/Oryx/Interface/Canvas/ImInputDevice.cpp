@@ -32,6 +32,7 @@ constexpr KeyMapping k_key_mappings[] = {
     { KeyCode::C, ImKey::C },
     { KeyCode::V, ImKey::V },
     { KeyCode::X, ImKey::X },
+    { KeyCode::P, ImKey::P },
 };
 
 bool either_down(const IInput& input, KeyCode left, KeyCode right)

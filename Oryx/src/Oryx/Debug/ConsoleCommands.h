@@ -72,6 +72,16 @@ namespace console
 #endif
 }
 
+struct Entry
+{
+    std::string name;
+    std::string usage;
+    std::string help;
+};
+
+// Every registered command and alias by name, for a palette or help listing.
+void list(std::vector<Entry>& out);
+
 void add_command(std::string_view usage, std::string_view help, ConsoleFunction function);
 void add_alias(std::string_view alias, std::string_view target);
 

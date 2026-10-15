@@ -114,9 +114,13 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
             edit.click = text_offset_at(ctx, text, style.text_height, input.pointer.position[0] - rect.min[0] - pad_left + state.scroll);
         }
     }
-    else if (outcome.item.double_clicked)
+    else if (outcome.item.triple_clicked)
     {
         edit.select_all = true;
+    }
+    else if (outcome.item.double_clicked)
+    {
+        edit.select_word = true;
     }
     else if (focused && left_pressed && !outcome.item.hovered)
     {
@@ -137,7 +141,7 @@ EditOutcome edit_field(GuiContext& ctx, ImId id, const ImStyle& style, char* buf
             ctx.request_copy(selection_text(buffer, state));
         }
         outcome.result = text_edit_apply(buffer, capacity, state, edit);
-        const bool activity = outcome.result.changed || outcome.result.moved || edit.click != k_no_click || edit.select_all;
+        const bool activity = outcome.result.changed || outcome.result.moved || edit.click != k_no_click || edit.select_all || edit.select_word;
         state.quiet = activity ? 0.0f : state.quiet + ctx.delta_time();
         if (outcome.result.submitted || outcome.result.cancelled)
         {

@@ -27,6 +27,8 @@ struct TextEditInput
     // Byte offset a click landed on, or k_no_click.
     uint32_t click = 0xFFFF'FFFFu;
     bool select_all = false;
+    // Select the word under the caret (a double click).
+    bool select_word = false;
 };
 
 static_assert(std::is_trivially_copyable_v<TextEditInput>);
@@ -53,6 +55,8 @@ static_assert(std::is_trivially_copyable_v<TextEditResult> && std::is_standard_l
 // Text that does not fit is cut on a code point boundary; control characters and everything after a newline in pasted text are dropped. Pure: no allocation, nothing global.
 // A copy or cut leaves the selection to read with `selection_text` taken before the call.
 TextEditResult text_edit_apply(char* buffer, uint32_t capacity, TextEditState& state, const TextEditInput& input);
+// The bytes [low, high) of the word `at` sits in (letters, digits, '_' and non-ASCII bytes; a run of anything else is one word of its own); empty text gives 0, 0.
+void word_range(std::string_view text, uint32_t at, uint32_t& low, uint32_t& high);
 // The selected bytes (empty when the caret and anchor agree).
 [[nodiscard]] std::string_view selection_text(const char* buffer, const TextEditState& state);
 // Puts the caret and anchor at the end of the text and clamps them into the buffer; call when the text was replaced from outside.

@@ -3,6 +3,7 @@
 
 #include "Oryx/Board/Graphics/DecisionAnnotations.h"
 #include "Oryx/Board/Graphics/PresenterActionDescriber.h"
+#include "Oryx/Interface/Workbench/Workbenches.h"
 
 namespace oryx
 {
@@ -126,11 +127,15 @@ void Dashboard::draw_board_toolbar()
 {
     if (gui::PanelToolbarScope bar(k_viewport_panel); bar.visible())
     {
-        gui::caption("Overlays");
-        gui::toggle("Heat", m_flags.heat);
-        gui::toggle("Chosen", m_flags.chosen);
-        gui::toggle("Values", m_flags.value);
+        context().workbenches.toolbar();
     }
+}
+
+void Dashboard::toolbar()
+{
+    gui::icon_toggle("Heat", Icon::Heat, m_flags.heat, "Shade each move by how likely the strategy was to play it");
+    gui::icon_toggle("Chosen", Icon::Target, m_flags.chosen, "Mark the move the strategy chose");
+    gui::icon_toggle("Values", Icon::Values, m_flags.value, "Show each move's estimated value");
 }
 
 void Dashboard::draw_panel(PanelHandle panel, const PanelFrame& frame)

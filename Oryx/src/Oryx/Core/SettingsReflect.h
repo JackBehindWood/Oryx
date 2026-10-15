@@ -8,8 +8,8 @@
 //       v.field("history", s.history, Range{ 1, INT32_MAX }, Doc{ "Records the feed keeps" });
 //       v.field("annotations", s.annotations, one_of({ "heat", "chosen", "value" }));
 //   }
-// `field` takes bool, int32_t, uint32_t, float, std::string, std::filesystem::path, std::vector<std::string> and enums (with `choices<E>({ { "name", E::Value }, ... })`). Constraints are plain data:
-// Range (integers), Percent (a float 0..1 written as a whole number 0..100), Doc (a one-line description). `removed` names a key that no longer exists, so the reader can say so.
+// `field` takes bool, int32_t, uint32_t, float, std::string, std::filesystem::path, std::vector<std::string>, std::vector<std::filesystem::path> and enums (with `choices<E>({ { "name", E::Value }, ... })`). Constraints are plain data:
+// Range (integers), Percent (a float 0..1 written as a whole number 0..100), Valid (a text field's accept function and what it expects), Doc (a one-line description). `removed` names a key that no longer exists, so the reader can say so.
 // The visitor behind `v` is an ISettingsSink, so one description serves the YAML reader, the text accessor behind the console and Save, and the settings panel.
 namespace oryx
 {
@@ -72,6 +72,13 @@ template<size_t N>
     return result;
 }
 
+// A text field's own check: `accepts` says whether a value is allowed and `expects` completes "must be ..." in the error.
+struct Valid
+{
+    bool (*accepts)(std::string_view) = nullptr;
+    std::string_view expects;
+};
+
 // A field as a sink sees it. `choices` lists the allowed names of an enum (the field then arrives as an index into it) or of each entry of a string list; empty means unrestricted.
 struct FieldInfo
 {
@@ -82,6 +89,7 @@ struct FieldInfo
     bool percent = false;
     const std::string_view* choices = nullptr;
     uint32_t choice_count = 0;
+    Valid valid;
 };
 
 class ISettingsSink
@@ -96,6 +104,7 @@ public:
     virtual void field(const FieldInfo& info, std::string& value) = 0;
     virtual void field(const FieldInfo& info, std::filesystem::path& value) = 0;
     virtual void field(const FieldInfo& info, std::vector<std::string>& value) = 0;
+    virtual void field(const FieldInfo& info, std::vector<std::filesystem::path>& value) = 0;
     virtual void removed(std::string_view key, std::string_view message) { static_cast<void>(key); static_cast<void>(message); }
 };
 
@@ -200,6 +209,7 @@ private:
         info.max = 100;
     }
     static void constrain(FieldInfo& info, const Doc& doc) { info.doc = doc.text; }
+    static void constrain(FieldInfo& info, const Valid& valid) { info.valid = valid; }
     template<typename E, size_t N>
     static void constrain(FieldInfo&, const Choices<E, N>&)
     {
@@ -230,6 +240,7 @@ public:
     void field(const FieldInfo& info, std::string& value) override;
     void field(const FieldInfo& info, std::filesystem::path& value) override;
     void field(const FieldInfo& info, std::vector<std::string>& value) override;
+    void field(const FieldInfo& info, std::vector<std::filesystem::path>& value) override;
     void removed(std::string_view key, std::string_view message) override;
 
 private:
@@ -281,6 +292,7 @@ public:
     void field(const FieldInfo& info, std::string& value) override;
     void field(const FieldInfo& info, std::filesystem::path& value) override;
     void field(const FieldInfo& info, std::vector<std::string>& value) override;
+    void field(const FieldInfo& info, std::vector<std::filesystem::path>& value) override;
 
     [[nodiscard]] const std::vector<Entry>& entries() const { return m_entries; }
     [[nodiscard]] bool found() const { return m_found; }

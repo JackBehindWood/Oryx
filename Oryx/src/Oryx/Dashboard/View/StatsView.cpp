@@ -87,13 +87,13 @@ private:
             options.height = fixed(static_cast<float>(rows) * gui::theme().row_height + gui::theme().bar_height);
             gui::TableScope table("keys", options);
             table.column("Name", grow(1.0f, k_name_min_width));
-            table.column(single ? "Value" : "Now", fixed(k_number_width), false, TextAlign::Right, true);
+            table.column(single ? "Value" : "Now", fixed(k_number_width), false, TextAlign::Right, true, single ? "Latest value" : "Value at the selected decision");
             if (!single)
             {
-                table.column("Last", fixed(k_number_width), false, TextAlign::Right, true);
-                table.column("Mean", fixed(k_number_width), false, TextAlign::Right, true);
-                table.column("Max", fixed(k_number_width), false, TextAlign::Right, true);
-                table.column("Count", fixed(k_number_width), false, TextAlign::Right, true);
+                table.column("Last", fixed(k_number_width), false, TextAlign::Right, true, "Most recent value");
+                table.column("Mean", fixed(k_number_width), false, TextAlign::Right, true, "Average over the decisions kept");
+                table.column("Max", fixed(k_number_width), false, TextAlign::Right, true, "Largest value seen");
+                table.column("Count", fixed(k_number_width), false, TextAlign::Right, true, "How many decisions reported this key");
             }
             std::ignore = table.headers();
             uint32_t row = 0;

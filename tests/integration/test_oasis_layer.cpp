@@ -457,7 +457,7 @@ TEST_CASE("OasisLayer: the dashboard's annotation flags are kept in the layout f
     CHECK(again.shell->annotation_flags().value);
 }
 
-TEST_CASE("OasisLayer: the status bar shows the decision counts and its Console button opens and closes the drawer")
+TEST_CASE("OasisLayer: the status bar shows the decision counts and its Console button tabs the console beside Trace")
 {
     ShellRig rig("tictactoe", "minimax");
     rig.frames(4);
@@ -469,6 +469,28 @@ TEST_CASE("OasisLayer: the status bar shows the decision counts and its Console 
     }
     CHECK(counts);
     CHECK_FALSE(rig.shell->console_open());
+    CHECK_FALSE(rig.panel_open("console/log"));
+
+    rig.click_text("Console");
+    rig.frames(3);
+    CHECK(rig.panel_open("console/log"));
+    CHECK_FALSE(rig.shell->console_open());
+    CHECK(rig.has_text("Follow"));
+
+    rig.click_text("Console");
+    rig.frames(3);
+    CHECK_FALSE(rig.panel_open("console/log"));
+}
+
+TEST_CASE("OasisLayer: without a Trace panel the Console button opens and closes the drawer")
+{
+    ShellRig rig("tictactoe", "minimax");
+    rig.frames(4);
+    {
+        ContextScope<GuiContext> scope(const_cast<GuiContext&>(rig.shell->context()));
+        CHECK(gui::set_panel_open("dashboard/trace", false).applied);
+    }
+    rig.frames(3);
     CHECK_FALSE(rig.has_text("search"));
 
     rig.click_text("Console");

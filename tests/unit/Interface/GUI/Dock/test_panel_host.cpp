@@ -181,6 +181,8 @@ TEST_CASE("panel host: the close button closes the panel and records its home")
     HostScene scene;
     scene.frames();
     const Rect tab = scene.solved().nodes[1].tab_rects[0];
+    scene.f.driver.move_to(centre(close_rect_of(scene, tab)));
+    scene.frames(3);
     scene.click(centre(close_rect_of(scene, tab)));
     CHECK_FALSE(is_open(scene.layout, pid("a")));
     CHECK(scene.layout.home_count == 1);

@@ -51,6 +51,8 @@ void title(std::string_view text, const WidgetOptions& options = {});
 void empty_state(std::string_view heading, std::string_view hint = {});
 // A small square that draws `icon` and reacts to the pointer (a fold chevron, a pin); `name` makes its id in the current scope.
 [[nodiscard]] ItemState icon_button(std::string_view name, Icon icon, const IconOptions& options = {});
+// A toolbar toggle: a line icon beside `label`, lit while `value` is set, with `tip` as its tooltip. Returns whether a click changed `value`.
+bool icon_toggle(std::string_view label, Icon icon, bool& value, std::string_view tip = {}, const WidgetOptions& options = {});
 void caption(std::string_view text, const WidgetOptions& options = {});
 // A one-line label that cuts overlong text with "..." and shows the full text as a tooltip while it is cut. The row is the label's width at most.
 ItemState label_ellipsis(std::string_view text, const WidgetOptions& options = {});

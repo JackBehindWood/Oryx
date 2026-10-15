@@ -39,6 +39,26 @@ float spacing()
     return active().ui_theme().spacing;
 }
 
+float animate(std::string_view name, float target, float rest, const AnimSpec& spec)
+{
+    return active().animate(active().id(name), target, rest, spec);
+}
+
+Vec2f animate(std::string_view name, const Vec2f& target, const Vec2f& rest, const AnimSpec& spec)
+{
+    return active().animate(active().id(name), target, rest, spec);
+}
+
+Colour animate(std::string_view name, const Colour& target, const Colour& rest, const AnimSpec& spec)
+{
+    return active().animate(active().id(name), target, rest, spec);
+}
+
+bool animating()
+{
+    return active().animating();
+}
+
 void label(std::string_view text, const WidgetOptions& options)
 {
     im::label(active(), text, options);

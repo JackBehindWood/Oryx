@@ -420,8 +420,11 @@ ItemState ImContext::item_clipped(ImId id, const Rect& rect, const Rect& layout_
             m_active = {};
             if (state.clicked)
             {
-                state.double_clicked = m_last_click_id == id && m_time - m_last_click_time <= m_theme.double_click_seconds;
-                m_last_click_id = state.double_clicked ? ImId{} : id;
+                const bool continues = m_last_click_id == id && m_time - m_last_click_time <= m_theme.double_click_seconds;
+                m_click_run = continues ? m_click_run + 1 : 1;
+                state.double_clicked = m_click_run == 2;
+                state.triple_clicked = m_click_run == 3;
+                m_last_click_id = m_click_run >= 3 ? ImId{} : id;
                 m_last_click_time = m_time;
             }
         }

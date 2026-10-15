@@ -101,6 +101,31 @@ TEST_CASE("GUI: double and right clicks")
     CHECK(clicks == 3);
 }
 
+TEST_CASE("GUI: a third quick click is a triple click and a fourth starts over")
+{
+    GuiFixture f;
+    const ImId id = f.context.id("triple");
+    uint32_t doubles = 0;
+    uint32_t triples = 0;
+    const auto build = [&]
+    {
+        const ItemState state = f.context.item(id, { { 10.0f, 10.0f }, { 40.0f, 40.0f } });
+        doubles += state.double_clicked ? 1 : 0;
+        triples += state.triple_clicked ? 1 : 0;
+    };
+    for (uint32_t index = 0; index < 3; ++index)
+    {
+        f.driver.click({ 20.0f, 20.0f }, build);
+    }
+    CHECK(doubles == 1);
+    CHECK(triples == 1);
+    f.driver.click({ 20.0f, 20.0f }, build);
+    CHECK(doubles == 1);
+    CHECK(triples == 1);
+    f.driver.click({ 20.0f, 20.0f }, build);
+    CHECK(doubles == 2);
+}
+
 TEST_CASE("GUI: clicks further apart than the double-click time are two single clicks")
 {
     GuiFixture f;

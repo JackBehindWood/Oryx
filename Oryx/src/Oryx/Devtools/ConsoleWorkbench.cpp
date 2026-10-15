@@ -42,6 +42,8 @@ void emit(spdlog::level::level_enum level, std::string_view text)
     Log::message(level, text);
 }
 
+constexpr std::string_view k_trace_panel = "dashboard/trace";
+
 } // namespace
 
 ConsoleWorkbench::ConsoleWorkbench(bool& drawer_open)
@@ -62,7 +64,8 @@ void ConsoleWorkbench::declare_panels()
     options.min_h = 120.0f;
     options.initial_open = false;
     options.dock_side = gui::DropZone::Bottom;
-    static_cast<void>(add_panel("log", "Console", options));
+    options.dock_tabbed_with = k_trace_panel;
+    m_log = add_panel("log", "Console", options);
     m_clear = add_command({ "clear", "Clear log", {}, false });
     m_toggle = add_command({ "toggle", "Toggle console", {}, false });
 }
@@ -75,8 +78,28 @@ void ConsoleWorkbench::command(CommandHandle command, const CommandArgs&)
     }
     else if (command == m_toggle)
     {
-        m_drawer_open = !m_drawer_open;
+        toggle_console();
     }
+}
+
+void ConsoleWorkbench::toggle_console()
+{
+    const std::string_view panel = panel_name(m_log);
+    if (!gui::is_panel_open(k_trace_panel) && !gui::is_panel_open(panel))
+    {
+        m_drawer_open = !m_drawer_open;
+        return;
+    }
+    m_drawer_open = false;
+    if (gui::toggle_panel(panel).applied && gui::is_panel_open(panel))
+    {
+        std::ignore = gui::select_panel(panel);
+    }
+}
+
+bool ConsoleWorkbench::console_shown() const
+{
+    return m_drawer_open || gui::is_panel_open(panel_name(m_log));
 }
 
 void ConsoleWorkbench::draw_panel(PanelHandle, const PanelFrame&)
@@ -235,9 +258,9 @@ void ConsoleWorkbench::status()
 {
     FrameArena& arena = gui::context().arena();
     const GuiTheme& theme = gui::theme();
-    if (gui::selectable("Console", m_drawer_open, { .full_width = false }).clicked)
+    if (gui::selectable("Console", console_shown(), { .full_width = false }).clicked)
     {
-        m_drawer_open = !m_drawer_open;
+        toggle_console();
     }
     if (m_errors > 0)
     {
@@ -255,7 +278,7 @@ void ConsoleWorkbench::draw_console()
     const ImInput& input = gui::context().input();
     bool filter_changed = false;
     {
-        gui::RowScope controls("console controls", { .width = grow(), .align = Align::Centre, .gap = gui::theme().space_md });
+        gui::RowScope controls("console controls", { .width = grow(), .gap = gui::theme().space_md, .align = Align::Centre });
         {
             gui::ComboScope level("level", k_level_names[m_state.level], { .label_width = 0.0f, .width = fixed(100.0f) });
             for (int32_t index = 0; index < static_cast<int32_t>(k_console_levels); ++index)

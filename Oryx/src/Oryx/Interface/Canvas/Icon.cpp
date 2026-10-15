@@ -55,6 +55,34 @@ void draw_icon(DrawList& list, const Rect& box, Icon icon, const Colour& colour,
             stroke(-half * 0.6f, 0.0f, half * 0.6f, 0.0f);
             stroke(0.0f, 0.0f, 0.0f, half);
             break;
+        case Icon::Heat:
+            stroke(-half * 0.7f, half, -half * 0.7f, quarter);
+            stroke(0.0f, half, 0.0f, -quarter);
+            stroke(half * 0.7f, half, half * 0.7f, -half);
+            break;
+        case Icon::Values:
+            stroke(-half * 0.6f, -half * 0.5f, half * 0.6f, -half * 0.5f);
+            stroke(0.0f, -half, 0.0f, 0.0f);
+            stroke(-half * 0.6f, half * 0.55f, half * 0.6f, half * 0.55f);
+            break;
+        case Icon::Terminal:
+            stroke(-half, -quarter, -quarter * 0.2f, 0.0f);
+            stroke(-quarter * 0.2f, 0.0f, -half, quarter);
+            stroke(quarter * 0.4f, half * 0.6f, half, half * 0.6f);
+            break;
+        case Icon::Target:
+        {
+            constexpr uint32_t k_ring_segments = 14;
+            const float ring = half * 0.85f;
+            for (uint32_t i = 0; i < k_ring_segments; ++i)
+            {
+                const float a0 = 2.0f * math::PI<float> * static_cast<float>(i) / k_ring_segments;
+                const float a1 = 2.0f * math::PI<float> * static_cast<float>(i + 1) / k_ring_segments;
+                stroke(ring * std::cos(a0), ring * std::sin(a0), ring * std::cos(a1), ring * std::sin(a1));
+            }
+            stroke(-thickness * 0.4f, 0.0f, thickness * 0.4f, 0.0f);
+            break;
+        }
         case Icon::Search:
         {
             constexpr uint32_t k_segments = 12;

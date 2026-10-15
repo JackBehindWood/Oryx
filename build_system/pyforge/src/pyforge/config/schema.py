@@ -115,7 +115,7 @@ class Suite:
 class TestsTable:
     project: str
     suites: dict[str, Suite] = field(default_factory=dict)
-    shards: int = 1
+    shards: int = 0
 
 
 @dataclass(frozen=True)

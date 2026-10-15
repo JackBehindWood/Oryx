@@ -138,6 +138,10 @@ void SettingsReader::field(const FieldInfo& info, float& value)
 void SettingsReader::field(const FieldInfo& info, std::string& value)
 {
     value = m_node.string(info.key, value);
+    if (info.valid.accepts && !info.valid.accepts(value))
+    {
+        throw SettingsError(std::string(m_node.section()) + "." + std::string(info.key) + " must be " + std::string(info.valid.expects) + ", got '" + value + "'");
+    }
 }
 
 void SettingsReader::field(const FieldInfo& info, std::filesystem::path& value)
@@ -162,6 +166,14 @@ void SettingsReader::field(const FieldInfo& info, std::vector<std::string>& valu
         {
             throw SettingsError(std::string(m_node.section()) + "." + std::string(info.key) + " " + message);
         }
+    }
+}
+
+void SettingsReader::field(const FieldInfo& info, std::vector<std::filesystem::path>& value)
+{
+    if (m_node.has(info.key))
+    {
+        value = m_node.paths(info.key);
     }
 }
 
@@ -191,6 +203,15 @@ std::string format(const FieldInfo& info, float value)
 }
 std::string format(const FieldInfo&, const std::string& value) { return value; }
 std::string format(const FieldInfo&, const std::filesystem::path& value) { return value.generic_string(); }
+std::string format(const FieldInfo&, const std::vector<std::filesystem::path>& value)
+{
+    std::string text;
+    for (const std::filesystem::path& item : value)
+    {
+        text += (text.empty() ? "" : ",") + item.generic_string();
+    }
+    return text;
+}
 std::string format(const FieldInfo&, const std::vector<std::string>& value)
 {
     std::string text;
@@ -284,8 +305,12 @@ std::string parse(const FieldInfo& info, std::string_view text, float& value)
     return {};
 }
 
-std::string parse(const FieldInfo&, std::string_view text, std::string& value)
+std::string parse(const FieldInfo& info, std::string_view text, std::string& value)
 {
+    if (info.valid.accepts && !info.valid.accepts(text))
+    {
+        return "must be " + std::string(info.valid.expects) + ", got '" + std::string(text) + "'";
+    }
     value = std::string(text);
     return {};
 }
@@ -293,6 +318,19 @@ std::string parse(const FieldInfo&, std::string_view text, std::string& value)
 std::string parse(const FieldInfo&, std::string_view text, std::filesystem::path& value)
 {
     value = std::filesystem::path(std::string(text));
+    return {};
+}
+
+std::string parse(const FieldInfo& info, std::string_view text, std::vector<std::string>& value);
+
+std::string parse(const FieldInfo& info, std::string_view text, std::vector<std::filesystem::path>& value)
+{
+    std::vector<std::string> names;
+    if (std::string message = parse(info, text, names); !message.empty())
+    {
+        return message;
+    }
+    value.assign(names.begin(), names.end());
     return {};
 }
 
@@ -374,6 +412,7 @@ void SettingsText::field(const FieldInfo& info, float& value) { visit(info, valu
 void SettingsText::field(const FieldInfo& info, std::string& value) { visit(info, value, SettingsKind::Text); }
 void SettingsText::field(const FieldInfo& info, std::filesystem::path& value) { visit(info, value, SettingsKind::Text); }
 void SettingsText::field(const FieldInfo& info, std::vector<std::string>& value) { visit(info, value, SettingsKind::List); }
+void SettingsText::field(const FieldInfo& info, std::vector<std::filesystem::path>& value) { visit(info, value, SettingsKind::List); }
 
 namespace
 {

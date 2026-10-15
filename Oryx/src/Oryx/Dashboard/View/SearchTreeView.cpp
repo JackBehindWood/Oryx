@@ -243,9 +243,9 @@ private:
         options.row_height = gui::theme().row_height;
         gui::TableScope table("search", options);
         table.column("Node", grow(1.0f, 96.0f), true);
-        table.column("Visits", fixed(72.0f), true, TextAlign::Right);
-        table.column("Value", fixed(64.0f), true, TextAlign::Right);
-        table.column("Share", fixed(56.0f), false, TextAlign::Right);
+        table.column("Visits", fixed(72.0f), true, TextAlign::Right, false, "Times the search went through this node; the bar is its share of the root's visits");
+        table.column("Value", fixed(64.0f), true, TextAlign::Right, false, "Estimated outcome for the player to move: +1 win, 0 even, -1 loss");
+        table.column("Share", fixed(56.0f), false, TextAlign::Right, false, "Visits over the parent's visits");
         reveal(options.row_count);
         const gui::TableResult sort = table.headers();
         if (sort.sort_changed)
@@ -257,6 +257,8 @@ private:
         }
 
         const ActionId linked = linked_action(model);
+        const uint32_t first_root = m_index.first_root();
+        const double root_visits = first_root == k_no_tree_node ? 0.0 : static_cast<double>(m_index.node(first_root).visits);
         for (uint32_t row = table.first_row(); row < table.last_row() && row < m_rows.size(); ++row)
         {
             const uint32_t node = m_rows[row];
@@ -284,12 +286,12 @@ private:
             draw_node_cell(view, node);
             table.end_cell();
             const SearchNode& data = m_index.node(node);
-            table.cell(format_view_number(arena, static_cast<double>(data.visits)));
+            table.bar_cell(format_view_number(arena, static_cast<double>(data.visits)), root_visits > 0.0 ? static_cast<float>(static_cast<double>(data.visits) / root_visits) : 0.0f);
             table.begin_cell();
             gui::text_coloured(format_view_number(arena, data.value), value_colour(gui::theme(), data.value));
             table.end_cell();
             const double share = m_index.share_of_parent(node);
-            table.cell(std::isnan(share) ? std::string_view("-") : arena.format("%.0f%%", share * 100.0));
+            table.bar_cell(std::isnan(share) ? std::string_view("-") : arena.format("%.0f%%", share * 100.0), static_cast<float>(share));
         }
     }
 

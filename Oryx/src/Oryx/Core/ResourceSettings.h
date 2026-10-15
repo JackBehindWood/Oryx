@@ -13,7 +13,12 @@ struct ResourceSettings
     bool compiled_enabled = true;
 };
 
-void read_settings(ResourceSettings& settings, const SettingsNode& node);
+template<typename Visitor>
+void reflect(Visitor& v, ResourceSettings& s)
+{
+    v.field("root", s.root, Doc{ "Resource folder; a relative path is relative to the settings file" });
+    v.field("compiled_enabled", s.compiled_enabled, Doc{ "Use derived assets under compiled/" });
+}
 
 [[nodiscard]] std::filesystem::path compiled_directory(const ResourceSettings& settings);
 

@@ -258,7 +258,8 @@ void end_scroll()
             state.offset = math::clamp(state.offset + drag.delta[1] * max_offset / travel, 0.0f, max_offset);
         }
         const ImStyle& style = theme.scroll;
-        const float width = thumb.hovered || thumb.held ? theme.scrollbar_width : theme.scrollbar_width * 0.6f;
+        const float slim = theme.scrollbar_width * 0.6f;
+        const float width = ctx.animate(make_im_id("width", thumb_id), thumb.hovered || thumb.held ? theme.scrollbar_width : slim, slim, AnimSpec::quick());
         LayoutStyle bar;
         bar.width = fixed(width);
         bar.height = fixed(thumb_height);
@@ -266,7 +267,7 @@ void end_scroll()
         const uint32_t index = ctx.begin_box(thumb_id, bar);
         BoxPaint& paint = ctx.layout().node(index).paint;
         paint.has_fill = true;
-        paint.fill = im::interaction_fill(style, thumb, style.border);
+        paint.fill = im::interaction_fill(ctx, make_im_id("fill", thumb_id), style, thumb, style.border);
         paint.radius = uniform_radius(width * 0.5f);
         ctx.end_box();
     }
@@ -498,7 +499,7 @@ bool splitter(std::string_view name, float& first_size, const SplitterOptions& o
     bar.height = row ? grow() : fixed(options.thickness);
     const uint32_t index = ctx.begin_box(id, bar);
     ctx.layout().node(index).paint.has_fill = true;
-    ctx.layout().node(index).paint.fill = state.held ? style.accent : im::interaction_fill(style, state, style.border);
+    ctx.layout().node(index).paint.fill = ctx.animate(make_im_id("fill", id), state.held ? style.accent : im::interaction_fill(style, state, style.border), style.border, AnimSpec::quick());
     ctx.end_box();
     return first_size != before;
 }

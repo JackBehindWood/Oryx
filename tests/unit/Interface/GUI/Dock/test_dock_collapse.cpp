@@ -396,6 +396,8 @@ TEST_CASE("panel host: a rail closes its panel through the close button next to 
     scene.frames(3);
     const SolvedNode& rail = scene.solved().nodes[1];
     const PanelId shown = scene.layout.nodes[1].tabs[rail.first_visible];
+    scene.f.driver.move_to(centre(scene.close_of(rail.tab_rects[rail.first_visible])));
+    scene.frames(3);
     scene.click(centre(scene.close_of(rail.tab_rects[rail.first_visible])));
     CHECK_FALSE(is_open(scene.layout, shown));
     CHECK_NOTHROW(validate(scene.layout, scene.model().panels, ValidateFlags{ true }));

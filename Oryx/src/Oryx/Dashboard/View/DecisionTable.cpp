@@ -19,6 +19,9 @@ constexpr float k_pad = 8.0f;
 constexpr float k_marker_width = 3.0f;
 constexpr float k_marker_gap = 6.0f;
 constexpr float k_column_gap = 10.0f;
+constexpr float k_rank_width = 18.0f;
+constexpr float k_pill_pad = 4.0f;
+constexpr float k_pill_scale = 0.8f;
 constexpr float k_number_width = 52.0f;
 constexpr float k_number_gap = 4.0f;
 constexpr float k_bar_height = 10.0f;
@@ -118,17 +121,22 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
     flat_values = flat_values && seen_value && rows > 1;
 
     const float height = static_cast<float>(rows + 1) * row_height;
+    const ImId rows_id = make_im_id("decision-rows", gui::context().current_id());
     im::CanvasArea area = gui::canvas("decision-rows", grow(), fixed(height));
     Painter& painter = area.painter;
     const Rect& rect = area.rect;
     const float text_height = theme.base.text_height;
 
+    const float pill_height = text_height * k_pill_scale;
+    const float pill_width = painter.text_width("chosen", pill_height) + k_pill_pad * 2.0f;
     float label_width = k_min_label_width;
     for (size_t row = 0; row < rows; ++row)
     {
-        label_width = math::max(label_width, painter.text_width(label_view(view.scores[order[row]].label), text_height));
+        const bool chosen_row = view.scores[order[row]].action == record.chosen;
+        label_width = math::max(label_width, painter.text_width(label_view(view.scores[order[row]].label), text_height) + (chosen_row ? pill_width + k_pill_pad : 0.0f));
     }
-    const float left = rect.min[0] + k_pad + k_marker_width + k_marker_gap;
+    const float rank_x = rect.min[0] + k_pad + k_marker_width + k_marker_gap;
+    const float left = rank_x + k_rank_width;
     const float right = rect.min[0] + rect.size[0] - k_pad;
     label_width = math::min(label_width, math::max(k_min_label_width, (right - left) * k_max_label_share));
     const float columns = static_cast<float>((shown.probabilities ? 1 : 0) + (shown.values ? 1 : 0));
@@ -143,6 +151,7 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
     TextSpec header_text;
     header_text.pixel_height = text_height;
     header_text.colour = muted;
+    painter.text({ { rank_x, rect.min[1] }, { k_rank_width, row_height } }, "#", header_text);
     painter.text({ { left, rect.min[1] }, { label_width, row_height } }, "Action", header_text);
     if (shown.probabilities)
     {
@@ -189,9 +198,11 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
             painter.fill_rect(line, with_alpha(theme.base.accent, k_chosen_tint));
             painter.fill_rect({ { line.min[0] + k_pad * 0.5f, line.min[1] + 2.0f }, { k_marker_width, line.size[1] - 4.0f } }, theme.base.accent);
         }
-        if (row == hovered_row || (is_game_action(board_action) && score.action == board_action))
+        const bool lit = row == hovered_row || (is_game_action(board_action) && score.action == board_action);
+        const Colour row_tint = im::row_fill(gui::context(), make_im_index_id(row, rows_id), theme.base, lit, false, false);
+        if (row_tint.a > math::EPSILON<float>)
         {
-            painter.fill_rect(line, theme.base.hover);
+            painter.fill_rect(line, row_tint);
         }
         if (score.action == model.pinned_action)
         {
@@ -203,7 +214,24 @@ void draw_decision_table(DashboardModel& model, const RecordView& view, const De
         label_spec.pixel_height = text_height;
         label_spec.colour = chosen ? theme.base.text : with_alpha(theme.base.text, 0.85f);
         label_spec.ellipsis = true;
-        painter.text({ { left, line.min[1] }, { label_width, row_height } }, label_view(score.label), label_spec);
+        TextSpec rank_spec;
+        rank_spec.pixel_height = text_height;
+        rank_spec.colour = muted;
+        rank_spec.tabular = true;
+        painter.text({ { rank_x, line.min[1] }, { k_rank_width - k_number_gap, row_height } }, arena.format("%zu", row + 1), rank_spec);
+        float shown_label_width = label_width;
+        if (chosen && painter.text_width(label_view(score.label), text_height) + pill_width + k_pill_pad <= label_width)
+        {
+            const Rect pill = { { left + label_width - pill_width, line.min[1] + (row_height - pill_height - 4.0f) * 0.5f }, { pill_width, pill_height + 4.0f } };
+            painter.fill_rounded_rect(pill, uniform_radius(pill.size[1] * 0.5f), theme.base.accent);
+            TextSpec pill_spec;
+            pill_spec.pixel_height = pill_height;
+            pill_spec.colour = theme.base.on_accent;
+            pill_spec.align = TextAlign::Centre;
+            painter.text(pill, "chosen", pill_spec);
+            shown_label_width = math::max(0.0f, label_width - pill_width - k_pill_pad);
+        }
+        painter.text({ { left, line.min[1] }, { shown_label_width, row_height } }, label_view(score.label), label_spec);
 
         TextSpec number_spec;
         number_spec.pixel_height = text_height;

@@ -351,10 +351,11 @@ void draw_tab(GuiContext& ctx, DockView& h, int32_t node_index, const DockNode& 
     const ImId tab_id = ctx.id("tab");
     const ItemState tab = ctx.item(tab_id, hit);
     const ItemDrag drag = ctx.item_drag(tab_id);
-    const bool show_close = closable && (close_buttons == CloseButtons::Always || chosen || tab.hovered);
+    const ImId close_id = ctx.id("close");
+    const bool show_close = closable && (close_buttons == CloseButtons::Always || chosen || tab.hovered || ctx.active() == close_id);
     ItemState close;
     if (show_close)
-        close = ctx.item(ctx.id("close"), close_rect);
+        close = ctx.item(close_id, close_rect);
     if (tab.hovered)
         ctx.request_cursor(CursorShape::Hand);
     const bool picked = in_multi(*h.model, id);
@@ -1351,16 +1352,29 @@ void select_all_tabs(DockView& h, const ImKeys& keys, const Vec2f& pointer)
     m.multi_anchor = node.tabs[0];
 }
 
-void measure_tab_widths(GuiContext& ctx, PanelTable& panels, const DockMetrics& metrics)
+void measure_tab_widths(GuiContext& ctx, PanelTable& panels, const DockLayout& layout, const DockMetrics& metrics)
 {
     const ImStyle& tab = ctx.gui_theme().tab;
     const float pad = tab.padding.right * 0.5f;
     const float lean = metrics.tab_slope * 0.5f;
-    const float close = metrics.style.close_buttons == CloseButtons::Never ? 0.0f : metrics.close_size + pad;
+    const float close = metrics.close_size + pad;
+    const CloseButtons close_buttons = metrics.style.close_buttons;
     for (uint32_t i = 0; i < panels.count; ++i)
     {
         PanelDesc& desc = panels.descs[i];
-        desc.tab_width = detail::measure_text(ctx, desc.title, tab.text_height) + tab.padding.left + tab.padding.right + 2.0f * lean + close;
+        desc.tab_width = detail::measure_text(ctx, desc.title, tab.text_height) + tab.padding.left + tab.padding.right + 2.0f * lean + (close_buttons == CloseButtons::Always ? close : 0.0f);
+    }
+    if (close_buttons != CloseButtons::OnHover)
+        return;
+    // A tab that is not selected shows its close button over its right padding while hovered, so only the selected one reserves room for it.
+    for (uint32_t n = 0; n < layout.node_count; ++n)
+    {
+        const DockNode& node = layout.nodes[n];
+        if (node.kind != DockNodeKind::Tabs || node.count == 0 || node.selected >= node.count)
+            continue;
+        PanelDesc* desc = find_panel(panels, node.tabs[node.selected]);
+        if (desc != nullptr && can_close(panels, desc->id) == DockReason::None)
+            desc->tab_width += close;
     }
 }
 
@@ -1369,7 +1383,7 @@ void draw_host(GuiContext& ctx, DockView& h)
     sanitize_multi(h);
     sync_drag_scroll(h);
     const DockMetrics metrics = metrics_of(ctx.gui_theme(), h.style);
-    measure_tab_widths(ctx, h.model->panels, metrics);
+    measure_tab_widths(ctx, h.model->panels, *h.layout, metrics);
     h.solved = solve(*h.layout, h.model->panels, metrics, h.host_rect, static_cast<uint8_t>(ctx.input().surface), &h.tab_scroll);
     for (uint32_t f = 0; f < h.solved.float_count; ++f)
     {

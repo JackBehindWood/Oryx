@@ -36,6 +36,7 @@ const char* key_name(ImKey key)
     case ImKey::C: return "C";
     case ImKey::V: return "V";
     case ImKey::X: return "X";
+    case ImKey::P: return "P";
     case ImKey::Count: break;
     }
     return "";
