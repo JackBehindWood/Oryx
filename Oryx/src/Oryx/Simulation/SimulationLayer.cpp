@@ -144,6 +144,7 @@ void SimulationLayer::update(double)
         m_match = create_unique<Match>(*m_game, m_strategies);
         m_match->set_observer(m_decision_observer);
         m_restart_requested = false;
+        m_end_notified = false;
         if (m_decision_observer)
         {
             m_decision_observer->on_match_start();
@@ -161,6 +162,14 @@ void SimulationLayer::update(double)
 
     if (m_match->is_terminal())
     {
+        if (!m_end_notified)
+        {
+            m_end_notified = true;
+            if (m_decision_observer)
+            {
+                m_decision_observer->on_match_end(m_match->outcome());
+            }
+        }
         if (m_linger && !m_restart_requested)
         {
             return;

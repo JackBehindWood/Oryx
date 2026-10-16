@@ -1,8 +1,9 @@
 #pragma once
 
-#include "Oryx/Dashboard/Feed/ActionDescription.h"
+#include "Oryx/Strategy/Observability/ActionDescription.h"
 #include "Oryx/Dashboard/Feed/DashboardRecord.h"
 #include "Oryx/Dashboard/Feed/FeedOptions.h"
+#include "Oryx/Dashboard/Feed/ReplayLog.h"
 #include "Oryx/Strategy/Observability/IDecisionObserver.h"
 
 namespace oryx
@@ -23,7 +24,15 @@ public:
     void clear();
     void begin_match();
     // The next begin_match clears the ring first, so a switch to another game starts empty even if the old match decides once more before it ends.
-    void clear_at_next_match() { m_clear_at_next_match = true; }
+    void clear_at_next_match() { m_clear_at_next_match = !m_replay_sourced; }
+
+    // Replay: the ring becomes a window onto a log so that sequence == log index. Live decisions are ignored until reset() or clear().
+    // Copies the log's key table and whole-log stats; size the feed with max_keys >= log.key_count() first.
+    void adopt_keys(const ReplayLog& log);
+    // Holds log records [first, first + capacity), first clamped to fit; only records not already resident are read.
+    void load_window(ReplayLog& log, uint64_t first);
+    [[nodiscard]] bool replay_sourced() const { return m_replay_sourced; }
+    [[nodiscard]] uint64_t oldest_sequence() const { return m_base_sequence + m_total - size(); }
 
     // Null falls back to IState::action_to_string and records no spaces.
     void set_describer(SharedPtr<const IActionDescriber> describer) { m_describer = std::move(describer); }
@@ -67,6 +76,7 @@ private:
     FeedDrops m_drops;
     uint64_t m_total = 0;
     bool m_clear_at_next_match = false;
+    bool m_replay_sourced = false;
     uint64_t m_base_sequence = 0;
     uint32_t m_match_index = 0;
     uint32_t m_decision_index = 0;

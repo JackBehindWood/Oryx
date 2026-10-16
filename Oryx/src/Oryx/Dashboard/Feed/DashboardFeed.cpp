@@ -48,6 +48,7 @@ void DashboardFeed::clear()
     // Sequences keep counting so a selection made before a clear can never alias a later record.
     m_base_sequence += m_total;
     m_total = 0;
+    m_replay_sourced = false;
     m_match_index = 0;
     m_decision_index = 0;
     m_drops = FeedDrops{};
@@ -57,6 +58,10 @@ void DashboardFeed::clear()
 
 void DashboardFeed::begin_match()
 {
+    if (m_replay_sourced)
+    {
+        return;
+    }
     if (m_clear_at_next_match)
     {
         m_clear_at_next_match = false;
@@ -213,8 +218,94 @@ void DashboardFeed::store_labels(size_t slot, const IState& state, const Decisio
 
 void DashboardFeed::on_decision(const IState& state, const Decision& decision)
 {
+    if (m_replay_sourced)
+    {
+        return;
+    }
     size_t slot = store_numbers(decision);
     store_labels(slot, state, decision);
+}
+
+void DashboardFeed::adopt_keys(const ReplayLog& log)
+{
+    size_t count = math::min(log.key_count(), static_cast<size_t>(m_options.max_keys));
+    m_key_names.clear();
+    std::fill(m_key_stats.begin(), m_key_stats.end(), KeyStats{});
+    for (size_t i = 0; i < count; ++i)
+    {
+        m_key_names.emplace_back(log.key_name(static_cast<uint16_t>(i)));
+        m_key_stats[i] = log.key_stats(static_cast<uint16_t>(i));
+    }
+}
+
+void DashboardFeed::load_window(ReplayLog& log, uint64_t first)
+{
+    uint64_t capacity = m_records.size();
+    uint64_t total = log.record_count();
+    uint64_t count = math::min(total, capacity);
+    first = total > capacity ? math::min(first, total - capacity) : 0;
+
+    uint64_t keep_begin = 0;
+    uint64_t keep_end = 0;
+    if (m_replay_sourced)
+    {
+        keep_begin = m_total - size();
+        keep_end = m_total;
+    }
+    else
+    {
+        m_base_sequence = 0;
+        m_total = 0;
+    }
+
+    size_t score_limit = static_cast<size_t>(m_options.max_scores);
+    size_t metric_limit = static_cast<size_t>(m_options.max_metrics);
+    size_t tree_limit = static_cast<size_t>(m_options.max_tree_nodes);
+    for (uint64_t sequence = first; sequence < first + count; ++sequence)
+    {
+        if (sequence >= keep_begin && sequence < keep_end)
+        {
+            continue;
+        }
+        size_t slot = static_cast<size_t>(sequence % capacity);
+        ParsedRecord parsed;
+        parsed.scores = m_scores.data() + slot * score_limit;
+        parsed.score_capacity = static_cast<uint32_t>(score_limit);
+        parsed.metrics = m_metrics.data() + slot * metric_limit;
+        parsed.metric_capacity = static_cast<uint32_t>(metric_limit);
+        parsed.tree = m_tree.data() + slot * tree_limit;
+        parsed.tree_capacity = static_cast<uint32_t>(tree_limit);
+        if (!log.read(sequence, parsed))
+        {
+            parsed.record = DashboardRecord{};
+        }
+        DashboardRecord& record = parsed.record;
+        uint32_t kept = 0;
+        for (uint32_t i = 0; i < record.metric_count; ++i)
+        {
+            if (parsed.metrics[i].key < m_key_names.size())
+            {
+                parsed.metrics[kept++] = parsed.metrics[i];
+            }
+        }
+        record.dropped_metrics += record.metric_count - kept;
+        record.metric_count = kept;
+        record.sequence = sequence;
+        m_records[slot] = record;
+    }
+
+    m_replay_sourced = true;
+    m_base_sequence = 0;
+    m_total = first + count;
+    m_clear_at_next_match = false;
+    m_drops = FeedDrops{};
+    for (size_t i = 0; i < size(); ++i)
+    {
+        const DashboardRecord& record = *view(i).record;
+        m_drops.scores += record.dropped_scores;
+        m_drops.metrics += record.dropped_metrics;
+        m_drops.tree_nodes += record.dropped_tree_nodes;
+    }
 }
 
 RecordView DashboardFeed::view_of_slot(size_t slot) const

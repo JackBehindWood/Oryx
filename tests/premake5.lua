@@ -30,6 +30,7 @@ project "Tests"
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/Options.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/OasisLayer.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/OasisMenus.cpp",
+        "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/RecordingObserver.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/SimulationRequest.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Core/SyntheticTreeObserver.cpp",
         "%{_MAIN_SCRIPT_DIR}/Oasis/src/Oasis/Strategy/TicTacToeHeuristicStrategy.cpp",

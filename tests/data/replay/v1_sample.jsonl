@@ -1,0 +1,17 @@
+{"kind":"header","schema_version":1,"game":"tictactoe","params":{},"players":["first-legal","first-legal"],"seed":1,"build":"golden"}
+{"kind":"decision","match":0,"ply":0,"player":0,"chosen":0,"chosen_label":"a3","chosen_spaces":[0],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":0,"ply":1,"player":1,"chosen":1,"chosen_label":"b3","chosen_spaces":[1],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":0,"ply":2,"player":0,"chosen":2,"chosen_label":"c3","chosen_spaces":[2],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":0,"ply":3,"player":1,"chosen":3,"chosen_label":"a2","chosen_spaces":[3],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":0,"ply":4,"player":0,"chosen":4,"chosen_label":"b2","chosen_spaces":[4],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":0,"ply":5,"player":1,"chosen":5,"chosen_label":"c2","chosen_spaces":[5],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":0,"ply":6,"player":0,"chosen":6,"chosen_label":"a1","chosen_spaces":[6],"scores":[],"extra":{},"tree":[]}
+{"kind":"match_end","match":0,"rewards":[1,-1]}
+{"kind":"decision","match":1,"ply":0,"player":0,"chosen":0,"chosen_label":"a3","chosen_spaces":[0],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":1,"ply":1,"player":1,"chosen":1,"chosen_label":"b3","chosen_spaces":[1],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":1,"ply":2,"player":0,"chosen":2,"chosen_label":"c3","chosen_spaces":[2],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":1,"ply":3,"player":1,"chosen":3,"chosen_label":"a2","chosen_spaces":[3],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":1,"ply":4,"player":0,"chosen":4,"chosen_label":"b2","chosen_spaces":[4],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":1,"ply":5,"player":1,"chosen":5,"chosen_label":"c2","chosen_spaces":[5],"scores":[],"extra":{},"tree":[]}
+{"kind":"decision","match":1,"ply":6,"player":0,"chosen":6,"chosen_label":"a1","chosen_spaces":[6],"scores":[],"extra":{},"tree":[]}
+{"kind":"match_end","match":1,"rewards":[1,-1]}

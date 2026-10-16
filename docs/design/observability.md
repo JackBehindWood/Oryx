@@ -75,7 +75,9 @@ Rules:
 | ---- | ------- |
 | `TraceRecorder` | In-memory, one entry per ply |
 | `DiagnosticsAggregator` | Folds decisions into `Metrics`: sums plus a per-namespace decision count so means are derivable; keys ending `_max` keep the maximum (`max_metric`), and `merge()` applies the same rule so a peak survives aggregating trials and repeats; keys must be `namespace/name` and may not use the built-in `wins`/`reward` namespaces |
-| JSON-lines writer | One object per ply behind a `schema_version` header line, deterministic key order |
+| `JsonLinesWriter` | The trace log (`Strategy/Observability/TraceSchema.h`): a `kind:"header"` line (schema version, game, params, players, seed, build) then one `kind:"decision"` line per decision and a `kind:"match_end"` line (`match`, `rewards`) when the observer's `on_match_end(outcome)` fires (readers skip it until replay uses it) with `match`, per-match `ply`, `player`, `chosen`, labels and board `spaces` (through an optional `IActionDescriber`), scores, `extra`, `tree`, and optional `t_us`. Deterministic key order, doubles at `max_digits10`, non-finite as `null`. Additive fields and kinds never bump `schema_version`; readers skip what they do not know and reject a newer version. Oasis `--record FILE` writes one (a game switch starts `FILE-2`) |
+| `ReplayLog` | The trace reader (`Dashboard/Feed/ReplayLog.h`, headless): one streaming pass indexes decision lines (8 B each) and builds the whole-log key table and stats; `read(index, ParsedRecord&)` re-reads one line into caller-owned pools without allocating. Only a missing or invalid header, or a newer `schema_version`, throws (at `open`); bad lines (malformed, over 1 MiB, nested past 32 levels) are skipped and counted, CRLF and a BOM are tolerated, an unterminated last line waits for `refresh()`, and `dashboard.replay_max_records` caps the index. `DashboardFeed::load_window` shows a window of it so `sequence == log index`; `ReplayPlayer` drives the playhead |
+| `ObserverTee` | Fan-out to several observers (feed + recorder) |
 | `DashboardFeed` | Bounded, allocation-free ring for the live dashboard (`Dashboard/Feed`): fixed pools, labels and board spaces captured at `on_decision` through an optional `IActionDescriber`, per-key aggregates, lenient keys; see [Dashboard](dashboard.md) |
 
 Experiments opt in with `RunOptions::collect_diagnostics`; it is not part of `ExperimentSpec`, so the spec hash and `result.yaml` schema are unchanged. A `rerun` must pass the same option.
@@ -86,7 +88,7 @@ Experiments opt in with `RunOptions::collect_diagnostics`; it is not part of `Ex
 
 ## Not built
 
-Dashboard transport (Phase 11), fan-out observers, Python-defined observers, populated search trees (MCTS). The seams are `Match::set_observer`, `Match::build_context(..., observer)` and `SearchNode`.
+Dashboard transport (Phase 11), Python-defined observers, populated search trees (MCTS). The seams are `Match::set_observer`, `Match::build_context(..., observer)` and `SearchNode`.
 
 ## The in-app console (Step 9)
 

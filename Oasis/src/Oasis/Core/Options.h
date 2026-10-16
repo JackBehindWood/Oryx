@@ -13,6 +13,7 @@ struct Options
     std::string opponent;
     std::string simulate;
     std::string rhi;
+    std::string record;
 };
 
 enum class LaunchMode

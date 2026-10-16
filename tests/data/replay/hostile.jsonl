@@ -1,0 +1,10 @@
+﻿{"kind":"header","schema_version":1,"game":"tictactoe","params":{"size":3},"players":["a","b"],"seed":1,"build":"hostile"}
+{"kind":"decision","match":0,"ply":0,"player":0,"chosen":1,"chosen_label":"b1","scores":[{"action":1,"label":"b1","value":0.5}],"extra":{"n":1},"tree":[]}
+}{
+{"kind":"decision","match":0,"ply":1,"player":0,"chosen":4294967296}
+{"kind":"decision","match":0,"ply":-1,"player":0,"chosen":1}
+{"kind":"decision","match":0,"ply":2,"chosen":1,"scores":[{"action":1,"value":1e999}]}
+{"kind":"future_thing","payload":[1,2,3]}
+{"kind":"decision","match":1,"ply":0,"player":0,"chosen":1,"unknown":{"a":{"b":{"c":[[[[1]]]]}}},"scores":[{"action":1,"label":"é\u00e9","value":null}],"extra":{"a":1,"a":2},"tree":[{"parent":99,"action":1,"visits":1,"value":0},{"parent":-7,"action":1,"visits":1,"value":0}]}
+
+{"kind":"decision","match":1,"ply":1,"player":1,"chosen":2,"scores":[],"extra":{},"tree":[]}

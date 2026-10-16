@@ -155,11 +155,111 @@ TEST_CASE("JsonLinesWriter writes a schema header and one line per decision")
         lines.push_back(line);
     }
     REQUIRE(lines.size() == 2);
-    CHECK(lines[0] == "{\"schema_version\":1}");
-    CHECK(lines[1].find("\"ply\":0") != std::string::npos);
+    CHECK(lines[0].find("\"kind\":\"header\",\"schema_version\":1") != std::string::npos);
+    CHECK(lines[1].find("\"kind\":\"decision\",\"match\":0,\"ply\":0") != std::string::npos);
     CHECK(lines[1].find("\"probability\":0.5") != std::string::npos);
     CHECK(lines[1].find("\"value\":1.5") != std::string::npos);
     CHECK(lines[1].find("\"extra\":{\"t/n\":2}") != std::string::npos);
+}
+
+namespace
+{
+
+class FixedSpaces final : public IActionDescriber
+{
+public:
+    bool describe(const IState&, ActionId action, ActionDescription& out) const override
+    {
+        set_label(out.label, "cell" + std::to_string(action));
+        out.spaces[0] = static_cast<uint32_t>(action);
+        out.space_count = 1;
+        return true;
+    }
+};
+
+std::vector<std::string> split_lines(const std::string& text)
+{
+    std::vector<std::string> lines;
+    std::istringstream in(text);
+    for (std::string line; std::getline(in, line);)
+    {
+        lines.push_back(line);
+    }
+    return lines;
+}
+
+} // namespace
+
+TEST_CASE("JsonLinesWriter header names the game, params, players and seed")
+{
+    std::ostringstream out;
+    TraceOptions options;
+    options.header.game = "tictactoe";
+    options.header.params = { { "size", int64_t(3) }, { "misere", false } };
+    options.header.players = { "me", "random" };
+    options.header.seed = 42;
+    JsonLinesWriter writer(out, options);
+    CHECK(out.str() == "{\"kind\":\"header\",\"schema_version\":1,\"game\":\"tictactoe\",\"params\":{\"misere\":false,\"size\":3},\"players\":[\"me\",\"random\"],\"seed\":42,\"build\":\"\"}\n");
+}
+
+TEST_CASE("JsonLinesWriter numbers plies per match and writes spaces from the describer")
+{
+    oasis::TicTacToeState state;
+    std::ostringstream out;
+    TraceOptions options;
+    options.describer = create_shared<FixedSpaces>();
+    JsonLinesWriter writer(out, options);
+    Decision decision;
+    decision.chosen = 4;
+    set_value(decision, 4, 1.0);
+    writer.on_match_start();
+    writer.on_decision(state, decision);
+    writer.on_decision(state, decision);
+    writer.on_match_start();
+    writer.on_decision(state, decision);
+
+    std::vector<std::string> lines = split_lines(out.str());
+    REQUIRE(lines.size() == 4);
+    CHECK(lines[1].find("\"match\":0,\"ply\":0") != std::string::npos);
+    CHECK(lines[2].find("\"match\":0,\"ply\":1") != std::string::npos);
+    CHECK(lines[3].find("\"match\":1,\"ply\":0") != std::string::npos);
+    CHECK(lines[1].find("\"chosen_label\":\"cell4\",\"chosen_spaces\":[4]") != std::string::npos);
+    CHECK(lines[1].find("\"label\":\"cell4\",\"spaces\":[4],\"value\":1") != std::string::npos);
+    CHECK(lines[1].find("t_us") == std::string::npos);
+}
+
+TEST_CASE("JsonLinesWriter adds t_us only when asked")
+{
+    oasis::TicTacToeState state;
+    std::ostringstream out;
+    TraceOptions options;
+    options.record_time = true;
+    JsonLinesWriter writer(out, options);
+    Decision decision;
+    decision.chosen = 4;
+    writer.on_decision(state, decision);
+    CHECK(split_lines(out.str())[1].find("\"t_us\":") != std::string::npos);
+}
+
+TEST_CASE("ObserverTee forwards decisions and match starts to every target in order")
+{
+    struct Counter final : IDecisionObserver
+    {
+        int32_t decisions = 0;
+        int32_t starts = 0;
+        void on_decision(const IState&, const Decision&) override { ++decisions; }
+        void on_match_start() override { ++starts; }
+    };
+    oasis::TicTacToeState state;
+    Counter first;
+    Counter second;
+    ObserverTee tee;
+    tee.add(first);
+    tee.add(second);
+    tee.on_match_start();
+    tee.on_decision(state, Decision{});
+    CHECK(first.decisions == 1);
+    CHECK(second.starts == 1);
 }
 
 TEST_CASE("run_trial adds strategy diagnostics only when collect_diagnostics is set")
@@ -372,4 +472,50 @@ TEST_CASE("MinimaxStrategy publishes its top plies as a tree and a policy over t
         total += score.probability;
     }
     CHECK(total == doctest::Approx(1.0));
+}
+
+namespace
+{
+
+struct EndCounter : IDecisionObserver
+{
+    void on_decision(const IState&, const Decision&) override { ++decisions; }
+    void on_match_end(const Outcome& outcome) override
+    {
+        ++ends;
+        players = outcome.rewards.player_count();
+    }
+    int32_t decisions = 0;
+    int32_t ends = 0;
+    size_t players = 0;
+};
+
+} // namespace
+
+TEST_CASE("Match::play notifies on_match_end once, through an ObserverTee, after the last decision")
+{
+    oasis::TicTacToeGame game;
+    FirstLegalStrategy first;
+    FirstLegalStrategy second;
+    SmallVector<IStrategy*, 2> strategies;
+    strategies.push_back(&first);
+    strategies.push_back(&second);
+    EndCounter counter;
+    std::ostringstream out;
+    JsonLinesWriter writer(out);
+    ObserverTee tee;
+    tee.add(counter);
+    tee.add(writer);
+    Match match(game, std::move(strategies));
+    match.set_observer(&tee);
+    match.play();
+
+    CHECK(counter.ends == 1);
+    CHECK(counter.players == 2);
+    CHECK(counter.decisions > 0);
+    std::string text = out.str();
+    size_t end = text.rfind("{\"kind\":\"match_end\",\"match\":0,\"rewards\":[");
+    REQUIRE(end != std::string::npos);
+    CHECK(text.find('\n', end) == text.size() - 1);
+    CHECK(text.rfind("\"kind\":\"decision\"") < end);
 }

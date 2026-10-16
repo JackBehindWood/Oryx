@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Oryx/Board/IBoardPresenter.h"
-#include "Oryx/Dashboard/Feed/ActionDescription.h"
+#include "Oryx/Strategy/Observability/ActionDescription.h"
 
 namespace oryx
 {

@@ -106,7 +106,12 @@ Outcome Match::play()
     {
         apply(decide());
     }
-    return outcome();
+    Outcome result = outcome();
+    if (m_observer != nullptr)
+    {
+        m_observer->on_match_end(result);
+    }
+    return result;
 }
 
 } // namespace oryx

@@ -44,6 +44,7 @@ private:
     // A lingering simulation keeps a finished match until a restart is requested and runs until the application closes.
     bool m_linger = false;
     bool m_restart_requested = false;
+    bool m_end_notified = false;
     bool m_benchmark;
     Timer m_timer;
     MemoryStats m_memory_before;

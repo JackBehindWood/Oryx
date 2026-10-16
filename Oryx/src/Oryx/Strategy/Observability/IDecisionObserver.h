@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Oryx/Game/IState.h"
+#include "Oryx/Game/Outcome.h"
 #include "Oryx/Strategy/Observability/Decision.h"
 
 namespace oryx
@@ -15,6 +16,8 @@ public:
     virtual void on_decision(const IState& state, const Decision& decision) = 0;
     // A new match is about to be decided; decisions that follow belong to it.
     virtual void on_match_start() {}
+    // The match reached a terminal state; no further decisions belong to it.
+    virtual void on_match_end(const Outcome& outcome) { (void)outcome; }
 };
 
 } // namespace oryx

@@ -1,6 +1,7 @@
 #include "OasisLayer.h"
 
 #include "OasisMenus.h"
+#include "RecordingObserver.h"
 #include "SimulationRequest.h"
 #include "SyntheticTreeObserver.h"
 
@@ -58,7 +59,8 @@ struct OasisLayer::Chrome
         static_cast<void>(oryx::gui::register_panel(k_showcase_panel, showcase));
         console = &workbenches.add<oryx::ConsoleWorkbench>(console_open);
         static_cast<void>(workbenches.add<oryx::SettingsWorkbench>());
-        observer = oryx::create_unique<SyntheticTreeObserver>(dashboard->feed());
+        tee.add(dashboard->feed());
+        observer = oryx::create_unique<SyntheticTreeObserver>(tee);
     }
 
     oryx::InputRouter& router;
@@ -66,6 +68,8 @@ struct OasisLayer::Chrome
     oryx::Workbenches workbenches;
     oryx::Dashboard* dashboard = nullptr;
     oryx::ConsoleWorkbench* console = nullptr;
+    oryx::ObserverTee tee;
+    oryx::UniquePtr<RecordingObserver> recorder;
     oryx::UniquePtr<SyntheticTreeObserver> observer;
     SwitchState switching;
     const oryx::BoardLayer* board = nullptr;
@@ -192,6 +196,11 @@ bool OasisLayer::start_graphics([[maybe_unused]] const LaunchPlan& plan)
 void OasisLayer::use_graphics(oryx::InputRouter& router)
 {
     m_chrome = oryx::create_unique<Chrome>(router);
+    if (!m_options.record.empty())
+    {
+        m_chrome->recorder = oryx::create_unique<RecordingObserver>(m_options.record);
+        m_chrome->tee.add(*m_chrome->recorder);
+    }
 }
 
 void OasisLayer::bind(const oryx::BoardLayer& layer)
@@ -205,6 +214,11 @@ void OasisLayer::board_created(oryx::IGraphicsBoard& board, const std::string& g
     if (m_chrome != nullptr)
     {
         m_chrome->dashboard->board_created(board, game);
+        if (m_chrome->recorder != nullptr)
+        {
+            m_chrome->recorder->begin_game(game, oryx::make_presenter_describer(game));
+            m_chrome->recorder->set_opponent(m_chrome->board != nullptr ? m_chrome->board->opponent_name() : m_options.opponent);
+        }
     }
 }
 

@@ -1,10 +1,36 @@
 #pragma once
 
-#include "Oryx/Dashboard/Feed/DashboardRecord.h"
+#include "Oryx/Game/ActionId.h"
 #include "Oryx/Game/IState.h"
 
 namespace oryx
 {
+
+constexpr size_t k_label_capacity = 24;
+constexpr size_t k_record_spaces = 8;
+
+struct FixedLabel
+{
+    char text[k_label_capacity] = {};
+    uint8_t length = 0;
+};
+
+inline void set_label(FixedLabel& label, std::string_view text)
+{
+    size_t length = text.size() < k_label_capacity ? text.size() : k_label_capacity;
+    // Never cut inside a multi-byte UTF-8 sequence.
+    while (length < text.size() && length > 0 && (static_cast<uint8_t>(text[length]) & 0xC0) == 0x80)
+    {
+        --length;
+    }
+    std::memcpy(label.text, text.data(), length);
+    label.length = static_cast<uint8_t>(length);
+}
+
+[[nodiscard]] inline std::string_view label_view(const FixedLabel& label)
+{
+    return std::string_view(label.text, label.length);
+}
 
 // What a person calls an action and the board spaces it touches, in the order they are picked; spaces are plain indices so Dashboard names no board type.
 struct ActionDescription
